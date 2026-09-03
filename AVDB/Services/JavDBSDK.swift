@@ -241,7 +241,8 @@ public final class JavDBSDK {
     /// 演员详情（GET /api/v1/actors/{id}）
     public func actorDetail(_ id: String) async throws -> Actor {
         struct ActorDetailData: Decodable { let actor: Actor? }
-        let resp: JavDBResponse<ActorDetailData> = try await client.get("/api/v1/actors/\(id)")
+        let resp: JavDBResponse<ActorDetailData> = try await client.get(
+            "/api/v1/actors/\(id)", query: ["from_rankings": "false"])
         guard let actor = resp.data?.actor else {
             throw JavDBError.apiError(action: nil, message: "获取演员失败")
         }

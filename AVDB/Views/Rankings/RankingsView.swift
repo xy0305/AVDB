@@ -30,6 +30,7 @@ struct RankingsView: View {
     @State private var period: RankPeriod = .daily
     @State private var playbackFilter: String = "high_score"
     @State private var playbackPeriod: RankPeriod = .daily
+    @State private var rankingKind: String = "movies"
     @StateObject private var vm = RankingsViewModel()
     @State private var showSearch = false
     @State private var showTopFilter = false
@@ -67,10 +68,18 @@ struct RankingsView: View {
                     )
                 }
             } else if tab != .top250 {
-                CapsuleChipBar(
-                    tabs: RankPeriod.allCases.map { ($0, $0.title) },
-                    selection: $period
-                )
+                VStack(spacing: 0) {
+                    CapsuleChipBar(
+                        tabs: RankPeriod.allCases.map { ($0, $0.title) },
+                        selection: $period
+                    )
+                    if tab == .censored {
+                        CapsuleChipBar(
+                            tabs: [("movies", "作品"), ("actors", "演員月榜")],
+                            selection: $rankingKind
+                        )
+                    }
+                }
             }
 
             content
@@ -98,27 +107,29 @@ struct RankingsView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .task { await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
-        .onChange(of: tab) { _, new in
-            Task { await vm.load(tab: new, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
-        }
-        .onChange(of: period) { _, new in
-            Task { await vm.load(tab: tab, period: new, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
-        }
-        .onChange(of: playbackFilter) { _, _ in
-            Task { await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
-        }
-        .onChange(of: playbackPeriod) { _, _ in
-            Task { await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
-        }
-        .refreshable {
-            await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod, force: true)
-        }
+        .task { await reload() }
+        .onChange(of: tab) { _, _ in Task { await reload() } }
+        .onChange(of: period) { _, _ in Task { await reload() } }
+        .onChange(of: playbackFilter) { _, _ in Task { await reload() } }
+        .onChange(of: playbackPeriod) { _, _ in Task { await reload() } }
+        .onChange(of: rankingKind) { _, _ in Task { await reload() } }
+        .refreshable { await reload(force: true) }
+    }
+
+    private func reload(force: Bool = false) async {
+        await vm.load(
+            tab: tab,
+            period: period,
+            playbackFilter: playbackFilter,
+            playbackPeriod: playbackPeriod,
+            rankingKind: rankingKind,
+            force: force
+        )
     }
 
     @ViewBuilder
     private var content: some View {
-        if vm.isLoading && vm.movies.isEmpty {
+        if vm.isLoading && vm.movies.isEmpty && vm.actors.isEmpty {
             ContentUnavailableView {
                 ProgressView()
             } description: {
@@ -126,7 +137,17 @@ struct RankingsView: View {
             }
             .frame(maxHeight: .infinity)
         } else if tab == .top250 {
-            top250List
+            if !APIClient.shared.hasToken {
+                ContentUnavailableView {
+                    Label("需要登录", systemImage: "person.crop.circle.badge.exclamationmark")
+                } description: {
+                    Text("TOP250 需要 JAVDB 账号登录后才能显示")
+                }
+            } else {
+                top250List
+            }
+        } else if vm.showingActors {
+            actorRankingGrid
         } else {
             ScrollView {
                 MoviePosterGrid(
@@ -137,6 +158,51 @@ struct RankingsView: View {
                 .padding(.top, 8)
                 if vm.isLoading { ProgressView().padding() }
             }
+        }
+    }
+
+    private var actorRankingGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 14),
+                GridItem(.flexible(), spacing: 14),
+                GridItem(.flexible(), spacing: 14),
+            ], spacing: 16) {
+                ForEach(Array(vm.actors.enumerated()), id: \.element.id) { idx, actor in
+                    NavigationLink {
+                        ActorDetailView(actorID: actor.id)
+                    } label: {
+                        VStack(spacing: 8) {
+                            ZStack(alignment: .topLeading) {
+                                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                                    .aspectRatio(1, contentMode: .fill)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                Text("\(idx + 1)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(idx < 3 ? Color.orange : Color.black.opacity(0.6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .padding(6)
+                            }
+                            Text(actor.displayName)
+                                .font(.system(size: 13))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .onAppear {
+                        if actor.id == vm.actors.last?.id {
+                            Task { await vm.loadMore() }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            if vm.isLoading { ProgressView().padding() }
         }
     }
 
@@ -229,6 +295,7 @@ struct RankingsView: View {
 @MainActor
 final class RankingsViewModel: ObservableObject {
     @Published var movies: [Movie] = []
+    @Published var actors: [Actor] = []
     @Published var isLoading = false
     @Published var catalog: String = "all"
     @Published var year: String = ""
@@ -241,16 +308,19 @@ final class RankingsViewModel: ObservableObject {
     private var currentPeriod: RankPeriod = .daily
     private var currentPlayback = "high_score"
     private var currentPlaybackPeriod: RankPeriod = .daily
+    private var currentKind = "movies"
     private var pool: [Movie] = []
     private let sdk = JavDBSDK.shared
 
     var displayed: [Movie] { movies }
+    var showingActors: Bool { currentTab == .censored && currentKind == "actors" }
 
     func load(
         tab: RankingTab,
         period: RankPeriod,
         playbackFilter: String,
         playbackPeriod: RankPeriod = .daily,
+        rankingKind: String = "movies",
         force: Bool = false
     ) async {
         if !force,
@@ -258,7 +328,8 @@ final class RankingsViewModel: ObservableObject {
            period == currentPeriod,
            playbackFilter == currentPlayback,
            playbackPeriod == currentPlaybackPeriod,
-           !movies.isEmpty,
+           rankingKind == currentKind,
+           (!movies.isEmpty || !actors.isEmpty),
            tab != .top250 {
             return
         }
@@ -266,9 +337,11 @@ final class RankingsViewModel: ObservableObject {
         currentPeriod = period
         currentPlayback = playbackFilter
         currentPlaybackPeriod = playbackPeriod
+        currentKind = rankingKind
         page = 1
         hasMore = true
         movies = []
+        actors = []
         pool = []
         await fetch()
     }
@@ -294,6 +367,18 @@ final class RankingsViewModel: ObservableObject {
         }
         isLoading = true
         defer { isLoading = false }
+        if showingActors {
+            let list = (try? await sdk.actorRankings(type: "0", period: "monthly", page: page)) ?? []
+            if list.isEmpty {
+                hasMore = false
+            } else if page == 1 {
+                actors = list
+            } else {
+                let ids = Set(actors.map(\.id))
+                actors.append(contentsOf: list.filter { !ids.contains($0.id) })
+            }
+            return
+        }
         let list: [Movie]
         switch currentTab {
         case .top250:

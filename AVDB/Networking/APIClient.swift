@@ -55,6 +55,8 @@ public final class APIClient: @unchecked Sendable {
     /// 当前登录用户
     @MainActor public var currentUser: User?
 
+    private static let tokenKey = "avdb.javdb.token"
+
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
@@ -62,14 +64,20 @@ public final class APIClient: @unchecked Sendable {
         config.httpShouldSetCookies = true
         config.httpCookieAcceptPolicy = .always
         session = URLSession(configuration: config)
+        token = UserDefaults.standard.string(forKey: Self.tokenKey)
     }
 
     // MARK: - Token 管理
 
     public func setToken(_ token: String?) {
         tokenLock.lock()
-        defer { tokenLock.unlock() }
         self.token = token
+        tokenLock.unlock()
+        if let token, !token.isEmpty {
+            UserDefaults.standard.set(token, forKey: Self.tokenKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.tokenKey)
+        }
     }
 
     public var hasToken: Bool {

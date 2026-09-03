@@ -253,7 +253,7 @@ struct ActorDetailView: View {
                             .frame(width: 100, height: 100)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(actor.name ?? "演員")
+                            Text(actor.displayName)
                                 .font(.title3.bold())
                             if let other = actor.otherName, !other.isEmpty {
                                 Text(other).font(.caption).foregroundColor(.secondary)

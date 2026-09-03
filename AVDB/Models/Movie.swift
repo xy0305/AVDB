@@ -237,6 +237,12 @@ public struct Actor: Decodable, Identifiable, Hashable {
     public let gender: Int?
     public let type: Int?
     public let videosCount: Int?
+    public let nameZht: String?
+
+    public var displayName: String {
+        if let z = nameZht, !z.isEmpty { return z }
+        return name ?? id
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, name, age, height, cup, hobby, gender, type, birthday
@@ -246,6 +252,7 @@ public struct Actor: Decodable, Identifiable, Hashable {
         case bloodType = "blood_type"
         case heightText = "height_text"
         case videosCount = "videos_count"
+        case nameZht = "name_zht"
     }
 
     public init(from decoder: Decoder) throws {
@@ -265,6 +272,7 @@ public struct Actor: Decodable, Identifiable, Hashable {
         gender = JSONFlex.int(c, .gender)
         type = JSONFlex.int(c, .type)
         videosCount = JSONFlex.int(c, .videosCount)
+        nameZht = try? c.decode(String.self, forKey: .nameZht)
     }
 }
 

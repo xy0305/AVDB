@@ -385,7 +385,13 @@ struct MovieDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
+                    .onAppear {
+                        if list.id == vm.relatedLists.last?.id {
+                            Task { await vm.loadMoreRelatedLists() }
+                        }
+                    }
                 }
+                if vm.loadingLists { ProgressView().frame(maxWidth: .infinity) }
             }
         }
         .padding(.horizontal)
@@ -405,6 +411,8 @@ final class MovieDetailViewModel: ObservableObject {
     @Published var loadingMagnets = false
     @Published var loadingLists = false
     @Published var errorMessage: String?
+    private var listsPage = 1
+    private var listsHasMore = true
 
     private let sdk = JavDBSDK.shared
 
@@ -448,9 +456,31 @@ final class MovieDetailViewModel: ObservableObject {
 
     func loadRelatedLists() async {
         guard !movieID.isEmpty, relatedLists.isEmpty else { return }
+        listsPage = 1
+        listsHasMore = true
+        await fetchRelatedLists()
+    }
+
+    func loadMoreRelatedLists() async {
+        guard listsHasMore, !loadingLists else { return }
+        listsPage += 1
+        await fetchRelatedLists()
+    }
+
+    private func fetchRelatedLists() async {
         loadingLists = true
         defer { loadingLists = false }
-        relatedLists = (try? await sdk.relatedLists(movieID, page: 1, limit: 24)) ?? []
+        let next = (try? await sdk.relatedLists(movieID, page: listsPage, limit: 24)) ?? []
+        if next.isEmpty {
+            listsHasMore = false
+            return
+        }
+        if listsPage == 1 {
+            relatedLists = next
+        } else {
+            let ids = Set(relatedLists.map(\.id))
+            relatedLists.append(contentsOf: next.filter { !ids.contains($0.id) })
+        }
     }
 }
 
