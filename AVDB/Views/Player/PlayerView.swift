@@ -308,63 +308,85 @@ struct KSChromePlayer: View {
 
     private var chromeOverlay: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color.black.opacity(0.5), .clear, Color.black.opacity(0.55)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            // 顶/底部渐变（仿 StripCam 质感）
             VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [Color.black.opacity(0.5), .clear],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: 90)
+                Spacer()
+                LinearGradient(
+                    colors: [.clear, Color.black.opacity(0.6)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: 110)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            // 左上：返回
+            VStack {
                 HStack {
-                    glassButton("chevron.backward") { dismiss() }
+                    glassButton("chevron.left") { dismiss() }
                     Spacer()
-                    glassButton("pip.enter") {
+                }
+                Spacer()
+            }
+
+            // 右上：PiP
+            VStack {
+                HStack {
+                    Spacer()
+                    glassButton("pip") {
                         coordinator.playerLayer?.isPipActive.toggle()
                     }
                 }
                 Spacer()
+            }
 
-                // 播放/暂停按钮居中
+            // 中央大播放按钮（仅暂停/缓冲时显示）
+            if !isPlaying {
                 Button {
-                    if isPlaying {
-                        coordinator.playerLayer?.pause()
-                    } else {
-                        coordinator.playerLayer?.play()
-                    }
+                    coordinator.playerLayer?.play()
                 } label: {
                     ZStack {
                         if isBuffering {
-                            ProgressView()
-                                .tint(.white)
-                                .scaleEffect(1.3)
+                            ProgressView().tint(.white).scaleEffect(1.2)
                         } else {
-                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 32, weight: .semibold))
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 22, weight: .bold))
                                 .foregroundStyle(.white)
                         }
                     }
-                    .frame(width: 72, height: 72)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .frame(width: 62, height: 62)
+                    .background(.black.opacity(0.45), in: Circle())
                 }
                 .buttonStyle(.plain)
+            }
 
+            // 左下：播放/暂停（胶囊容器）
+            VStack {
                 Spacer()
-
                 HStack {
-                    if !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(.ultraThinMaterial, in: Capsule())
+                    capsuleButton(isPlaying ? "pause.fill" : "play.fill") {
+                        if isPlaying {
+                            coordinator.playerLayer?.pause()
+                        } else {
+                            coordinator.playerLayer?.play()
+                        }
                     }
                     Spacer()
                 }
-                progressBar
-                    .padding(.top, 12)
             }
-            .padding(14)
+
+            // 底部：进度条
+            VStack {
+                Spacer()
+                progressBar
+            }
         }
+        .padding(16)
         .allowsHitTesting(true)
     }
 
@@ -405,10 +427,24 @@ struct KSChromePlayer: View {
     private func glassButton(_ system: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
+                .frame(width: 40, height: 40)
                 .background(.ultraThinMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+    }
+
+    private func capsuleButton(_ system: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: system)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(.ultraThinMaterial, in: Capsule())
         }
         .buttonStyle(.plain)
     }
