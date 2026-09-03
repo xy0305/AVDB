@@ -79,7 +79,7 @@
 				4ED555353441D19559249EC8 /* Resources */,
 			);
 			name = AVDB;
-			
+			path = AVDB;
 			sourceTree = "<group>";
 		};
 		A296A58319160592237A1545 /* Models */ = {
