@@ -55,6 +55,8 @@ public struct Movie: Codable, Identifiable, Hashable {
     public let previewImages: [PreviewImage]?
     public let playSources: [PlaySource]?
     public let previewVideoURL: String?
+    public let relativeMovies: [Movie]?
+    public let actorMovies: [Movie]?
 
     // 派生字段
     public var displayTitle: String { title ?? number ?? "未知影片" }
@@ -96,6 +98,8 @@ public struct Movie: Codable, Identifiable, Hashable {
         case previewImages = "preview_images"
         case playSources = "play_sources"
         case previewVideoURL = "preview_video_url"
+        case relativeMovies = "relative_movies"
+        case actorMovies = "actor_movies"
     }
 }
 

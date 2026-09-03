@@ -81,8 +81,8 @@ struct MovieDetailView: View {
             reviewsSection(movie)
 
             // 相似推荐
-            if let related = movie.relativeMovies, !related.isEmpty {
-                relatedSection(related)
+            if !vm.relatedMovies.isEmpty {
+                relatedSection(vm.relatedMovies)
             }
         }
         .padding(.vertical)
@@ -159,13 +159,15 @@ struct MovieDetailView: View {
     private func tagsSection(_ tags: [Tag]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("标签").font(.headline)
-            FlowLayout(tags) { tag in
-                Text(tag.name ?? "")
-                    .font(.caption)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color(.systemGray6))
-                    .clipShape(Capsule())
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(tags) { tag in
+                    Text(tag.name ?? "")
+                        .font(.caption)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color(.systemGray6))
+                        .clipShape(Capsule())
+                }
             }
         }
         .padding(.horizontal)
@@ -324,6 +326,7 @@ struct MovieDetailView: View {
 final class MovieDetailViewModel: ObservableObject {
     let movieID: String
     @Published var movie: Movie?
+    @Published var relatedMovies: [Movie] = []
     @Published var magnets: [Magnet] = []
     @Published var reviews: [Review] = []
     @Published var isLoading = false
@@ -341,7 +344,9 @@ final class MovieDetailViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            movie = try await sdk.movieDetail(movieID)
+            let full = try await sdk.movieDetailFull(movieID)
+            movie = full.movie
+            relatedMovies = full.relativeMovies ?? []
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -442,47 +447,5 @@ struct ReviewRow: View {
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-/// 流式标签布局
-struct FlowLayout: Layout {
-    let items: [Tag]
-    let content: (Tag) -> AnyView
-
-    init(_ items: [Tag], @ViewBuilder content: @escaping (Tag) -> some View) {
-        self.items = items
-        self.content = { AnyView(content($0)) }
-    }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 300
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var maxY: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > width {
-                x = 0
-                y += size.height + 6
-            }
-            x += size.width + 6
-            maxY = y + size.height
-        }
-        return CGSize(width: width, height: maxY)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX {
-                x = bounds.minX
-                y += size.height + 6
-            }
-            subview.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
-            x += size.width + 6
-        }
     }
 }

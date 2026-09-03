@@ -89,6 +89,19 @@ public final class JavDBSDK {
         return movie
     }
 
+    /// 影片详情完整数据（含相似推荐/演员影片）
+    public func movieDetailFull(_ id: String, fromRankings: Bool = false) async throws -> MovieDetailData {
+        let resp: JavDBResponse<MovieDetailData> = try await client.get(
+            "/api/v4/movies/\(id)", query: ["from_rankings": fromRankings ? "true" : "false"])
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        guard let data = resp.data else {
+            throw JavDBError.apiError(action: nil, message: "获取详情失败")
+        }
+        return data
+    }
+
     /// 磁力列表（GET /api/v1/movies/{id}/magnets）
     public func movieMagnets(_ id: String, page: Int = 1) async throws -> [Magnet] {
         let resp: JavDBResponse<MagnetListData> = try await client.get(
