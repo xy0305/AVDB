@@ -73,17 +73,14 @@ struct HomeView: View {
     private func shortcut(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(color.opacity(0.12))
-                        .frame(width: 48, height: 48)
-                    Image(systemName: icon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(color)
-                }
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(color)
+                    .frame(width: 44, height: 44)
+                    .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Text(title)
-                    .font(.system(size: 12))
-                    .foregroundColor(.primary)
+                    .font(.caption)
+                    .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity)
         }
@@ -94,14 +91,13 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("佳片推薦")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.headline)
                 Text(vm.periodLabel)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color(.systemGray6))
-                    .clipShape(Capsule())
+                    .background(Color(.systemGray6), in: Capsule())
                 Spacer()
                 NavigationLink {
                     PastRecommendView()
@@ -109,10 +105,10 @@ struct HomeView: View {
                     HStack(spacing: 2) {
                         Text("往期推薦")
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
+                            .font(.caption.weight(.semibold))
                     }
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 16)
@@ -126,22 +122,22 @@ struct HomeView: View {
                     HStack(alignment: .top, spacing: 12) {
                         JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                             .frame(width: 110, height: 150)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         VStack(alignment: .leading, spacing: 8) {
                             Text(movie.displayNumber + "  " + movie.displayTitle)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.primary)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.primary)
                                 .lineLimit(3)
                             if let score = movie.score, score > 0 {
                                 HStack(spacing: 4) {
                                     ForEach(0..<5, id: \.self) { i in
                                         Image(systemName: i < Int(score.rounded()) ? "star.fill" : "star")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.orange)
+                                            .font(.caption)
+                                            .foregroundStyle(.orange)
                                     }
                                     Text(String(format: "%.2f", score))
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                         }
@@ -166,8 +162,8 @@ struct HomeView: View {
                 Task { await vm.shuffleLatest() }
             } label: {
                 Text("換一組")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -182,11 +178,10 @@ struct HomeView: View {
                     .clipped()
                     .overlay(Color.black.opacity(0.35))
                 Text("TOP250")
-                    .font(.system(size: 36, weight: .heavy, design: .rounded))
-                    .foregroundColor(Color(red: 0.95, green: 0.35, blue: 0.75))
-                    .shadow(radius: 2)
+                    .font(.largeTitle.weight(.heavy))
+                    .foregroundStyle(.white)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .padding(.horizontal, 12)
         }
         .buttonStyle(.plain)
@@ -204,8 +199,8 @@ struct HomeView: View {
                 Task { await vm.shuffleMagnets() }
             } label: {
                 Text("換一組")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -216,11 +211,11 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("我的關注")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.headline)
                 Spacer()
                 Text("更新時間倒序")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16)
             if vm.following.isEmpty {
