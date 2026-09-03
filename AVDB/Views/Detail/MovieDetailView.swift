@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import AVKit
 
 struct MovieDetailView: View {
     let movieID: String
     @StateObject private var vm: MovieDetailViewModel
     @State private var play115 = false
+    @State private var showTrailer = false
 
     init(movieID: String) {
         self.movieID = movieID
@@ -53,6 +55,11 @@ struct MovieDetailView: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: $showTrailer) {
+            if let url = vm.movie?.previewVideoURL.flatMap(URL.init) {
+                TrailerPlayerView(url: url, onClose: { showTrailer = false })
+            }
+        }
     }
 
     private func detailContent(_ movie: Movie) -> some View {
@@ -76,6 +83,11 @@ struct MovieDetailView: View {
             }
 
             playSection(movie)
+
+            // 预告片
+            if let trailer = movie.previewVideoURL, let url = URL(string: trailer) {
+                trailerSection(url)
+            }
 
             // 剧照
             if let images = movie.previewImages, !images.isEmpty {
@@ -269,6 +281,28 @@ struct MovieDetailView: View {
                 .padding()
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal)
+    }
+
+    private func trailerSection(_ url: URL) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("预告片").font(.headline)
+            Button {
+                showTrailer = true
+            } label: {
+                ZStack {
+                    JavDBImage(url: vm.movie?.coverURL ?? vm.movie?.thumbURL, contentMode: .fill)
+                        .frame(height: 180)
+                        .clipped()
+                        .overlay(Color.black.opacity(0.35))
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.white)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
         }
@@ -679,5 +713,29 @@ final class ReviewsListViewModel: ObservableObject {
             let ids = Set(reviews.map(\.stableReviewID))
             reviews.append(contentsOf: next.filter { !ids.contains($0.stableReviewID) })
         }
+    }
+}
+
+/// 预告片播放器：系统 AVKit，m3u8 免费预览（sign 已含在 URL，无需登录）。
+struct TrailerPlayerView: View {
+    let url: URL
+    var onClose: (() -> Void)? = nil
+
+    var body: some View {
+        VideoPlayer(player: AVPlayer(url: url))
+            .ignoresSafeArea()
+            .overlay(alignment: .topLeading) {
+                Button {
+                    onClose?()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(.white)
+                        .padding()
+                }
+            }
+            .onDisappear {
+                // 播放器随视图销毁自动释放
+            }
     }
 }
