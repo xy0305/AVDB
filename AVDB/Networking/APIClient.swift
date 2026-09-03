@@ -46,7 +46,7 @@ public final class APIClient: @unchecked Sendable {
     public static let shared = APIClient()
 
     private let session: URLSession
-    private let userAgent = "Mozilla/5.0 (Linux; Android 13; javdb)"
+    private let userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 
     /// 当前登录 token（JWT）
     public private(set) var token: String?

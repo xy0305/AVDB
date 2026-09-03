@@ -11,8 +11,8 @@ import CryptoKit
 
 /// JAVDB API 常量（逆向自官方 App v1.9.35）
 public enum JavDBConstants {
-    /// 生产基址
-    public static let baseURL = "https://jdforrepam.com"
+    /// 生产基址（官方 iOS 抓包 2026-09-03）
+    public static let baseURL = "https://apidd.spthgb.com"
 
     /// 测试/默认基址（Dart 代码 HttpApi.baseUrl 默认值）
     public static let stagingBaseURL = "https://staging.letidi.com"
@@ -27,7 +27,7 @@ public enum JavDBConstants {
     public static let hlsSegmentHost = "u1.029xxj.com"
 
     /// App 版本标识
-    public static let appVersionNumber = "1.9.35"
+    public static let appVersionNumber = "1.9.28"
 
     /// 签名常量 STR1（native libsecurity.so 解密后的固定常量）
     public static let STR1 = "71cf27bb3c0bcdf207b64abecddc970098c7421ee7203b9cdae54478478a199e7d5a6e1a57691123c1a931c057842fb73ba3b3c83bcd69c17ccf174081e3d8aa"
@@ -35,13 +35,13 @@ public enum JavDBConstants {
     /// 签名常量 STR2
     public static let STR2 = "lpw6vgqzsp"
 
-    /// 每个请求必带的 query 参数
+    /// 每个请求必带的 query 参数（对齐官方 iOS 抓包）
     public static let baseQuery: [String: String] = [
-        "platform": "android",
+        "platform": "ios",
         "app_channel": "official",
         "app_version": "official",
-        "app_version_number": "1.9.35",
-        "system_version": "13",
+        "app_version_number": "1.9.28",
+        "system_version": "18.0",
     ]
 }
 

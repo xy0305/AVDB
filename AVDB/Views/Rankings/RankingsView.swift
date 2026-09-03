@@ -28,7 +28,8 @@ struct RankingsView: View {
     var initialTab: RankingTab = .top250
     @State private var tab: RankingTab
     @State private var period: RankPeriod = .daily
-    @State private var playbackFilter: String = "rated"
+    @State private var playbackFilter: String = "high_score"
+    @State private var playbackPeriod: RankPeriod = .daily
     @StateObject private var vm = RankingsViewModel()
     @State private var showSearch = false
     @State private var showTopFilter = false
@@ -55,10 +56,16 @@ struct RankingsView: View {
                 .padding(.top, 4)
 
             if tab == .playback {
-                CapsuleChipBar(
-                    tabs: [("rated", "高評價"), ("all", "全部"), ("daily", "日榜"), ("weekly", "周榜"), ("monthly", "月榜")],
-                    selection: $playbackFilter
-                )
+                VStack(spacing: 0) {
+                    CapsuleChipBar(
+                        tabs: [("high_score", "高評價"), ("all", "全部")],
+                        selection: $playbackFilter
+                    )
+                    CapsuleChipBar(
+                        tabs: RankPeriod.allCases.map { ($0, $0.title) },
+                        selection: $playbackPeriod
+                    )
+                }
             } else if tab != .top250 {
                 CapsuleChipBar(
                     tabs: RankPeriod.allCases.map { ($0, $0.title) },
@@ -91,18 +98,21 @@ struct RankingsView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
-        .task { await vm.load(tab: tab, period: period, playbackFilter: playbackFilter) }
+        .task { await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
         .onChange(of: tab) { _, new in
-            Task { await vm.load(tab: new, period: period, playbackFilter: playbackFilter) }
+            Task { await vm.load(tab: new, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
         }
         .onChange(of: period) { _, new in
-            Task { await vm.load(tab: tab, period: new, playbackFilter: playbackFilter) }
+            Task { await vm.load(tab: tab, period: new, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
         }
-        .onChange(of: playbackFilter) { _, new in
-            Task { await vm.load(tab: tab, period: period, playbackFilter: new) }
+        .onChange(of: playbackFilter) { _, _ in
+            Task { await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
+        }
+        .onChange(of: playbackPeriod) { _, _ in
+            Task { await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod) }
         }
         .refreshable {
-            await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, force: true)
+            await vm.load(tab: tab, period: period, playbackFilter: playbackFilter, playbackPeriod: playbackPeriod, force: true)
         }
     }
 
@@ -224,7 +234,8 @@ final class RankingsViewModel: ObservableObject {
     private var hasMore = true
     private var currentTab: RankingTab = .top250
     private var currentPeriod: RankPeriod = .daily
-    private var currentPlayback = "rated"
+    private var currentPlayback = "high_score"
+    private var currentPlaybackPeriod: RankPeriod = .daily
     private var pool: [Movie] = []
     private let sdk = JavDBSDK.shared
 
@@ -247,13 +258,26 @@ final class RankingsViewModel: ObservableObject {
         return []
     }
 
-    func load(tab: RankingTab, period: RankPeriod, playbackFilter: String, force: Bool = false) async {
-        if !force, tab == currentTab, period == currentPeriod, playbackFilter == currentPlayback, !movies.isEmpty, tab != .top250 {
+    func load(
+        tab: RankingTab,
+        period: RankPeriod,
+        playbackFilter: String,
+        playbackPeriod: RankPeriod = .daily,
+        force: Bool = false
+    ) async {
+        if !force,
+           tab == currentTab,
+           period == currentPeriod,
+           playbackFilter == currentPlayback,
+           playbackPeriod == currentPlaybackPeriod,
+           !movies.isEmpty,
+           tab != .top250 {
             return
         }
         currentTab = tab
         currentPeriod = period
         currentPlayback = playbackFilter
+        currentPlaybackPeriod = playbackPeriod
         page = 1
         hasMore = true
         movies = []
@@ -287,9 +311,11 @@ final class RankingsViewModel: ObservableObject {
         case .top250:
             list = []
         case .playback:
-            let filter = currentPlayback == "rated" ? "all" : currentPlayback
-            let period = ["daily", "weekly", "monthly"].contains(currentPlayback) ? currentPlayback : "daily"
-            list = (try? await sdk.playbackRankings(filterBy: filter, period: period, page: page)) ?? []
+            list = (try? await sdk.playbackRankings(
+                filterBy: currentPlayback,
+                period: currentPlaybackPeriod.rawValue,
+                page: page
+            )) ?? []
         case .censored:
             list = (try? await sdk.rankings(type: "0", period: currentPeriod.rawValue, page: page)) ?? []
         case .uncensored:

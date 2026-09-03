@@ -251,8 +251,8 @@ final class HomeViewModel: ObservableObject {
 
     func initialLoad() async {
         async let rec = try? sdk.recommendMovies(page: 1)
-        async let latestTask = try? sdk.latestMovies(page: 1, limit: 9, type: "0")
-        async let magTask = try? sdk.latestMovies(page: 2, limit: 9, type: "0")
+        async let latestTask = try? sdk.latestMovies(page: 1, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
+        async let magTask = try? sdk.latestMovies(page: 2, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
         async let periodsTask = try? sdk.recommendPeriods()
         async let followTask = try? sdk.recentViewed()
 
@@ -283,14 +283,14 @@ final class HomeViewModel: ObservableObject {
 
     func shuffleLatest() async {
         latestPage += 1
-        let next = (try? await sdk.latestMovies(page: latestPage, limit: 9, type: "0")) ?? []
+        let next = (try? await sdk.latestMovies(page: latestPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
         if next.isEmpty { latestPage = 1 }
         else { latest = next }
     }
 
     func shuffleMagnets() async {
         magnetPage += 1
-        let next = (try? await sdk.latestMovies(page: magnetPage, limit: 9, type: "0")) ?? []
+        let next = (try? await sdk.latestMovies(page: magnetPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
         let filtered = next.filter { ($0.magnetsCount ?? 0) > 0 }
         if filtered.isEmpty { magnetPage = 1 }
         else { magnets = filtered }

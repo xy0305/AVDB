@@ -131,17 +131,26 @@ public final class JavDBSDK {
     }
 
     /// 影评列表（GET /api/v1/movies/{id}/reviews）
-    public func movieReviews(_ id: String, page: Int = 1) async throws -> [Review] {
+    public func movieReviews(_ id: String, page: Int = 1, sortBy: String = "hotly", limit: Int = 24) async throws -> [Review] {
         let resp: JavDBResponse<ReviewListData> = try await client.get(
-            "/api/v1/movies/\(id)/reviews", query: ["page": "\(page)"])
+            "/api/v1/movies/\(id)/reviews",
+            query: ["page": "\(page)", "sort_by": sortBy, "limit": "\(limit)"])
         return resp.data?.reviews ?? []
     }
 
     /// 最新发布（GET /api/v1/movies/latest）
-    /// type: 0有码 1无码 2欧美 3 FC2 4动漫
-    public func latestMovies(page: Int = 1, limit: Int = 20, type: String? = nil) async throws -> [Movie] {
+    /// type: all / 0有码 1无码 2欧美 3 FC2 4动漫
+    public func latestMovies(
+        page: Int = 1,
+        limit: Int = 20,
+        type: String? = nil,
+        filterBy: String? = nil,
+        sortBy: String? = nil
+    ) async throws -> [Movie] {
         var query = ["page": "\(page)", "limit": "\(min(limit, 50))"]
         if let type { query["type"] = type }
+        if let filterBy { query["filter_by"] = filterBy }
+        if let sortBy { query["sort_by"] = sortBy }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/latest", query: query)
         return resp.data?.movies ?? []
     }
@@ -172,6 +181,7 @@ public final class JavDBSDK {
     public func recommendMovies(page: Int = 1, period: Int? = nil) async throws -> [Movie] {
         var query = ["page": "\(page)"]
         if let period { query["period"] = "\(period)" }
+        else { query["period"] = "-1" }
         let resp: JavDBResponse<RecommendMoviesData> = try await client.get(
             "/api/v1/movies/recommend", query: query)
         return resp.data?.movies ?? []
@@ -186,7 +196,7 @@ public final class JavDBSDK {
     /// 相似推荐（GET /api/v1/movies/may_also_like）
     public func mayAlsoLike(_ id: String) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v1/movies/may_also_like", query: ["id": id])
+            "/api/v1/movies/may_also_like", query: ["id": id, "limit": "9"])
         return resp.data?.movies ?? []
     }
 
@@ -355,11 +365,11 @@ public final class JavDBSDK {
             "device_uuid": deviceUUID,
             "device_name": "AVDB",
             "device_model": "iPhone",
-            "platform": "android",
-            "system_version": "13",
+            "platform": "ios",
+            "system_version": "18.0",
             "app_channel": "official",
             "app_version": "official",
-            "app_version_number": "1.9.35",
+            "app_version_number": "1.9.28",
         ]
         let resp: JavDBResponse<SessionData> = try await client.post("/api/v1/sessions", form: form)
         guard resp.isSuccess, let token = resp.data?.token, let user = resp.data?.user else {
