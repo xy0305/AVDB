@@ -185,13 +185,15 @@ public final class JavDBSDK {
         type: String? = "0",
         page: Int = 1,
         limit: Int = 24,
-        sortBy: String = "update"
+        sortBy: String = "update",
+        orderBy: String = "desc"
     ) async throws -> [Movie] {
         var query = [
             "filter_by": filterBy,
             "page": "\(page)",
             "limit": "\(limit)",
             "sort_by": sortBy,
+            "order_by": orderBy,
         ]
         if let type { query["type"] = type }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query)

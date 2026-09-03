@@ -194,6 +194,13 @@ public struct Tag: Decodable, Identifiable, Hashable {
         case videosCount = "videos_count"
     }
 
+    public init(id: String, name: String?, coverURL: String? = nil, count: Int? = nil) {
+        self.id = id
+        self.name = name
+        self.coverURL = coverURL
+        self.count = count
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = JSONFlex.string(c, .id) ?? ""
