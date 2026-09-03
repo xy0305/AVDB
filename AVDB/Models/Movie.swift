@@ -191,6 +191,7 @@ public struct Tag: Decodable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, name, count
         case coverURL = "cover_url"
+        case videosCount = "videos_count"
     }
 
     public init(from decoder: Decoder) throws {
@@ -198,7 +199,7 @@ public struct Tag: Decodable, Identifiable, Hashable {
         id = JSONFlex.string(c, .id) ?? ""
         name = try? c.decode(String.self, forKey: .name)
         coverURL = try? c.decode(String.self, forKey: .coverURL)
-        count = JSONFlex.int(c, .count)
+        count = JSONFlex.int(c, .count) ?? JSONFlex.int(c, .videosCount)
     }
 }
 
@@ -238,14 +239,22 @@ public struct Actor: Decodable, Identifiable, Hashable {
     public let type: Int?
     public let videosCount: Int?
     public let nameZht: String?
+    public let twitterID: String?
+    public let instagramID: String?
+    public let bust: String?
+    public let waist: String?
+    public let hips: String?
+    public let birthplace: String?
+    public let cons: String?
 
     public var displayName: String {
         if let z = nameZht, !z.isEmpty { return z }
+        if let other = otherName, !other.isEmpty { return other }
         return name ?? id
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, age, height, cup, hobby, gender, type, birthday
+        case id, name, age, height, cup, hobby, gender, type, birthday, cons
         case otherName = "other_name"
         case avatarURL = "avatar_url"
         case coverURL = "cover_url"
@@ -253,6 +262,9 @@ public struct Actor: Decodable, Identifiable, Hashable {
         case heightText = "height_text"
         case videosCount = "videos_count"
         case nameZht = "name_zht"
+        case twitterID = "twitter_id"
+        case instagramID = "instagram_id"
+        case bust, waist, hips, birthplace
     }
 
     public init(from decoder: Decoder) throws {
@@ -273,6 +285,29 @@ public struct Actor: Decodable, Identifiable, Hashable {
         type = JSONFlex.int(c, .type)
         videosCount = JSONFlex.int(c, .videosCount)
         nameZht = try? c.decode(String.self, forKey: .nameZht)
+        twitterID = try? c.decode(String.self, forKey: .twitterID)
+        instagramID = try? c.decode(String.self, forKey: .instagramID)
+        bust = JSONFlex.string(c, .bust)
+        waist = JSONFlex.string(c, .waist)
+        hips = JSONFlex.string(c, .hips)
+        birthplace = try? c.decode(String.self, forKey: .birthplace)
+        cons = try? c.decode(String.self, forKey: .cons)
+    }
+}
+
+/// 演员详情（嵌套 actor + 筛选标签）
+public struct ActorDetailPayload: Decodable {
+    public let actor: Actor?
+    public let filterTags: [Tag]?
+    public let tags: [Tag]?
+    public let shareInfo: String?
+    public let hasCollected: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case actor, tags
+        case filterTags = "filter_tags"
+        case shareInfo = "share_info"
+        case hasCollected = "has_collected"
     }
 }
 
@@ -297,6 +332,13 @@ public struct RecommendPeriod: Codable, Identifiable, Hashable {
     public let createdAt: String?
 
     public var id: Int { period ?? 0 }
+
+    public var titleText: String { "第\(period ?? 0)期" }
+
+    public var dateText: String {
+        guard let createdAt, createdAt.count >= 10 else { return "" }
+        return String(createdAt.prefix(10))
+    }
 
     enum CodingKeys: String, CodingKey {
         case period

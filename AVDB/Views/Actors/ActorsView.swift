@@ -234,7 +234,7 @@ final class ActorsHomeViewModel: ObservableObject {
     }
 }
 
-/// 演员详情
+/// 演员详情：/api/v1/actors/{id} 嵌套 actor + filter_tags，作品走 movies/tags
 struct ActorDetailView: View {
     let actorID: String
     @StateObject private var vm: ActorDetailViewModel
@@ -248,14 +248,14 @@ struct ActorDetailView: View {
         ScrollView {
             if let actor = vm.actor {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 16) {
+                    HStack(alignment: .top, spacing: 16) {
                         JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                             .frame(width: 100, height: 100)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         VStack(alignment: .leading, spacing: 6) {
                             Text(actor.displayName)
                                 .font(.title3.bold())
-                            if let other = actor.otherName, !other.isEmpty {
+                            if let other = actor.otherName, !other.isEmpty, other != actor.displayName {
                                 Text(other).font(.caption).foregroundColor(.secondary)
                             }
                             if let birthday = actor.birthday, !birthday.isEmpty {
@@ -268,10 +268,41 @@ struct ActorDetailView: View {
                                 if let cup = actor.cup { info(cup) }
                                 if let count = actor.videosCount { info("\(count) 部") }
                             }
+                            if let twitter = actor.twitterID, !twitter.isEmpty {
+                                info("@" + twitter)
+                            }
                         }
                         Spacer()
                     }
                     .padding(.horizontal)
+
+                    if !vm.filterTags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                filterChip("全部", id: "")
+                                ForEach(vm.filterTags) { tag in
+                                    filterChip(tag.name ?? tag.id, id: tag.id)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+
+                    if !vm.tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(vm.tags.prefix(20)) { tag in
+                                    Text("\(tag.name ?? tag.id)\(tag.count.map { " \($0)" } ?? "")")
+                                        .font(.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color(.systemGray6))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
 
                     if vm.movies.isEmpty {
                         if vm.isLoadingMovies {
@@ -292,9 +323,24 @@ struct ActorDetailView: View {
                 ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
             }
         }
-        .navigationTitle(vm.actor?.name ?? "演員")
+        .navigationTitle(vm.actor?.displayName ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.load() }
+    }
+
+    private func filterChip(_ title: String, id: String) -> some View {
+        Button {
+            Task { await vm.selectFilter(id) }
+        } label: {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(vm.filter == id ? Color.accentColor : Color(.systemGray5))
+                .foregroundColor(vm.filter == id ? .white : .primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func info(_ text: String) -> some View {
@@ -305,12 +351,16 @@ struct ActorDetailView: View {
 @MainActor
 final class ActorDetailViewModel: ObservableObject {
     @Published var actor: Actor?
+    @Published var filterTags: [Tag] = []
+    @Published var tags: [Tag] = []
     @Published var movies: [Movie] = []
     @Published var isLoading = false
     @Published var isLoadingMovies = false
+    @Published var filter = ""
     let actorID: String
     private var page = 1
     private var hasMore = true
+    private var actorType: String { actor.flatMap { $0.type.map(String.init) } ?? "0" }
 
     init(actorID: String) {
         self.actorID = actorID
@@ -320,7 +370,20 @@ final class ActorDetailViewModel: ObservableObject {
         isLoading = true
         isLoadingMovies = true
         defer { isLoading = false }
-        actor = try? await JavDBSDK.shared.actorDetail(actorID)
+        if let payload = try? await JavDBSDK.shared.actorDetail(actorID) {
+            actor = payload.actor
+            filterTags = payload.filterTags ?? []
+            tags = payload.tags ?? []
+        }
+        page = 1
+        hasMore = true
+        movies = []
+        await fetchMovies()
+    }
+
+    func selectFilter(_ id: String) async {
+        guard filter != id else { return }
+        filter = id
         page = 1
         hasMore = true
         movies = []
@@ -336,8 +399,9 @@ final class ActorDetailViewModel: ObservableObject {
     private func fetchMovies() async {
         isLoadingMovies = true
         defer { isLoadingMovies = false }
-        let keyword = actor?.name ?? actorID
-        let next = (try? await JavDBSDK.shared.search(keyword: keyword, page: page, limit: 21)) ?? []
+        let next = (try? await JavDBSDK.shared.actorMovies(
+            actorID, page: page, limit: 21, type: actorType, filter: filter
+        )) ?? []
         if next.isEmpty {
             hasMore = false
         } else if page == 1 {

@@ -215,8 +215,10 @@ public final class JavDBSDK {
     }
 
     /// 推荐时间段（GET /api/v1/movies/recommend_periods）
-    public func recommendPeriods() async throws -> [RecommendPeriod] {
-        let resp: JavDBResponse<RecommendPeriodListData> = try await client.get("/api/v1/movies/recommend_periods")
+    public func recommendPeriods(page: Int = 1, limit: Int = 24) async throws -> [RecommendPeriod] {
+        let resp: JavDBResponse<RecommendPeriodListData> = try await client.get(
+            "/api/v1/movies/recommend_periods",
+            query: ["page": "\(page)", "limit": "\(limit)"])
         return resp.data?.periods ?? []
     }
 
@@ -239,14 +241,30 @@ public final class JavDBSDK {
     }
 
     /// 演员详情（GET /api/v1/actors/{id}）
-    public func actorDetail(_ id: String) async throws -> Actor {
-        struct ActorDetailData: Decodable { let actor: Actor? }
-        let resp: JavDBResponse<ActorDetailData> = try await client.get(
+    public func actorDetail(_ id: String) async throws -> ActorDetailPayload {
+        let resp: JavDBResponse<ActorDetailPayload> = try await client.get(
             "/api/v1/actors/\(id)", query: ["from_rankings": "false"])
-        guard let actor = resp.data?.actor else {
+        guard let data = resp.data, data.actor != nil else {
             throw JavDBError.apiError(action: nil, message: "获取演员失败")
         }
-        return actor
+        return data
+    }
+
+    /// 演员作品（GET /api/v1/movies/tags?filter_by={type}:a:{id}:{filter}）
+    public func actorMovies(
+        _ id: String,
+        page: Int = 1,
+        limit: Int = 21,
+        type: String = "0",
+        filter: String = ""
+    ) async throws -> [Movie] {
+        try await moviesByTag(
+            filterBy: "\(type):a:\(id):\(filter)",
+            type: type,
+            page: page,
+            limit: limit,
+            sortBy: "release"
+        )
     }
 
     /// 演员推荐（GET /api/v1/actors/recommend）

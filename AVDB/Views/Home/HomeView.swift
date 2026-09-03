@@ -103,8 +103,8 @@ struct HomeView: View {
                     .background(Color(.systemGray6))
                     .clipShape(Capsule())
                 Spacer()
-                Button {
-                    Task { await vm.shuffleRecommend() }
+                NavigationLink {
+                    PastRecommendView()
                 } label: {
                     HStack(spacing: 2) {
                         Text("往期推薦")
@@ -244,7 +244,6 @@ final class HomeViewModel: ObservableObject {
     @Published var following: [Movie] = []
     @Published var periodLabel = "週一/四更新"
     @Published var periods: [RecommendPeriod] = []
-    private var periodIndex = 0
     private var latestPage = 1
     private var magnetPage = 2
     private let sdk = JavDBSDK.shared
@@ -264,20 +263,6 @@ final class HomeViewModel: ObservableObject {
         following = await followTask ?? []
         if let created = periods.first?.createdAt, created.count >= 10 {
             periodLabel = String(created.prefix(10))
-        }
-    }
-
-    func shuffleRecommend() async {
-        guard !periods.isEmpty else {
-            recommended = (try? await sdk.recommendMovies(page: 1)) ?? recommended
-            return
-        }
-        periodIndex = (periodIndex + 1) % periods.count
-        if let p = periods[periodIndex].period {
-            recommended = (try? await sdk.recommendMovies(page: 1, period: p)) ?? recommended
-            if let created = periods[periodIndex].createdAt {
-                periodLabel = String(created.prefix(10))
-            }
         }
     }
 
@@ -352,5 +337,120 @@ struct HotReviewsView: View {
             reviews = (try? await JavDBSDK.shared.hotReviews()) ?? []
             loading = false
         }
+    }
+}
+
+/// 往期推薦：/api/v1/movies/recommend_periods
+struct PastRecommendView: View {
+    @StateObject private var vm = PastRecommendViewModel()
+    @State private var query = ""
+    @State private var showSearch = false
+
+    var body: some View {
+        List {
+            ForEach(Array(vm.filtered(query).enumerated()), id: \.element.id) { idx, period in
+                NavigationLink {
+                    PeriodMoviesView(period: period)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(period.titleText)
+                            .font(.system(size: 16))
+                            .foregroundColor(.primary)
+                        if !period.dateText.isEmpty {
+                            Text("(\(period.dateText))")
+                                .font(.system(size: 16))
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 10)
+                }
+                .listRowBackground(idx % 2 == 0 ? Color(.systemBackground) : Color(.systemGray5))
+                .listRowSeparator(.hidden)
+                .onAppear {
+                    if period.id == vm.periods.last?.id {
+                        Task { await vm.loadMore() }
+                    }
+                }
+            }
+            if vm.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("往期推薦")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showSearch.toggle()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+            }
+        }
+        .searchable(text: $query, prompt: "搜尋期數", isPresented: $showSearch)
+        .task { await vm.loadMore() }
+    }
+}
+
+@MainActor
+final class PastRecommendViewModel: ObservableObject {
+    @Published var periods: [RecommendPeriod] = []
+    @Published var isLoading = false
+    private var page = 1
+    private var hasMore = true
+
+    func filtered(_ query: String) -> [RecommendPeriod] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return periods }
+        return periods.filter {
+            $0.titleText.contains(q) || $0.dateText.contains(q) || "\($0.period ?? 0)".contains(q)
+        }
+    }
+
+    func loadMore() async {
+        guard !isLoading, hasMore else { return }
+        isLoading = true
+        defer { isLoading = false }
+        let next = (try? await JavDBSDK.shared.recommendPeriods(page: page, limit: 24)) ?? []
+        if next.isEmpty {
+            hasMore = false
+            return
+        }
+        let ids = Set(periods.map(\.id))
+        periods.append(contentsOf: next.filter { !ids.contains($0.id) })
+        page += 1
+    }
+}
+
+struct PeriodMoviesView: View {
+    let period: RecommendPeriod
+    @StateObject private var vm: MovieListViewModel
+
+    init(period: RecommendPeriod) {
+        self.period = period
+        let p = period.period
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.recommendMovies(page: page, period: p)
+        })
+    }
+
+    var body: some View {
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+        }
+        .navigationTitle(period.dateText.isEmpty ? period.titleText : "\(period.titleText)  \(period.dateText)")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
     }
 }

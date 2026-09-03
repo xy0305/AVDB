@@ -2,11 +2,13 @@
 //  PlayerView.swift
 //  AVDB
 //
-//  KSPlayer 对齐 WebCam：isAutoPlay、Coordinator 状态、竖屏 16:9 + 四角毛玻璃。
+//  KSPlayer：进入横屏、进度条、左侧亮度 / 右侧音量。
 //
 
 import SwiftUI
 import UIKit
+import MediaPlayer
+import AVFoundation
 import KSPlayer
 
 struct PlayerView: View {
@@ -124,7 +126,7 @@ final class PlayerViewModel: ObservableObject {
     }
 }
 
-/// 对齐 WebCam PlayerView：16:9 视频 + 四角控件 + Coordinator 状态。
+/// 横屏铺满 + 进度条 + 左亮度右音量。
 struct KSChromePlayer: View {
     let url: URL
     var title: String = ""
@@ -138,6 +140,19 @@ struct KSChromePlayer: View {
     @State private var hasStarted = false
     @State private var showChrome = true
     @State private var hideTask: Task<Void, Never>?
+    @State private var tickTask: Task<Void, Never>?
+
+    @State private var currentTime: TimeInterval = 0
+    @State private var duration: TimeInterval = 0
+    @State private var isSeeking = false
+    @State private var seekValue: Double = 0
+
+    @State private var overlay: OverlayKind?
+    @State private var overlayValue: Double = 0
+    @State private var dragStart: Double = 0
+    @State private var verticalDrag = false
+
+    private enum OverlayKind { case brightness, volume }
 
     private var playerOptions: KSOptions {
         let o = KSOptions()
@@ -155,7 +170,7 @@ struct KSChromePlayer: View {
             let landscape = geo.size.width > geo.size.height
             let videoHeight = landscape ? geo.size.height : geo.size.width * 9 / 16
             VStack(spacing: 0) {
-                videoArea(height: videoHeight, landscape: landscape)
+                videoArea(height: videoHeight, width: geo.size.width)
                 if !landscape {
                     infoBar
                     Spacer(minLength: 0)
@@ -167,21 +182,24 @@ struct KSChromePlayer: View {
         .ignoresSafeArea()
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .background(HiddenVolumeView().frame(width: 0, height: 0))
         .onAppear {
             coordinator.isMaskShow = false
             wireCoordinator()
+            startTicker()
             scheduleHide()
             OrientationLock.set(.landscapeRight, keepLocked: true)
         }
         .onDisappear {
             hideTask?.cancel()
+            tickTask?.cancel()
             coordinator.playerLayer?.pause()
             OrientationLock.set(.portrait, keepLocked: true)
         }
     }
 
     @ViewBuilder
-    private func videoArea(height: CGFloat, landscape: Bool) -> some View {
+    private func videoArea(height: CGFloat, width: CGFloat) -> some View {
         ZStack {
             Color.black
             KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
@@ -189,6 +207,9 @@ struct KSChromePlayer: View {
                 ProgressView()
                     .tint(.white)
                     .scaleEffect(1.15)
+            }
+            if let overlay {
+                overlayHUD(overlay)
             }
             if showChrome {
                 chromeOverlay
@@ -199,6 +220,70 @@ struct KSChromePlayer: View {
         .clipped()
         .contentShape(Rectangle())
         .onTapGesture { toggleChrome() }
+        .simultaneousGesture(sideDrag(width: width))
+    }
+
+    private func sideDrag(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                let dx = abs(value.translation.width)
+                let dy = abs(value.translation.height)
+                if !verticalDrag && overlay == nil {
+                    guard dy > dx, dy > 12 else { return }
+                    verticalDrag = true
+                    if value.startLocation.x < width / 2 {
+                        overlay = .brightness
+                        dragStart = UIScreen.main.brightness
+                    } else {
+                        overlay = .volume
+                        dragStart = Double(AVAudioSession.sharedInstance().outputVolume)
+                    }
+                    overlayValue = dragStart
+                }
+                guard verticalDrag, overlay != nil else { return }
+                let delta = -value.translation.height / 240
+                let next = min(1, max(0, dragStart + delta))
+                overlayValue = next
+                applyOverlay(next)
+            }
+            .onEnded { _ in
+                verticalDrag = false
+                overlay = nil
+            }
+    }
+
+    private func applyOverlay(_ value: Double) {
+        switch overlay {
+        case .brightness:
+            UIScreen.main.brightness = value
+        case .volume:
+            SystemVolume.set(Float(value))
+        case nil:
+            break
+        }
+    }
+
+    private func overlayHUD(_ kind: OverlayKind) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: kind == .brightness
+                  ? (overlayValue > 0.5 ? "sun.max.fill" : "sun.min.fill")
+                  : (overlayValue > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill"))
+                .font(.system(size: 22, weight: .semibold))
+            Capsule()
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 6, height: 90)
+                .overlay(alignment: .bottom) {
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(height: 90 * overlayValue)
+                }
+                .clipShape(Capsule())
+            Text("\(Int(overlayValue * 100))%")
+                .font(.caption.monospacedDigit())
+        }
+        .foregroundStyle(.white)
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var infoBar: some View {
@@ -224,11 +309,11 @@ struct KSChromePlayer: View {
     private var chromeOverlay: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.black.opacity(0.45), .clear, Color.black.opacity(0.45)],
+                colors: [Color.black.opacity(0.5), .clear, Color.black.opacity(0.55)],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            VStack {
+            VStack(spacing: 0) {
                 HStack {
                     glassButton("chevron.backward") { dismiss() }
                     Spacer()
@@ -258,10 +343,46 @@ struct KSChromePlayer: View {
                             .background(.ultraThinMaterial, in: Capsule())
                     }
                 }
+                progressBar
+                    .padding(.top, 12)
             }
             .padding(14)
         }
         .allowsHitTesting(true)
+    }
+
+    private var progressBar: some View {
+        HStack(spacing: 8) {
+            Text(formatTime(isSeeking ? seekValue : currentTime))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.white)
+                .frame(width: 48, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { isSeeking ? seekValue : currentTime },
+                    set: { newValue in
+                        isSeeking = true
+                        seekValue = newValue
+                    }
+                ),
+                in: 0...max(duration, 0.1)
+            ) { editing in
+                if editing {
+                    hideTask?.cancel()
+                    isSeeking = true
+                } else {
+                    seek(to: seekValue)
+                    currentTime = seekValue
+                    isSeeking = false
+                    scheduleHide()
+                }
+            }
+            .tint(.white)
+            Text(formatTime(duration))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.white)
+                .frame(width: 48, alignment: .trailing)
+        }
     }
 
     private func glassButton(_ system: String, action: @escaping () -> Void) -> some View {
@@ -286,9 +407,41 @@ struct KSChromePlayer: View {
                 }
                 if state == .readyToPlay {
                     coordinator.playerLayer?.play()
+                    syncTime()
                 }
             }
         }
+    }
+
+    private func startTicker() {
+        tickTask?.cancel()
+        tickTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                syncTime()
+            }
+        }
+    }
+
+    private func syncTime() {
+        guard !isSeeking, let layer = coordinator.playerLayer else { return }
+        currentTime = layer.currentPlaybackTime
+        let d = layer.duration
+        if d.isFinite, d > 0 { duration = d }
+    }
+
+    private func seek(to time: TimeInterval) {
+        coordinator.playerLayer?.seek(time: time)
+    }
+
+    private func formatTime(_ t: TimeInterval) -> String {
+        guard t.isFinite, t >= 0 else { return "00:00" }
+        let total = Int(t)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%02d:%02d", m, s)
     }
 
     private func toggleChrome() {
@@ -327,5 +480,29 @@ enum OrientationLock {
                 }
             }
         }
+    }
+}
+
+private struct HiddenVolumeView: UIViewRepresentable {
+    func makeUIView(context: Context) -> MPVolumeView {
+        let v = MPVolumeView(frame: CGRect(x: -1000, y: -1000, width: 1, height: 1))
+        v.alpha = 0.0001
+        v.isUserInteractionEnabled = false
+        DispatchQueue.main.async {
+            SystemVolume.slider = v.subviews.compactMap { $0 as? UISlider }.first
+        }
+        return v
+    }
+
+    func updateUIView(_ uiView: MPVolumeView, context: Context) {
+        SystemVolume.slider = uiView.subviews.compactMap { $0 as? UISlider }.first
+    }
+}
+
+enum SystemVolume {
+    static weak var slider: UISlider?
+
+    static func set(_ value: Float) {
+        slider?.value = max(0, min(1, value))
     }
 }
