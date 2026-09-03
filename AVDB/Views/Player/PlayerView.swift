@@ -425,13 +425,13 @@ struct KSChromePlayer: View {
 
     private func syncTime() {
         guard !isSeeking, let layer = coordinator.playerLayer else { return }
-        currentTime = layer.currentPlaybackTime
-        let d = layer.duration
+        currentTime = layer.player.currentPlaybackTime
+        let d = layer.player.duration
         if d.isFinite, d > 0 { duration = d }
     }
 
     private func seek(to time: TimeInterval) {
-        coordinator.playerLayer?.seek(time: time)
+        coordinator.playerLayer?.seek(time: time, autoPlay: coordinator.playerLayer?.options.isSeekedAutoPlay ?? false) { _ in }
     }
 
     private func formatTime(_ t: TimeInterval) -> String {

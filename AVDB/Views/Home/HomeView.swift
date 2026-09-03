@@ -394,7 +394,7 @@ struct PastRecommendView: View {
                 }
             }
         }
-        .searchable(text: $query, prompt: "搜尋期數", isPresented: $showSearch)
+        .searchable(text: $query, isPresented: $showSearch, prompt: "搜尋期數")
         .task { await vm.loadMore() }
     }
 }
