@@ -303,7 +303,7 @@
 			);
 			mainGroup = AVDB00000000000000000000B0;
 			packageReferences = (
-				A115C11E7A7B115C11E7A201 /* XCRemoteSwiftPackageReference "KSPlayer" */,
+				A115C11E7A7B115C11E7A301 /* XCRemoteSwiftPackageReference "KSPlayer" */,
 			);
 			productRefGroup = AVDB00000000000000000000B1 /* Products */;
 			projectDirPath = "";
@@ -483,7 +483,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A115C11E7A7B115C11E7A201 /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
+		A115C11E7A7B115C11E7A301 /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/kingslay/KSPlayer.git";
 			requirement = {
@@ -496,7 +496,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		A115C11E7A7B115C11E7A109 /* KSPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A115C11E7A7B115C11E7A201 /* XCRemoteSwiftPackageReference "KSPlayer" */;
+			package = A115C11E7A7B115C11E7A301 /* XCRemoteSwiftPackageReference "KSPlayer" */;
 			productName = KSPlayer;
 		};
 /* End XCSwiftPackageProductDependency section */
