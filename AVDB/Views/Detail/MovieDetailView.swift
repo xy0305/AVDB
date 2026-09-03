@@ -81,6 +81,8 @@ struct MovieDetailView: View {
             if !vm.relatedMovies.isEmpty {
                 relatedSection(vm.relatedMovies)
             }
+
+            relatedListsSection
         }
         .padding(.vertical)
     }
@@ -347,6 +349,48 @@ struct MovieDetailView: View {
             }
         }
     }
+
+    private var relatedListsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("相关片单")
+                .font(.headline)
+            if vm.relatedLists.isEmpty {
+                if vm.loadingLists {
+                    ProgressView().frame(maxWidth: .infinity)
+                }
+            } else {
+                ForEach(vm.relatedLists) { list in
+                    NavigationLink {
+                        ListDetailView(listID: list.id, title: list.displayName)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(list.displayName)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                HStack(spacing: 8) {
+                                    if let n = list.movieCount { Text("\(n) 部") }
+                                    if let c = list.collectionsCount { Text("\(c) 收藏") }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(12)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .task { await vm.loadRelatedLists() }
+    }
 }
 
 @MainActor
@@ -356,8 +400,10 @@ final class MovieDetailViewModel: ObservableObject {
     @Published var relatedMovies: [Movie] = []
     @Published var magnets: [Magnet] = []
     @Published var reviews: [Review] = []
+    @Published var relatedLists: [MovieList] = []
     @Published var isLoading = false
     @Published var loadingMagnets = false
+    @Published var loadingLists = false
     @Published var errorMessage: String?
 
     private let sdk = JavDBSDK.shared
@@ -398,6 +444,13 @@ final class MovieDetailViewModel: ObservableObject {
         if let r = try? await sdk.movieReviews(movieID) {
             reviews = r
         }
+    }
+
+    func loadRelatedLists() async {
+        guard !movieID.isEmpty, relatedLists.isEmpty else { return }
+        loadingLists = true
+        defer { loadingLists = false }
+        relatedLists = (try? await sdk.relatedLists(movieID, page: 1, limit: 24)) ?? []
     }
 }
 

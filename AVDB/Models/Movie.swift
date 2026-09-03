@@ -487,27 +487,59 @@ public struct RankingItem: Decodable, Identifiable {
     public var identifier: String { id ?? movie?.id ?? actor?.id ?? UUID().uuidString }
 }
 
-/// 片单
-public struct MovieList: Codable, Identifiable {
-    public let id: String?
+/// 片单（官方 related：name / movies_count / collections_count / views_count）
+public struct MovieList: Decodable, Identifiable, Hashable {
+    public let id: String
     public let name: String?
     public let title: String?
     public let description: String?
     public let coverURL: String?
     public let movieCount: Int?
+    public let collectionsCount: Int?
+    public let viewsCount: Int?
+    public let createdAt: String?
+    public let shareInfo: String?
+    public let isDefault: Bool?
     public let userID: Int?
     public let userName: String?
     public let isFavorite: Bool?
     public let isPrivate: Bool?
 
+    public var displayName: String { name ?? title ?? "片单" }
+
     enum CodingKeys: String, CodingKey {
         case id, name, title, description
         case coverURL = "cover_url"
         case movieCount = "movie_count"
+        case moviesCount = "movies_count"
+        case collectionsCount = "collections_count"
+        case viewsCount = "views_count"
+        case createdAt = "created_at"
+        case shareInfo = "share_info"
+        case isDefault = "is_default"
         case userID = "user_id"
         case userName = "user_name"
         case isFavorite = "is_favorite"
         case isPrivate = "is_private"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = JSONFlex.string(c, .id) ?? ""
+        name = try? c.decode(String.self, forKey: .name)
+        title = try? c.decode(String.self, forKey: .title)
+        description = try? c.decode(String.self, forKey: .description)
+        coverURL = try? c.decode(String.self, forKey: .coverURL)
+        movieCount = JSONFlex.int(c, .movieCount) ?? JSONFlex.int(c, .moviesCount)
+        collectionsCount = JSONFlex.int(c, .collectionsCount)
+        viewsCount = JSONFlex.int(c, .viewsCount)
+        createdAt = JSONFlex.string(c, .createdAt)
+        shareInfo = try? c.decode(String.self, forKey: .shareInfo)
+        isDefault = JSONFlex.bool(c, .isDefault)
+        userID = JSONFlex.int(c, .userID)
+        userName = try? c.decode(String.self, forKey: .userName)
+        isFavorite = JSONFlex.bool(c, .isFavorite)
+        isPrivate = JSONFlex.bool(c, .isPrivate)
     }
 }
 

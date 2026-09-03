@@ -331,17 +331,44 @@ public final class JavDBSDK {
         return resp.data?.lists ?? []
     }
 
-    /// 相关片单（GET /api/v1/lists/related）
-    public func relatedLists(_ id: String) async throws -> [MovieList] {
-        struct ListData: Decodable { let lists: [MovieList]? }
-        let resp: JavDBResponse<ListData> = try await client.get("/api/v1/lists/related", query: ["id": id])
+    /// 相关片单（GET /api/v1/lists/related?movie_id=）
+    public func relatedLists(_ movieID: String, page: Int = 1, limit: Int = 24) async throws -> [MovieList] {
+        struct ListData: Decodable {
+            let lists: [MovieList]?
+            let currentPage: Int?
+            enum CodingKeys: String, CodingKey {
+                case lists
+                case currentPage = "current_page"
+            }
+        }
+        let resp: JavDBResponse<ListData> = try await client.get(
+            "/api/v1/lists/related",
+            query: ["movie_id": movieID, "page": "\(page)", "limit": "\(limit)"])
         return resp.data?.lists ?? []
     }
 
-    /// 片单详情（GET /api/v1/lists/{id}）
+    /// 片单元数据（GET /api/v1/lists/{id}）只有名称/计数，没有影片。
+    public func listInfo(_ id: String) async throws -> MovieList? {
+        struct Wrap: Decodable { let list: MovieList? }
+        let resp: JavDBResponse<Wrap> = try await client.get("/api/v1/lists/\(id)")
+        return resp.data?.list
+    }
+
+    /// 片单影片（GET /api/v1/lists/{id}/movies）
+    public func listMovies(_ id: String, page: Int = 1, limit: Int = 21) async throws -> [Movie] {
+        let resp: JavDBResponse<MovieListData> = try await client.get(
+            "/api/v1/lists/\(id)/movies",
+            query: ["page": "\(page)", "limit": "\(limit)"])
+        if let movies = resp.data?.movies, !movies.isEmpty { return movies }
+        let fallback: JavDBResponse<MovieListData> = try await client.get(
+            "/api/v1/lists/\(id)",
+            query: ["page": "\(page)", "limit": "\(limit)"])
+        return fallback.data?.movies ?? []
+    }
+
+    /// 兼容旧调用
     public func listDetail(_ id: String) async throws -> [Movie] {
-        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/lists/\(id)")
-        return resp.data?.movies ?? []
+        try await listMovies(id)
     }
 
     /// 关注的标签（GET /api/v1/following_tags）

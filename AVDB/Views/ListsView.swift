@@ -2,7 +2,7 @@
 //  ListsView.swift
 //  AVDB
 //
-//  片单列表页。
+//  片单列表 / 片单作品（/api/v1/lists/{id}/movies 分页）。
 //
 
 import SwiftUI
@@ -15,21 +15,26 @@ struct ListsView: View {
             List {
                 ForEach(vm.lists) { list in
                     NavigationLink {
-                        ListDetailView(listID: list.id ?? "", title: list.name ?? list.title ?? "片单")
+                        ListDetailView(listID: list.id, title: list.displayName)
                     } label: {
-                        HStack(spacing: 12) {
-                            JavDBImage(url: list.coverURL)
-                                .frame(width: 50, height: 60)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(list.name ?? list.title ?? "片单")
-                                    .font(.subheadline)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(list.displayName)
+                                .font(.subheadline)
+                            HStack(spacing: 8) {
                                 if let count = list.movieCount {
                                     Text("\(count) 部影片")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                }
+                                if let c = list.collectionsCount {
+                                    Text("\(c) 收藏")
                                 }
                             }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
+                    }
+                    .onAppear {
+                        if list.id == vm.lists.last?.id {
+                            Task { await vm.load() }
                         }
                     }
                 }
@@ -51,25 +56,31 @@ final class ListsViewModel: ObservableObject {
     @Published var lists: [MovieList] = []
     @Published var isLoading = false
     private var page = 1
+    private var hasMore = true
 
     func load() async {
+        guard hasMore, !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
-        if let l = try? await JavDBSDK.shared.lists(page: page) {
-            if l.isEmpty { return }
-            lists.append(contentsOf: l)
-            page += 1
+        let next = (try? await JavDBSDK.shared.lists(page: page)) ?? []
+        if next.isEmpty {
+            hasMore = false
+            return
         }
+        let ids = Set(lists.map(\.id))
+        lists.append(contentsOf: next.filter { !ids.contains($0.id) })
+        page += 1
     }
 
     func refresh() async {
         page = 1
+        hasMore = true
         lists = []
         await load()
     }
 }
 
-/// 片单详情
+/// 片单作品列表
 struct ListDetailView: View {
     let listID: String
     let title: String
@@ -78,12 +89,21 @@ struct ListDetailView: View {
     init(listID: String, title: String) {
         self.listID = listID
         self.title = title
-        _vm = StateObject(wrappedValue: MovieListViewModel { _ in
-            try await JavDBSDK.shared.listDetail(listID)
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.listMovies(listID, page: page, limit: 21)
         })
     }
 
     var body: some View {
-        MovieGridView(title: title, viewModel: vm)
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
     }
 }
