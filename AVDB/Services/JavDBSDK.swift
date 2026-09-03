@@ -251,6 +251,7 @@ public final class JavDBSDK {
     }
 
     /// 演员作品（GET /api/v1/movies/tags?filter_by={type}:a:{id}:{filter}）
+    /// 官方详情页的参演列表走这个，不是 /movies/latest?authorid=（后者会忽略 authorid 返回全站最新）。
     public func actorMovies(
         _ id: String,
         page: Int = 1,
@@ -260,11 +261,23 @@ public final class JavDBSDK {
     ) async throws -> [Movie] {
         try await moviesByTag(
             filterBy: "\(type):a:\(id):\(filter)",
-            type: type,
+            type: nil,
             page: page,
             limit: limit,
             sortBy: "release"
         )
+    }
+
+    /// 订阅/取消订阅演员（POST /api/v1/actors/{id}/collect_actions）
+    /// form: name=<演员名> collect=1|0，需 token。
+    @discardableResult
+    public func collectActor(_ id: String, name: String, collect: Bool) async throws -> Bool {
+        let resp: JavDBResponse<EmptyData> = try await client.post(
+            "/api/v1/actors/\(id)/collect_actions",
+            form: ["name": name, "collect": collect ? "1" : "0"],
+            useToken: true
+        )
+        return resp.isSuccess
     }
 
     /// 演员推荐（GET /api/v1/actors/recommend）

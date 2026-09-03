@@ -244,6 +244,8 @@ struct ActorDetailView: View {
         _vm = StateObject(wrappedValue: ActorDetailViewModel(actorID: actorID))
     }
 
+    @EnvironmentObject private var appState: AppState
+
     var body: some View {
         ScrollView {
             if let actor = vm.actor {
@@ -271,6 +273,19 @@ struct ActorDetailView: View {
                             if let twitter = actor.twitterID, !twitter.isEmpty {
                                 info("@" + twitter)
                             }
+                            Button {
+                                Task { await vm.toggleCollect() }
+                            } label: {
+                                Text(vm.hasCollected ? "已訂閱" : "訂閱")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(vm.hasCollected ? Color(.systemGray5) : Color.accentColor)
+                                    .foregroundColor(vm.hasCollected ? .primary : .white)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!appState.isLoggedIn || vm.isCollecting)
                         }
                         Spacer()
                     }
@@ -357,10 +372,13 @@ final class ActorDetailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLoadingMovies = false
     @Published var filter = ""
+    @Published var hasCollected = false
+    @Published var isCollecting = false
     let actorID: String
     private var page = 1
     private var hasMore = true
-    private var actorType: String { actor.flatMap { $0.type.map(String.init) } ?? "0" }
+    /// 有码女优详情页官方固定 filter_by=0:a:{id}:，不要拿 actor.type（欧美/无码会串片）
+    private let catalogType = "0"
 
     init(actorID: String) {
         self.actorID = actorID
@@ -374,6 +392,7 @@ final class ActorDetailViewModel: ObservableObject {
             actor = payload.actor
             filterTags = payload.filterTags ?? []
             tags = payload.tags ?? []
+            hasCollected = payload.hasCollected ?? false
         }
         page = 1
         hasMore = true
@@ -396,11 +415,22 @@ final class ActorDetailViewModel: ObservableObject {
         await fetchMovies()
     }
 
+    func toggleCollect() async {
+        guard let actor, !isCollecting else { return }
+        isCollecting = true
+        defer { isCollecting = false }
+        let next = !hasCollected
+        let ok = (try? await JavDBSDK.shared.collectActor(
+            actorID, name: actor.displayName, collect: next
+        )) ?? false
+        if ok { hasCollected = next }
+    }
+
     private func fetchMovies() async {
         isLoadingMovies = true
         defer { isLoadingMovies = false }
         let next = (try? await JavDBSDK.shared.actorMovies(
-            actorID, page: page, limit: 21, type: actorType, filter: filter
+            actorID, page: page, limit: 21, type: catalogType, filter: filter
         )) ?? []
         if next.isEmpty {
             hasMore = false
