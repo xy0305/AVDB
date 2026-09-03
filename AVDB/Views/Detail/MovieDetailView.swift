@@ -9,7 +9,12 @@ import SwiftUI
 
 struct MovieDetailView: View {
     let movieID: String
-    @StateObject private var vm = MovieDetailViewModel()
+    @StateObject private var vm: MovieDetailViewModel
+
+    init(movieID: String) {
+        self.movieID = movieID
+        _vm = StateObject(wrappedValue: MovieDetailViewModel(movieID: movieID))
+    }
 
     var body: some View {
         ScrollView {

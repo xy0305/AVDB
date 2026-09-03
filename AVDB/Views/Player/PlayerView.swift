@@ -11,7 +11,13 @@ import AVKit
 struct PlayerView: View {
     let movieID: String
     let sourceID: Int
-    @StateObject private var vm = PlayerViewModel()
+    @StateObject private var vm: PlayerViewModel
+
+    init(movieID: String, sourceID: Int) {
+        self.movieID = movieID
+        self.sourceID = sourceID
+        _vm = StateObject(wrappedValue: PlayerViewModel(movieID: movieID, sourceID: sourceID))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -113,6 +119,13 @@ final class PlayerViewModel: ObservableObject {
 
     private let sdk = JavDBSDK.shared
     private var allEpisodes: [PlayData.Episode] = []
+    let movieID: String
+    let sourceID: Int
+
+    init(movieID: String, sourceID: Int) {
+        self.movieID = movieID
+        self.sourceID = sourceID
+    }
 
     var currentEpisode: PlayData.Episode? {
         playData?.movies?.first { $0.index == currentEpisodeIndex }
@@ -123,11 +136,11 @@ final class PlayerViewModel: ObservableObject {
         defer { isLoading = false }
         // 尝试播放，若失败回退续播
         do {
-            let data = try await sdk.moviePlay(vmMovieID(), sourceID: sourceID)
+            let data = try await sdk.moviePlay(movieID, sourceID: sourceID)
             apply(data)
         } catch {
             // 回退续播
-            if let data = try? await sdk.movieResumePlay(vmMovieID(), sourceID: sourceID) {
+            if let data = try? await sdk.movieResumePlay(movieID, sourceID: sourceID) {
                 if data.movies?.isEmpty == false {
                     apply(data)
                 } else {
@@ -139,10 +152,7 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
-    private func vmMovieID() -> String { movieID }
-
-    private func apply(_ data: PlayData) {
-        playData = data
+    private func apply(_ data: PlayData) {        playData = data
         allEpisodes = data.movies ?? []
         if let first = allEpisodes.first {
             currentEpisodeIndex = first.index

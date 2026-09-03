@@ -74,7 +74,12 @@ final class ActorsViewModel: ObservableObject {
 /// 演员详情
 struct ActorDetailView: View {
     let actorID: String
-    @StateObject private var vm = ActorDetailViewModel()
+    @StateObject private var vm: ActorDetailViewModel
+
+    init(actorID: String) {
+        self.actorID = actorID
+        _vm = StateObject(wrappedValue: ActorDetailViewModel(actorID: actorID))
+    }
 
     var body: some View {
         ScrollView {
@@ -118,6 +123,11 @@ struct ActorDetailView: View {
 final class ActorDetailViewModel: ObservableObject {
     @Published var actor: Actor?
     @Published var isLoading = false
+    let actorID: String
+
+    init(actorID: String) {
+        self.actorID = actorID
+    }
 
     func load() async {
         isLoading = true
