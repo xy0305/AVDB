@@ -14,7 +14,8 @@ struct Pan115PlayerView: View {
     @StateObject private var vm = Pan115PlayerViewModel()
 
     var body: some View {
-        Group {
+        ZStack {
+            Color.black.ignoresSafeArea()
             if let url = vm.playURL, vm.errorMessage == nil, !vm.isLoading {
                 KSChromePlayer(
                     url: url,
@@ -22,12 +23,6 @@ struct Pan115PlayerView: View {
                     subtitle: vm.qualityLabel,
                     headers: vm.headers
                 )
-            } else if vm.isLoading {
-                ContentUnavailableView {
-                    ProgressView()
-                } description: {
-                    Text(vm.status)
-                }
             } else if let err = vm.errorMessage {
                 ContentUnavailableView {
                     Label("无法播放", systemImage: "exclamationmark.triangle")
@@ -38,9 +33,20 @@ struct Pan115PlayerView: View {
                         Task { await vm.start(movie: movie, magnetURL: magnetURL) }
                     }
                 }
+                .foregroundStyle(.white)
+            } else {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .tint(.white)
+                    Text(vm.status)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
             }
         }
-        .background(Color(.systemBackground))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("115 原画")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

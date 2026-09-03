@@ -10,6 +10,7 @@ import SwiftUI
 struct MovieDetailView: View {
     let movieID: String
     @StateObject private var vm: MovieDetailViewModel
+    @State private var play115 = false
 
     init(movieID: String) {
         self.movieID = movieID
@@ -40,6 +41,18 @@ struct MovieDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.load() }
+        .fullScreenCover(isPresented: $play115) {
+            if let movie = vm.movie {
+                NavigationStack {
+                    Pan115PlayerView(movie: movie)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("关闭") { play115 = false }
+                            }
+                        }
+                }
+            }
+        }
     }
 
     private func detailContent(_ movie: Movie) -> some View {
@@ -234,8 +247,8 @@ struct MovieDetailView: View {
                     .foregroundColor(JAVDBPalette.accent)
             }
 
-            NavigationLink {
-                Pan115PlayerView(movie: movie)
+            Button {
+                play115 = true
             } label: {
                 HStack {
                     Image(systemName: "play.circle.fill")

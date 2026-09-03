@@ -175,6 +175,7 @@ struct KSChromePlayer: View {
             .onAppear { isLandscape = landscape }
             .onChange(of: landscape) { _, new in isLandscape = new }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black)
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
