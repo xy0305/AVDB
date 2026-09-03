@@ -159,10 +159,13 @@ public struct Movie: Decodable, Identifiable, Hashable {
         actorMovies = try? c.decode([Movie].self, forKey: .actorMovies)
     }
 
-    /// 播放角标文案（中字可播放 / 可播放）
+    /// 播放角标。官方 `play_subtitle` 经常是 1/0，不是文案。
     public var playBadge: String? {
-        if let s = playSubtitle, !s.isEmpty, s != "0", s != "false" { return s }
-        if canPlay == true {
+        if let s = playSubtitle, !s.isEmpty,
+           s != "0", s != "1", s != "true", s != "false" {
+            return s
+        }
+        if canPlay == true || playSubtitle == "1" || playSubtitle == "true" {
             return hasCnsub == true ? "中字可播放" : "可播放"
         }
         return nil
@@ -393,20 +396,16 @@ public struct Magnet: Decodable, Identifiable, Hashable {
     }
 }
 
-/// 预览图/剧照
-public struct PreviewImage: Codable, Identifiable, Hashable {
-    public let id: String?
+/// 预览图/剧照（API 无 id，用 URL 作稳定标识）
+public struct PreviewImage: Decodable, Identifiable, Hashable {
     public let thumbURL: String?
     public let largeURL: String?
 
+    public var id: String { largeURL ?? thumbURL ?? "preview" }
+
     enum CodingKeys: String, CodingKey {
-        case id
         case thumbURL = "thumb_url"
         case largeURL = "large_url"
-    }
-
-    public var identifier: String {
-        return largeURL ?? thumbURL ?? UUID().uuidString
     }
 }
 

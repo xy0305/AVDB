@@ -373,7 +373,11 @@ final class MovieDetailViewModel: ObservableObject {
         do {
             let full = try await sdk.movieDetailFull(movieID)
             movie = full.movie
-            relatedMovies = full.relativeMovies ?? []
+            relatedMovies = full.movie?.relativeMovies
+                ?? full.relativeMovies
+                ?? full.movie?.actorMovies
+                ?? full.actorMovies
+                ?? []
             WatchedStore.mark(movieID)
         } catch {
             errorMessage = error.localizedDescription
@@ -516,7 +520,7 @@ struct ReviewRow: View {
                 }
                 Spacer()
                 if let date = review.createdAt {
-                    Text(date).font(.caption2).foregroundColor(.secondary)
+                    Text(Self.shortDate(date)).font(.caption2).foregroundColor(.secondary)
                 }
             }
             if let content = review.content {
@@ -529,6 +533,11 @@ struct ReviewRow: View {
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private static func shortDate(_ raw: String) -> String {
+        if raw.count >= 10 { return String(raw.prefix(10)) }
+        return raw
     }
 }
 
