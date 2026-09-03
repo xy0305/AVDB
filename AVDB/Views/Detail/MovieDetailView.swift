@@ -62,10 +62,7 @@ struct MovieDetailView: View {
                 summarySection(summary)
             }
 
-            // 播放按钮（VIP）
-            if movie.canPlay == true {
-                playSection(movie)
-            }
+            playSection(movie)
 
             // 剧照
             if let images = movie.previewImages, !images.isEmpty {
@@ -230,21 +227,45 @@ struct MovieDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("播放").font(.headline)
-                if movie.playSubtitle?.isEmpty == false {
-                    Text(movie.playSubtitle ?? "")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                }
+                Text("115 原画")
+                    .font(.caption)
+                    .foregroundColor(JAVDBPalette.accent)
             }
+
+            NavigationLink {
+                Pan115PlayerView(movie: movie)
+            } label: {
+                HStack {
+                    Image(systemName: "play.circle.fill")
+                        .foregroundColor(JAVDBPalette.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("播放 115 原画")
+                            .foregroundColor(.primary)
+                        Text(Pan115Settings.shared.isConfigured
+                             ? "等待离线完成后自动播放"
+                             : "请先在「我的」填写 115 Cookie")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.gray)
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+
             if let sources = movie.playSources, !sources.isEmpty {
                 ForEach(sources) { source in
                     NavigationLink {
                         PlayerView(movieID: movie.id, sourceID: source.id)
                     } label: {
                         HStack {
-                            Image(systemName: "play.circle.fill")
+                            Image(systemName: "play.circle")
                                 .foregroundColor(.orange)
-                            Text(source.name ?? "播放")
+                            Text((source.name ?? "片源") + "（JAVDB）")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.gray)
@@ -255,14 +276,6 @@ struct MovieDetailView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            } else {
-                Button {
-                    // 无特定片源，用默认
-                } label: {
-                    Label(movie.playSubtitle ?? "立即播放", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
             }
         }
         .padding(.horizontal)
@@ -276,7 +289,7 @@ struct MovieDetailView: View {
                 ProgressView()
             } else {
                 ForEach(vm.magnets, id: \.stableID) { magnet in
-                    MagnetRow(magnet: magnet)
+                    MagnetRow(magnet: magnet, movieID: movie.id)
                 }
             }
         }
@@ -372,6 +385,7 @@ final class MovieDetailViewModel: ObservableObject {
 /// 磁力行：点击推送到 115 离线；长按复制
 struct MagnetRow: View {
     let magnet: Magnet
+    var movieID: String = ""
     @State private var pushing = false
     @State private var toast: String?
 
@@ -460,6 +474,9 @@ struct MagnetRow: View {
                 cookie: settings.cookie,
                 folderCID: settings.folderCID
             )
+            if !movieID.isEmpty {
+                Pan115PlaybackCache.save(movieID: movieID, magnet: url)
+            }
             toast = result.message
         } catch {
             toast = error.localizedDescription
