@@ -25,7 +25,6 @@
 		DCD7082DF560C4E504407AB2 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D199611F7084B75D4EFDFF2B /* SearchView.swift */; };
 		CF3F7E8D6C65083DAE58F921 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8A6DDD7AACE6897F060AED /* LoginView.swift */; };
 		D93E29B791E253E75F820628 /* UserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E30F604E876D29C296F9649 /* UserView.swift */; };
-		7A21E28D564E76D63F6B5E14 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3C89A98DF7D244A11A3A0C82 /* Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,7 +47,6 @@
 		D199611F7084B75D4EFDFF2B /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		DA8A6DDD7AACE6897F060AED /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		0E30F604E876D29C296F9649 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
-		3C89A98DF7D244A11A3A0C82 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -199,7 +197,6 @@
 		4ED555353441D19559249EC8 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				3C89A98DF7D244A11A3A0C82 /* Info.plist */,
 			);
 			name = Resources;
 			 path = "Resources";
@@ -272,7 +269,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7A21E28D564E76D63F6B5E14 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
