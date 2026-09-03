@@ -2,7 +2,7 @@
 //  PlayerView.swift
 //  AVDB
 //
-//  KSPlayer 播放器，控件对齐 CamWeb / AngelLive：16:9、四角毛玻璃、单击显隐。
+//  KSPlayer 对齐 WebCam：isAutoPlay、Coordinator 状态、竖屏 16:9 + 四角毛玻璃。
 //
 
 import SwiftUI
@@ -72,7 +72,8 @@ final class PlayerViewModel: ObservableObject {
     @Published var qualities: [String] = []
 
     let headers: [String: String] = [
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+        "Referer": "https://javdb.com/",
     ]
 
     private let sdk = JavDBSDK.shared
@@ -122,7 +123,7 @@ final class PlayerViewModel: ObservableObject {
     }
 }
 
-/// CamWeb 风格：顶上 16:9、四角毛玻璃、单击显隐 5 秒。
+/// 对齐 WebCam PlayerView：16:9 视频 + 四角控件 + Coordinator 状态。
 struct KSChromePlayer: View {
     let url: URL
     var title: String = ""
@@ -131,78 +132,88 @@ struct KSChromePlayer: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
+    @State private var isPlaying = false
+    @State private var isBuffering = true
+    @State private var hasStarted = false
     @State private var showChrome = true
     @State private var hideTask: Task<Void, Never>?
-    @State private var isLandscape = false
-    @State private var options: KSOptions
 
-    init(url: URL, title: String = "", subtitle: String = "", headers: [String: String] = [:]) {
-        self.url = url
-        self.title = title
-        self.subtitle = subtitle
-        self.headers = headers
+    private var playerOptions: KSOptions {
         let o = KSOptions()
         if !headers.isEmpty { o.appendHeader(headers) }
-        _options = State(initialValue: o)
+        KSOptions.isAutoPlay = true
+        o.videoAdaptable = false
+        o.canStartPictureInPictureAutomaticallyFromInline = true
+        return o
     }
 
     var body: some View {
         GeometryReader { geo in
             let landscape = geo.size.width > geo.size.height
-            ZStack {
-                Color.black.ignoresSafeArea()
-                VStack(spacing: 0) {
-                    ZStack {
-                        KSVideoPlayer(coordinator: coordinator, url: url, options: options)
-                            .onAppear {
-                                coordinator.playerLayer?.play()
-                                scheduleHide()
-                            }
-                        if showChrome {
-                            chromeOverlay
-                        }
-                    }
-                    .aspectRatio(landscape ? nil : 16 / 9, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: landscape ? .infinity : nil)
-
-                    if !landscape {
-                        infoBar
-                        Spacer(minLength: 0)
-                    }
+            let videoHeight = landscape ? geo.size.height : geo.size.width * 9 / 16
+            VStack(spacing: 0) {
+                videoArea(height: videoHeight, landscape: landscape)
+                if !landscape {
+                    infoBar
+                    Spacer(minLength: 0)
                 }
             }
-            .onAppear { isLandscape = landscape }
-            .onChange(of: landscape) { _, new in isLandscape = new }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black)
+        .ignoresSafeArea()
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .onTapGesture { toggleChrome() }
+        .onAppear {
+            coordinator.isMaskShow = false
+            wireCoordinator()
+            scheduleHide()
+        }
         .onDisappear {
             hideTask?.cancel()
             coordinator.playerLayer?.pause()
         }
     }
 
+    @ViewBuilder
+    private func videoArea(height: CGFloat, landscape: Bool) -> some View {
+        ZStack {
+            Color.black
+            KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
+            if !hasStarted {
+                ProgressView()
+                    .tint(.white)
+                    .scaleEffect(1.15)
+            }
+            if showChrome {
+                chromeOverlay
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .clipped()
+        .contentShape(Rectangle())
+        .onTapGesture { toggleChrome() }
+    }
+
     private var infoBar: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title.isEmpty ? "正在播放" : title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.7))
                 }
             }
             Spacer()
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial)
+        .background(Color(white: 0.12))
     }
 
     private var chromeOverlay: some View {
@@ -222,14 +233,17 @@ struct KSChromePlayer: View {
                 }
                 Spacer()
                 HStack {
-                    glassButton(coordinator.state.isPlaying ? "pause.fill" : "play.fill") {
-                        if coordinator.state.isPlaying {
+                    glassButton(isPlaying ? "pause.fill" : "play.fill") {
+                        if isPlaying {
                             coordinator.playerLayer?.pause()
                         } else {
                             coordinator.playerLayer?.play()
                         }
                     }
                     Spacer()
+                    if isBuffering {
+                        ProgressView().tint(.white)
+                    }
                     if !subtitle.isEmpty {
                         Text(subtitle)
                             .font(.caption.weight(.semibold))
@@ -256,6 +270,22 @@ struct KSChromePlayer: View {
         .buttonStyle(.plain)
     }
 
+    private func wireCoordinator() {
+        coordinator.isMaskShow = false
+        coordinator.onStateChanged = { _, state in
+            Task { @MainActor in
+                isPlaying = state.isPlaying
+                isBuffering = state == .buffering || state == .preparing
+                if state.isPlaying || state == .readyToPlay || state == .paused {
+                    hasStarted = true
+                }
+                if state == .readyToPlay {
+                    coordinator.playerLayer?.play()
+                }
+            }
+        }
+    }
+
     private func toggleChrome() {
         withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() }
         if showChrome { scheduleHide() }
@@ -263,13 +293,10 @@ struct KSChromePlayer: View {
 
     private func scheduleHide() {
         hideTask?.cancel()
-        hideTask = Task {
+        hideTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 5_000_000_000)
-            if !Task.isCancelled {
-                await MainActor.run {
-                    withAnimation { showChrome = false }
-                }
-            }
+            guard !Task.isCancelled else { return }
+            withAnimation { showChrome = false }
         }
     }
 }
