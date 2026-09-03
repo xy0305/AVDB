@@ -249,14 +249,23 @@ public final class Pan115Client: @unchecked Sendable {
         throw lastError
     }
 
-    /// 在离线目录中找最大的视频（必要时进一层文件夹）
-    public func findLatestVideo(in cid: String, cookie: String, keyword: String? = nil) async throws -> FileItem {
+    /// 在离线目录中找与番号匹配的视频（必要时进一层文件夹）
+    public func findLatestVideo(
+        in cid: String,
+        cookie: String,
+        keyword: String? = nil,
+        requireMatch: Bool = false
+    ) async throws -> FileItem {
         let files = try await listFiles(cid: cid, cookie: cookie)
-        if let video = pickVideo(from: files, keyword: keyword) { return video }
+        if let video = pickVideo(from: files, keyword: keyword, requireMatch: requireMatch) { return video }
         let dirs = files.filter(\.isDir)
-        for dir in dirs.prefix(8) {
+        let needle = normalizedKey(keyword)
+        let preferred = dirs.filter { dir in
+            needle.isEmpty || normalizedKey(dir.name).contains(needle) || needle.contains(normalizedKey(dir.name))
+        }
+        for dir in (preferred + dirs).uniquedFiles.prefix(12) {
             let nested = try await listFiles(cid: dir.cid.isEmpty ? dir.fileID : dir.cid, cookie: cookie)
-            if let video = pickVideo(from: nested, keyword: keyword) { return video }
+            if let video = pickVideo(from: nested, keyword: keyword, requireMatch: requireMatch) { return video }
         }
         throw Pan115Error.fileNotFound
     }
@@ -314,16 +323,30 @@ public final class Pan115Client: @unchecked Sendable {
         return try await originalPlayURL(pickCode: file.pickCode, cookie: cookie, filename: file.name)
     }
 
-    private func pickVideo(from files: [FileItem], keyword: String?) -> FileItem? {
+    private func pickVideo(from files: [FileItem], keyword: String?, requireMatch: Bool) -> FileItem? {
         var videos = files.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
         if videos.isEmpty {
             videos = files.filter { !$0.isDir && !$0.pickCode.isEmpty && $0.size > 10_000_000 }
         }
-        if let keyword, !keyword.isEmpty {
-            let n = keyword.lowercased()
-            if let hit = videos.first(where: { $0.name.lowercased().contains(n) }) { return hit }
+        guard let keyword, !keyword.isEmpty else {
+            return requireMatch ? nil : videos.max(by: { $0.size < $1.size })
         }
-        return videos.max(by: { $0.size < $1.size })
+        let n = normalizedKey(keyword)
+        let hits = videos.filter { file in
+            let name = normalizedKey(file.name)
+            return name.contains(n) || n.contains(name)
+        }
+        if let hit = hits.max(by: { $0.size < $1.size }) { return hit }
+        return requireMatch ? nil : videos.max(by: { $0.size < $1.size })
+    }
+
+    private func normalizedKey(_ raw: String?) -> String {
+        guard let raw else { return "" }
+        return raw.lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ".", with: "")
     }
 
     private func extractFileList(_ obj: [String: Any]) -> [FileItem] {
@@ -486,7 +509,7 @@ public enum Pan115Error: Error, LocalizedError {
         case .http(let code): return "115 接口 HTTP \(code)"
         case .timeout: return "等待 115 离线完成超时"
         case .taskFailed(let msg): return "115 离线失败：\(msg)"
-        case .fileNotFound: return "离线目录里没找到视频文件"
+        case .fileNotFound: return "离线目录里没找到与当前番号匹配的视频"
         case .playURLNotFound: return "无法获取 115 原画播放地址"
         }
     }
@@ -514,5 +537,15 @@ private extension String {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
         return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
+    }
+}
+
+private extension Array where Element == Pan115Client.FileItem {
+    var uniquedFiles: [Pan115Client.FileItem] {
+        var seen = Set<String>()
+        return filter { item in
+            let key = item.fileID.isEmpty ? item.cid : item.fileID
+            return seen.insert(key).inserted
+        }
     }
 }

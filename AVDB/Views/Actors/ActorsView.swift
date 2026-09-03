@@ -272,11 +272,27 @@ struct ActorDetailView: View {
                         Spacer()
                     }
                     .padding(.horizontal)
+
+                    if vm.movies.isEmpty {
+                        if vm.isLoadingMovies {
+                            ProgressView().frame(maxWidth: .infinity).padding(.top, 24)
+                        } else {
+                            Text("暫無作品")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal)
+                        }
+                    } else {
+                        MoviePosterGrid(movies: vm.movies, onAppearLast: { _ in
+                            Task { await vm.loadMore() }
+                        })
+                    }
                 }
             } else if vm.isLoading {
                 ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
             }
         }
+        .navigationTitle(vm.actor?.name ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.load() }
     }
@@ -289,8 +305,12 @@ struct ActorDetailView: View {
 @MainActor
 final class ActorDetailViewModel: ObservableObject {
     @Published var actor: Actor?
+    @Published var movies: [Movie] = []
     @Published var isLoading = false
+    @Published var isLoadingMovies = false
     let actorID: String
+    private var page = 1
+    private var hasMore = true
 
     init(actorID: String) {
         self.actorID = actorID
@@ -298,7 +318,33 @@ final class ActorDetailViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
+        isLoadingMovies = true
         defer { isLoading = false }
         actor = try? await JavDBSDK.shared.actorDetail(actorID)
+        page = 1
+        hasMore = true
+        movies = []
+        await fetchMovies()
+    }
+
+    func loadMore() async {
+        guard hasMore, !isLoadingMovies else { return }
+        page += 1
+        await fetchMovies()
+    }
+
+    private func fetchMovies() async {
+        isLoadingMovies = true
+        defer { isLoadingMovies = false }
+        let keyword = actor?.name ?? actorID
+        let next = (try? await JavDBSDK.shared.search(keyword: keyword, page: page, limit: 21)) ?? []
+        if next.isEmpty {
+            hasMore = false
+        } else if page == 1 {
+            movies = next
+        } else {
+            let ids = Set(movies.map(\.id))
+            movies.append(contentsOf: next.filter { !ids.contains($0.id) })
+        }
     }
 }

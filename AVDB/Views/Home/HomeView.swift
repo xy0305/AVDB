@@ -22,9 +22,6 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     shortcutRow
                     recommendSection
-                    if let ad = vm.bannerAd {
-                        adBanner(ad)
-                    }
                     latestSection
                     top250Banner
                     magnetSection
@@ -157,25 +154,6 @@ struct HomeView: View {
         }
     }
 
-    private func adBanner(_ ad: AdItem) -> some View {
-        Group {
-            if let url = ad.url, let link = URL(string: url) {
-                Link(destination: link) {
-                    JavDBImage(url: ad.imageURL, contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 70)
-                        .clipped()
-                }
-            } else {
-                JavDBImage(url: ad.imageURL, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 70)
-                    .clipped()
-            }
-        }
-        .padding(.horizontal, 12)
-    }
-
     private var latestSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeaderBar(title: "最新上架") { goLatest = true }
@@ -264,7 +242,6 @@ final class HomeViewModel: ObservableObject {
     @Published var latest: [Movie] = []
     @Published var magnets: [Movie] = []
     @Published var following: [Movie] = []
-    @Published var bannerAd: AdItem?
     @Published var periodLabel = "週一/四更新"
     @Published var periods: [RecommendPeriod] = []
     private var periodIndex = 0
@@ -277,7 +254,6 @@ final class HomeViewModel: ObservableObject {
         async let latestTask = try? sdk.latestMovies(page: 1, limit: 9, type: "0")
         async let magTask = try? sdk.latestMovies(page: 2, limit: 9, type: "0")
         async let periodsTask = try? sdk.recommendPeriods()
-        async let adsTask = try? sdk.adsPayload()
         async let followTask = try? sdk.recentViewed()
 
         recommended = await rec ?? []
@@ -285,9 +261,6 @@ final class HomeViewModel: ObservableObject {
         magnets = (await magTask ?? []).filter { ($0.magnetsCount ?? 0) > 0 }
         if magnets.isEmpty { magnets = latest }
         periods = await periodsTask ?? []
-        if let ads = await adsTask, let first = ads.ads?["web_magnets_top"]?.first {
-            bannerAd = first
-        }
         following = await followTask ?? []
         if let created = periods.first?.createdAt, created.count >= 10 {
             periodLabel = String(created.prefix(10))

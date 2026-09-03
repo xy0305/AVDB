@@ -32,6 +32,8 @@
 		A115C11E7A7B115C11E7A005 /* RankingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A105 /* RankingsView.swift */; };
 		A115C11E7A7B115C11E7A006 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A106 /* CategoriesView.swift */; };
 		A115C11E7A7B115C11E7A007 /* Pan115PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A107 /* Pan115PlayerView.swift */; };
+		A115C11E7A7B115C11E7A008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A108 /* Assets.xcassets */; };
+		A115C11E7A7B115C11E7A009 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = A115C11E7A7B115C11E7A109 /* KSPlayer */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +63,7 @@
 		A115C11E7A7B115C11E7A105 /* RankingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A106 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A107 /* Pan115PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115PlayerView.swift; sourceTree = "<group>"; };
+		A115C11E7A7B115C11E7A108 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +71,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A115C11E7A7B115C11E7A009 /* KSPlayer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,6 +240,7 @@
 		4ED555353441D19559249EC8 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				A115C11E7A7B115C11E7A108 /* Assets.xcassets */,
 			);
 			name = Resources;
 			 path = "Resources";
@@ -265,6 +270,9 @@
 			dependencies = (
 			);
 			name = AVDB;
+			packageProductDependencies = (
+				A115C11E7A7B115C11E7A109 /* KSPlayer */,
+			);
 			productName = AVDB;
 			productReference = AVDB00000000000000000000A2 /* AVDB.app */;
 			productType = "com.apple.product-type.application";
@@ -294,6 +302,9 @@
 				zh_CN,
 			);
 			mainGroup = AVDB00000000000000000000B0;
+			packageReferences = (
+				A115C11E7A7B115C11E7A201 /* XCRemoteSwiftPackageReference "KSPlayer" */,
+			);
 			productRefGroup = AVDB00000000000000000000B1 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -308,6 +319,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A115C11E7A7B115C11E7A008 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,16 +417,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xy0305.AVDB;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -427,16 +440,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xy0305.AVDB;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -467,6 +481,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A115C11E7A7B115C11E7A201 /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kingslay/KSPlayer.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A115C11E7A7B115C11E7A109 /* KSPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A115C11E7A7B115C11E7A201 /* XCRemoteSwiftPackageReference "KSPlayer" */;
+			productName = KSPlayer;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = AVDB00000000000000000000A0 /* Project object */;
 }

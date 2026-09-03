@@ -327,41 +327,69 @@ public struct AdsData: Codable {
     public let ads: [String: [AdItem]]?
 }
 
-/// 磁力链接
-public struct Magnet: Codable, Identifiable, Hashable {
-    public let id: String?
-    public let link: String?
+/// 磁力链接（API：name/hash/size/cnsub/hd/files_count/created_at/pikpak_url）
+public struct Magnet: Decodable, Identifiable, Hashable {
     public let name: String?
-    public let title: String?
-    public let size: String?
-    public let sizeByte: Int64?
-    public let magnet: String?
-    public let fileCount: Int?
-    public let isHd: Bool?
-    public let hasCnsub: Bool?
-    public let sourceType: String?
-    public let provider: String?
-    public let number: String?
-    public let date: String?
-    public let isFavorite: Bool?
+    public let hash: String?
+    public let size: Int64?
+    public let cnsub: Bool?
+    public let hd: Bool?
+    public let filesCount: Int?
+    public let createdAt: String?
+    public let pikpakURL: String?
+
+    public var id: String { hash ?? name ?? "magnet" }
+    public var isHd: Bool? { hd }
+    public var hasCnsub: Bool? { cnsub }
+    public var date: String? { createdAt }
 
     enum CodingKeys: String, CodingKey {
-        case id, link, name, title, size, magnet, number, date, provider
-        case sizeByte = "size_byte"
-        case fileCount = "file_count"
+        case name, hash, size, cnsub, hd
+        case filesCount = "files_count"
+        case createdAt = "created_at"
+        case pikpakURL = "pikpak_url"
+        case link, magnet, id
         case isHd = "is_hd"
         case hasCnsub = "has_cnsub"
-        case sourceType = "source_type"
-        case isFavorite = "is_favorite"
+        case fileCount = "file_count"
     }
 
-    public var displayName: String {
-        return name ?? title ?? "磁力链接"
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try? c.decode(String.self, forKey: .name)
+        hash = JSONFlex.string(c, .hash)
+            ?? JSONFlex.string(c, .id)
+        size = JSONFlex.int(c, .size).map(Int64.init)
+        cnsub = JSONFlex.bool(c, .cnsub) ?? JSONFlex.bool(c, .hasCnsub)
+        hd = JSONFlex.bool(c, .hd) ?? JSONFlex.bool(c, .isHd)
+        filesCount = JSONFlex.int(c, .filesCount) ?? JSONFlex.int(c, .fileCount)
+        createdAt = JSONFlex.string(c, .createdAt)
+        pikpakURL = try? c.decode(String.self, forKey: .pikpakURL)
     }
 
-    /// ForEach 稳定标识（API 的 id 经常为空）
-    public var stableID: String {
-        id ?? link ?? magnet ?? displayName
+    public var displayName: String { name ?? "磁力链接" }
+
+    public var stableID: String { hash ?? name ?? displayName }
+
+    public var magnetURL: String? {
+        if let hash, !hash.isEmpty {
+            return "magnet:?xt=urn:btih:\(hash)"
+        }
+        return nil
+    }
+
+    public var sizeText: String? {
+        guard let size, size > 0 else { return nil }
+        // 实测磁力 size 多为 MB（如 5294 ≈ 5.29 GB）；更大则按字节。
+        if size < 100_000 {
+            if size >= 1000 {
+                return String(format: "%.2f GB", Double(size) / 1000.0)
+            }
+            return String(format: "%.0f MB", Double(size))
+        }
+        let gb = Double(size) / 1_000_000_000
+        if gb >= 1 { return String(format: "%.2f GB", gb) }
+        return String(format: "%.1f MB", Double(size) / 1_000_000)
     }
 }
 
@@ -413,7 +441,7 @@ public struct MovieDetailData: Decodable {
 }
 
 /// 磁力列表响应 data
-public struct MagnetListData: Codable {
+public struct MagnetListData: Decodable {
     public let magnets: [Magnet]?
     public let currentPage: Int?
     public let totalPages: Int?
@@ -510,6 +538,7 @@ public struct Review: Decodable, Identifiable, Hashable {
         case likeCount = "like_count"
         case isLiked = "is_liked"
         case likesCount = "likes_count"
+        case liked
         case username
     }
 
@@ -524,7 +553,7 @@ public struct Review: Decodable, Identifiable, Hashable {
         score = JSONFlex.int(c, .score)
         createdAt = JSONFlex.string(c, .createdAt)
         likeCount = JSONFlex.int(c, .likeCount) ?? JSONFlex.int(c, .likesCount)
-        isLiked = JSONFlex.bool(c, .isLiked)
+        isLiked = JSONFlex.bool(c, .isLiked) ?? JSONFlex.bool(c, .liked)
     }
 }
 

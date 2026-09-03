@@ -299,14 +299,28 @@ struct MovieDetailView: View {
 
     private func reviewsSection(_ movie: Movie) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("影评 (\(movie.reviewsCount ?? 0))")
-                .font(.headline)
+            NavigationLink {
+                ReviewsListView(movieID: movie.id, total: movie.reviewsCount ?? 0)
+            } label: {
+                HStack {
+                    Text("影评 (\(movie.reviewsCount ?? 0))")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text("全部")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
             if vm.reviews.isEmpty {
                 Text("暂无影评")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             } else {
-                ForEach(vm.reviews) { review in
+                ForEach(vm.reviews.prefix(3)) { review in
                     ReviewRow(review: review)
                 }
             }
@@ -360,6 +374,7 @@ final class MovieDetailViewModel: ObservableObject {
             let full = try await sdk.movieDetailFull(movieID)
             movie = full.movie
             relatedMovies = full.relativeMovies ?? []
+            WatchedStore.mark(movieID)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -389,11 +404,7 @@ struct MagnetRow: View {
     @State private var pushing = false
     @State private var toast: String?
 
-    private var magnetURL: String? {
-        let raw = magnet.link ?? magnet.magnet
-        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? nil : trimmed
-    }
+    private var magnetURL: String? { magnet.magnetURL }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -402,7 +413,7 @@ struct MagnetRow: View {
                     .font(.caption)
                     .lineLimit(2)
                 HStack(spacing: 8) {
-                    if let size = magnet.size, !size.isEmpty {
+                    if let size = magnet.sizeText {
                         Text(size).font(.caption2).foregroundColor(.secondary)
                     }
                     if magnet.isHd == true {
@@ -518,5 +529,71 @@ struct ReviewRow: View {
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+/// 影评独立列表，可滚动翻页
+struct ReviewsListView: View {
+    let movieID: String
+    var total: Int = 0
+    @StateObject private var vm = ReviewsListViewModel()
+
+    var body: some View {
+        List {
+            ForEach(vm.reviews) { review in
+                ReviewRow(review: review)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .onAppear {
+                        if review.id == vm.reviews.last?.id {
+                            Task { await vm.loadMore(movieID: movieID) }
+                        }
+                    }
+            }
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity)
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("影评 (\(total > 0 ? "\(total)" : "\(vm.reviews.count)"))")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await vm.load(movieID: movieID) }
+        .refreshable { await vm.load(movieID: movieID, force: true) }
+    }
+}
+
+@MainActor
+final class ReviewsListViewModel: ObservableObject {
+    @Published var reviews: [Review] = []
+    @Published var isLoading = false
+    private var page = 1
+    private var hasMore = true
+
+    func load(movieID: String, force: Bool = false) async {
+        if !force, !reviews.isEmpty { return }
+        page = 1
+        hasMore = true
+        reviews = []
+        await fetch(movieID: movieID)
+    }
+
+    func loadMore(movieID: String) async {
+        guard hasMore, !isLoading else { return }
+        page += 1
+        await fetch(movieID: movieID)
+    }
+
+    private func fetch(movieID: String) async {
+        isLoading = true
+        defer { isLoading = false }
+        let next = (try? await JavDBSDK.shared.movieReviews(movieID, page: page)) ?? []
+        if next.isEmpty {
+            hasMore = false
+        } else if page == 1 {
+            reviews = next
+        } else {
+            let ids = Set(reviews.map(\.stableReviewID))
+            reviews.append(contentsOf: next.filter { !ids.contains($0.stableReviewID) })
+        }
     }
 }
