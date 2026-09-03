@@ -249,6 +249,57 @@ public final class Pan115Client: @unchecked Sendable {
         throw lastError
     }
 
+    /// 全盘按番号搜索（对齐 Forward 模块 `GET webapi.115.com/files/search`）
+    public func searchFiles(keyword: String, cookie: String, limit: Int = 30) async throws -> [FileItem] {
+        let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !kw.isEmpty else { return [] }
+        let encoded = kw.formEncoded
+        let urls = [
+            "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&format=json",
+            "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&type=4&format=json",
+            "https://proapi.115.com/android/2.0/ufile/search?search_value=\(encoded)&limit=\(limit)&offset=0",
+        ]
+        var lastError: Error = Pan115Error.fileNotFound
+        for u in urls {
+            guard let url = URL(string: u) else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = "GET"
+            appendCommonHeaders(&req, cookie: cookie)
+            do {
+                let obj = try await json(for: req)
+                let files = extractFileList(obj)
+                if !files.isEmpty { return files }
+                if boolState(obj["state"]) { return [] }
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
+    }
+
+    /// 按番号匹配 115 文件：全盘搜索优先，再回落到离线目录。
+    public func findMatchedVideo(
+        keyword: String,
+        cookie: String,
+        folderCID: String? = nil,
+        requireMatch: Bool = true
+    ) async throws -> FileItem {
+        let needle = normalizedKey(keyword)
+        guard !needle.isEmpty else { throw Pan115Error.fileNotFound }
+
+        let searchText = searchKeyword(from: keyword)
+        if let files = try? await searchFiles(keyword: searchText, cookie: cookie) {
+            if let hit = pickVideo(from: files, keyword: keyword, requireMatch: true) {
+                return hit
+            }
+        }
+
+        if let cid = folderCID, !cid.isEmpty {
+            return try await findLatestVideo(in: cid, cookie: cookie, keyword: keyword, requireMatch: requireMatch)
+        }
+        throw Pan115Error.fileNotFound
+    }
+
     /// 在离线目录中找与番号匹配的视频（必要时进一层文件夹）
     public func findLatestVideo(
         in cid: String,
@@ -319,7 +370,7 @@ public final class Pan115Client: @unchecked Sendable {
         _ = try await addOfflineTask(url: magnet, cookie: cookie, folderCID: folderCID)
         let task = try await waitOfflineReady(keyword: keyword, cookie: cookie)
         let cid = task.dirID.isEmpty ? folderCID : task.dirID
-        let file = try await findLatestVideo(in: cid, cookie: cookie, keyword: keyword)
+        let file = try await findMatchedVideo(keyword: keyword, cookie: cookie, folderCID: cid, requireMatch: true)
         return try await originalPlayURL(pickCode: file.pickCode, cookie: cookie, filename: file.name)
     }
 
@@ -328,16 +379,47 @@ public final class Pan115Client: @unchecked Sendable {
         if videos.isEmpty {
             videos = files.filter { !$0.isDir && !$0.pickCode.isEmpty && $0.size > 10_000_000 }
         }
-        guard let keyword, !keyword.isEmpty else {
-            return requireMatch ? nil : videos.max(by: { $0.size < $1.size })
+        let scored: [FileItem]
+        if let keyword, !keyword.isEmpty {
+            let n = normalizedKey(keyword)
+            let hits = videos.filter { file in
+                let name = normalizedKey(file.name)
+                return name.contains(n)
+            }
+            scored = hits.isEmpty && !requireMatch ? videos : hits
+        } else {
+            if requireMatch { return nil }
+            scored = videos
         }
-        let n = normalizedKey(keyword)
-        let hits = videos.filter { file in
-            let name = normalizedKey(file.name)
-            return name.contains(n) || n.contains(name)
+        return scored.max(by: { score($0) < score($1) })
+    }
+
+    /// 排除 trailer/sample/preview，大文件优先（对齐 Forward 模块 scoreWesternFile）
+    private func score(_ file: FileItem) -> Int {
+        var s = 0
+        let n = file.name.lowercased()
+        for bad in ["trailer", "sample", "preview", "behind", "bts"] {
+            if n.contains(bad) { s -= 50 }
         }
-        if let hit = hits.max(by: { $0.size < $1.size }) { return hit }
-        return requireMatch ? nil : videos.max(by: { $0.size < $1.size })
+        if file.size >= 2_000_000_000 { s += 30 }
+        else if file.size >= 1_000_000_000 { s += 20 }
+        else if file.size >= 500_000_000 { s += 10 }
+        else if file.size > 0 && file.size < 100_000_000 { s -= 20 }
+        if n.count > 30 { s += 5 }
+        s += Int(min(file.size / 50_000_000, 40))
+        return s
+    }
+
+    /// FC2-PPV-123 → 123；普通番号去掉符号后搜
+    private func searchKeyword(from raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let upper = trimmed.uppercased()
+        if let r = try? NSRegularExpression(pattern: #"FC2(?:[- ]?PPV)?[- ]?(\d{5,8})"#, options: .caseInsensitive),
+           let m = r.firstMatch(in: upper, range: NSRange(upper.startIndex..., in: upper)),
+           let range = Range(m.range(at: 1), in: upper) {
+            return String(upper[range])
+        }
+        return trimmed.lowercased()
     }
 
     private func normalizedKey(_ raw: String?) -> String {
@@ -376,20 +458,69 @@ public final class Pan115Client: @unchecked Sendable {
         var i = 0
         while i < lines.count {
             let line = lines[i]
-            if line.hasPrefix("#EXT-X-STREAM-INF:") {
-                let bw = Int(line.split(separator: "BANDWIDTH=").last?.split(separator: ",").first ?? "0") ?? 0
+            if line.contains("#EXT-X-STREAM-INF") {
+                let name = capture(line, #"NAME="([^"]+)""#)
+                let height = Int(capture(line, #"RESOLUTION=\d+x(\d+)"#) ?? "") ?? 0
+                let bw = Int(capture(line, #"BANDWIDTH=(\d+)"#) ?? "") ?? 0
+                let label = qualityLabel(name: name, height: height, bandwidth: bw)
                 if i + 1 < lines.count {
                     var u = lines[i + 1]
+                    if u.hasPrefix("https: //") { u = u.replacingOccurrences(of: "https: //", with: "https://") }
                     if !u.hasPrefix("http"), let abs = URL(string: u, relativeTo: URL(string: "https://115.com/")) {
                         u = abs.absoluteString
                     }
-                    let name = bw > 0 ? "\(bw / 1000)k" : "原画"
-                    streams.append(PlayStream(name: "115 \(name)", url: u, bandwidth: bw))
+                    if u.hasPrefix("http") {
+                        streams.append(PlayStream(name: label, url: u, bandwidth: bw + qualityPriority(name: name, height: height) * 10_000_000))
+                    }
                 }
             }
             i += 1
         }
         return streams.sorted { $0.bandwidth > $1.bandwidth }
+    }
+
+    private func capture(_ line: String, _ pattern: String) -> String? {
+        guard let r = try? NSRegularExpression(pattern: pattern),
+              let m = r.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+              m.numberOfRanges > 1,
+              let range = Range(m.range(at: 1), in: line) else { return nil }
+        return String(line[range])
+    }
+
+    private func qualityLabel(name: String?, height: Int, bandwidth: Int) -> String {
+        let n = (name ?? "").uppercased()
+        switch n {
+        case "BD": return "4K"
+        case "UD": return "1080P"
+        case "HD": return "720P"
+        case "SD": return "480P"
+        case "LD": return "360P"
+        default: break
+        }
+        if height >= 2160 { return "4K" }
+        if height >= 1080 { return "1080P" }
+        if height >= 720 { return "720P" }
+        if height >= 480 { return "480P" }
+        if height >= 360 { return "360P" }
+        if bandwidth > 0 { return "\(bandwidth / 1000)k" }
+        return "原画"
+    }
+
+    private func qualityPriority(name: String?, height: Int) -> Int {
+        let n = (name ?? "").uppercased()
+        switch n {
+        case "BD": return 4
+        case "UD": return 3
+        case "HD": return 2
+        case "SD": return 1
+        case "LD": return 0
+        default: break
+        }
+        if height >= 2160 { return 4 }
+        if height >= 1080 { return 3 }
+        if height >= 720 { return 2 }
+        if height >= 480 { return 1 }
+        return 0
     }
 
     private func json(for req: URLRequest) async throws -> [String: Any] {

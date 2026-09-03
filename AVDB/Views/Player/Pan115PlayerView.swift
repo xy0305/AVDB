@@ -2,7 +2,7 @@
 //  Pan115PlayerView.swift
 //  AVDB
 //
-//  推送磁力到 115 离线，按番号匹配完成后用 KSPlayer 播原画。
+//  按番号全盘搜索 115 文件（对齐 Forward 模块 files/search），KSPlayer 播最高清晰度。
 //
 
 import SwiftUI
@@ -19,7 +19,7 @@ struct Pan115PlayerView: View {
                 KSChromePlayer(
                     url: url,
                     title: movie.displayNumber,
-                    subtitle: vm.fileName,
+                    subtitle: vm.qualityLabel,
                     headers: vm.headers
                 )
             } else if vm.isLoading {
@@ -43,6 +43,19 @@ struct Pan115PlayerView: View {
         .background(Color(.systemBackground))
         .navigationTitle("115 原画")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if vm.streams.count > 1 {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        ForEach(Array(vm.streams.enumerated()), id: \.offset) { _, s in
+                            Button(s.name) { vm.select(s) }
+                        }
+                    } label: {
+                        Text(vm.qualityLabel)
+                    }
+                }
+            }
+        }
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
     }
 }
@@ -54,11 +67,14 @@ final class Pan115PlayerViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var fileName = ""
     @Published var playURL: URL?
+    @Published var streams: [Pan115Client.PlayStream] = []
+    @Published var qualityLabel = "原画"
 
     var headers: [String: String] {
         [
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
             "Referer": "https://115.com/",
+            "Origin": "https://115.com",
             "Cookie": Pan115Settings.shared.cookie,
         ]
     }
@@ -72,6 +88,7 @@ final class Pan115PlayerViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         playURL = nil
+        streams = []
         defer { isLoading = false }
 
         let cookie = settings.cookie
@@ -82,14 +99,11 @@ final class Pan115PlayerViewModel: ObservableObject {
             ?? ""
 
         do {
-            status = "正在目录中查找 \(keyword)…"
-            if let existing = try? await Pan115Client.shared.findLatestVideo(
-                in: cid, cookie: cookie, keyword: keyword, requireMatch: true
+            status = "正在 115 中搜索 \(keyword)…"
+            if let existing = try? await Pan115Client.shared.findMatchedVideo(
+                keyword: keyword, cookie: cookie, folderCID: cid, requireMatch: true
             ) {
-                fileName = existing.name
-                status = "获取 115 原画地址…"
-                playURL = try await Pan115Client.shared.originalPlayURL(
-                    pickCode: existing.pickCode, cookie: cookie, filename: existing.name)
+                try await play(file: existing, cookie: cookie)
                 return
             }
 
@@ -103,20 +117,34 @@ final class Pan115PlayerViewModel: ObservableObject {
             Pan115PlaybackCache.save(movieID: movie.id, magnet: magnet)
             status = result.message + "，等待离线完成…"
 
-            let task = try await Pan115Client.shared.waitOfflineReady(
+            _ = try await Pan115Client.shared.waitOfflineReady(
                 keyword: keyword, cookie: cookie, timeout: 90)
-            status = "离线完成：\(task.name)"
 
-            let searchCID = task.dirID.isEmpty ? cid : task.dirID
-            let file = try await Pan115Client.shared.findLatestVideo(
-                in: searchCID, cookie: cookie, keyword: keyword, requireMatch: true)
-            fileName = file.name
-            status = "获取 115 原画地址…"
-            playURL = try await Pan115Client.shared.originalPlayURL(
-                pickCode: file.pickCode, cookie: cookie, filename: file.name)
+            status = "离线完成，正在匹配 \(keyword)…"
+            let file = try await Pan115Client.shared.findMatchedVideo(
+                keyword: keyword, cookie: cookie, folderCID: cid, requireMatch: true)
+            try await play(file: file, cookie: cookie)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func select(_ stream: Pan115Client.PlayStream) {
+        qualityLabel = stream.name
+        playURL = URL(string: stream.url)
+    }
+
+    private func play(file: Pan115Client.FileItem, cookie: String) async throws {
+        fileName = file.name
+        status = "获取 115 播放地址…"
+        let list = try await Pan115Client.shared.streamsForVideo(
+            pickCode: file.pickCode, cookie: cookie, filename: file.name)
+        streams = list
+        guard let best = list.first, let url = URL(string: best.url) else {
+            throw Pan115Error.playURLNotFound
+        }
+        qualityLabel = best.name
+        playURL = url
     }
 }
 
