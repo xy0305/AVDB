@@ -59,13 +59,24 @@ struct UnderlineTabBar<Tab: Hashable>: View {
     }
 }
 
-/// 胶囊筛选条（原生分段按钮）。保留旧名以兼容调用点。
+/// 胶囊筛选条（系统原生分段控件，不滚动、不拖动）。
 struct CapsuleChipBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
 
     var body: some View {
-        SegmentChipBar(tabs: tabs, selection: $selection)
+        if tabs.count <= 4 {
+            Picker("", selection: $selection) {
+                ForEach(tabs, id: \.0) { tab, title in
+                    Text(title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        } else {
+            SegmentChipBar(tabs: tabs, selection: $selection)
+        }
     }
 }
 
@@ -85,28 +96,30 @@ struct SegmentedTabBar<Tab: Hashable>: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(tabs, id: \.0) { tab, title in
-                        Button {
-                            selection = tab
-                        } label: {
-                            Text(title)
-                                .font(.subheadline.weight(selection == tab ? .semibold : .regular))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(
-                                    selection == tab ? Color.accentColor : Color(.tertiarySystemFill)
-                                )
-                                .foregroundStyle(selection == tab ? Color.white : Color.primary)
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
+            // 多标签：非滚动、等宽原生按钮，避免横向拖动
+            HStack(spacing: 0) {
+                ForEach(tabs, id: \.0) { tab, title in
+                    Button {
+                        selection = tab
+                    } label: {
+                        Text(title)
+                            .font(.footnote.weight(selection == tab ? .semibold : .regular))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .foregroundStyle(selection == tab ? Color.accentColor : Color.secondary)
+                            .overlay(alignment: .bottom) {
+                                Rectangle()
+                                    .fill(selection == tab ? Color.accentColor : Color.clear)
+                                    .frame(height: 2)
+                            }
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
             }
-            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .padding(.top, 4)
         }
     }
 }

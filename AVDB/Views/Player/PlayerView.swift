@@ -322,18 +322,34 @@ struct KSChromePlayer: View {
                     }
                 }
                 Spacer()
-                HStack {
-                    glassButton(isPlaying ? "pause.fill" : "play.fill") {
-                        if isPlaying {
-                            coordinator.playerLayer?.pause()
+
+                // 播放/暂停按钮居中
+                Button {
+                    if isPlaying {
+                        coordinator.playerLayer?.pause()
+                    } else {
+                        coordinator.playerLayer?.play()
+                    }
+                } label: {
+                    ZStack {
+                        if isBuffering {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(1.3)
                         } else {
-                            coordinator.playerLayer?.play()
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 32, weight: .semibold))
+                                .foregroundStyle(.white)
                         }
                     }
-                    Spacer()
-                    if isBuffering {
-                        ProgressView().tint(.white)
-                    }
+                    .frame(width: 72, height: 72)
+                    .background(.ultraThinMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                HStack {
                     if !subtitle.isEmpty {
                         Text(subtitle)
                             .font(.caption.weight(.semibold))
@@ -342,6 +358,7 @@ struct KSChromePlayer: View {
                             .padding(.vertical, 6)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
+                    Spacer()
                 }
                 progressBar
                     .padding(.top, 12)
