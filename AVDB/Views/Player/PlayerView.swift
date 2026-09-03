@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import KSPlayer
 
 struct PlayerView: View {
@@ -141,6 +142,8 @@ struct KSChromePlayer: View {
     private var playerOptions: KSOptions {
         let o = KSOptions()
         if !headers.isEmpty { o.appendHeader(headers) }
+        if let ua = headers["User-Agent"] { o.userAgent = ua }
+        if let referer = headers["Referer"] { o.referer = referer }
         KSOptions.isAutoPlay = true
         o.videoAdaptable = false
         o.canStartPictureInPictureAutomaticallyFromInline = true
@@ -168,10 +171,12 @@ struct KSChromePlayer: View {
             coordinator.isMaskShow = false
             wireCoordinator()
             scheduleHide()
+            OrientationLock.set(.landscapeRight, keepLocked: true)
         }
         .onDisappear {
             hideTask?.cancel()
             coordinator.playerLayer?.pause()
+            OrientationLock.set(.portrait, keepLocked: true)
         }
     }
 
@@ -297,6 +302,30 @@ struct KSChromePlayer: View {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard !Task.isCancelled else { return }
             withAnimation { showChrome = false }
+        }
+    }
+}
+
+enum OrientationLock {
+    static func set(_ mask: UIInterfaceOrientationMask, keepLocked: Bool = false) {
+        KSOptions.supportedInterfaceOrientations = mask
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first else { return }
+        if let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController {
+            rootVC.setNeedsUpdateOfSupportedInterfaceOrientations()
+        }
+        DispatchQueue.main.async {
+            windowScene.requestGeometryUpdate(
+                UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
+            ) { _ in }
+            guard !keepLocked else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                KSOptions.supportedInterfaceOrientations = .allButUpsideDown
+                if let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController {
+                    rootVC.setNeedsUpdateOfSupportedInterfaceOrientations()
+                }
+            }
         }
     }
 }

@@ -84,7 +84,10 @@ public final class Pan115Client: @unchecked Sendable {
     public static let shared = Pan115Client()
 
     private let session: URLSession
-    private let userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    /// 必须与播放器 UA 一致，否则 115 按 UA 绑定的 m3u8 会 403。
+    static let safariUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15"
+
+    private var userAgent: String { Self.safariUA }
 
     private init() {
         let config = URLSessionConfiguration.ephemeral
@@ -610,13 +613,24 @@ public final class Pan115Client: @unchecked Sendable {
         return .failed(msg.isEmpty ? "添加失败" : msg)
     }
 
+    static func playHeaders(cookie: String) -> [String: String] {
+        [
+            "User-Agent": safariUA,
+            "Accept": "*/*",
+            "Origin": "https://115.com",
+            "Referer": "https://115.com/",
+            "Cookie": Pan115Settings.normalizeCookie(cookie),
+        ]
+    }
+
     private func appendCommonHeaders(_ req: inout URLRequest, cookie: String) {
-        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        let h = Self.playHeaders(cookie: cookie)
+        req.setValue(h["User-Agent"], forHTTPHeaderField: "User-Agent")
         req.setValue("application/json, text/javascript, */*; q=0.01", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
-        req.setValue("https://115.com", forHTTPHeaderField: "Origin")
-        req.setValue("https://115.com/", forHTTPHeaderField: "Referer")
-        req.setValue(cookie, forHTTPHeaderField: "Cookie")
+        req.setValue(h["Origin"], forHTTPHeaderField: "Origin")
+        req.setValue(h["Referer"], forHTTPHeaderField: "Referer")
+        req.setValue(h["Cookie"], forHTTPHeaderField: "Cookie")
     }
 }
 

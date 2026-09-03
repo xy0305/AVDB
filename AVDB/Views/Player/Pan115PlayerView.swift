@@ -77,12 +77,7 @@ final class Pan115PlayerViewModel: ObservableObject {
     @Published var qualityLabel = "原画"
 
     var headers: [String: String] {
-        [
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
-            "Referer": "https://115.com/",
-            "Origin": "https://115.com",
-            "Cookie": Pan115Settings.shared.cookie,
-        ]
+        Pan115Client.playHeaders(cookie: Pan115Settings.shared.cookie)
     }
 
     func start(movie: Movie, magnetURL: String?) async {
