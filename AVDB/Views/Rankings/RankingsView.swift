@@ -150,6 +150,11 @@ struct RankingsView: View {
                         top250Row(rank: vm.startRank + idx, movie: movie)
                     }
                     .buttonStyle(.plain)
+                    .onAppear {
+                        if movie.id == vm.displayed.last?.id {
+                            Task { await vm.loadMore() }
+                        }
+                    }
                 }
                 if vm.isLoading { ProgressView().padding() }
             }
@@ -239,24 +244,7 @@ final class RankingsViewModel: ObservableObject {
     private var pool: [Movie] = []
     private let sdk = JavDBSDK.shared
 
-    var displayed: [Movie] {
-        var list = pool
-        if catalog != "all" {
-            // 類型篩選走重新拉榜，這裡只做年份 / 看過
-        }
-        if !year.isEmpty {
-            list = list.filter { ($0.releaseDate ?? "").hasPrefix(year) }
-        }
-        if hideWatched {
-            let seen = WatchedStore.ids
-            list = list.filter { !seen.contains($0.id) }
-        }
-        let start = max(startRank - 1, 0)
-        if start < list.count {
-            return Array(list[start...])
-        }
-        return []
-    }
+    var displayed: [Movie] { movies }
 
     func load(
         tab: RankingTab,
@@ -286,7 +274,7 @@ final class RankingsViewModel: ObservableObject {
     }
 
     func loadMore() async {
-        guard currentTab != .top250, hasMore, !isLoading else { return }
+        guard hasMore, !isLoading else { return }
         page += 1
         await fetch()
     }
@@ -328,26 +316,27 @@ final class RankingsViewModel: ObservableObject {
         append(list)
     }
 
+    private var topQuery: (type: String, value: String) {
+        if !year.isEmpty { return ("year", year) }
+        switch catalog {
+        case "0", "1", "2", "3": return ("video_type", catalog)
+        default: return ("all", "")
+        }
+    }
+
     private func fetchTop250() async {
         isLoading = true
         defer { isLoading = false }
-        let type: String
-        switch catalog {
-        case "0", "1", "2", "3": type = catalog
-        default: type = "0"
-        }
-        var all: [Movie] = []
-        var seen = Set<String>()
-        for p in 1...6 {
-            let chunk = (try? await sdk.rankings(type: type, period: "daily", page: p)) ?? []
-            if chunk.isEmpty { break }
-            for m in chunk where seen.insert(m.id).inserted {
-                all.append(m)
-            }
-            if all.count >= 250 { break }
-        }
-        pool = Array(all.prefix(250))
-        movies = pool
+        let q = topQuery
+        let list = (try? await sdk.topMovies(
+            startRank: startRank,
+            type: q.type,
+            typeValue: q.value,
+            ignoreWatched: hideWatched,
+            page: page,
+            limit: 25
+        )) ?? []
+        append(list)
     }
 
     private func append(_ list: [Movie]) {
@@ -379,12 +368,20 @@ struct Top250FilterSheet: View {
                     Text("篩選")
                         .font(.title2.bold())
 
-                    chipRow(types.map { ($0.0, $0.1) }, selected: vm.catalog) { vm.catalog = $0 }
+                    chipRow(types.map { ($0.0, $0.1) }, selected: vm.year.isEmpty ? vm.catalog : "") { id in
+                        vm.catalog = id
+                        vm.year = ""
+                    }
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
                         ForEach(years, id: \.self) { y in
                             chip(y, on: vm.year == y) {
-                                vm.year = vm.year == y ? "" : y
+                                if vm.year == y {
+                                    vm.year = ""
+                                } else {
+                                    vm.year = y
+                                    vm.catalog = "all"
+                                }
                             }
                         }
                     }

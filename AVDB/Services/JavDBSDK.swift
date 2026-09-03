@@ -155,11 +155,26 @@ public final class JavDBSDK {
         return resp.data?.movies ?? []
     }
 
-    /// 排行榜（GET /api/v1/movies/top，需登录）
-    public func topMovies(page: Int = 1, period: String? = nil) async throws -> [Movie] {
-        var query = ["page": "\(page)"]
-        if let p = period { query["period"] = p }
-        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/top", query: query, useToken: true)
+    /// TOP250（GET /api/v1/movies/top）
+    /// type: all | video_type | year；type_value: 空 / 0有码 1无码 2欧美 3FC2 / 年份
+    public func topMovies(
+        startRank: Int = 1,
+        type: String = "all",
+        typeValue: String = "",
+        ignoreWatched: Bool = false,
+        page: Int = 1,
+        limit: Int = 25
+    ) async throws -> [Movie] {
+        let query: [String: String] = [
+            "start_rank": "\(startRank)",
+            "type": type,
+            "type_value": typeValue,
+            "ignore_watched": ignoreWatched ? "true" : "false",
+            "page": "\(page)",
+            "limit": "\(min(limit, 50))",
+        ]
+        let resp: JavDBResponse<MovieListData> = try await client.get(
+            "/api/v1/movies/top", query: query, useToken: true)
         return resp.data?.movies ?? []
     }
 
