@@ -45,14 +45,7 @@ struct MovieDetailView: View {
         .task { await vm.load() }
         .fullScreenCover(isPresented: $play115) {
             if let movie = vm.movie {
-                NavigationStack {
-                    Pan115PlayerView(movie: movie)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("关闭") { play115 = false }
-                            }
-                        }
-                }
+                Pan115PlayerView(movie: movie)
             }
         }
         .fullScreenCover(isPresented: $showTrailer) {

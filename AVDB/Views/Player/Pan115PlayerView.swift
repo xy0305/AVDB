@@ -47,21 +47,7 @@ struct Pan115PlayerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("115 原画")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if vm.streams.count > 1 {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(Array(vm.streams.enumerated()), id: \.offset) { _, s in
-                            Button(s.name) { vm.select(s) }
-                        }
-                    } label: {
-                        Text(vm.qualityLabel)
-                    }
-                }
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
     }
 }

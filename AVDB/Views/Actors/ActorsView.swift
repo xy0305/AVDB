@@ -245,6 +245,7 @@ struct ActorDetailView: View {
     }
 
     @EnvironmentObject private var appState: AppState
+    @State private var showLogin = false
 
     var body: some View {
         ScrollView {
@@ -274,7 +275,11 @@ struct ActorDetailView: View {
                                 info("@" + twitter)
                             }
                             Button {
-                                Task { await vm.toggleCollect() }
+                                if appState.isLoggedIn {
+                                    Task { await vm.toggleCollect() }
+                                } else {
+                                    showLogin = true
+                                }
                             } label: {
                                 Text(vm.hasCollected ? "已訂閱" : "訂閱")
                                     .font(.caption.weight(.semibold))
@@ -285,7 +290,12 @@ struct ActorDetailView: View {
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
-                            .disabled(!appState.isLoggedIn || vm.isCollecting)
+                            .disabled(vm.isCollecting)
+                            if let hint = vm.collectHint {
+                                Text(hint)
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
                         }
                         Spacer()
                     }
@@ -341,6 +351,10 @@ struct ActorDetailView: View {
         .navigationTitle(vm.actor?.displayName ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.load() }
+        .sheet(isPresented: $showLogin) {
+            LoginView()
+                .environmentObject(appState)
+        }
     }
 
     private func filterChip(_ title: String, id: String) -> some View {
@@ -374,6 +388,7 @@ final class ActorDetailViewModel: ObservableObject {
     @Published var filter = ""
     @Published var hasCollected = false
     @Published var isCollecting = false
+    @Published var collectHint: String?
     let actorID: String
     private var page = 1
     private var hasMore = true
@@ -418,12 +433,22 @@ final class ActorDetailViewModel: ObservableObject {
     func toggleCollect() async {
         guard let actor, !isCollecting else { return }
         isCollecting = true
+        collectHint = nil
         defer { isCollecting = false }
         let next = !hasCollected
-        let ok = (try? await JavDBSDK.shared.collectActor(
-            actorID, name: actor.displayName, collect: next
-        )) ?? false
-        if ok { hasCollected = next }
+        let officialName = actor.name ?? actor.otherName ?? actor.displayName
+        do {
+            let ok = try await JavDBSDK.shared.collectActor(
+                actorID, name: officialName, collect: next
+            )
+            if ok {
+                hasCollected = next
+            } else {
+                collectHint = "訂閱失敗，請稍後再試"
+            }
+        } catch {
+            collectHint = error.localizedDescription
+        }
     }
 
     private func fetchMovies() async {

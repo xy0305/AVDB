@@ -151,8 +151,14 @@ struct KSChromePlayer: View {
     @State private var overlayValue: Double = 0
     @State private var dragStart: Double = 0
     @State private var verticalDrag = false
+    @State private var fillMode: FillMode = .fit
 
     private enum OverlayKind { case brightness, volume }
+    private enum FillMode: String, CaseIterable {
+        case fit = "适应屏幕"
+        case fill = "填满屏幕"
+        case stretch = "拉伸填满"
+    }
 
     private var playerOptions: KSOptions {
         let o = KSOptions()
@@ -160,8 +166,8 @@ struct KSChromePlayer: View {
         if let ua = headers["User-Agent"] { o.userAgent = ua }
         if let referer = headers["Referer"] { o.referer = referer }
         KSOptions.isAutoPlay = true
-        o.videoAdaptable = false
-        o.canStartPictureInPictureAutomaticallyFromInline = true
+        o.videoAdaptable = fillMode != .stretch
+        o.canStartPictureInPictureAutomaticallyFromInline = false
         return o
     }
 
@@ -203,6 +209,7 @@ struct KSChromePlayer: View {
         ZStack {
             Color.black
             KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
+                .onAppear { applyFillMode() }
             if !hasStarted {
                 ProgressView()
                     .tint(.white)
@@ -307,86 +314,100 @@ struct KSChromePlayer: View {
     }
 
     private var chromeOverlay: some View {
-        ZStack {
-            // 顶/底部渐变（仿 StripCam 质感）
-            VStack(spacing: 0) {
-                LinearGradient(
-                    colors: [Color.black.opacity(0.5), .clear],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(height: 90)
-                Spacer()
-                LinearGradient(
-                    colors: [.clear, Color.black.opacity(0.6)],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(height: 110)
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-
-            // 左上：返回
-            VStack {
-                HStack {
-                    glassButton("chevron.left") { dismiss() }
-                    Spacer()
-                }
-                Spacer()
-            }
-
-            // 右上：PiP
-            VStack {
-                HStack {
-                    Spacer()
-                    glassButton("pip") {
-                        coordinator.playerLayer?.isPipActive.toggle()
-                    }
-                }
-                Spacer()
-            }
-
-            // 中央大播放按钮（仅暂停/缓冲时显示）
-            if !isPlaying {
-                Button {
-                    coordinator.playerLayer?.play()
-                } label: {
-                    ZStack {
-                        if isBuffering {
-                            ProgressView().tint(.white).scaleEffect(1.2)
-                        } else {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .frame(width: 62, height: 62)
-                    .background(.black.opacity(0.45), in: Circle())
+        VStack(spacing: 0) {
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
-            }
 
-            // 左下：播放/暂停（胶囊容器）
-            VStack {
-                Spacer()
-                HStack {
-                    capsuleButton(isPlaying ? "pause.fill" : "play.fill") {
-                        if isPlaying {
-                            coordinator.playerLayer?.pause()
-                        } else {
-                            coordinator.playerLayer?.play()
+                Text(title.isEmpty ? "正在播放" : title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+
+                Menu {
+                    ForEach(FillMode.allCases, id: \.self) { mode in
+                        Button {
+                            fillMode = mode
+                            applyFillMode()
+                        } label: {
+                            if fillMode == mode {
+                                Label(mode.rawValue, systemImage: "checkmark")
+                            } else {
+                                Text(mode.rawValue)
+                            }
                         }
                     }
-                    Spacer()
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
 
-            // 底部：进度条
-            VStack {
+            Spacer()
+
+            progressBar
+                .padding(.horizontal, 16)
+
+            HStack(spacing: 22) {
+                Button {
+                    if isPlaying {
+                        coordinator.playerLayer?.pause()
+                    } else {
+                        coordinator.playerLayer?.play()
+                    }
+                } label: {
+                    Group {
+                        if isBuffering {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    seek(to: min((isSeeking ? seekValue : currentTime) + 10, max(duration, 0)))
+                } label: {
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+
                 Spacer()
-                progressBar
+
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+            .padding(.top, 6)
         }
-        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0.55), .clear, .clear, Color.black.opacity(0.7)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
         .allowsHitTesting(true)
     }
 
@@ -417,6 +438,7 @@ struct KSChromePlayer: View {
                 }
             }
             .tint(.white)
+            .controlSize(.small)
             Text(formatTime(duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white)
@@ -449,6 +471,18 @@ struct KSChromePlayer: View {
         .buttonStyle(.plain)
     }
 
+    private func applyFillMode() {
+        guard let player = coordinator.playerLayer?.player else { return }
+        switch fillMode {
+        case .fit:
+            player.contentMode = .scaleAspectFit
+        case .fill:
+            player.contentMode = .scaleAspectFill
+        case .stretch:
+            player.contentMode = .scaleToFill
+        }
+    }
+
     private func wireCoordinator() {
         coordinator.isMaskShow = false
         coordinator.onStateChanged = { _, state in
@@ -460,6 +494,7 @@ struct KSChromePlayer: View {
                 }
                 if state == .readyToPlay {
                     coordinator.playerLayer?.play()
+                    applyFillMode()
                     syncTime()
                 }
             }
