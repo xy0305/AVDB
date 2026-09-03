@@ -230,11 +230,12 @@ struct RankingsView: View {
         .safeAreaInset(edge: .bottom) {
             Button { showTopFilter = true } label: {
                 Text("篩選")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
             }
             .background(.bar)
+            .padding(.bottom, 88)
         }
     }
 

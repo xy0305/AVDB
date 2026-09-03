@@ -11,10 +11,11 @@ import KSPlayer
 struct Pan115PlayerView: View {
     let movie: Movie
     var magnetURL: String? = nil
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var vm = Pan115PlayerViewModel()
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             Color.black.ignoresSafeArea()
             if let url = vm.playURL, vm.errorMessage == nil, !vm.isLoading {
                 KSChromePlayer(
@@ -32,6 +33,7 @@ struct Pan115PlayerView: View {
                     Button("重试") {
                         Task { await vm.start(movie: movie, magnetURL: magnetURL) }
                     }
+                    Button("关闭") { dismiss() }
                 }
                 .foregroundStyle(.white)
             } else {
@@ -43,7 +45,21 @@ struct Pan115PlayerView: View {
                         .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
+                    Button("取消") { dismiss() }
+                        .foregroundStyle(.white)
                 }
+            }
+
+            if vm.playURL == nil || vm.errorMessage != nil {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 16)
+                .padding(.top, 12)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -178,12 +178,18 @@ struct MovieDetailView: View {
             Text("标签").font(.headline)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(tags) { tag in
-                    Text(tag.name ?? "")
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color(.systemGray6))
-                        .clipShape(Capsule())
+                    NavigationLink {
+                        TagMoviesView(tag: tag, catalogType: vm.movie?.type ?? "0")
+                    } label: {
+                        Text(tag.name ?? "")
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color(.systemGray6))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

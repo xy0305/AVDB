@@ -57,7 +57,9 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaPadding(.bottom, 76)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Color.clear.frame(height: 88)
+            }
 
             FloatingGlassTabBar(selection: $selectedTab)
                 .padding(.horizontal, 18)

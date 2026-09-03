@@ -96,6 +96,7 @@ struct CategoriesView: View {
             .padding(.vertical, 10)
             .background(Color(.systemBackground))
         }
+        .padding(.bottom, 88)
     }
 }
 
@@ -388,6 +389,43 @@ struct FlowLayout: Layout {
             x += size.width + spacing
         }
         return (CGSize(width: maxWidth.isFinite ? maxWidth : x, height: y + rowHeight), positions)
+    }
+}
+
+/// 详情标签跳转：官方 `filter_by={type}:t::{tagID}::`
+struct TagMoviesView: View {
+    let tag: Tag
+    var catalogType: String = "0"
+    @StateObject private var vm: MovieListViewModel
+
+    init(tag: Tag, catalogType: String = "0") {
+        self.tag = tag
+        self.catalogType = catalogType
+        let type = catalogType.isEmpty ? "0" : catalogType
+        let filter = "\(type):t::\(tag.id)::"
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.moviesByTag(
+                filterBy: filter,
+                type: nil,
+                page: page,
+                limit: 24,
+                sortBy: "release",
+                orderBy: "desc"
+            )
+        })
+    }
+
+    var body: some View {
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+        }
+        .navigationTitle(tag.name ?? tag.id)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
     }
 }
 
