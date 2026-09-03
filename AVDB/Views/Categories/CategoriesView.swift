@@ -134,12 +134,7 @@ enum CatalogSort: String, CaseIterable, Identifiable {
     }
 
     var orderBy: String {
-        switch self {
-        case .releaseAsc, .score, .hit, .wantWatch, .watched:
-            return "asc"
-        default:
-            return "desc"
-        }
+        self == .releaseAsc ? "asc" : "desc"
     }
 }
 
@@ -158,8 +153,9 @@ final class CategoriesViewModel: ObservableObject {
     private var hasMore = true
     private let sdk = JavDBSDK.shared
 
-    /// 官方槽位：{type}:t:{main}:{tags}:{year}:{month}
-    /// main 空 = 基本「全部」；默认不选时跟官方一样用 m（可下載）。
+    /// 官方抓包 7 段：`{type}:t:{main}:{tags}:{year}:{month}:`
+    /// README 没有槽位说明。主题/角色/服装/体型/行为/玩法/类别/时长全部进第 4 段，逗号拼接。
+    /// 例：欧美巨乳 `2:t:m:13:::` ；有码巨乳 `0:t:m:17:::` ；年份 `0:t:m::2024::`
     private var filterBy: String {
         let main: String
         if let picked = selected["main"] {
@@ -175,12 +171,13 @@ final class CategoriesViewModel: ObservableObject {
         let month = slot("month")
         let extras = groups
             .compactMap { group -> String? in
-                guard let cid = group.categoryID, cid != "main", cid != "year", cid != "month" else { return nil }
+                guard let cid = group.categoryID,
+                      !["main", "year", "month"].contains(cid) else { return nil }
                 return selected[cid]
             }
             .filter { !$0.isEmpty && $0 != "all" }
         let tagSlot = extras.joined(separator: ",")
-        return "\(catalog.rawValue):t:\(main):\(tagSlot):\(year):\(month)"
+        return "\(catalog.rawValue):t:\(main):\(tagSlot):\(year):\(month):"
     }
 
     func load(type: MovieCatalogType, force: Bool = false) async {
