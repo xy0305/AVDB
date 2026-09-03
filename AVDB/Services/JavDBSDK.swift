@@ -178,9 +178,21 @@ public final class JavDBSDK {
         return resp.data?.movies ?? []
     }
 
-    /// 按标签筛影片（GET /api/v1/movies/tags）
-    public func moviesByTag(filterBy: String, type: String? = nil, page: Int = 1) async throws -> [Movie] {
-        var query = ["filter_by": filterBy, "page": "\(page)"]
+    /// 按标签/片单筛影片（GET /api/v1/movies/tags）
+    /// 片单：filter_by=0:l:{listID}:
+    public func moviesByTag(
+        filterBy: String,
+        type: String? = "0",
+        page: Int = 1,
+        limit: Int = 24,
+        sortBy: String = "update"
+    ) async throws -> [Movie] {
+        var query = [
+            "filter_by": filterBy,
+            "page": "\(page)",
+            "limit": "\(limit)",
+            "sort_by": sortBy,
+        ]
         if let type { query["type"] = type }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query)
         return resp.data?.movies ?? []
@@ -354,16 +366,15 @@ public final class JavDBSDK {
         return resp.data?.list
     }
 
-    /// 片单影片（GET /api/v1/lists/{id}/movies）
-    public func listMovies(_ id: String, page: Int = 1, limit: Int = 21) async throws -> [Movie] {
-        let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v1/lists/\(id)/movies",
-            query: ["page": "\(page)", "limit": "\(limit)"])
-        if let movies = resp.data?.movies, !movies.isEmpty { return movies }
-        let fallback: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v1/lists/\(id)",
-            query: ["page": "\(page)", "limit": "\(limit)"])
-        return fallback.data?.movies ?? []
+    /// 片单影片：官方走 /api/v1/movies/tags?filter_by=0:l:{id}:
+    public func listMovies(_ id: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+        try await moviesByTag(
+            filterBy: "0:l:\(id):",
+            type: "0",
+            page: page,
+            limit: limit,
+            sortBy: "update"
+        )
     }
 
     /// 兼容旧调用
