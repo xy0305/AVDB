@@ -561,17 +561,17 @@ public final class JavDBSDK {
 // MARK: - 辅助响应 data 结构
 
 /// 标签列表
-public struct TagListData: Codable {
+public struct TagListData: Decodable {
     public let tags: [Tag]?
 }
 
 /// 演员列表
-public struct ActorListData: Codable {
+public struct ActorListData: Decodable {
     public let actors: [Actor]?
 }
 
 /// 影评列表
-public struct ReviewListData: Codable {
+public struct ReviewListData: Decodable {
     public let reviews: [Review]?
 }
 

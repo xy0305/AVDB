@@ -179,7 +179,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
 }
 
 /// 标签
-public struct Tag: Codable, Identifiable, Hashable {
+public struct Tag: Decodable, Identifiable, Hashable {
     public let id: String
     public let name: String?
     public let coverURL: String?
@@ -200,7 +200,7 @@ public struct Tag: Codable, Identifiable, Hashable {
 }
 
 /// v2/tags 分组（基本 / 年份 / 月份 / 主题…）
-public struct TagGroup: Codable, Identifiable, Hashable {
+public struct TagGroup: Decodable, Identifiable, Hashable {
     public let category: String?
     public let categoryID: String?
     public let tags: [Tag]?
@@ -213,12 +213,12 @@ public struct TagGroup: Codable, Identifiable, Hashable {
     }
 }
 
-public struct TagGroupListData: Codable {
+public struct TagGroupListData: Decodable {
     public let tags: [TagGroup]?
 }
 
 /// 演员
-public struct Actor: Codable, Identifiable, Hashable {
+public struct Actor: Decodable, Identifiable, Hashable {
     public let id: String
     public let name: String?
     public let otherName: String?
@@ -266,7 +266,7 @@ public struct Actor: Codable, Identifiable, Hashable {
 }
 
 /// 演员推荐（新人 / 月排名 / 推荐）
-public struct ActorRecommendData: Codable {
+public struct ActorRecommendData: Decodable {
     public let newActors: [Actor]?
     public let monthlyActors: [Actor]?
     public let recommendActors: [Actor]?
@@ -304,7 +304,7 @@ public struct RecommendPeriodListData: Codable {
     }
 }
 
-public struct RecommendMoviesData: Codable {
+public struct RecommendMoviesData: Decodable {
     public let period: Int?
     public let movies: [Movie]?
 }
@@ -389,7 +389,7 @@ public struct PlaySource: Codable, Identifiable, Hashable {
 }
 
 /// 影片搜索/列表响应 data
-public struct MovieListData: Codable {
+public struct MovieListData: Decodable {
     public let currentPage: Int?
     public let movies: [Movie]?
 
@@ -400,7 +400,7 @@ public struct MovieListData: Codable {
 }
 
 /// 影片详情响应 data
-public struct MovieDetailData: Codable {
+public struct MovieDetailData: Decodable {
     public let movie: Movie?
     public let relativeMovies: [Movie]?
     public let actorMovies: [Movie]?
@@ -451,20 +451,13 @@ public struct PlayData: Codable {
 }
 
 /// 排行榜条目
-public struct RankingItem: Codable, Identifiable {
+public struct RankingItem: Decodable, Identifiable {
     public let id: String?
     public let rank: Int?
     public let movie: Movie?
     public let actor: Actor?
 
     public var identifier: String { id ?? movie?.id ?? actor?.id ?? UUID().uuidString }
-}
-
-extension Review {
-    public var stableReviewID: String {
-        if let id { return String(describing: id) }
-        return "\(userID ?? 0)-\(content ?? "")-\(createdAt ?? "")"
-    }
 }
 
 /// 片单

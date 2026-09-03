@@ -25,8 +25,7 @@ public enum Pan115PushResult: Equatable {
 }
 
 /// 115 Cookie / 目录 CID 本地配置
-@MainActor
-public final class Pan115Settings: ObservableObject {
+public final class Pan115Settings: ObservableObject, @unchecked Sendable {
     public static let shared = Pan115Settings()
 
     @Published public var cookie: String {
