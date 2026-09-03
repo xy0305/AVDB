@@ -413,6 +413,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xy0305.AVDB;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -434,6 +435,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xy0305.AVDB;
 				PRODUCT_NAME = "$(TARGET_NAME)";

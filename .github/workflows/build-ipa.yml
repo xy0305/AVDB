@@ -1,0 +1,57 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build unsigned (iphoneos)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project AVDB.xcodeproj \
+            -scheme AVDB \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
+            build
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP=$(find DerivedData/Build/Products -path '*/Release-iphoneos/*.app' | head -1)
+          echo "APP=$APP"
+          test -n "$APP" && test -d "$APP"
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" Payload/
+          find Payload -name '*.xcent' -delete || true
+          find Payload -name 'embedded.mobileprovision' -delete || true
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Payload/AVDB.app/Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Payload/AVDB.app/Info.plist)
+          NAME="AVDB-unsigned-${VERSION}-${BUILD}.ipa"
+          zip -qry "$NAME" Payload
+          ls -lh "$NAME"
+          echo "IPA_NAME=$NAME" >> "$GITHUB_ENV"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AVDB-unsigned-ipa
+          path: AVDB-unsigned-*.ipa
+          if-no-files-found: error
