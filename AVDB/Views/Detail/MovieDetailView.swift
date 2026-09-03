@@ -226,11 +226,11 @@ struct MovieDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("剧照").font(.headline)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     ForEach(images) { img in
                         JavDBImage(url: img.largeURL ?? img.thumbURL)
-                            .frame(width: 160, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .frame(width: 260, height: 160)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                 }
                 .padding(.horizontal)
@@ -271,27 +271,6 @@ struct MovieDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .buttonStyle(.plain)
-
-            if let sources = movie.playSources, !sources.isEmpty {
-                ForEach(sources) { source in
-                    NavigationLink {
-                        PlayerView(movieID: movie.id, sourceID: source.id)
-                    } label: {
-                        HStack {
-                            Image(systemName: "play.circle")
-                                .foregroundColor(.orange)
-                            Text((source.name ?? "片源") + "（JAVDB）")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
         }
         .padding(.horizontal)
     }
