@@ -25,6 +25,12 @@
 		DCD7082DF560C4E504407AB2 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D199611F7084B75D4EFDFF2B /* SearchView.swift */; };
 		CF3F7E8D6C65083DAE58F921 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8A6DDD7AACE6897F060AED /* LoginView.swift */; };
 		D93E29B791E253E75F820628 /* UserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E30F604E876D29C296F9649 /* UserView.swift */; };
+		A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A101 /* Pan115Client.swift */; };
+		A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */; };
+		A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A103 /* JSONFlex.swift */; };
+		A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */; };
+		A115C11E7A7B115C11E7A005 /* RankingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A105 /* RankingsView.swift */; };
+		A115C11E7A7B115C11E7A006 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A106 /* CategoriesView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -47,6 +53,12 @@
 		D199611F7084B75D4EFDFF2B /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		DA8A6DDD7AACE6897F060AED /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		0E30F604E876D29C296F9649 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
+		A115C11E7A7B115C11E7A101 /* Pan115Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115Client.swift; sourceTree = "<group>"; };
+		A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115SettingsView.swift; sourceTree = "<group>"; };
+		A115C11E7A7B115C11E7A103 /* JSONFlex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONFlex.swift; sourceTree = "<group>"; };
+		A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVDBUI.swift; sourceTree = "<group>"; };
+		A115C11E7A7B115C11E7A105 /* RankingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingsView.swift; sourceTree = "<group>"; };
+		A115C11E7A7B115C11E7A106 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,6 +99,7 @@
 			children = (
 				2983B5FE03DB5129649F2FCD /* Movie.swift */,
 				D36425E01D91EA8878F32C60 /* User.swift */,
+				A115C11E7A7B115C11E7A103 /* JSONFlex.swift */,
 			);
 			name = Models;
 			 path = "Models";
@@ -108,6 +121,7 @@
 				BB0CA06C662C216213639A15 /* ImageLoader.swift */,
 				7231C462DD413E8C76270418 /* JavDBSDK.swift */,
 				5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */,
+				A115C11E7A7B115C11E7A101 /* Pan115Client.swift */,
 			);
 			name = Services;
 			 path = "Services";
@@ -119,6 +133,8 @@
 				E21E8365384D35AB1B1B4C52 /* ContentView.swift */,
 				90AF03F73ECC44EEA75E592E /* ListsView.swift */,
 				BE1B261A3D98E18F55F9BF42 /* Home */,
+				A115C11E7A7B115C11E7A201 /* Rankings */,
+				A115C11E7A7B115C11E7A202 /* Categories */,
 				2D537B2EF8ECD274AC73DBDA /* Search */,
 				83F964E04092BB67F0CACF0E /* Detail */,
 				B4BA6A446DE35F5AFE9E6A1F /* Player */,
@@ -180,15 +196,35 @@
 			children = (
 				DA8A6DDD7AACE6897F060AED /* LoginView.swift */,
 				0E30F604E876D29C296F9649 /* UserView.swift */,
+				A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */,
 			);
 			name = User;
 			 path = "User";
+			sourceTree = "<group>";
+		};
+		A115C11E7A7B115C11E7A201 /* Rankings */ = {
+			isa = PBXGroup;
+			children = (
+				A115C11E7A7B115C11E7A105 /* RankingsView.swift */,
+			);
+			name = Rankings;
+			 path = "Rankings";
+			sourceTree = "<group>";
+		};
+		A115C11E7A7B115C11E7A202 /* Categories */ = {
+			isa = PBXGroup;
+			children = (
+				A115C11E7A7B115C11E7A106 /* CategoriesView.swift */,
+			);
+			name = Categories;
+			 path = "Categories";
 			sourceTree = "<group>";
 		};
 		D61BF97C974390F107B21CF4 /* Components */ = {
 			isa = PBXGroup;
 			children = (
 				4FD2D4F5DD8440D59ECADE97 /* MovieGridView.swift */,
+				A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */,
 			);
 			name = Components;
 			 path = "Components";
@@ -297,6 +333,12 @@
 				DCD7082DF560C4E504407AB2 /* SearchView.swift in Sources */,
 				CF3F7E8D6C65083DAE58F921 /* LoginView.swift in Sources */,
 				D93E29B791E253E75F820628 /* UserView.swift in Sources */,
+				A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */,
+				A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */,
+				A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */,
+				A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */,
+				A115C11E7A7B115C11E7A005 /* RankingsView.swift in Sources */,
+				A115C11E7A7B115C11E7A006 /* CategoriesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

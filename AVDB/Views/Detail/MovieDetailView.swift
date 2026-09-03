@@ -275,7 +275,7 @@ struct MovieDetailView: View {
             if vm.magnets.isEmpty && vm.loadingMagnets {
                 ProgressView()
             } else {
-                ForEach(vm.magnets) { magnet in
+                ForEach(vm.magnets, id: \.stableID) { magnet in
                     MagnetRow(magnet: magnet)
                 }
             }
@@ -369,9 +369,17 @@ final class MovieDetailViewModel: ObservableObject {
     }
 }
 
-/// 磁力行
+/// 磁力行：点击推送到 115 离线；长按复制
 struct MagnetRow: View {
     let magnet: Magnet
+    @State private var pushing = false
+    @State private var toast: String?
+
+    private var magnetURL: String? {
+        let raw = magnet.link ?? magnet.magnet
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -389,27 +397,73 @@ struct MagnetRow: View {
                     if magnet.hasCnsub == true {
                         Text("中字").font(.caption2).foregroundColor(.green)
                     }
+                    if let toast {
+                        Text(toast)
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    }
                 }
             }
             Spacer()
             Button {
                 copyMagnet()
+                toast = "已复制"
             } label: {
                 Image(systemName: "doc.on.doc")
                     .foregroundColor(.orange)
             }
+            .buttonStyle(.plain)
+
             Button {
-                UIPasteboard.general.string = magnet.link ?? magnet.magnet
+                Task { await pushTo115() }
             } label: {
-                Image(systemName: "arrow.down.circle")
-                    .foregroundColor(.blue)
+                if pushing {
+                    ProgressView()
+                } else {
+                    Image(systemName: "icloud.and.arrow.up")
+                        .foregroundColor(.blue)
+                }
             }
+            .buttonStyle(.plain)
+            .disabled(pushing)
         }
         .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            Task { await pushTo115() }
+        }
+        .onLongPressGesture {
+            copyMagnet()
+            toast = "已复制"
+        }
     }
 
     private func copyMagnet() {
-        UIPasteboard.general.string = magnet.link ?? magnet.magnet
+        UIPasteboard.general.string = magnetURL
+    }
+
+    private func pushTo115() async {
+        guard let url = magnetURL else {
+            toast = "无磁力链接"
+            return
+        }
+        let settings = Pan115Settings.shared
+        guard settings.isConfigured else {
+            toast = settings.missingHint
+            return
+        }
+        pushing = true
+        defer { pushing = false }
+        do {
+            let result = try await Pan115Client.shared.addOfflineTask(
+                url: url,
+                cookie: settings.cookie,
+                folderCID: settings.folderCID
+            )
+            toast = result.message
+        } catch {
+            toast = error.localizedDescription
+        }
     }
 }
 

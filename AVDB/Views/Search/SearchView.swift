@@ -18,42 +18,41 @@ struct SearchView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 12) {
-                Picker("类型", selection: $searchType) {
-                    ForEach(SearchType.allCases, id: \.self) { t in
-                        Text(t.rawValue).tag(t)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-
-                HStack {
-                    TextField("搜索番号 / 关键词", text: $keyword)
-                        .textFieldStyle(.roundedBorder)
-                        .submitLabel(.search)
-                        .onSubmit { submit() }
-
-                    Button {
-                        submit()
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                    }
-                }
-                .padding(.horizontal)
-
-                if !submitted.isEmpty {
-                    if searchType == .movie {
-                        SearchResultView(keyword: submitted)
-                    } else {
-                        MagnetResultView(keyword: submitted)
-                    }
-                } else {
-                    SearchPlaceholderView()
+        VStack(spacing: 12) {
+            Picker("类型", selection: $searchType) {
+                ForEach(SearchType.allCases, id: \.self) { t in
+                    Text(t.rawValue).tag(t)
                 }
             }
-            .navigationTitle("搜索")
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+
+            HStack {
+                TextField("搜索番号 / 关键词", text: $keyword)
+                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.search)
+                    .onSubmit { submit() }
+
+                Button {
+                    submit()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+            }
+            .padding(.horizontal)
+
+            if !submitted.isEmpty {
+                if searchType == .movie {
+                    SearchResultView(keyword: submitted)
+                } else {
+                    MagnetResultView(keyword: submitted)
+                }
+            } else {
+                SearchPlaceholderView()
+            }
         }
+        .navigationTitle("搜索")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func submit() {
@@ -88,7 +87,7 @@ struct MagnetResultView: View {
     var body: some View {
         VStack {
             List {
-                ForEach(vm.magnets) { magnet in
+                ForEach(vm.magnets, id: \.stableID) { magnet in
                     MagnetRow(magnet: magnet)
                 }
                 if vm.isLoading {

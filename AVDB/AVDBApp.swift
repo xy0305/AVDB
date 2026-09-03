@@ -2,7 +2,7 @@
 //  AVDBApp.swift
 //  AVDB
 //
-//  App 入口。
+//  App 入口。官方 App 为浅色界面。
 //
 
 import SwiftUI
@@ -15,7 +15,7 @@ struct AVDBApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
         }
     }
 }

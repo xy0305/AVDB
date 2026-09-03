@@ -9,6 +9,7 @@ import SwiftUI
 
 struct UserView: View {
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var pan115 = Pan115Settings.shared
     @State private var showLogin = false
 
     var body: some View {
@@ -76,6 +77,20 @@ struct UserView: View {
                                 Image(systemName: "person.crop.circle.badge.plus")
                                 Text("登录 / 注册")
                             }
+                        }
+                    }
+                }
+
+                Section("下载") {
+                    NavigationLink {
+                        Pan115SettingsView()
+                    } label: {
+                        HStack {
+                            Text("115 离线")
+                            Spacer()
+                            Text(pan115.isConfigured ? "已配置" : "未配置")
+                                .font(.caption)
+                                .foregroundColor(pan115.isConfigured ? .green : .secondary)
                         }
                     }
                 }

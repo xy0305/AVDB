@@ -138,37 +138,49 @@ public final class JavDBSDK {
     }
 
     /// 最新发布（GET /api/v1/movies/latest）
-    public func latestMovies(page: Int = 1, limit: Int = 20) async throws -> [Movie] {
-        let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v1/movies/latest", query: ["page": "\(page)", "limit": "\(min(limit, 50))"])
+    /// type: 0有码 1无码 2欧美 3 FC2 4动漫
+    public func latestMovies(page: Int = 1, limit: Int = 20, type: String? = nil) async throws -> [Movie] {
+        var query = ["page": "\(page)", "limit": "\(min(limit, 50))"]
+        if let type { query["type"] = type }
+        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/latest", query: query)
         return resp.data?.movies ?? []
     }
 
-    /// 排行榜（GET /api/v1/movies/top）
+    /// 排行榜（GET /api/v1/movies/top，需登录）
     public func topMovies(page: Int = 1, period: String? = nil) async throws -> [Movie] {
         var query = ["page": "\(page)"]
         if let p = period { query["period"] = p }
-        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/top", query: query)
+        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/top", query: query, useToken: true)
         return resp.data?.movies ?? []
     }
 
-    /// 标签/分类（GET /api/v1/movies/tags）
+    /// 按标签筛影片（GET /api/v1/movies/tags）
+    public func moviesByTag(filterBy: String, type: String? = nil, page: Int = 1) async throws -> [Movie] {
+        var query = ["filter_by": filterBy, "page": "\(page)"]
+        if let type { query["type"] = type }
+        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query)
+        return resp.data?.movies ?? []
+    }
+
+    /// 标签/分类（兼容旧调用）
     public func movieTags() async throws -> [Tag] {
-        let resp: JavDBResponse<TagListData> = try await client.get("/api/v1/movies/tags")
-        return resp.data?.tags ?? []
+        let groups = try await tagGroups(type: "0")
+        return groups.flatMap { $0.tags ?? [] }
     }
 
     /// 推荐（GET /api/v1/movies/recommend）
-    public func recommendMovies(page: Int = 1) async throws -> [Movie] {
-        let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v1/movies/recommend", query: ["page": "\(page)"], useToken: true)
+    public func recommendMovies(page: Int = 1, period: Int? = nil) async throws -> [Movie] {
+        var query = ["page": "\(page)"]
+        if let period { query["period"] = "\(period)" }
+        let resp: JavDBResponse<RecommendMoviesData> = try await client.get(
+            "/api/v1/movies/recommend", query: query)
         return resp.data?.movies ?? []
     }
 
     /// 推荐时间段（GET /api/v1/movies/recommend_periods）
-    public func recommendPeriods() async throws -> [String] {
-        let resp: JavDBResponse<StringListData> = try await client.get("/api/v1/movies/recommend_periods")
-        return resp.data?.items ?? []
+    public func recommendPeriods() async throws -> [RecommendPeriod] {
+        let resp: JavDBResponse<RecommendPeriodListData> = try await client.get("/api/v1/movies/recommend_periods")
+        return resp.data?.periods ?? []
     }
 
     /// 相似推荐（GET /api/v1/movies/may_also_like）
@@ -181,9 +193,10 @@ public final class JavDBSDK {
     // MARK: - 演员 / 导演 / 系列 / 片商 / 发行商
 
     /// 演员列表（GET /api/v1/actors）
-    public func actors(page: Int = 1, filter: String? = nil) async throws -> [Actor] {
-        var query = ["page": "\(page)"]
-        if let f = filter { query["filter"] = f }
+    /// type: 0有码 1无码 2欧美 3 FC2；gender: 0女 1男
+    public func actors(page: Int = 1, type: String = "0", gender: String? = nil) async throws -> [Actor] {
+        var query = ["page": "\(page)", "type": type]
+        if let gender { query["gender"] = gender }
         let resp: JavDBResponse<ActorListData> = try await client.get("/api/v1/actors", query: query)
         return resp.data?.actors ?? []
     }
@@ -199,9 +212,9 @@ public final class JavDBSDK {
     }
 
     /// 演员推荐（GET /api/v1/actors/recommend）
-    public func recommendActors() async throws -> [Actor] {
-        let resp: JavDBResponse<ActorListData> = try await client.get("/api/v1/actors/recommend")
-        return resp.data?.actors ?? []
+    public func recommendActors() async throws -> ActorRecommendData {
+        let resp: JavDBResponse<ActorRecommendData> = try await client.get("/api/v1/actors/recommend")
+        return resp.data ?? ActorRecommendData(newActors: nil, monthlyActors: nil, recommendActors: nil)
     }
 
     /// 导演详情（GET /api/v1/directors/{id}）
@@ -241,24 +254,40 @@ public final class JavDBSDK {
     }
 
     /// 排行榜（GET /api/v1/rankings）
-    public func rankings() async throws -> [RankingItem] {
-        struct RankingData: Decodable { let rankings: [RankingItem]? }
-        let resp: JavDBResponse<RankingData> = try await client.get("/api/v1/rankings")
-        return resp.data?.rankings ?? []
+    /// type: 0有码 1无码 2欧美 3 FC2；period: daily/weekly/monthly
+    public func rankings(type: String, period: String, page: Int = 1) async throws -> [Movie] {
+        let resp: JavDBResponse<MovieListData> = try await client.get(
+            "/api/v1/rankings",
+            query: ["type": type, "period": period, "page": "\(page)"])
+        return resp.data?.movies ?? []
     }
 
     /// 演员排行榜（GET /api/v1/rankings/actors）
-    public func actorRankings() async throws -> [RankingItem] {
-        struct RankingData: Decodable { let actors: [RankingItem]? }
-        let resp: JavDBResponse<RankingData> = try await client.get("/api/v1/rankings/actors")
+    public func actorRankings(type: String = "0", period: String = "monthly", page: Int = 1) async throws -> [Actor] {
+        let resp: JavDBResponse<ActorListData> = try await client.get(
+            "/api/v1/rankings/actors",
+            query: ["type": type, "period": period, "page": "\(page)"])
         return resp.data?.actors ?? []
     }
 
-    /// 播放排行榜（GET /api/v1/rankings/playbackP）
-    public func playbackRankings() async throws -> [RankingItem] {
-        struct RankingData: Decodable { let movies: [RankingItem]? }
-        let resp: JavDBResponse<RankingData> = try await client.get("/api/v1/rankings/playbackP")
+    /// 热播排行（GET /api/v1/rankings/playback）
+    public func playbackRankings(filterBy: String = "all", period: String = "daily", page: Int = 1) async throws -> [Movie] {
+        let resp: JavDBResponse<MovieListData> = try await client.get(
+            "/api/v1/rankings/playback",
+            query: ["filter_by": filterBy, "period": period, "page": "\(page)"])
         return resp.data?.movies ?? []
+    }
+
+    /// 筛选项（GET /api/v2/tags）type: 0有码 1无码 2欧美 3 FC2
+    public func tagGroups(type: String) async throws -> [TagGroup] {
+        let resp: JavDBResponse<TagGroupListData> = try await client.get("/api/v2/tags", query: ["type": type])
+        return resp.data?.tags ?? []
+    }
+
+    /// 广告（GET /api/v1/ads）
+    public func adsPayload() async throws -> AdsData {
+        let resp: JavDBResponse<AdsData> = try await client.get("/api/v1/ads")
+        return resp.data ?? AdsData(enabled: nil, ads: nil)
     }
 
     // MARK: - 片单 / 标签 / 影评 / 文章
