@@ -164,7 +164,9 @@ struct MoviePosterCard: View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topLeading) {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                    .aspectRatio(0.72, contentMode: .fill)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 200)
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 if let rank {
