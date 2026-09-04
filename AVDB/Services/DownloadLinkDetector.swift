@@ -115,7 +115,7 @@ public enum DownloadLinkDetector {
     private static func normalizeDownloadLink(_ raw: String) -> String {
         var v = clean(raw).trimmingCharacters(in: .whitespacesAndNewlines)
         // 去掉结尾多余标点
-        while let last = v.last, ")\]】》>，。；;、".contains(last) {
+        while let last = v.last, ")]】》>，。；;、".contains(last) {
             v.removeLast()
         }
         v = v.trimmingCharacters(in: .whitespacesAndNewlines)
