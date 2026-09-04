@@ -280,7 +280,7 @@ public final class Pan115Client: @unchecked Sendable {
     }
 
     /// 用 ".mp4" 穿透 + type=4 拉出目录内所有视频文件（不依赖番号）。
-    public func searchAllVideos(cid: String, cookie: String, limit: Int = 1150) async throws -> [FileItem] {
+    public func searchAllVideos(cid: String, cookie: String, limit: Int = 200) async throws -> [FileItem] {
         let q = "cid=\(cid.formEncoded)&search_value=.mp4&type=4&limit=\(limit)&offset=0&format=json"
         guard let url = URL(string: "https://webapi.115.com/files/search?\(q)") else {
             throw Pan115Error.fileNotFound
@@ -292,7 +292,7 @@ public final class Pan115Client: @unchecked Sendable {
         return extractFileList(obj)
     }
 
-    /// 按番号匹配 115 文件：.mp4 穿透全量拉取优先，再回落到离线目录递归。
+    /// 按番号匹配 115 文件：番号搜索优先命中，穿透并行，递归仅兜底。
     public func findMatchedVideo(
         keyword: String,
         cookie: String,
@@ -302,31 +302,34 @@ public final class Pan115Client: @unchecked Sendable {
         let needle = normalizedKey(keyword)
         guard !needle.isEmpty else { throw Pan115Error.fileNotFound }
 
-        // 1) 全盘番号搜索
-        let searchText = searchKeyword(from: keyword)
-        if let files = try? await searchFiles(keyword: searchText, cookie: cookie) {
-            if let hit = pickVideo(from: files, keyword: keyword, requireMatch: true) {
+        // 1) 全盘番号搜索（多关键词变体，命中立即返回）
+        let variants = searchKeywords(from: keyword)
+        for kw in variants {
+            if let files = try? await searchFiles(keyword: kw, cookie: cookie) {
+                if let hit = pickVideo(from: files, keyword: keyword, requireMatch: true) {
+                    return hit
+                }
+            }
+        }
+
+        // 2) .mp4 穿透：并行拉取候选 CID，命中立即返回
+        var candidateCIDs: [String] = []
+        if let cid = folderCID, !cid.isEmpty { candidateCIDs.append(cid) }
+        if let uid = Pan115Settings.extractUID(from: cookie), uid != "0" {
+            candidateCIDs.append(uid) // 用户根目录
+        }
+        let cids = candidateCIDs.uniqued
+        if !cids.isEmpty {
+            async let a = searchAllVideos(cid: cids[0], cookie: cookie)
+            async let b = cids.count > 1 ? searchAllVideos(cid: cids[1], cookie: cookie) : [FileItem]()
+            let (first, second) = (try? await a) ?? [], (try? await b) ?? []
+            let all = (first + second).filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
+            if let hit = pickVideo(from: all, keyword: keyword, requireMatch: requireMatch) {
                 return hit
             }
         }
 
-        // 2) .mp4 穿透：拉取整个目录的所有视频，再本地匹配（不怕嵌套目录）
-        var candidateCIDs: [String] = []
-        if let cid = folderCID, !cid.isEmpty { candidateCIDs.append(cid) }
-        if let uid = Pan115Settings.extractUID(from: cookie) {
-            candidateCIDs.append(uid) // 用户根目录
-        }
-        var allVideos: [FileItem] = []
-        for cid in candidateCIDs.uniqued {
-            if let files = try? await searchAllVideos(cid: cid, cookie: cookie) {
-                allVideos.append(contentsOf: files.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty })
-            }
-        }
-        if let hit = pickVideo(from: allVideos, keyword: keyword, requireMatch: requireMatch) {
-            return hit
-        }
-
-        // 3) 离线目录递归兜底
+        // 3) 离线目录递归兜底（仅必要）
         if let cid = folderCID, !cid.isEmpty {
             return try await findLatestVideo(in: cid, cookie: cookie, keyword: keyword, requireMatch: requireMatch)
         }
@@ -455,16 +458,27 @@ public final class Pan115Client: @unchecked Sendable {
         return s
     }
 
-    /// FC2-PPV-123 → 123；普通番号去掉符号后搜
-    private func searchKeyword(from raw: String) -> String {
+    /// 多个搜索关键词变体：115 搜索对「-」敏感，务必保留连字符。
+    private func searchKeywords(from raw: String) -> [String] {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
         let upper = trimmed.uppercased()
+
+        // FC2 特判
         if let r = try? NSRegularExpression(pattern: #"FC2(?:[- ]?PPV)?[- ]?(\d{5,8})"#, options: .caseInsensitive),
            let m = r.firstMatch(in: upper, range: NSRange(upper.startIndex..., in: upper)),
            let range = Range(m.range(at: 1), in: upper) {
-            return String(upper[range])
+            let digits = String(upper[range])
+            return ["FC2-\(digits)", "FC2\(digits)"]
         }
-        return trimmed.lowercased()
+
+        // 保留连字符，只做大小写两种变体（去连字符会搜索失败）
+        var variants: [String] = []
+        variants.append(trimmed)   // 原样（小写 + 连字符）
+        if upper != trimmed {
+            variants.append(upper) // 大写 + 连字符
+        }
+        return variants.uniqued
     }
 
     private func normalizedKey(_ raw: String?) -> String {
