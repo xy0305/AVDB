@@ -469,6 +469,8 @@ struct PeriodMoviesView: View {
                 vm.loadMoreIfNeeded(current: movie)
             })
             if vm.isLoading { ProgressView().padding() }
+            // 底部占位：避开悬浮 Tab 栏，让最后一行作品完整露出
+            Color.clear.frame(height: 100)
         }
         .navigationTitle(period.dateText.isEmpty ? period.titleText : "\(period.titleText)  \(period.dateText)")
         .navigationBarTitleDisplayMode(.inline)
