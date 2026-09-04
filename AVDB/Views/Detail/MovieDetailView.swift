@@ -95,6 +95,11 @@ struct MovieDetailView: View {
             // 影评
             reviewsSection(movie)
 
+            // Ta 还出演过
+            if !vm.actorMovies.isEmpty {
+                actorMoviesSection(vm.actorMovies)
+            }
+
             // 相似推荐
             if !vm.relatedMovies.isEmpty {
                 relatedSection(vm.relatedMovies)
@@ -379,6 +384,25 @@ struct MovieDetailView: View {
         }
     }
 
+    private func actorMoviesSection(_ movies: [Movie]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Ta 还出演过").font(.headline)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(movies) { movie in
+                        NavigationLink {
+                            MovieDetailView(movieID: movie.id)
+                        } label: {
+                            MovieCoverCard(movie: movie)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
     private var relatedListsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("相关片单")
@@ -433,6 +457,7 @@ final class MovieDetailViewModel: ObservableObject {
     let movieID: String
     @Published var movie: Movie?
     @Published var relatedMovies: [Movie] = []
+    @Published var actorMovies: [Movie] = []
     @Published var magnets: [Magnet] = []
     @Published var reviews: [Review] = []
     @Published var relatedLists: [MovieList] = []
@@ -458,7 +483,8 @@ final class MovieDetailViewModel: ObservableObject {
             movie = full.movie
             relatedMovies = full.movie?.relativeMovies
                 ?? full.relativeMovies
-                ?? full.movie?.actorMovies
+                ?? []
+            actorMovies = full.movie?.actorMovies
                 ?? full.actorMovies
                 ?? []
             WatchedStore.mark(movieID)
