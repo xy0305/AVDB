@@ -255,12 +255,11 @@ public final class Pan115Client: @unchecked Sendable {
     /// 全盘按番号搜索（对齐 Forward 模块 `GET webapi.115.com/files/search`）
     public func searchFiles(keyword: String, cookie: String, limit: Int = 30) async throws -> [FileItem] {
         let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !kw.isEmpty else { return [] }
-        let encoded = kw.formEncoded
+        let encoded = (kw.isEmpty ? ".mp4" : kw).formEncoded
+        let q = "search_value=\(encoded)&type=4&limit=\(limit)&offset=0&format=json"
         let urls = [
-            "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&format=json",
-            "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&type=4&format=json",
-            "https://proapi.115.com/android/2.0/ufile/search?search_value=\(encoded)&limit=\(limit)&offset=0",
+            "https://webapi.115.com/files/search?\(q)",
+            "https://proapi.115.com/android/2.0/ufile/search?\(q)",
         ]
         var lastError: Error = Pan115Error.fileNotFound
         for u in urls {
@@ -280,7 +279,20 @@ public final class Pan115Client: @unchecked Sendable {
         throw lastError
     }
 
-    /// 按番号匹配 115 文件：全盘搜索优先，再回落到离线目录。
+    /// 用 ".mp4" 穿透 + type=4 拉出目录内所有视频文件（不依赖番号）。
+    public func searchAllVideos(cid: String, cookie: String, limit: Int = 1150) async throws -> [FileItem] {
+        let q = "cid=\(cid.formEncoded)&search_value=.mp4&type=4&limit=\(limit)&offset=0&format=json"
+        guard let url = URL(string: "https://webapi.115.com/files/search?\(q)") else {
+            throw Pan115Error.fileNotFound
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        appendCommonHeaders(&req, cookie: cookie)
+        let obj = try await json(for: req)
+        return extractFileList(obj)
+    }
+
+    /// 按番号匹配 115 文件：.mp4 穿透全量拉取优先，再回落到离线目录递归。
     public func findMatchedVideo(
         keyword: String,
         cookie: String,
@@ -290,6 +302,7 @@ public final class Pan115Client: @unchecked Sendable {
         let needle = normalizedKey(keyword)
         guard !needle.isEmpty else { throw Pan115Error.fileNotFound }
 
+        // 1) 全盘番号搜索
         let searchText = searchKeyword(from: keyword)
         if let files = try? await searchFiles(keyword: searchText, cookie: cookie) {
             if let hit = pickVideo(from: files, keyword: keyword, requireMatch: true) {
@@ -297,30 +310,59 @@ public final class Pan115Client: @unchecked Sendable {
             }
         }
 
+        // 2) .mp4 穿透：拉取整个目录的所有视频，再本地匹配（不怕嵌套目录）
+        var candidateCIDs: [String] = []
+        if let cid = folderCID, !cid.isEmpty { candidateCIDs.append(cid) }
+        if let uid = Pan115Settings.extractUID(from: cookie) {
+            candidateCIDs.append(uid) // 用户根目录
+        }
+        var allVideos: [FileItem] = []
+        for cid in candidateCIDs.uniqued {
+            if let files = try? await searchAllVideos(cid: cid, cookie: cookie) {
+                allVideos.append(contentsOf: files.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty })
+            }
+        }
+        if let hit = pickVideo(from: allVideos, keyword: keyword, requireMatch: requireMatch) {
+            return hit
+        }
+
+        // 3) 离线目录递归兜底
         if let cid = folderCID, !cid.isEmpty {
             return try await findLatestVideo(in: cid, cookie: cookie, keyword: keyword, requireMatch: requireMatch)
         }
         throw Pan115Error.fileNotFound
     }
 
-    /// 在离线目录中找与番号匹配的视频（必要时进一层文件夹）
+    /// 在目录中递归找与番号匹配的视频（遍历所有子目录，不限层数）。
     public func findLatestVideo(
         in cid: String,
         cookie: String,
         keyword: String? = nil,
         requireMatch: Bool = false
     ) async throws -> FileItem {
-        let files = try await listFiles(cid: cid, cookie: cookie)
-        if let video = pickVideo(from: files, keyword: keyword, requireMatch: requireMatch) { return video }
-        let dirs = files.filter(\.isDir)
-        let needle = normalizedKey(keyword)
-        let preferred = dirs.filter { dir in
-            needle.isEmpty || normalizedKey(dir.name).contains(needle) || needle.contains(normalizedKey(dir.name))
+        var visited = Set<String>()
+        func walk(_ dirID: String, depth: Int) async throws -> FileItem? {
+            guard depth < 8, !visited.contains(dirID) else { return nil }
+            visited.insert(dirID)
+            let files = try await listFiles(cid: dirID, cookie: cookie)
+            let videos = files.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
+            if let hit = pickVideo(from: videos, keyword: keyword, requireMatch: requireMatch) {
+                return hit
+            }
+            let dirs = files.filter(\.isDir)
+            let needle = normalizedKey(keyword)
+            let preferred = dirs.filter { dir in
+                needle.isEmpty || normalizedKey(dir.name).contains(needle) || needle.contains(normalizedKey(dir.name))
+            }
+            for dir in (preferred + dirs).uniquedFiles.prefix(40) {
+                let childID = dir.cid.isEmpty ? dir.fileID : dir.cid
+                if let hit = try await walk(childID, depth: depth + 1) {
+                    return hit
+                }
+            }
+            return nil
         }
-        for dir in (preferred + dirs).uniquedFiles.prefix(12) {
-            let nested = try await listFiles(cid: dir.cid.isEmpty ? dir.fileID : dir.cid, cookie: cookie)
-            if let video = pickVideo(from: nested, keyword: keyword, requireMatch: requireMatch) { return video }
-        }
+        if let hit = try await walk(cid, depth: 0) { return hit }
         throw Pan115Error.fileNotFound
     }
 
@@ -436,22 +478,35 @@ public final class Pan115Client: @unchecked Sendable {
 
     private func extractFileList(_ obj: [String: Any]) -> [FileItem] {
         var raw: [[String: Any]] = []
-        if let data = obj["data"] as? [[String: Any]] { raw = data }
-        else if let list = obj["list"] as? [[String: Any]] { raw = list }
-        else if let data = obj["data"] as? [String: Any] {
-            if let list = data["list"] as? [[String: Any]] { raw = list }
-            else {
-                raw = data.values.compactMap { $0 as? [String: Any] }
+        // 兼容 search 接口双层 data 嵌套（data.data / data.list / data.files 等）
+        func collect(_ value: Any?) {
+            guard let value else { return }
+            if let arr = value as? [[String: Any]] { raw = arr; return }
+            if let dict = value as? [String: Any] {
+                for key in ["data", "list", "files", "items", "videos"] {
+                    if let arr = dict[key] as? [[String: Any]] { raw = arr; return }
+                }
+                // 兜底：dict 里第一个数组
+                if raw.isEmpty {
+                    for (_, v) in dict {
+                        if let arr = v as? [[String: Any]] { raw = arr; break }
+                    }
+                    if raw.isEmpty { raw = [dict] }
+                }
             }
         }
+        collect(obj["data"])
+        if raw.isEmpty { collect(obj["list"]) }
+        if raw.isEmpty { collect(obj["files"]) }
+        if raw.isEmpty { collect(obj) }
         return raw.map { item in
-            let name = (item["n"] as? String) ?? (item["name"] as? String) ?? (item["file_name"] as? String) ?? ""
-            let pc = (item["pc"] as? String) ?? (item["pick_code"] as? String) ?? (item["pickcode"] as? String) ?? ""
+            let name = (item["n"] as? String) ?? (item["name"] as? String) ?? (item["file_name"] as? String) ?? (item["filename"] as? String) ?? ""
+            let pc = (item["pc"] as? String) ?? (item["pick_code"] as? String) ?? (item["pickcode"] as? String) ?? (item["pickCode"] as? String) ?? ""
             let fid = stringValue(item["fid"] ?? item["file_id"] ?? item["id"])
             let cid = stringValue(item["cid"])
-            let isDir = (item["fid"] == nil && item["pc"] == nil && item["sha"] == nil && !cid.isEmpty)
+            let isDir = (item["pc"] == nil && item["pick_code"] == nil && item["pickcode"] == nil && item["sha"] == nil && !cid.isEmpty && pc.isEmpty)
                 || intValue(item["fc"]) == 0
-            return FileItem(name: name, pickCode: pc, fileID: fid, cid: cid, isDir: isDir, size: Int64(doubleValue(item["s"] ?? item["size"])))
+            return FileItem(name: name, pickCode: pc, fileID: fid, cid: cid.isEmpty ? fid : cid, isDir: isDir, size: Int64(doubleValue(item["s"] ?? item["size"])))
         }
     }
 
@@ -692,5 +747,12 @@ private extension Array where Element == Pan115Client.FileItem {
             let key = item.fileID.isEmpty ? item.cid : item.fileID
             return seen.insert(key).inserted
         }
+    }
+}
+
+private extension Array where Element == String {
+    var uniqued: [String] {
+        var seen = Set<String>()
+        return filter { seen.insert($0).inserted }
     }
 }
