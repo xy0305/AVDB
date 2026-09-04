@@ -230,9 +230,9 @@ public final class Pan115Client: @unchecked Sendable {
     public func listFiles(cid: String, cookie: String, limit: Int = 115) async throws -> [FileItem] {
         let q = "aid=1&cid=\(cid.formEncoded)&o=user_ptime&asc=0&offset=0&show_dir=1&limit=\(limit)&natsort=1&record_open_time=1&format=json"
         let urls = [
-            "https://webapi.115.com/files?\(q)",
             "https://aps.115.com/natsort/files.php?\(q)",
             "https://proapi.115.com/android/2.0/ufile/files?\(q)",
+            "https://webapi.115.com/files?\(q)",
         ]
         var lastError: Error = Pan115Error.fileNotFound
         for u in urls {
@@ -241,7 +241,7 @@ public final class Pan115Client: @unchecked Sendable {
             req.httpMethod = "GET"
             appendCommonHeaders(&req, cookie: cookie)
             do {
-                let obj = try await json(for: req)
+                let obj = try await json(for: req, retries: 1)
                 let files = extractFileList(obj)
                 let ok = boolState(obj["state"]) || !files.isEmpty
                 if ok { return files }
@@ -252,14 +252,17 @@ public final class Pan115Client: @unchecked Sendable {
         throw lastError
     }
 
-    /// 全盘按番号搜索（对齐 Forward 模块 `GET webapi.115.com/files/search`）
+    /// 全盘按番号搜索。
+    /// 注意：`webapi.115.com` 在部分网络/客户端下会稳定触发 SSL EOF（UNEXPECTED_EOF_WHILE_READING），
+    /// 而 `proapi.115.com` / `aps.115.com` 通常正常。把可用的域名排前面，webapi 降级为后备。
     public func searchFiles(keyword: String, cookie: String, limit: Int = 30) async throws -> [FileItem] {
         let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         let encoded = (kw.isEmpty ? ".mp4" : kw).formEncoded
         let urls = [
+            "https://proapi.115.com/android/2.0/ufile/search?search_value=\(encoded)&limit=\(limit)&offset=0&type=4&format=json",
+            "https://aps.115.com/natsort/files.php?search_value=\(encoded)&type=4&limit=\(limit)&offset=0&format=json",
             "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&type=4&format=json",
             "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&format=json",
-            "https://proapi.115.com/android/2.0/ufile/search?search_value=\(encoded)&limit=\(limit)&offset=0&type=4",
         ]
         var lastError: Error = Pan115Error.fileNotFound
         for u in urls {
@@ -268,7 +271,7 @@ public final class Pan115Client: @unchecked Sendable {
             req.httpMethod = "GET"
             appendCommonHeaders(&req, cookie: cookie)
             do {
-                let obj = try await json(for: req)
+                let obj = try await json(for: req, retries: 1)
                 let files = extractFileList(obj)
                 if !files.isEmpty { return files }
                 if boolState(obj["state"]) { return [] }
@@ -505,13 +508,13 @@ public final class Pan115Client: @unchecked Sendable {
         if raw.isEmpty { collect(obj["files"]) }
         if raw.isEmpty { collect(obj) }
         return raw.map { item in
-            let name = (item["n"] as? String) ?? (item["name"] as? String) ?? (item["file_name"] as? String) ?? (item["filename"] as? String) ?? ""
+            let name = (item["n"] as? String) ?? (item["fn"] as? String) ?? (item["name"] as? String) ?? (item["file_name"] as? String) ?? (item["filename"] as? String) ?? ""
             let pc = (item["pc"] as? String) ?? (item["pick_code"] as? String) ?? (item["pickcode"] as? String) ?? (item["pickCode"] as? String) ?? ""
             let fid = stringValue(item["fid"] ?? item["file_id"] ?? item["id"])
             let cid = stringValue(item["cid"])
             let isDir = (item["pc"] == nil && item["pick_code"] == nil && item["pickcode"] == nil && item["sha"] == nil && !cid.isEmpty && pc.isEmpty)
                 || intValue(item["fc"]) == 0
-            return FileItem(name: name, pickCode: pc, fileID: fid, cid: cid.isEmpty ? fid : cid, isDir: isDir, size: Int64(doubleValue(item["s"] ?? item["size"])))
+            return FileItem(name: name, pickCode: pc, fileID: fid, cid: cid.isEmpty ? fid : cid, isDir: isDir, size: Int64(doubleValue(item["s"] ?? item["fs"] ?? item["size"])))
         }
     }
 
