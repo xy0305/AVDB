@@ -16,6 +16,9 @@ struct HomeView: View {
     @State private var goMagnets = false
     @State private var goArticles = false
     @State private var goReviews = false
+    @State private var goSeries = false
+    @State private var goMakers = false
+    @State private var goDirectors = false
 
     var body: some View {
         NavigationStack {
@@ -61,6 +64,15 @@ struct HomeView: View {
             .navigationDestination(isPresented: $goReviews) {
                 HotReviewsView()
             }
+            .navigationDestination(isPresented: $goSeries) {
+                NamedListView(kind: .series)
+            }
+            .navigationDestination(isPresented: $goMakers) {
+                NamedListView(kind: .makers)
+            }
+            .navigationDestination(isPresented: $goDirectors) {
+                NamedListView(kind: .directors)
+            }
         }
     }
 
@@ -92,6 +104,9 @@ struct HomeView: View {
             shortcut("AV資訊", "newspaper.fill", Color.red) { goArticles = true }
             shortcut("看短評", "text.bubble.fill", Color.orange) { goReviews = true }
             shortcut("找磁鏈", "link", Color.green) { goMagnets = true }
+            shortcut("系列", "square.stack", Color.purple) { goSeries = true }
+            shortcut("片商", "building.2", Color.teal) { goMakers = true }
+            shortcut("导演", "person.3", Color.indigo) { goDirectors = true }
         }
         .padding(.horizontal, 8)
         .padding(.top, 4)

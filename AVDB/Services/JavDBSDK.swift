@@ -41,7 +41,7 @@ public final class JavDBSDK {
         keyword: String,
         page: Int = 1,
         type: String = "movie",
-        sortBy: MovieSortBy = .release,
+        sortBy: MovieSortBy = .relevance,
         filterBy: MovieFilterBy = .all,
         limit: Int = 20
     ) async throws -> [Movie] {
@@ -58,6 +58,45 @@ public final class JavDBSDK {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
         return resp.data?.movies ?? []
+    }
+
+    /// 分类搜索：按演员/系列/片商/导演/清单/番号 搜索。
+    /// type 对应 /api/v2/search 的 type 参数：actor/series/maker/director/list/code。
+    public func searchActors(keyword: String, page: Int = 1, limit: Int = 20) async throws -> [Actor] {
+        let query: [String: String] = [
+            "q": keyword, "page": "\(page)", "type": "actor", "limit": "\(min(limit, 50))",
+        ]
+        let resp: JavDBResponse<ActorListData> = try await client.get("/api/v2/search", query: query)
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return resp.data?.actors ?? []
+    }
+
+    /// 分类搜索：系列 / 片商 / 导演（都返回 {id,name,videos_count} 结构）。
+    /// type 对应 /api/v2/search 的 type：series / maker / director。
+    public func searchNamed(keyword: String, type: String, page: Int = 1, limit: Int = 20) async throws -> [NamedResult] {
+        let query: [String: String] = [
+            "q": keyword, "page": "\(page)", "type": type, "limit": "\(min(limit, 50))",
+        ]
+        let resp: JavDBResponse<NamedListData> = try await client.get("/api/v2/search", query: query)
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return resp.data?.items ?? []
+    }
+
+    /// 分类搜索：清单（type=list，返回 {id,name,movies_count}）。
+    public func searchLists(keyword: String, page: Int = 1, limit: Int = 20) async throws -> [MovieList] {
+        struct ListData: Decodable { let lists: [MovieList]? }
+        let query: [String: String] = [
+            "q": keyword, "page": "\(page)", "type": "list", "limit": "\(min(limit, 50))",
+        ]
+        let resp: JavDBResponse<ListData> = try await client.get("/api/v2/search", query: query)
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return resp.data?.lists ?? []
     }
 
     /// 以图搜图（GET /api/v2/search_image）
@@ -300,15 +339,28 @@ public final class JavDBSDK {
         return resp.data?.movie
     }
 
-    /// 系列字母索引（GET /api/v1/series/letters）
+    /// 系列字母索引（GET /api/v1/series/letters）——返回 {id, letter, description, videos_count}
     public func seriesLetters() async throws -> [String] {
         let resp: JavDBResponse<StringListData> = try await client.get("/api/v1/series/letters")
         return resp.data?.items ?? []
     }
 
+    /// 系列列表（GET /api/v1/series/letters）——返回可跳转的系列对象。
+    public func seriesList() async throws -> [Actor] {
+        struct LetterList: Decodable { let letters: [Actor]? }
+        let resp: JavDBResponse<LetterList> = try await client.get("/api/v1/series/letters")
+        return resp.data?.letters ?? []
+    }
+
     /// 片商列表（GET /api/v1/makers）
     public func makers() async throws -> [Actor] {
         let resp: JavDBResponse<ActorListData> = try await client.get("/api/v1/makers")
+        return resp.data?.actors ?? []
+    }
+
+    /// 导演列表（GET /api/v1/directors）
+    public func directors() async throws -> [Actor] {
+        let resp: JavDBResponse<ActorListData> = try await client.get("/api/v1/directors")
         return resp.data?.actors ?? []
     }
 
@@ -408,6 +460,39 @@ public final class JavDBSDK {
             page: page,
             limit: limit,
             sortBy: "update"
+        )
+    }
+
+    /// 系列影片：filter_by=0:s:{id}:
+    public func seriesMovies(_ id: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+        try await moviesByTag(
+            filterBy: "0:s:\(id):",
+            type: "0",
+            page: page,
+            limit: limit,
+            sortBy: "release"
+        )
+    }
+
+    /// 片商影片：filter_by=0:m:{id}:
+    public func makerMovies(_ id: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+        try await moviesByTag(
+            filterBy: "0:m:\(id):",
+            type: "0",
+            page: page,
+            limit: limit,
+            sortBy: "release"
+        )
+    }
+
+    /// 导演影片：filter_by=0:d:{id}:
+    public func directorMovies(_ id: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+        try await moviesByTag(
+            filterBy: "0:d:\(id):",
+            type: "0",
+            page: page,
+            limit: limit,
+            sortBy: "release"
         )
     }
 
@@ -665,6 +750,34 @@ public struct TagListData: Decodable {
 /// 演员列表
 public struct ActorListData: Decodable {
     public let actors: [Actor]?
+}
+
+/// 分类搜索结果项（系列/片商/导演，字段统一 id/name/videos_count）
+public struct NamedResult: Decodable, Identifiable, Hashable {
+    public let id: String
+    public let name: String?
+    public let videosCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case videosCount = "videos_count"
+    }
+}
+
+/// 分类搜索响应（兼容 series/makers/directors 三字段名）
+public struct NamedListData: Decodable {
+    public let items: [NamedResult]?
+
+    enum CodingKeys: String, CodingKey {
+        case series, makers, directors
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        items = try c.decodeIfPresent([NamedResult].self, forKey: .series)
+            ?? c.decodeIfPresent([NamedResult].self, forKey: .makers)
+            ?? c.decodeIfPresent([NamedResult].self, forKey: .directors)
+    }
 }
 
 /// 影评列表

@@ -107,3 +107,171 @@ struct ListDetailView: View {
         .refreshable { await vm.refresh() }
     }
 }
+
+/// 系列作品列表
+struct SeriesMoviesView: View {
+    let seriesID: String
+    let title: String
+    @StateObject private var vm: MovieListViewModel
+
+    init(seriesID: String, title: String) {
+        self.seriesID = seriesID
+        self.title = title
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.seriesMovies(seriesID, page: page, limit: 21)
+        })
+    }
+
+    var body: some View {
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
+    }
+}
+
+/// 片商作品列表
+struct MakerMoviesView: View {
+    let makerID: String
+    let title: String
+    @StateObject private var vm: MovieListViewModel
+
+    init(makerID: String, title: String) {
+        self.makerID = makerID
+        self.title = title
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.makerMovies(makerID, page: page, limit: 21)
+        })
+    }
+
+    var body: some View {
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
+    }
+}
+
+/// 导演作品列表
+struct DirectorMoviesView: View {
+    let directorID: String
+    let title: String
+    @StateObject private var vm: MovieListViewModel
+
+    init(directorID: String, title: String) {
+        self.directorID = directorID
+        self.title = title
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.directorMovies(directorID, page: page, limit: 21)
+        })
+    }
+
+    var body: some View {
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
+    }
+}
+
+/// 通用「名称列表」：系列 / 片商 / 导演 的首页入口，复用 Actor 模型（id/name/videos_count）。
+struct NamedListView: View {
+    let kind: NamedListKind
+    @State private var items: [Actor] = []
+    @State private var loading = false
+
+    enum NamedListKind {
+        case series, makers, directors
+
+        var title: String {
+            switch self {
+            case .series: return "系列"
+            case .makers: return "片商"
+            case .directors: return "导演"
+            }
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(items) { item in
+                    NavigationLink {
+                        destination(item)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.name ?? item.id)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                if let c = item.videosCount {
+                                    Text("\(c) 部")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
+                    Divider()
+                }
+            }
+            .padding(.horizontal, 16)
+            if loading { ProgressView().padding() }
+        }
+        .navigationTitle(kind.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load(force: true) }
+    }
+
+    @ViewBuilder
+    private func destination(_ item: Actor) -> some View {
+        switch kind {
+        case .series:
+            SeriesMoviesView(seriesID: item.id, title: item.name ?? item.id)
+        case .makers:
+            MakerMoviesView(makerID: item.id, title: item.name ?? item.id)
+        case .directors:
+            DirectorMoviesView(directorID: item.id, title: item.name ?? item.id)
+        }
+    }
+
+    private func load(force: Bool = false) async {
+        if force { items = [] }
+        guard items.isEmpty, !loading else { return }
+        loading = true
+        defer { loading = false }
+        switch kind {
+        case .series:
+            items = (try? await JavDBSDK.shared.seriesList()) ?? []
+        case .makers:
+            items = (try? await JavDBSDK.shared.makers()) ?? []
+        case .directors:
+            items = (try? await JavDBSDK.shared.directors()) ?? []
+        }
+    }
+}
