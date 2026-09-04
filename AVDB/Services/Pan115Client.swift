@@ -256,10 +256,10 @@ public final class Pan115Client: @unchecked Sendable {
     public func searchFiles(keyword: String, cookie: String, limit: Int = 30) async throws -> [FileItem] {
         let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         let encoded = (kw.isEmpty ? ".mp4" : kw).formEncoded
-        let q = "search_value=\(encoded)&type=4&limit=\(limit)&offset=0&format=json"
         let urls = [
-            "https://webapi.115.com/files/search?\(q)",
-            "https://proapi.115.com/android/2.0/ufile/search?\(q)",
+            "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&type=4&format=json",
+            "https://webapi.115.com/files/search?search_value=\(encoded)&limit=\(limit)&offset=0&format=json",
+            "https://proapi.115.com/android/2.0/ufile/search?search_value=\(encoded)&limit=\(limit)&offset=0&type=4",
         ]
         var lastError: Error = Pan115Error.fileNotFound
         for u in urls {
@@ -600,21 +600,32 @@ public final class Pan115Client: @unchecked Sendable {
         return 0
     }
 
-    private func json(for req: URLRequest) async throws -> [String: Any] {
-        let (data, response) = try await session.data(for: req)
-        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-            throw Pan115Error.http(http.statusCode)
+    private func json(for req: URLRequest, retries: Int = 2) async throws -> [String: Any] {
+        var lastErr: Error = Pan115Error.playURLNotFound
+        for attempt in 0...retries {
+            do {
+                let (data, response) = try await session.data(for: req)
+                if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+                    throw Pan115Error.http(http.statusCode)
+                }
+                guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+                    throw Pan115Error.playURLNotFound
+                }
+                if text.lowercased().contains("<html") || text.contains("登录") {
+                    throw Pan115Error.cookieInvalid
+                }
+                guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw Pan115Error.playURLNotFound
+                }
+                return obj
+            } catch {
+                lastErr = error
+                if attempt < retries {
+                    try? await Task.sleep(nanoseconds: 400_000_000 * UInt64(attempt + 1))
+                }
+            }
         }
-        guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
-            throw Pan115Error.playURLNotFound
-        }
-        if text.lowercased().contains("<html") || text.contains("登录") {
-            throw Pan115Error.cookieInvalid
-        }
-        guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw Pan115Error.playURLNotFound
-        }
-        return obj
+        throw lastErr
     }
 
     private func boolState(_ v: Any?) -> Bool {
