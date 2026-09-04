@@ -416,6 +416,103 @@ public final class Pan115Client: @unchecked Sendable {
         return try await originalPlayURL(pickCode: file.pickCode, cookie: cookie, filename: file.name)
     }
 
+    /// 推送磁力 → 等离线完成 → 删除离线目录内 <115MB 的小文件。
+    /// 返回 (离线任务, 删除的小文件数)。
+    public func pushAndCleanSmallFiles(
+        magnet: String,
+        cookie: String,
+        folderCID: String,
+        keyword: String,
+        thresholdBytes: Int64 = 115 * 1024 * 1024
+    ) async throws -> (OfflineTask, Int) {
+        _ = try await addOfflineTask(url: magnet, cookie: cookie, folderCID: folderCID)
+        let task = try await waitOfflineReady(keyword: keyword, cookie: cookie)
+        let cid = task.dirID.isEmpty ? folderCID : task.dirID
+        let deleted = try await deleteSmallFiles(in: cid, cookie: cookie, thresholdBytes: thresholdBytes)
+        return (task, deleted)
+    }
+
+    /// 等待离线任务完成（已推送过），然后进入离线产物（新建文件夹）删除 <115MB 的小文件。
+    /// 离线完成后，视频落在离线目录下新建的文件夹里（磁力多文件时）——用 task.fileID
+    /// 在父目录定位该产物，若是文件夹则进入删除其内 <115MB 的小文件。
+    /// 返回删除数量。供「推送成功后后台清理」复用，不重复推送。
+    public func waitAndCleanSmallFiles(
+        keyword: String,
+        cookie: String,
+        folderCID: String,
+        timeout: TimeInterval = 90,
+        thresholdBytes: Int64 = 115 * 1024 * 1024
+    ) async throws -> Int {
+        let task = try await waitOfflineReady(keyword: keyword, cookie: cookie, timeout: timeout)
+        let parentCID = (task.dirID.isEmpty ? folderCID : task.dirID)
+
+        // 1) 定位离线产物：在父目录里找 fid == task.fileID 的条目
+        let parentFiles = (try? await listFiles(cid: parentCID, cookie: cookie, limit: 500)) ?? []
+        if let product = parentFiles.first(where: { $0.fileID == task.fileID || $0.cid == task.fileID }) {
+            if product.isDir {
+                // 产物是新建文件夹 → 进入删除 <115MB 的小文件
+                return try await deleteSmallFiles(in: product.fileID.isEmpty ? product.cid : product.fileID, cookie: cookie, thresholdBytes: thresholdBytes)
+            } else {
+                // 产物是单文件 → 无需删（没有夹带小文件）
+                return 0
+            }
+        }
+
+        // 2) 兜底：若拿不到 task.fileID（某些任务 file_id 为空），退化为删除父目录内 <115MB 的小文件
+        return try await deleteSmallFiles(in: parentCID, cookie: cookie, thresholdBytes: thresholdBytes)
+    }
+
+    // MARK: - 删除文件（推送后清理小于阈值的小文件）
+
+    /// 删除目录内指定文件（对齐参考脚本 POST webapi.115.com/rb/delete，form pid + fid[N]）。
+    /// 返回实际删除数量。
+    @discardableResult
+    public func deleteFiles(cid: String, fileIDs: [String], cookie: String) async throws -> Int {
+        let ids = fileIDs.filter { !$0.isEmpty }
+        guard !ids.isEmpty else { return 0 }
+        let urls = [
+            "https://webapi.115.com/rb/delete",
+            "https://proapi.115.com/android/2.0/ufile/rb/delete",
+            "https://aps.115.com/natsort/rb/delete",
+        ]
+        var body = URLComponents()
+        var items = [URLQueryItem(name: "pid", value: cid), URLQueryItem(name: "ignore_warn", value: "1")]
+        for (i, fid) in ids.enumerated() {
+            items.append(URLQueryItem(name: "fid[\(i)]", value: fid))
+        }
+        body.queryItems = items
+
+        var lastError: Error = Pan115Error.playURLNotFound
+        for u in urls {
+            guard let url = URL(string: u) else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.httpBody = body.percentEncodedQuery?.data(using: .utf8)
+            req.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
+            appendCommonHeaders(&req, cookie: cookie)
+            do {
+                let obj = try await json(for: req, retries: 1)
+                if boolState(obj["state"]) || (obj["state"] as? Int) == 1 {
+                    return ids.count
+                }
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
+    }
+
+    /// 删除目录内所有小于给定字节数的文件（用于清理离线完成后夹带的小文件）。
+    /// 只删非目录、有 fid 的文件；返回删除数量。
+    @discardableResult
+    public func deleteSmallFiles(in cid: String, cookie: String, thresholdBytes: Int64 = 115 * 1024 * 1024) async throws -> Int {
+        let files = (try? await listFiles(cid: cid, cookie: cookie, limit: 500)) ?? []
+        let small = files.filter { !$0.isDir && $0.size > 0 && $0.size < thresholdBytes && !$0.fileID.isEmpty }
+        let ids = small.map(\.fileID)
+        guard !ids.isEmpty else { return 0 }
+        return try await deleteFiles(cid: cid, fileIDs: ids, cookie: cookie)
+    }
+
     private func pickVideo(from files: [FileItem], keyword: String?, requireMatch: Bool) -> FileItem? {
         var videos = files.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
         if videos.isEmpty {

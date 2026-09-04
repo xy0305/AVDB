@@ -348,7 +348,7 @@ struct MovieDetailView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(vm.reviews.prefix(3)) { review in
-                    ReviewRow(review: review)
+                    ReviewRow(review: review, movieID: movie.id)
                 }
             }
         }
@@ -601,18 +601,56 @@ struct MagnetRow: View {
                 Pan115PlaybackCache.save(movieID: movieID, magnet: url)
             }
             toast = result.message
+            // 推送成功后，后台等待离线完成并清理 <115MB 的小文件
+            await autoCleanSmallFiles(url: url)
         } catch {
             toast = error.localizedDescription
         }
     }
+
+    /// 推送成功后，后台等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
+    private func autoCleanSmallFiles(url: String) async {
+        let settings = Pan115Settings.shared
+        let keyword = magnet.displayName
+        do {
+            let deleted = try await Pan115Client.shared.waitAndCleanSmallFiles(
+                keyword: keyword,
+                cookie: settings.cookie,
+                folderCID: settings.folderCID
+            )
+            if deleted > 0 {
+                toast = "已清理 \(deleted) 个小于 115MB 的小文件"
+            }
+        } catch {
+            // 清理失败不影响已推送结果，静默忽略
+        }
+    }
 }
 
-/// 影评行
+/// 影评行：正文可识别磁力/ed2k 链接（复制/推送115），番号可点击复制。
 struct ReviewRow: View {
     let review: Review
+    var movieID: String = ""
+
+    @State private var linkStates: [String: LinkState] = [:]
+    @State private var toast: String?
+
+    enum LinkState {
+        case idle
+        case pushing
+    }
+
+    /// 从正文提取的下载链接（磁力/ed2k）
+    private var links: [DownloadLinkKind] {
+        DownloadLinkDetector.downloadLinks(in: review.content ?? "")
+    }
+    /// 从正文提取的番号
+    private var numbers: [String] {
+        DownloadLinkDetector.numbers(in: review.content ?? "")
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(review.userName ?? "匿名")
                     .font(.caption.bold())
@@ -631,11 +669,31 @@ struct ReviewRow: View {
                     Text(Self.shortDate(date)).font(.caption2).foregroundColor(.secondary)
                 }
             }
+
             if let content = review.content {
                 Text(content)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(5)
+                    .textSelection(.enabled)
+            }
+
+            // 识别到的下载链接
+            ForEach(Array(links.enumerated()), id: \.offset) { _, link in
+                linkRow(link)
+            }
+
+            // 识别到的番号（点击复制）
+            if !numbers.isEmpty {
+                FlowTags(numbers: numbers) { number in
+                    copyNumber(number)
+                }
+            }
+
+            if let toast {
+                Text(toast)
+                    .font(.caption2)
+                    .foregroundColor(.orange)
             }
         }
         .padding()
@@ -643,9 +701,180 @@ struct ReviewRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
+    private func linkRow(_ link: DownloadLinkKind) -> some View {
+        let key = link.rawValue
+        let state = linkStates[key] ?? .idle
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: link.isDownloadLink ? "link" : "number")
+                    .font(.caption2)
+                    .foregroundColor(.blue)
+                Text(link.label)
+                    .font(.caption2.bold())
+                    .foregroundColor(.blue)
+                Text(link.rawValue)
+                    .font(.caption2.monospaced())
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    copyText(link.rawValue)
+                } label: {
+                    Label("复制", systemImage: "doc.on.doc")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.orange)
+
+                Button {
+                    if link.isDownloadLink {
+                        Task { await push(to: link) }
+                    }
+                } label: {
+                    if case .pushing = state {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("推送到115", systemImage: "icloud.and.arrow.up")
+                            .font(.caption2)
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.blue)
+                .disabled(linkStates[key] != nil)
+            }
+        }
+        .padding(8)
+        .background(Color(.systemGray5))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func copyText(_ text: String) {
+        UIPasteboard.general.string = text
+        toast = "已复制"
+    }
+
+    private func copyNumber(_ number: String) {
+        UIPasteboard.general.string = number
+        toast = "已复制番号 \(number)"
+    }
+
+    private func push(to link: DownloadLinkKind) async {
+        let key = link.rawValue
+        let settings = Pan115Settings.shared
+        guard settings.isConfigured else {
+            toast = settings.missingHint
+            return
+        }
+        linkStates[key] = .pushing
+        defer { linkStates[key] = nil }
+        do {
+            let result = try await Pan115Client.shared.addOfflineTask(
+                url: link.rawValue,
+                cookie: settings.cookie,
+                folderCID: settings.folderCID
+            )
+            if !movieID.isEmpty {
+                Pan115PlaybackCache.save(movieID: movieID, magnet: link.rawValue)
+            }
+            toast = result.message
+            // 推送成功后，后台等待离线完成并清理 <115MB 的小文件
+            await autoCleanSmallFiles(link: link)
+        } catch {
+            toast = error.localizedDescription
+        }
+    }
+
+    /// 推送成功后，后台等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
+    /// keyword 用链接本身（task.url 可精确匹配），失败静默忽略。
+    private func autoCleanSmallFiles(link: DownloadLinkKind) async {
+        let settings = Pan115Settings.shared
+        do {
+            let deleted = try await Pan115Client.shared.waitAndCleanSmallFiles(
+                keyword: link.rawValue,
+                cookie: settings.cookie,
+                folderCID: settings.folderCID
+            )
+            if deleted > 0 {
+                toast = "已清理 \(deleted) 个小于 115MB 的小文件"
+            }
+        } catch {
+            // 清理失败不影响已推送结果
+        }
+    }
+
     private static func shortDate(_ raw: String) -> String {
         if raw.count >= 10 { return String(raw.prefix(10)) }
         return raw
+    }
+}
+
+/// 简单流式标签（自动换行）
+struct FlowTags: View {
+    let numbers: [String]
+    let onTap: (String) -> Void
+
+    var body: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(numbers, id: \.self) { number in
+                Button {
+                    onTap(number)
+                } label: {
+                    Text(number)
+                        .font(.caption2.monospaced())
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGray5))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.primary)
+            }
+        }
+    }
+}
+
+/// 简易流式布局（自动换行的 HStack）
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return CGSize(width: maxWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let maxWidth = bounds.width
+        var x: CGFloat = bounds.minX
+        var y: CGFloat = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > bounds.minX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 
@@ -658,7 +887,7 @@ struct ReviewsListView: View {
     var body: some View {
         List {
             ForEach(vm.reviews) { review in
-                ReviewRow(review: review)
+                ReviewRow(review: review, movieID: movieID)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .onAppear {

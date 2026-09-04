@@ -9,6 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
+    @State private var goSearch = false
     @State private var goRankings = false
     @State private var goHot = false
     @State private var goLatest = false
@@ -20,6 +21,7 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    searchBar
                     shortcutRow
                     recommendSection
                     latestSection
@@ -38,6 +40,9 @@ struct HomeView: View {
             }
             .task { await vm.initialLoad() }
             .refreshable { await vm.initialLoad() }
+            .navigationDestination(isPresented: $goSearch) {
+                SearchView()
+            }
             .navigationDestination(isPresented: $goRankings) {
                 RankingsView(embedded: true, initialTab: .top250)
             }
@@ -57,6 +62,28 @@ struct HomeView: View {
                 HotReviewsView()
             }
         }
+    }
+
+    /// 首页顶部原生搜索框（点击进入搜索页）
+    private var searchBar: some View {
+        Button {
+            goSearch = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                Text("搜索番号 / 关键词")
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
     }
 
     private var shortcutRow: some View {

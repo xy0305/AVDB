@@ -281,7 +281,7 @@ struct ActorDetailView: View {
                                     showLogin = true
                                 }
                             } label: {
-                                Text(vm.hasCollected ? "已訂閱" : "訂閱")
+                                Text(vm.hasCollected ? "已关注" : "关注")
                                     .font(.caption.weight(.semibold))
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
@@ -444,7 +444,7 @@ final class ActorDetailViewModel: ObservableObject {
             if ok {
                 hasCollected = next
             } else {
-                collectHint = "訂閱失敗，請稍後再試"
+                collectHint = "关注失败，请稍后再试"
             }
         } catch {
             collectHint = error.localizedDescription

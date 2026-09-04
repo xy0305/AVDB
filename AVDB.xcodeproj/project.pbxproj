@@ -26,6 +26,7 @@
 		CF3F7E8D6C65083DAE58F921 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8A6DDD7AACE6897F060AED /* LoginView.swift */; };
 		D93E29B791E253E75F820628 /* UserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E30F604E876D29C296F9649 /* UserView.swift */; };
 		A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A101 /* Pan115Client.swift */; };
+		B00BB00CDE000D10DE000002 /* DownloadLinkDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */; };
 		A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */; };
 		A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A103 /* JSONFlex.swift */; };
 		A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */; };
@@ -57,6 +58,7 @@
 		DA8A6DDD7AACE6897F060AED /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		0E30F604E876D29C296F9649 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A101 /* Pan115Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115Client.swift; sourceTree = "<group>"; };
+		B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadLinkDetector.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115SettingsView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A103 /* JSONFlex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONFlex.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVDBUI.swift; sourceTree = "<group>"; };
@@ -128,6 +130,7 @@
 				7231C462DD413E8C76270418 /* JavDBSDK.swift */,
 				5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */,
 				A115C11E7A7B115C11E7A101 /* Pan115Client.swift */,
+				B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */,
 			);
 			name = Services;
 			 path = "Services";
@@ -349,6 +352,7 @@
 				CF3F7E8D6C65083DAE58F921 /* LoginView.swift in Sources */,
 				D93E29B791E253E75F820628 /* UserView.swift in Sources */,
 				A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */,
+				B00BB00CDE000D10DE000002 /* DownloadLinkDetector.swift in Sources */,
 				A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */,
 				A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */,
 				A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */,
