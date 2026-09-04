@@ -162,7 +162,7 @@ struct MoviePosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .topLeading) {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                     .frame(minWidth: 0, maxWidth: .infinity)
                     .aspectRatio(0.72, contentMode: .fill)
@@ -170,6 +170,7 @@ struct MoviePosterCard: View {
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
+                // 排名角标：不再用 maxWidth/maxHeight 撑满（避免点击区溢出到相邻列）
                 if let rank {
                     Text("\(rank)")
                         .font(.caption.bold())
@@ -178,10 +179,10 @@ struct MoviePosterCard: View {
                         .padding(.vertical, 3)
                         .background(rank <= 3 ? Color.orange : Color.black.opacity(0.65))
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(6)
                 }
-
+            }
+            .overlay(alignment: .bottomTrailing) {
                 if let badge = movie.playBadge {
                     Text(badge)
                         .font(.caption2.weight(.semibold))
@@ -251,6 +252,8 @@ struct MoviePosterGrid: View {
                     MovieDetailView(movieID: movie.id)
                 } label: {
                     MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .onAppear {
