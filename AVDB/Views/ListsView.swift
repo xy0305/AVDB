@@ -195,7 +195,8 @@ struct DirectorMoviesView: View {
 /// 通用「名称列表」：系列 / 片商 / 导演 的首页入口，复用 Actor 模型（id/name/videos_count）。
 struct NamedListView: View {
     let kind: NamedListKind
-    @State private var items: [Actor] = []
+    @State private var seriesItems: [Series] = []
+    @State private var actorItems: [Actor] = []
     @State private var loading = false
 
     enum NamedListKind {
@@ -213,30 +214,25 @@ struct NamedListView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(items) { item in
-                    NavigationLink {
-                        destination(item)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.name ?? item.id)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.primary)
-                                if let c = item.videosCount {
-                                    Text("\(c) 部")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
+                switch kind {
+                case .series:
+                    ForEach(seriesItems) { item in
+                        row(name: item.displayName, count: item.videosCount) {
+                            SeriesMoviesView(seriesID: item.id, title: item.displayName)
                         }
-                        .padding(.vertical, 10)
                     }
-                    .buttonStyle(.plain)
-                    Divider()
+                case .makers:
+                    ForEach(actorItems) { item in
+                        row(name: item.displayName, count: item.videosCount) {
+                            MakerMoviesView(makerID: item.id, title: item.displayName)
+                        }
+                    }
+                case .directors:
+                    ForEach(actorItems) { item in
+                        row(name: item.displayName, count: item.videosCount) {
+                            DirectorMoviesView(directorID: item.id, title: item.displayName)
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -248,30 +244,47 @@ struct NamedListView: View {
         .refreshable { await load(force: true) }
     }
 
-    @ViewBuilder
-    private func destination(_ item: Actor) -> some View {
-        switch kind {
-        case .series:
-            SeriesMoviesView(seriesID: item.id, title: item.name ?? item.id)
-        case .makers:
-            MakerMoviesView(makerID: item.id, title: item.name ?? item.id)
-        case .directors:
-            DirectorMoviesView(directorID: item.id, title: item.name ?? item.id)
+    private func row<D: View>(name: String, count: Int?, @ViewBuilder destination: @escaping () -> D) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    if let c = count {
+                        Text("\(c) 部")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 10)
         }
+        .buttonStyle(.plain)
     }
 
     private func load(force: Bool = false) async {
-        if force { items = [] }
-        guard items.isEmpty, !loading else { return }
+        if force {
+            seriesItems = []
+            actorItems = []
+        }
+        let empty = kind == .series ? seriesItems.isEmpty : actorItems.isEmpty
+        guard empty, !loading else { return }
         loading = true
         defer { loading = false }
         switch kind {
         case .series:
-            items = (try? await JavDBSDK.shared.seriesList()) ?? []
+            seriesItems = (try? await JavDBSDK.shared.series(type: "0")) ?? []
         case .makers:
-            items = (try? await JavDBSDK.shared.makers()) ?? []
+            actorItems = (try? await JavDBSDK.shared.makers()) ?? []
         case .directors:
-            items = (try? await JavDBSDK.shared.directors()) ?? []
+            actorItems = (try? await JavDBSDK.shared.directors()) ?? []
         }
     }
 }

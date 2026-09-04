@@ -326,6 +326,39 @@ public struct ActorDetailPayload: Decodable {
     }
 }
 
+/// 系列（GET /api/v1/series?type=N，字段 id/type/name/videos_count）
+public struct Series: Decodable, Identifiable, Hashable {
+    public let id: String
+    public let type: Int?
+    public let name: String?
+    public let videosCount: Int?
+
+    public var displayName: String { name ?? id }
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, name
+        case videosCount = "videos_count"
+    }
+}
+
+/// 系列字母索引项（GET /api/v1/series/letters，字段 id/letter/type/description/videos_count/views_count）
+public struct SeriesLetter: Decodable, Identifiable, Hashable {
+    public let id: String
+    public let letter: String?
+    public let type: Int?
+    public let description: String?
+    public let videosCount: Int?
+    public let viewsCount: Int?
+
+    public var displayName: String { letter ?? description ?? id }
+
+    enum CodingKeys: String, CodingKey {
+        case id, letter, type, description
+        case videosCount = "videos_count"
+        case viewsCount = "views_count"
+    }
+}
+
 /// 演员推荐（新人 / 月排名 / 推荐）
 public struct ActorRecommendData: Decodable {
     public let newActors: [Actor]?

@@ -339,17 +339,20 @@ public final class JavDBSDK {
         return resp.data?.movie
     }
 
-    /// 系列字母索引（GET /api/v1/series/letters）——返回 {id, letter, description, videos_count}
-    public func seriesLetters() async throws -> [String] {
-        let resp: JavDBResponse<StringListData> = try await client.get("/api/v1/series/letters")
-        return resp.data?.items ?? []
-    }
-
-    /// 系列列表（GET /api/v1/series/letters）——返回可跳转的系列对象。
-    public func seriesList() async throws -> [Actor] {
-        struct LetterList: Decodable { let letters: [Actor]? }
+    /// 系列字母索引（GET /api/v1/series/letters）——返回 {id, letter, type, description, videos_count, views_count}
+    public func seriesLetters() async throws -> [SeriesLetter] {
+        struct LetterList: Decodable { let letters: [SeriesLetter]? }
         let resp: JavDBResponse<LetterList> = try await client.get("/api/v1/series/letters")
         return resp.data?.letters ?? []
+    }
+
+    /// 系列列表（GET /api/v1/series?type=N）type: 0有码 1无码 2欧美
+    public func series(type: String = "0", page: Int = 1, limit: Int = 24) async throws -> [Series] {
+        struct SeriesList: Decodable { let series: [Series]? }
+        let resp: JavDBResponse<SeriesList> = try await client.get(
+            "/api/v1/series",
+            query: ["type": type, "page": "\(page)", "limit": "\(min(limit, 50))"])
+        return resp.data?.series ?? []
     }
 
     /// 片商列表（GET /api/v1/makers）
