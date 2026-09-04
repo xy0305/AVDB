@@ -162,12 +162,9 @@ struct MoviePosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .topLeading) {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                    .frame(minWidth: 0, maxWidth: .infinity)
                     .aspectRatio(0.72, contentMode: .fill)
-                    .frame(minHeight: 140)
-                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 if let rank {
@@ -178,10 +175,10 @@ struct MoviePosterCard: View {
                         .padding(.vertical, 3)
                         .background(rank <= 3 ? Color.orange : Color.black.opacity(0.65))
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(6)
                 }
-
+            }
+            .overlay(alignment: .bottomTrailing) {
                 if let badge = movie.playBadge {
                     Text(badge)
                         .font(.caption2.weight(.semibold))
@@ -229,6 +226,8 @@ struct MoviePosterCard: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
