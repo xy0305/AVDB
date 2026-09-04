@@ -279,20 +279,7 @@ public final class Pan115Client: @unchecked Sendable {
         throw lastError
     }
 
-    /// 用 ".mp4" 穿透 + type=4 拉出目录内所有视频文件（不依赖番号）。
-    public func searchAllVideos(cid: String, cookie: String, limit: Int = 200) async throws -> [FileItem] {
-        let q = "cid=\(cid.formEncoded)&search_value=.mp4&type=4&limit=\(limit)&offset=0&format=json"
-        guard let url = URL(string: "https://webapi.115.com/files/search?\(q)") else {
-            throw Pan115Error.fileNotFound
-        }
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
-        appendCommonHeaders(&req, cookie: cookie)
-        let obj = try await json(for: req)
-        return extractFileList(obj)
-    }
-
-    /// 按番号匹配 115 文件：番号搜索优先命中，穿透并行，递归仅兜底。
+    /// 按番号匹配 115 文件：全盘番号搜索优先命中，目录列举与浅层递归兜底。
     public func findMatchedVideo(
         keyword: String,
         cookie: String,
@@ -302,43 +289,42 @@ public final class Pan115Client: @unchecked Sendable {
         let needle = normalizedKey(keyword)
         guard !needle.isEmpty else { throw Pan115Error.fileNotFound }
 
-        // 1) 全盘番号搜索（多关键词变体，命中立即返回）
+        // 1) 全盘番号搜索（多关键词变体，命中立即返回）。
+        //    这是唯一可靠且快速的路径：115 的「目录内 search_value」不递归子目录，
+        //    而「全盘 .mp4」返回全站几十万条，无法定位具体番号——两者都不可用。
         let variants = searchKeywords(from: keyword)
+        var lastSearchError: Error = Pan115Error.fileNotFound
         for kw in variants {
-            if let files = try? await searchFiles(keyword: kw, cookie: cookie) {
+            do {
+                let files = try await searchFiles(keyword: kw, cookie: cookie)
                 if let hit = pickVideo(from: files, keyword: keyword, requireMatch: true) {
                     return hit
                 }
+            } catch {
+                lastSearchError = error
             }
         }
 
-        // 2) .mp4 穿透：并行拉取候选 CID，命中立即返回
-        var candidateCIDs: [String] = []
-        if let cid = folderCID, !cid.isEmpty { candidateCIDs.append(cid) }
-        if let uid = Pan115Settings.extractUID(from: cookie), uid != "0" {
-            candidateCIDs.append(uid) // 用户根目录
-        }
-        let cids = candidateCIDs.uniqued
-        if !cids.isEmpty {
-            let results = await withTaskGroup(of: [FileItem].self) { group in
-                for cid in cids.prefix(2) {
-                    group.addTask { (try? await self.searchAllVideos(cid: cid, cookie: cookie)) ?? [] }
-                }
-                var collected: [FileItem] = []
-                for await r in group { collected.append(contentsOf: r) }
-                return collected
-            }
-            let all = results.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
-            if let hit = pickVideo(from: all, keyword: keyword, requireMatch: requireMatch) {
+        // 2) 离线目录内全量列举（limit 拉满），在当前目录层面再匹配一次。
+        //    不再递归遍历子目录——深嵌套目录（如 263 条 ED2K 大目录）递归会发
+        //    起数千次请求，是「一直搜索」的直接元凶。
+        if let cid = folderCID, !cid.isEmpty {
+            let files = (try? await listFiles(cid: cid, cookie: cookie, limit: 500)) ?? []
+            if let hit = pickVideo(from: files, keyword: keyword, requireMatch: requireMatch) {
                 return hit
             }
         }
 
-        // 3) 离线目录递归兜底（仅必要）
+        // 3) 兜底：离线目录浅层递归（深度 2，带超时），仅覆盖「番号压在下一层子目录」的常见场景。
         if let cid = folderCID, !cid.isEmpty {
-            return try await findLatestVideo(in: cid, cookie: cookie, keyword: keyword, requireMatch: requireMatch)
+            if let hit = try? await findLatestVideo(in: cid, cookie: cookie, keyword: keyword, requireMatch: requireMatch) {
+                return hit
+            }
         }
-        throw Pan115Error.fileNotFound
+
+        // 兜底：优先抛出番号搜索途中遇到的具体错误（如 SSL EOF / cookie 失效），
+        // 避免上层把「网络错误」误判成「一直搜索」而卡住不提示。
+        throw lastSearchError
     }
 
     /// 在目录中递归找与番号匹配的视频（遍历所有子目录，不限层数）。
@@ -350,9 +336,9 @@ public final class Pan115Client: @unchecked Sendable {
     ) async throws -> FileItem {
         var visited = Set<String>()
         func walk(_ dirID: String, depth: Int) async throws -> FileItem? {
-            guard depth < 8, !visited.contains(dirID) else { return nil }
+            guard depth < 2, !visited.contains(dirID) else { return nil }
             visited.insert(dirID)
-            let files = try await listFiles(cid: dirID, cookie: cookie)
+            let files = try await listFiles(cid: dirID, cookie: cookie, limit: 500)
             let videos = files.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
             if let hit = pickVideo(from: videos, keyword: keyword, requireMatch: requireMatch) {
                 return hit
