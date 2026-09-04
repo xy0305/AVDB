@@ -115,6 +115,10 @@ struct MovieDetailView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(movie.displayNumber)
                     .font(.title3.bold())
+                    .textSelection(.enabled)
+                    .onTapGesture {
+                        UIPasteboard.general.string = movie.displayNumber
+                    }
 
                 Text(movie.displayTitle)
                     .font(.subheadline)
@@ -327,10 +331,10 @@ struct MovieDetailView: View {
     private func reviewsSection(_ movie: Movie) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             NavigationLink {
-                ReviewsListView(movieID: movie.id, total: movie.reviewsCount ?? 0)
+                ReviewsListView(movieID: movie.id, total: vm.reviews.count)
             } label: {
                 HStack {
-                    Text("影评 (\(movie.reviewsCount ?? 0))")
+                    Text("影评 (\(vm.reviews.count))")
                         .font(.headline)
                         .foregroundStyle(.primary)
                     Spacer()
