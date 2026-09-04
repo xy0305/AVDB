@@ -322,7 +322,7 @@ public final class Pan115Client: @unchecked Sendable {
         if !cids.isEmpty {
             let results = await withTaskGroup(of: [FileItem].self) { group in
                 for cid in cids.prefix(2) {
-                    group.addTask { (try? await searchAllVideos(cid: cid, cookie: cookie)) ?? [] }
+                    group.addTask { (try? await self.searchAllVideos(cid: cid, cookie: cookie)) ?? [] }
                 }
                 var collected: [FileItem] = []
                 for await r in group { collected.append(contentsOf: r) }
