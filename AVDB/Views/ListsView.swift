@@ -108,17 +108,47 @@ struct ListDetailView: View {
     }
 }
 
-/// 系列作品列表
+/// 系列作品列表（type: 0有码 1无码 2欧美）
 struct SeriesMoviesView: View {
     let seriesID: String
     let title: String
+    let type: String
     @StateObject private var vm: MovieListViewModel
 
-    init(seriesID: String, title: String) {
+    init(seriesID: String, title: String, type: String = "0") {
         self.seriesID = seriesID
         self.title = title
+        self.type = type
         _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.seriesMovies(seriesID, page: page, limit: 21)
+            try await JavDBSDK.shared.seriesMovies(seriesID, type: type, page: page, limit: 21)
+        })
+    }
+
+    var body: some View {
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
+    }
+}
+
+/// 番号前缀作品列表（系列「番号」子分类，如 IPX → 搜索 q=IPX）
+struct SeriesNumberMoviesView: View {
+    let number: String
+    let title: String
+    @StateObject private var vm: MovieListViewModel
+
+    init(number: String, title: String) {
+        self.number = number
+        self.title = title
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.moviesByNumber(number, page: page, limit: 21)
         })
     }
 
@@ -189,6 +219,128 @@ struct DirectorMoviesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
+    }
+}
+
+/// 系列子分类
+enum SeriesTab: String, CaseIterable, Identifiable {
+    case number
+    case censored
+    case uncensored
+    case western
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .number: return "番号"
+        case .censored: return "有码"
+        case .uncensored: return "无码"
+        case .western: return "欧美"
+        }
+    }
+
+    /// series 接口 type 参数（番号不用）
+    var type: String {
+        switch self {
+        case .number: return "0"
+        case .censored: return "0"
+        case .uncensored: return "1"
+        case .western: return "2"
+        }
+    }
+}
+
+/// 系列模块：番号 / 有码 / 无码 / 欧美 四个子分类。
+struct SeriesView: View {
+    @State private var tab: SeriesTab = .number
+    @State private var letters: [SeriesLetter] = []
+    @State private var series: [Series] = []
+    @State private var loading = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            CapsuleChipBar(
+                tabs: SeriesTab.allCases.map { ($0, $0.title) },
+                selection: $tab
+            )
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if tab == .number {
+                        ForEach(letters) { item in
+                            row(title: item.displayName, subtitle: item.description, count: item.videosCount) {
+                                SeriesNumberMoviesView(number: item.letter ?? item.id, title: item.displayName)
+                            }
+                        }
+                    } else {
+                        ForEach(series) { item in
+                            row(title: item.displayName, subtitle: nil, count: item.videosCount) {
+                                SeriesMoviesView(seriesID: item.id, title: item.displayName, type: tab.type)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                if loading { ProgressView().padding() }
+            }
+        }
+        .navigationTitle("系列")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load(force: true) }
+        .onChange(of: tab) { _, new in
+            Task { await load(tab: new) }
+        }
+    }
+
+    private func row<D: View>(title: String, subtitle: String?, count: Int?, @ViewBuilder destination: @escaping () -> D) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    if let c = count {
+                        Text("\(c) 部")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func load(tab: SeriesTab? = nil, force: Bool = false) async {
+        let current = tab ?? self.tab
+        let isNumber = current == .number
+        let empty = isNumber ? letters.isEmpty : series.isEmpty
+        if force {
+            letters = []
+            series = []
+        }
+        guard empty, !loading else { return }
+        loading = true
+        defer { loading = false }
+        if isNumber {
+            letters = (try? await JavDBSDK.shared.seriesLetters()) ?? []
+        } else {
+            series = (try? await JavDBSDK.shared.series(type: current.type)) ?? []
+        }
     }
 }
 

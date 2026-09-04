@@ -466,15 +466,20 @@ public final class JavDBSDK {
         )
     }
 
-    /// 系列影片：filter_by=0:s:{id}:
-    public func seriesMovies(_ id: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+    /// 系列影片：filter_by={type}:s:{id}:（type: 0有码 1无码 2欧美）
+    public func seriesMovies(_ id: String, type: String = "0", page: Int = 1, limit: Int = 24) async throws -> [Movie] {
         try await moviesByTag(
-            filterBy: "0:s:\(id):",
-            type: "0",
+            filterBy: "\(type):s:\(id):",
+            type: type,
             page: page,
             limit: limit,
             sortBy: "release"
         )
+    }
+
+    /// 按番号前缀搜影片（系列「番号」子分类，如 IPX → 全盘搜索 q=IPX）
+    public func moviesByNumber(_ number: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+        try await search(keyword: number, page: page, sortBy: .release, limit: limit)
     }
 
     /// 片商影片：filter_by=0:m:{id}:
