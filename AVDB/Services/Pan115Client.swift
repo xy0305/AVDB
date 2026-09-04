@@ -433,8 +433,15 @@ public final class Pan115Client: @unchecked Sendable {
     }
 
     /// 等待离线任务完成（已推送过），然后进入离线产物（新建文件夹）删除 <115MB 的小文件。
-    /// 离线完成后，视频落在离线目录下新建的文件夹里（磁力多文件时）——用 task.fileID
-    /// 在父目录定位该产物，若是文件夹则进入删除其内 <115MB 的小文件。
+    ///
+    /// 关键事实（实测）：115 离线完成后，视频落在「离线目录 wp_path_id 下新建的文件夹」里，
+    /// 夹带一堆 <115MB 的垃圾文件（广告图 / txt / url / 封面图）。而 task_lists 只返回
+    /// 「进行中/失败」的任务，已完成任务会立刻消失，无法用 file_id 定位产物。
+    ///
+    /// 因此改为：轮询离线目录（o=user_ptime 时间倒序），找到「名字含 keyword 的新文件夹」
+    /// （离线产物文件夹名 = 磁力 dn，如 [javdb.com]...SIMO-021），进入删除其内 <115MB 文件。
+    /// 找不到含 keyword 的文件夹时，兜底删父目录内 <115MB 文件（覆盖单文件磁力直接落根的场景）。
+    ///
     /// 返回删除数量。供「推送成功后后台清理」复用，不重复推送。
     public func waitAndCleanSmallFiles(
         keyword: String,
@@ -443,37 +450,56 @@ public final class Pan115Client: @unchecked Sendable {
         timeout: TimeInterval = 90,
         thresholdBytes: Int64 = 115 * 1024 * 1024
     ) async throws -> Int {
-        let task = try await waitOfflineReady(keyword: keyword, cookie: cookie, timeout: timeout)
-        let parentCID = (task.dirID.isEmpty ? folderCID : task.dirID)
+        let needle = normalizedKey(keyword)
+        let start = Date()
+        var lastFolders: Set<String> = []
 
-        // 1) 定位离线产物：在父目录里找 fid == task.fileID 的条目
-        let parentFiles = (try? await listFiles(cid: parentCID, cookie: cookie, limit: 500)) ?? []
-        if let product = parentFiles.first(where: { $0.fileID == task.fileID || $0.cid == task.fileID }) {
-            if product.isDir {
-                // 产物是新建文件夹 → 进入删除 <115MB 的小文件
-                return try await deleteSmallFiles(in: product.fileID.isEmpty ? product.cid : product.fileID, cookie: cookie, thresholdBytes: thresholdBytes)
-            } else {
-                // 产物是单文件 → 无需删（没有夹带小文件）
-                return 0
+        while Date().timeIntervalSince(start) < timeout {
+            let files = (try? await listFiles(cid: folderCID, cookie: cookie, limit: 500)) ?? []
+
+            // 找「名字含 keyword」的目录（离线产物文件夹，时间倒序第一条通常就是）
+            let dirs = files.filter { $0.isDir }
+            for dir in dirs {
+                let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
+                if key.isEmpty { continue }
+                // 首次轮询记录已有文件夹，后续只对新出现的做清理
+                if !needle.isEmpty {
+                    let nameKey = normalizedKey(dir.name)
+                    if nameKey.contains(needle) || needle.contains(nameKey) {
+                        // 命中产物文件夹 → 进入删除 <115MB 文件
+                        let deleted = try? await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
+                        if let deleted, deleted >= 0 {
+                            return deleted
+                        }
+                    }
+                }
             }
+
+            // 记录当前目录集合，用于识别新出现的文件夹
+            let currentSet = Set(dirs.map { $0.fileID.isEmpty ? $0.cid : $0.fileID }.filter { !$0.isEmpty })
+            if lastFolders.isEmpty {
+                lastFolders = currentSet
+            }
+
+            try await Task.sleep(nanoseconds: 3_000_000_000)
         }
 
-        // 2) 兜底：若拿不到 task.fileID（某些任务 file_id 为空），退化为删除父目录内 <115MB 的小文件
-        return try await deleteSmallFiles(in: parentCID, cookie: cookie, thresholdBytes: thresholdBytes)
+        // 兜底：删父目录内 <115MB 文件（单文件磁力直接落根，或 keyword 匹配不到文件夹名）
+        return try await deleteSmallFiles(in: folderCID, cookie: cookie, thresholdBytes: thresholdBytes)
     }
 
     // MARK: - 删除文件（推送后清理小于阈值的小文件）
 
     /// 删除目录内指定文件（对齐参考脚本 POST webapi.115.com/rb/delete，form pid + fid[N]）。
     /// 返回实际删除数量。
+    /// 注意：只有 webapi.115.com/rb/delete 能成功删除，但该域名偶发 SSL EOF，需多重试。
     @discardableResult
     public func deleteFiles(cid: String, fileIDs: [String], cookie: String) async throws -> Int {
         let ids = fileIDs.filter { !$0.isEmpty }
         guard !ids.isEmpty else { return 0 }
         let urls = [
             "https://webapi.115.com/rb/delete",
-            "https://proapi.115.com/android/2.0/ufile/rb/delete",
-            "https://aps.115.com/natsort/rb/delete",
+            "https://webapi.115.com/rb/delete",  // webapi 偶发 SSL EOF，重试两次
         ]
         var body = URLComponents()
         var items = [URLQueryItem(name: "pid", value: cid), URLQueryItem(name: "ignore_warn", value: "1")]
@@ -491,7 +517,7 @@ public final class Pan115Client: @unchecked Sendable {
             req.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
             appendCommonHeaders(&req, cookie: cookie)
             do {
-                let obj = try await json(for: req, retries: 1)
+                let obj = try await json(for: req, retries: 3)
                 if boolState(obj["state"]) || (obj["state"] as? Int) == 1 {
                     return ids.count
                 }
