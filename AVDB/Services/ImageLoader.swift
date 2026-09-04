@@ -16,6 +16,69 @@ public enum ImageLoaderError: Error {
     case invalidData
 }
 
+/// 高清封面 URL 构建器（移植自 jable.js 的 HQ cover 规则）。
+/// 根据番号拼出 DMM / MGS 官方无水印高清封面直链，作为 JAVDB 加密封面的首选/回退源。
+public enum CoverURLBuilder {
+
+    /// 番号 → contentId 的厂牌前缀映射（对齐 jable.js numMap）。
+    private static let numMap: [String: String] = [
+        "WSA": "2",
+        "FSDSS": "1", "FCDSS": "1", "FNS": "1", "FTHTD": "1",
+        "FALENO": "1", "FGAN": "1", "FSNF": "1", "FLAV": "1",
+        "ABP": "118", "CHN": "118",
+        "STARS": "1", "STAR": "1", "START": "1",
+        "SODS": "1",
+        "REBD": "h_346", "REBDB": "h_346", "GSHRB": "h_346",
+    ]
+
+    /// MGS（prestige 系）厂牌映射。
+    private static let mgstageRules: [String: String] = [
+        "ABF": "prestige", "ABW": "prestige", "ABP": "prestige",
+        "CHN": "prestige", "JUFE": "prestige", "MAAN": "prestige",
+        "PPT": "prestige", "390JAC": "jackson",
+    ]
+
+    /// 生成高清封面候选 URL（poster + backdrop）。
+    public static func coverURLs(for number: String?) -> (poster: String?, backdrop: String?) {
+        guard let number, !number.isEmpty else { return (nil, nil) }
+        let raw = number.uppercased()
+        guard let match = raw.range(of: #"([A-Z0-9]+)-?(\d{2,5})"#, options: .regularExpression) else {
+            return (nil, nil)
+        }
+        let seg = String(raw[match])
+        // 分离字母前缀与数字
+        let prefix = String(seg.prefix { !$0.isNumber })
+        let numStr = String(seg.drop { !$0.isNumber }).trimmingCharacters(in: .whitespaces)
+        guard !prefix.isEmpty, !prefix.contains("-"), let idx = Int(numStr), idx > 0 else {
+            return (nil, nil)
+        }
+        let prefixLower = prefix.lowercased()
+        let number5 = String(idx).paddingLeft(toLength: 5, withPad: "0")
+        let mapPrefix = numMap[prefix] ?? ""
+        let code = "\(mapPrefix)\(prefixLower)\(number5)"
+
+        // MGS 厂牌
+        if let maker = mgstageRules[prefix] {
+            let base = "https://image.mgstage.com/images/\(maker)/\(prefixLower)/\(idx)"
+            let poster = "\(base)/pf_e_\(prefixLower)-\(idx).jpg"
+            let backdrop = "\(base)/pb_e_\(prefixLower)-\(idx).jpg"
+            return (poster, backdrop)
+        }
+
+        // DMM 默认
+        let poster = "https://pics.dmm.co.jp/digital/video/\(code)/\(code)ps.jpg"
+        let backdrop = "https://pics.dmm.co.jp/digital/video/\(code)/\(code)pl.jpg"
+        return (poster, backdrop)
+    }
+}
+
+extension String {
+    func paddingLeft(toLength: Int, withPad: String) -> String {
+        guard toLength > count else { return self }
+        return String(repeating: withPad, count: toLength - count) + self
+    }
+}
+
 /// 图片加载器（单例，带内存 + 磁盘缓存）
 @MainActor
 public final class ImageLoader: ObservableObject {
@@ -88,16 +151,18 @@ public final class ImageLoader: ObservableObject {
     }
 }
 
-/// AsyncImage 封装：自动处理 JAVDB 加密 CDN
+/// AsyncImage 封装：自动处理 JAVDB 加密 CDN；可选优先加载高清源并回退。
 public struct JavDBImage: View {
     let url: String?
+    var fallbackURL: String? = nil
     let contentMode: ContentMode
 
     @State private var image: UIImage?
     @State private var loading = false
 
-    public init(url: String?, contentMode: ContentMode = .fill) {
-        self.url = url
+    public init(url: String?, fallbackURL: String? = nil, contentMode: ContentMode = .fill) {
+        self.url = fallbackURL ?? url
+        self.fallbackURL = fallbackURL
         self.contentMode = contentMode
     }
 
@@ -112,7 +177,11 @@ public struct JavDBImage: View {
                     .task {
                         guard !loading, let u = url else { return }
                         loading = true
-                        image = await ImageLoader.shared.load(u)
+                        if let img = await ImageLoader.shared.load(u) {
+                            image = img
+                        } else if let fb = fallbackURL, fb != u, let fbImg = await ImageLoader.shared.load(fb) {
+                            image = fbImg
+                        }
                         loading = false
                     }
             }

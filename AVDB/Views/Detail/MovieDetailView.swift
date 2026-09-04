@@ -107,7 +107,7 @@ struct MovieDetailView: View {
 
     private func headerSection(_ movie: Movie) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+            JavDBImage(url: movie.coverURL ?? movie.thumbURL, fallbackURL: movie.hdCoverURL)
                 .frame(width: 120, height: 168)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .shadow(radius: 3)

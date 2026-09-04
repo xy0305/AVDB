@@ -67,6 +67,14 @@ public struct Movie: Decodable, Identifiable, Hashable {
         return String(format: "%.2f", s)
     }
 
+    /// 高清官方封面（DMM/MGS 直链，无水印），作为详情页大开图首选。
+    public var hdCoverURL: String? {
+        CoverURLBuilder.coverURLs(for: number).poster
+    }
+    public var hdBackdropURL: String? {
+        CoverURLBuilder.coverURLs(for: number).backdrop
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, type, number, title, summary, desc, duration, score, rating, category
         case numberLetter = "number_letter"
