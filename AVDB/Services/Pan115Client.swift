@@ -320,10 +320,15 @@ public final class Pan115Client: @unchecked Sendable {
         }
         let cids = candidateCIDs.uniqued
         if !cids.isEmpty {
-            async let a = searchAllVideos(cid: cids[0], cookie: cookie)
-            async let b = cids.count > 1 ? searchAllVideos(cid: cids[1], cookie: cookie) : [FileItem]()
-            let (first, second) = (try? await a) ?? [], (try? await b) ?? []
-            let all = (first + second).filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
+            let results = await withTaskGroup(of: [FileItem].self) { group in
+                for cid in cids.prefix(2) {
+                    group.addTask { (try? await searchAllVideos(cid: cid, cookie: cookie)) ?? [] }
+                }
+                var collected: [FileItem] = []
+                for await r in group { collected.append(contentsOf: r) }
+                return collected
+            }
+            let all = results.filter { !$0.isDir && $0.isVideo && !$0.pickCode.isEmpty }
             if let hit = pickVideo(from: all, keyword: keyword, requireMatch: requireMatch) {
                 return hit
             }
