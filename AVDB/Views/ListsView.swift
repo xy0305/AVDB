@@ -170,13 +170,15 @@ struct SeriesNumberMoviesView: View {
 struct MakerMoviesView: View {
     let makerID: String
     let title: String
+    var type: String = "0"
     @StateObject private var vm: MovieListViewModel
 
-    init(makerID: String, title: String) {
+    init(makerID: String, title: String, type: String = "0") {
         self.makerID = makerID
         self.title = title
+        self.type = type
         _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.makerMovies(makerID, page: page, limit: 21)
+            try await JavDBSDK.shared.makerMovies(makerID, type: type, page: page, limit: 21)
         })
     }
 
@@ -198,13 +200,15 @@ struct MakerMoviesView: View {
 struct DirectorMoviesView: View {
     let directorID: String
     let title: String
+    var type: String = "0"
     @StateObject private var vm: MovieListViewModel
 
-    init(directorID: String, title: String) {
+    init(directorID: String, title: String, type: String = "0") {
         self.directorID = directorID
         self.title = title
+        self.type = type
         _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.directorMovies(directorID, page: page, limit: 21)
+            try await JavDBSDK.shared.directorMovies(directorID, type: type, page: page, limit: 21)
         })
     }
 
@@ -384,6 +388,223 @@ struct SeriesView: View {
                 series.append(contentsOf: next.filter { !ids.contains($0.id) })
                 seriesPage += 1
             }
+        }
+    }
+}
+
+/// 片商/导演 的分类 Tab（有码/无码/欧美/FC2）
+enum NamedTypeTab: String, CaseIterable, Identifiable {
+    case censored
+    case uncensored
+    case western
+    case fc2
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .censored: return "有码"
+        case .uncensored: return "无码"
+        case .western: return "欧美"
+        case .fc2: return "FC2"
+        }
+    }
+
+    /// makers/directors 接口 type 参数
+    var type: String {
+        switch self {
+        case .censored: return "0"
+        case .uncensored: return "1"
+        case .western: return "2"
+        case .fc2: return "3"
+        }
+    }
+}
+
+/// 片商模块：有码 / 无码 / 欧美 / FC2 四个子分类（带分页）。
+struct MakersView: View {
+    @State private var tab: NamedTypeTab = .censored
+    @State private var items: [Actor] = []
+    @State private var loading = false
+    @State private var page = 1
+    @State private var hasMore = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            CapsuleChipBar(
+                tabs: NamedTypeTab.allCases.map { ($0, $0.title) },
+                selection: $tab
+            )
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(items) { item in
+                        row(name: item.displayName, count: item.videosCount) {
+                            MakerMoviesView(makerID: item.id, title: item.displayName, type: tab.type)
+                        }
+                        .onAppear {
+                            if item.id == items.last?.id {
+                                Task { await loadMore() }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                if loading { ProgressView().padding() }
+            }
+        }
+        .navigationTitle("片商")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load(force: true) }
+        .onChange(of: tab) { _, _ in
+            Task { await load(force: true) }
+        }
+    }
+
+    private func row<D: View>(name: String, count: Int?, @ViewBuilder destination: @escaping () -> D) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    if let c = count {
+                        Text("\(c) 部")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func load(force: Bool = false) async {
+        if force {
+            items = []
+            page = 1
+            hasMore = true
+        }
+        guard items.isEmpty, !loading else { return }
+        loading = true
+        defer { loading = false }
+        items = (try? await JavDBSDK.shared.makers(type: tab.type, page: 1, limit: 100)) ?? []
+        page = 2
+        hasMore = !items.isEmpty
+    }
+
+    private func loadMore() async {
+        guard hasMore, !loading else { return }
+        loading = true
+        defer { loading = false }
+        let next = (try? await JavDBSDK.shared.makers(type: tab.type, page: page, limit: 100)) ?? []
+        if next.isEmpty {
+            hasMore = false
+        } else {
+            let ids = Set(items.map(\.id))
+            items.append(contentsOf: next.filter { !ids.contains($0.id) })
+            page += 1
+        }
+    }
+}
+
+/// 导演模块：有码 / 无码 / 欧美 / FC2 四个子分类（带分页）。
+struct DirectorsView: View {
+    @State private var tab: NamedTypeTab = .censored
+    @State private var items: [Actor] = []
+    @State private var loading = false
+    @State private var page = 1
+    @State private var hasMore = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            CapsuleChipBar(
+                tabs: NamedTypeTab.allCases.map { ($0, $0.title) },
+                selection: $tab
+            )
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(items) { item in
+                        row(name: item.displayName, count: item.videosCount) {
+                            DirectorMoviesView(directorID: item.id, title: item.displayName, type: tab.type)
+                        }
+                        .onAppear {
+                            if item.id == items.last?.id {
+                                Task { await loadMore() }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                if loading { ProgressView().padding() }
+            }
+        }
+        .navigationTitle("导演")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load(force: true) }
+        .onChange(of: tab) { _, _ in
+            Task { await load(force: true) }
+        }
+    }
+
+    private func row<D: View>(name: String, count: Int?, @ViewBuilder destination: @escaping () -> D) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    if let c = count {
+                        Text("\(c) 部")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func load(force: Bool = false) async {
+        if force {
+            items = []
+            page = 1
+            hasMore = true
+        }
+        guard items.isEmpty, !loading else { return }
+        loading = true
+        defer { loading = false }
+        items = (try? await JavDBSDK.shared.directors(type: tab.type, page: 1, limit: 100)) ?? []
+        page = 2
+        hasMore = !items.isEmpty
+    }
+
+    private func loadMore() async {
+        guard hasMore, !loading else { return }
+        loading = true
+        defer { loading = false }
+        let next = (try? await JavDBSDK.shared.directors(type: tab.type, page: page, limit: 100)) ?? []
+        if next.isEmpty {
+            hasMore = false
+        } else {
+            let ids = Set(items.map(\.id))
+            items.append(contentsOf: next.filter { !ids.contains($0.id) })
+            page += 1
         }
     }
 }

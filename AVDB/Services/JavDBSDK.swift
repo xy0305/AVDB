@@ -358,19 +358,19 @@ public final class JavDBSDK {
         return resp.data?.series ?? []
     }
 
-    /// 片商列表（GET /api/v1/makers）返回 data.makers
-    public func makers() async throws -> [Actor] {
+    /// 片商列表（GET /api/v1/makers）返回 data.makers；type: 0有码 1无码 2欧美 3FC2
+    public func makers(type: String = "0", page: Int = 1, limit: Int = 50) async throws -> [Actor] {
         struct MakersData: Decodable { let makers: [Actor]? }
         let resp: JavDBResponse<MakersData> = try await client.get(
-            "/api/v1/makers", query: ["type": "0", "page": "1", "limit": "100"])
+            "/api/v1/makers", query: ["type": type, "page": "\(page)", "limit": "\(min(limit, 100))"])
         return resp.data?.makers ?? []
     }
 
-    /// 导演列表（GET /api/v1/directors）返回 data.directors
-    public func directors() async throws -> [Actor] {
+    /// 导演列表（GET /api/v1/directors）返回 data.directors；type: 0有码 1无码 2欧美 3FC2
+    public func directors(type: String = "0", page: Int = 1, limit: Int = 50) async throws -> [Actor] {
         struct DirectorsData: Decodable { let directors: [Actor]? }
         let resp: JavDBResponse<DirectorsData> = try await client.get(
-            "/api/v1/directors", query: ["type": "0", "page": "1", "limit": "100"])
+            "/api/v1/directors", query: ["type": type, "page": "\(page)", "limit": "\(min(limit, 100))"])
         return resp.data?.directors ?? []
     }
 
@@ -490,21 +490,22 @@ public final class JavDBSDK {
     }
 
     /// 片商影片：filter_by=0:m:{id}:
-    public func makerMovies(_ id: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+    /// 片商影片：filter_by={type}:m:{id}:（type: 0有码 1无码 2欧美 3FC2）
+    public func makerMovies(_ id: String, type: String = "0", page: Int = 1, limit: Int = 24) async throws -> [Movie] {
         try await moviesByTag(
-            filterBy: "0:m:\(id):",
-            type: "0",
+            filterBy: "\(type):m:\(id):",
+            type: type,
             page: page,
             limit: limit,
             sortBy: "release"
         )
     }
 
-    /// 导演影片：filter_by=0:d:{id}:
-    public func directorMovies(_ id: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
+    /// 导演影片：filter_by={type}:d:{id}:（type: 0有码 1无码 2欧美 3FC2）
+    public func directorMovies(_ id: String, type: String = "0", page: Int = 1, limit: Int = 24) async throws -> [Movie] {
         try await moviesByTag(
-            filterBy: "0:d:\(id):",
-            type: "0",
+            filterBy: "\(type):d:\(id):",
+            type: type,
             page: page,
             limit: limit,
             sortBy: "release"
