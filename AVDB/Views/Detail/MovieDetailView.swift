@@ -111,12 +111,13 @@ struct MovieDetailView: View {
     private func heroHeader(_ movie: Movie) -> some View {
         ZStack(alignment: .bottomLeading) {
             JavDBImage(
-                url: movie.hdCoverURL ?? movie.hdBackdropURL,
+                // 优先 DMM/MGS 竖版海报；失败再回退 JAVDB 高清封面。
+                url: movie.hdCoverURL ?? movie.coverURL,
                 fallbackURL: movie.coverURL ?? movie.thumbURL,
-                contentMode: .fill
+                contentMode: .fit
             )
             .frame(maxWidth: .infinity)
-            .frame(height: 560)
+            .frame(height: 420)
             .clipped()
 
             LinearGradient(
