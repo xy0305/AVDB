@@ -590,11 +590,24 @@ public final class Pan115Client: @unchecked Sendable {
     /// 只删非目录、有 fid 的文件；返回删除数量。
     @discardableResult
     public func deleteSmallFiles(in cid: String, cookie: String, thresholdBytes: Int64 = 115 * 1024 * 1024) async throws -> Int {
-        let files = (try? await listFiles(cid: cid, cookie: cookie, limit: 500)) ?? []
-        let small = files.filter { !$0.isDir && $0.size > 0 && $0.size < thresholdBytes && !$0.fileID.isEmpty }
-        let ids = small.map(\.fileID)
-        guard !ids.isEmpty else { return 0 }
-        return try await deleteFiles(cid: cid, fileIDs: ids, cookie: cookie)
+        var deleted = 0
+        var lastRemaining = 0
+        for attempt in 0..<3 {
+            let files = try await listFiles(cid: cid, cookie: cookie, limit: 500)
+            let small = files.filter { !$0.isDir && $0.size > 0 && $0.size < thresholdBytes && !$0.fileID.isEmpty }
+            guard !small.isEmpty else { return deleted }
+            deleted += try await deleteFiles(cid: cid, fileIDs: small.map(\.fileID), cookie: cookie)
+
+            // 115 返回成功后仍可能有短暂延迟，必须复查实际目录。
+            let remainingFiles = try await listFiles(cid: cid, cookie: cookie, limit: 500)
+            let remaining = remainingFiles.filter { !$0.isDir && $0.size > 0 && $0.size < thresholdBytes && !$0.fileID.isEmpty }
+            lastRemaining = remaining.count
+            if remaining.isEmpty { return deleted }
+            if attempt < 2 {
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
+        throw Pan115Error.cleanupFailed(lastRemaining)
     }
 
     private func pickVideo(from files: [FileItem], keyword: String?, requireMatch: Bool) -> FileItem? {
@@ -901,6 +914,7 @@ public enum Pan115Error: Error, LocalizedError {
     case taskFailed(String)
     case fileNotFound
     case playURLNotFound
+    case cleanupFailed(Int)
 
     public var errorDescription: String? {
         switch self {
@@ -913,6 +927,7 @@ public enum Pan115Error: Error, LocalizedError {
         case .taskFailed(let msg): return "115 离线失败：\(msg)"
         case .fileNotFound: return "离线目录里没找到与当前番号匹配的视频"
         case .playURLNotFound: return "无法获取 115 原画播放地址"
+        case .cleanupFailed(let count): return "115 垃圾文件仍剩余 \(count) 个"
         }
     }
 }
