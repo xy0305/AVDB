@@ -89,8 +89,10 @@ struct ListDetailView: View {
     init(listID: String, title: String) {
         self.listID = listID
         self.title = title
-        _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.listMovies(listID, page: page, limit: 21)
+        _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
+            try await JavDBSDK.shared.moviesByTag(
+                filterBy: "0:l:\(listID):", type: "0", page: page, limit: 21,
+                sortBy: sort.sortBy, orderBy: sort.orderBy)
         })
     }
 
@@ -103,6 +105,7 @@ struct ListDetailView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }
@@ -119,8 +122,10 @@ struct SeriesMoviesView: View {
         self.seriesID = seriesID
         self.title = title
         self.type = type
-        _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.seriesMovies(seriesID, type: type, page: page, limit: 21)
+        _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
+            try await JavDBSDK.shared.moviesByTag(
+                filterBy: "\(type):s:\(seriesID):", type: type, page: page, limit: 21,
+                sortBy: sort.sortBy, orderBy: sort.orderBy)
         })
     }
 
@@ -133,6 +138,7 @@ struct SeriesMoviesView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }
@@ -147,8 +153,10 @@ struct SeriesNumberMoviesView: View {
     init(number: String, title: String) {
         self.number = number
         self.title = title
-        _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.moviesByNumber(number, page: page, limit: 21)
+        _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
+            try await JavDBSDK.shared.moviesByTag(
+                filterBy: "0:c:\(number):", type: "0", page: page, limit: 21,
+                sortBy: sort.sortBy, orderBy: sort.orderBy)
         })
     }
 
@@ -161,6 +169,7 @@ struct SeriesNumberMoviesView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }
@@ -177,8 +186,10 @@ struct MakerMoviesView: View {
         self.makerID = makerID
         self.title = title
         self.type = type
-        _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.makerMovies(makerID, type: type, page: page, limit: 21)
+        _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
+            try await JavDBSDK.shared.moviesByTag(
+                filterBy: "\(type):m:\(makerID):", type: type, page: page, limit: 21,
+                sortBy: sort.sortBy, orderBy: sort.orderBy)
         })
     }
 
@@ -191,6 +202,7 @@ struct MakerMoviesView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }
@@ -207,8 +219,10 @@ struct DirectorMoviesView: View {
         self.directorID = directorID
         self.title = title
         self.type = type
-        _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.directorMovies(directorID, type: type, page: page, limit: 21)
+        _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
+            try await JavDBSDK.shared.moviesByTag(
+                filterBy: "\(type):d:\(directorID):", type: type, page: page, limit: 21,
+                sortBy: sort.sortBy, orderBy: sort.orderBy)
         })
     }
 
@@ -221,6 +235,7 @@ struct DirectorMoviesView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }
