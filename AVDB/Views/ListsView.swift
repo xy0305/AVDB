@@ -515,9 +515,31 @@ struct MakersView: View {
     }
 }
 
-/// 导演模块：有码 / 无码 / 欧美 / FC2 四个子分类（带分页）。
+/// 导演分类 Tab（有码 type=0 / 无码 type=2）。
+enum DirectorTypeTab: String, CaseIterable, Identifiable {
+    case censored
+    case uncensored
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .censored: return "有码"
+        case .uncensored: return "无码"
+        }
+    }
+
+    var type: String {
+        switch self {
+        case .censored: return "0"
+        case .uncensored: return "2"
+        }
+    }
+}
+
+/// 导演模块：有码 / 无码两个子分类（带分页）。
 struct DirectorsView: View {
-    @State private var tab: NamedTypeTab = .censored
+    @State private var tab: DirectorTypeTab = .censored
     @State private var items: [Actor] = []
     @State private var loading = false
     @State private var page = 1
@@ -526,7 +548,7 @@ struct DirectorsView: View {
     var body: some View {
         VStack(spacing: 0) {
             CapsuleChipBar(
-                tabs: NamedTypeTab.allCases.map { ($0, $0.title) },
+                tabs: DirectorTypeTab.allCases.map { ($0, $0.title) },
                 selection: $tab
             )
             ScrollView {

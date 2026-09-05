@@ -71,7 +71,7 @@ struct HomeView: View {
                 MakersView()
             }
             .navigationDestination(isPresented: $goDirectors) {
-                NamedListView(kind: .directors)
+                DirectorsView()
             }
         }
     }
