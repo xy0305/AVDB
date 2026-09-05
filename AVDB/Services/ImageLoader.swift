@@ -54,6 +54,8 @@ public enum CoverURLBuilder {
         guard !prefix.isEmpty, let idx = Int(numStr), idx > 0 else {
             return (nil, nil)
         }
+        // FC2/FC2PPV 没有 DMM 标准封面，必须回退到 JAVDB cover_url。
+        if prefix == "FC2" || prefix == "FC2PPV" { return (nil, nil) }
         let prefixLower = prefix.lowercased()
         let number5 = String(idx).paddingLeft(toLength: 5, withPad: "0")
         let mapPrefix = numMap[prefix] ?? ""
@@ -168,6 +170,15 @@ public struct JavDBImage: View {
         self.contentMode = contentMode
     }
 
+    private var imageURLs: [String] {
+        var result: [String] = []
+        if let url, !url.isEmpty { result.append(url) }
+        if let fallbackURL, !fallbackURL.isEmpty, !result.contains(fallbackURL) {
+            result.append(fallbackURL)
+        }
+        return result
+    }
+
     public var body: some View {
         Group {
             if let image = image {
@@ -177,12 +188,13 @@ public struct JavDBImage: View {
             } else {
                 placeholder
                     .task {
-                        guard !loading, let u = url else { return }
+                        guard !loading else { return }
                         loading = true
-                        if let img = await ImageLoader.shared.load(u) {
-                            image = img
-                        } else if let fb = fallbackURL, fb != u, let fbImg = await ImageLoader.shared.load(fb) {
-                            image = fbImg
+                        for candidate in imageURLs {
+                            if let img = await ImageLoader.shared.load(candidate) {
+                                image = img
+                                break
+                            }
                         }
                         loading = false
                     }
