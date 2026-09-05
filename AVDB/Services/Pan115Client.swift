@@ -483,62 +483,29 @@ public final class Pan115Client: @unchecked Sendable {
         }
 
         while Date().timeIntervalSince(start) < timeout {
-            // 按参考脚本：递归扫描父目录及两层子目录，按名称/扩展名删除垃圾。
-            let junkDeleted = try await deleteJunkFiles(
-                in: folderCID,
-                cookie: cookie,
-                maxDepth: 2,
-                thresholdBytes: thresholdBytes
-            )
-            if junkDeleted > 0 { return junkDeleted }
-
+            // folderCID 仅作为父目录，绝不删除其直属文件。
             let files = try await listFiles(cid: folderCID, cookie: cookie, limit: 500)
             let dirs = files.filter { $0.isDir }
 
-            // 1) 只在用户配置的离线父目录中匹配番号目录。
-            //    同一番号可能在网盘其他位置有多个副本；全盘挑最大视频会误清旧目录并提前返回 0。
-            if !needle.isEmpty {
-                let matchedDirs = dirs.filter { dir in
-                    let nameKey = normalizedKey(dir.name)
-                    return nameKey.contains(needle) || needle.contains(nameKey)
-                }
-                for dir in matchedDirs {
-                    let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
-                    guard !key.isEmpty,
-                          let children = try? await listFiles(cid: key, cookie: cookie, limit: 500),
-                          children.contains(where: { !$0.isDir && $0.isVideo && $0.size >= thresholdBytes })
-                    else { continue }
-                    return try await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
-                }
-            }
-
-            // 2) 新出现的文件夹（磁力链接没有可用番号时的兜底）
+            // 只进入推送前快照中不存在的新建文件夹；进入后才按大小递归清理。
             for dir in dirs {
                 let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
-                if key.isEmpty || knownFolders.contains(key) { continue }
-                knownFolders.insert(key)
-                let deleted = try await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
-                if deleted >= 0 { return deleted }
-            }
-
-            // 3) 名字含 keyword 的文件夹兜底
-            if !needle.isEmpty {
-                for dir in dirs {
-                    let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
-                    if key.isEmpty { continue }
-                    let nameKey = normalizedKey(dir.name)
-                    if nameKey.contains(needle) || needle.contains(nameKey) {
-                        let deleted = try await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
-                        if deleted >= 0 { return deleted }
-                    }
-                }
+                guard !key.isEmpty, !knownFolders.contains(key) else { continue }
+                let deleted = try await deleteJunkFiles(
+                    in: key,
+                    cookie: cookie,
+                    maxDepth: 2,
+                    thresholdBytes: thresholdBytes
+                )
+                if deleted > 0 { return deleted }
+                // 新目录可能还在写入，空扫描不能视为已完成；下一轮继续检查。
+                knownFolders.remove(key)
             }
 
             try await Task.sleep(nanoseconds: 3_000_000_000)
         }
 
-        // 兜底：删父目录内 <115MB 文件（单文件磁力直接落根，或 keyword 匹配不到文件夹名）
-        return try await deleteSmallFiles(in: folderCID, cookie: cookie, thresholdBytes: thresholdBytes)
+        throw Pan115Error.cleanupFolderNotFound
     }
 
     // MARK: - 删除文件（推送后清理垃圾文件）
@@ -956,6 +923,7 @@ public enum Pan115Error: Error, LocalizedError {
     case fileNotFound
     case playURLNotFound
     case cleanupFailed(Int)
+    case cleanupFolderNotFound
 
     public var errorDescription: String? {
         switch self {
@@ -969,7 +937,7 @@ public enum Pan115Error: Error, LocalizedError {
         case .fileNotFound: return "离线目录里没找到与当前番号匹配的视频"
         case .playURLNotFound: return "无法获取 115 原画播放地址"
         case .cleanupFailed(let count): return "115 垃圾文件仍剩余 \(count) 个"
-        }
+        case .cleanupFolderNotFound: return "115 离线后未找到新建文件夹，未删除父目录文件"        }
     }
 }
 
