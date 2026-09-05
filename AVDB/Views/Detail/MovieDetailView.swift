@@ -110,21 +110,8 @@ struct MovieDetailView: View {
 
     private func heroHeader(_ movie: Movie) -> some View {
         ZStack(alignment: .bottomLeading) {
-            // 用同一张海报铺满做模糊背景，避免横版图片 fit 后出现纯黑上下边。
             JavDBImage(
-                url: movie.hdCoverURL ?? movie.coverURL,
-                fallbackURL: movie.coverURL ?? movie.thumbURL,
-                contentMode: .fill
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 420)
-            .scaleEffect(1.12)
-            .blur(radius: 20)
-            .overlay(Color.black.opacity(0.28))
-            .clipped()
-
-            // 前景保持原始比例，保证海报内容不变形。
-            JavDBImage(
+                // 优先 DMM/MGS 竖版海报；失败再回退 JAVDB 高清封面。
                 url: movie.hdCoverURL ?? movie.coverURL,
                 fallbackURL: movie.coverURL ?? movie.thumbURL,
                 contentMode: .fit
