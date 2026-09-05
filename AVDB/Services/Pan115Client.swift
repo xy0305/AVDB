@@ -636,6 +636,8 @@ public final class Pan115Client: @unchecked Sendable {
             .replacingOccurrences(of: "_", with: "")
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: ".", with: "")
+            // 115 常将 FC2-PPV 写成 FC2PPV，视为同一番号。
+            .replacingOccurrences(of: "fc2ppv", with: "fc2")
     }
 
     private func extractFileList(_ obj: [String: Any]) -> [FileItem] {
@@ -665,8 +667,8 @@ public final class Pan115Client: @unchecked Sendable {
             let name = (item["n"] as? String) ?? (item["fn"] as? String) ?? (item["name"] as? String) ?? (item["file_name"] as? String) ?? (item["filename"] as? String) ?? ""
             let pc = (item["pc"] as? String) ?? (item["pick_code"] as? String) ?? (item["pickcode"] as? String) ?? (item["pickCode"] as? String) ?? ""
             let fid = stringValue(item["fid"] ?? item["file_id"] ?? item["id"])
-            let cid = stringValue(item["cid"])
-            let isDir = (item["pc"] == nil && item["pick_code"] == nil && item["pickcode"] == nil && item["sha"] == nil && !cid.isEmpty && pc.isEmpty)
+            let cid = stringValue(item["cid"] ?? item["pid"])
+            let isDir = (item["pc"] == nil && item["pick_code"] == nil && item["pickcode"] == nil && item["sha"] == nil && item["sha1"] == nil && !cid.isEmpty && pc.isEmpty)
                 || intValue(item["fc"]) == 0
             return FileItem(name: name, pickCode: pc, fileID: fid, cid: cid.isEmpty ? fid : cid, isDir: isDir, size: Int64(doubleValue(item["s"] ?? item["fs"] ?? item["size"])))
         }
