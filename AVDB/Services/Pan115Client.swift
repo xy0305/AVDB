@@ -263,6 +263,14 @@ public final class Pan115Client: @unchecked Sendable {
         throw lastError
     }
 
+    /// 获取离线父目录当前的子文件夹 ID，必须在推送磁力之前调用。
+    public func folderSnapshot(cid: String, cookie: String) async -> Set<String> {
+        guard let files = try? await listFiles(cid: cid, cookie: cookie, limit: 500) else { return [] }
+        return Set(files.filter { $0.isDir }
+            .map { $0.fileID.isEmpty ? $0.cid : $0.fileID }
+            .filter { !$0.isEmpty })
+    }
+
     /// 全盘按番号搜索。
     /// 注意：`webapi.115.com` 在部分网络/客户端下会稳定触发 SSL EOF（UNEXPECTED_EOF_WHILE_READING），
     /// 而 `proapi.115.com` / `aps.115.com` 通常正常。把可用的域名排前面，webapi 降级为后备。
@@ -460,32 +468,42 @@ public final class Pan115Client: @unchecked Sendable {
         keyword: String,
         cookie: String,
         folderCID: String,
+        existingFolderIDs: Set<String>? = nil,
         timeout: TimeInterval = 90,
         thresholdBytes: Int64 = 115 * 1024 * 1024
     ) async throws -> Int {
         let needle = normalizedKey(keyword)
         let start = Date()
-        var knownFolders: Set<String> = []
+        var knownFolders = existingFolderIDs ?? []
 
-        // 记录推送前已有的文件夹
-        if let initial = try? await listFiles(cid: folderCID, cookie: cookie, limit: 500) {
+        // 兼容旧调用；新推送入口应在 addOfflineTask 前传入目录快照，避免新目录被误记为旧目录。
+        if existingFolderIDs == nil,
+           let initial = try? await listFiles(cid: folderCID, cookie: cookie, limit: 500) {
             knownFolders = Set(initial.filter { $0.isDir }.map { $0.fileID.isEmpty ? $0.cid : $0.fileID }.filter { !$0.isEmpty })
         }
 
         while Date().timeIntervalSince(start) < timeout {
-            // 1) 优先全盘按番号找到正片，视频条目的 cid 就是实际产物目录。
-            //    这不依赖 task_lists，也不怕目录在快照前已经创建或任务返回「已存在」。
-            if !needle.isEmpty,
-               let matches = try? await searchFiles(keyword: keyword, cookie: cookie, limit: 100),
-               let video = pickVideo(from: matches, keyword: keyword, requireMatch: true),
-               !video.cid.isEmpty {
-                return try await deleteSmallFiles(in: video.cid, cookie: cookie, thresholdBytes: thresholdBytes)
-            }
-
             let files = (try? await listFiles(cid: folderCID, cookie: cookie, limit: 500)) ?? []
             let dirs = files.filter { $0.isDir }
 
-            // 2) 新出现的文件夹（番号搜索尚未命中时的兜底）
+            // 1) 只在用户配置的离线父目录中匹配番号目录。
+            //    同一番号可能在网盘其他位置有多个副本；全盘挑最大视频会误清旧目录并提前返回 0。
+            if !needle.isEmpty {
+                let matchedDirs = dirs.filter { dir in
+                    let nameKey = normalizedKey(dir.name)
+                    return nameKey.contains(needle) || needle.contains(nameKey)
+                }
+                for dir in matchedDirs {
+                    let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
+                    guard !key.isEmpty,
+                          let children = try? await listFiles(cid: key, cookie: cookie, limit: 500),
+                          children.contains(where: { !$0.isDir && $0.isVideo && $0.size >= thresholdBytes })
+                    else { continue }
+                    return try await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
+                }
+            }
+
+            // 2) 新出现的文件夹（磁力链接没有可用番号时的兜底）
             for dir in dirs {
                 let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
                 if key.isEmpty || knownFolders.contains(key) { continue }

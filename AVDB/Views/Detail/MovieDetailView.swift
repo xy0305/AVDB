@@ -623,6 +623,8 @@ struct MagnetRow: View {
         pushing = true
         defer { pushing = false }
         do {
+            let folderSnapshot = await Pan115Client.shared.folderSnapshot(
+                cid: settings.folderCID, cookie: settings.cookie)
             let result = try await Pan115Client.shared.addOfflineTask(
                 url: url,
                 cookie: settings.cookie,
@@ -632,28 +634,29 @@ struct MagnetRow: View {
                 Pan115PlaybackCache.save(movieID: movieID, magnet: url)
             }
             toast = result.message
-            // 推送成功后，后台等待离线完成并清理 <115MB 的小文件
-            await autoCleanSmallFiles(url: url)
+            // 推送成功后，等待离线完成并清理 <115MB 的小文件
+            await autoCleanSmallFiles(existingFolderIDs: folderSnapshot)
         } catch {
             toast = error.localizedDescription
         }
     }
 
-    /// 推送成功后，后台等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
-    private func autoCleanSmallFiles(url: String) async {
+    /// 推送成功后，等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
+    private func autoCleanSmallFiles(existingFolderIDs: Set<String>) async {
         let settings = Pan115Settings.shared
         let keyword = movieNumber.isEmpty ? magnet.displayName : movieNumber
         do {
             let deleted = try await Pan115Client.shared.waitAndCleanSmallFiles(
                 keyword: keyword,
                 cookie: settings.cookie,
-                folderCID: settings.folderCID
+                folderCID: settings.folderCID,
+                existingFolderIDs: existingFolderIDs
             )
             if deleted > 0 {
                 toast = "已清理 \(deleted) 个小于 115MB 的小文件"
             }
         } catch {
-            // 清理失败不影响已推送结果，静默忽略
+            toast = "自动清理失败：\(error.localizedDescription)"
         }
     }
 }
@@ -803,6 +806,8 @@ struct ReviewRow: View {
         linkStates[key] = .pushing
         defer { linkStates[key] = nil }
         do {
+            let folderSnapshot = await Pan115Client.shared.folderSnapshot(
+                cid: settings.folderCID, cookie: settings.cookie)
             let result = try await Pan115Client.shared.addOfflineTask(
                 url: link.rawValue,
                 cookie: settings.cookie,
@@ -812,28 +817,28 @@ struct ReviewRow: View {
                 Pan115PlaybackCache.save(movieID: movieID, magnet: link.rawValue)
             }
             toast = result.message
-            // 推送成功后，后台等待离线完成并清理 <115MB 的小文件
-            await autoCleanSmallFiles(link: link)
+            // 推送成功后，等待离线完成并清理 <115MB 的小文件
+            await autoCleanSmallFiles(link: link, existingFolderIDs: folderSnapshot)
         } catch {
             toast = error.localizedDescription
         }
     }
 
-    /// 推送成功后，后台等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
-    /// keyword 用链接本身（task.url 可精确匹配），失败静默忽略。
-    private func autoCleanSmallFiles(link: DownloadLinkKind) async {
+    /// 推送成功后，等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
+    private func autoCleanSmallFiles(link: DownloadLinkKind, existingFolderIDs: Set<String>) async {
         let settings = Pan115Settings.shared
         do {
             let deleted = try await Pan115Client.shared.waitAndCleanSmallFiles(
                 keyword: link.rawValue,
                 cookie: settings.cookie,
-                folderCID: settings.folderCID
+                folderCID: settings.folderCID,
+                existingFolderIDs: existingFolderIDs
             )
             if deleted > 0 {
                 toast = "已清理 \(deleted) 个小于 115MB 的小文件"
             }
         } catch {
-            // 清理失败不影响已推送结果
+            toast = "自动清理失败：\(error.localizedDescription)"
         }
     }
 
