@@ -68,7 +68,7 @@ struct HomeView: View {
                 SeriesView()
             }
             .navigationDestination(isPresented: $goMakers) {
-                NamedListView(kind: .makers)
+                MakersView()
             }
             .navigationDestination(isPresented: $goDirectors) {
                 NamedListView(kind: .directors)
