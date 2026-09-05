@@ -484,7 +484,12 @@ public final class Pan115Client: @unchecked Sendable {
 
         while Date().timeIntervalSince(start) < timeout {
             // 按参考脚本：递归扫描父目录及两层子目录，按名称/扩展名删除垃圾。
-            let junkDeleted = try await deleteJunkFiles(in: folderCID, cookie: cookie, maxDepth: 2)
+            let junkDeleted = try await deleteJunkFiles(
+                in: folderCID,
+                cookie: cookie,
+                maxDepth: 2,
+                thresholdBytes: thresholdBytes
+            )
             if junkDeleted > 0 { return junkDeleted }
 
             let files = try await listFiles(cid: folderCID, cookie: cookie, limit: 500)
@@ -538,12 +543,36 @@ public final class Pan115Client: @unchecked Sendable {
 
     // MARK: - 删除文件（推送后清理垃圾文件）
 
-    private func isJunkFile(_ file: FileItem) -> Bool {
-        guard !file.isDir, !file.fileID.isEmpty else { return false }
-        let name = file.name.lowercased()
-        if file.isVideo { return false }
-        return [".txt", ".html", ".htm", ".url", ".nfo", ".xml", ".mht", ".chm", ".exe", ".apk", ".torrent", ".js", ".css"].contains { name.hasSuffix($0) }
-            || file.size < 115 * 1024 * 1024
+    private func isJunkFile(_ file: FileItem, thresholdBytes: Int64) -> Bool {
+        // 115 的 s/fs 字段就是文件大小；按大小清理，不依赖扩展名或视频类型。
+        !file.isDir && !file.fileID.isEmpty && file.size < thresholdBytes
+    }
+
+    private func deleteJunkFiles(
+        in cid: String,
+        cookie: String,
+        maxDepth: Int,
+        thresholdBytes: Int64
+    ) async throws -> Int {
+        let files = try await listFiles(cid: cid, cookie: cookie, limit: 1150)
+        var deleted = 0
+        let junk = files.filter { isJunkFile($0, thresholdBytes: thresholdBytes) }
+        if !junk.isEmpty {
+            deleted += try await deleteFiles(cid: cid, fileIDs: junk.map(\.fileID), cookie: cookie)
+        }
+        guard maxDepth > 0 else { return deleted }
+        for dir in files where dir.isDir {
+            let child = dir.cid.isEmpty ? dir.fileID : dir.cid
+            if !child.isEmpty {
+                deleted += try await deleteJunkFiles(
+                    in: child,
+                    cookie: cookie,
+                    maxDepth: maxDepth - 1,
+                    thresholdBytes: thresholdBytes
+                )
+            }
+        }
+        return deleted
     }
 
     private func deleteJunkFiles(in cid: String, cookie: String, maxDepth: Int) async throws -> Int {
@@ -623,7 +652,7 @@ public final class Pan115Client: @unchecked Sendable {
         var lastRemaining = 0
         for attempt in 0..<3 {
             let files = try await listFiles(cid: cid, cookie: cookie, limit: 500)
-            let small = files.filter { !$0.isDir && $0.size > 0 && $0.size < thresholdBytes && !$0.fileID.isEmpty }
+            let small = files.filter { !$0.isDir && $0.size < thresholdBytes && !$0.fileID.isEmpty }
             guard !small.isEmpty else { return deleted }
             deleted += try await deleteFiles(cid: cid, fileIDs: small.map(\.fileID), cookie: cookie)
 
