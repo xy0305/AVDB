@@ -325,7 +325,7 @@ struct MovieDetailView: View {
                 ProgressView()
             } else {
                 ForEach(vm.magnets, id: \.stableID) { magnet in
-                    MagnetRow(magnet: magnet, movieID: movie.id)
+                    MagnetRow(magnet: magnet, movieID: movie.id, movieNumber: movie.displayNumber)
                 }
             }
         }
@@ -543,6 +543,7 @@ final class MovieDetailViewModel: ObservableObject {
 struct MagnetRow: View {
     let magnet: Magnet
     var movieID: String = ""
+    var movieNumber: String = ""
     @State private var pushing = false
     @State private var toast: String?
 
@@ -641,7 +642,7 @@ struct MagnetRow: View {
     /// 推送成功后，后台等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
     private func autoCleanSmallFiles(url: String) async {
         let settings = Pan115Settings.shared
-        let keyword = magnet.displayName
+        let keyword = movieNumber.isEmpty ? magnet.displayName : movieNumber
         do {
             let deleted = try await Pan115Client.shared.waitAndCleanSmallFiles(
                 keyword: keyword,

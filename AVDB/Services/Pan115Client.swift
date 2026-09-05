@@ -473,10 +473,19 @@ public final class Pan115Client: @unchecked Sendable {
         }
 
         while Date().timeIntervalSince(start) < timeout {
+            // 1) 优先全盘按番号找到正片，视频条目的 cid 就是实际产物目录。
+            //    这不依赖 task_lists，也不怕目录在快照前已经创建或任务返回「已存在」。
+            if !needle.isEmpty,
+               let matches = try? await searchFiles(keyword: keyword, cookie: cookie, limit: 100),
+               let video = pickVideo(from: matches, keyword: keyword, requireMatch: true),
+               !video.cid.isEmpty {
+                return try await deleteSmallFiles(in: video.cid, cookie: cookie, thresholdBytes: thresholdBytes)
+            }
+
             let files = (try? await listFiles(cid: folderCID, cookie: cookie, limit: 500)) ?? []
             let dirs = files.filter { $0.isDir }
 
-            // 1) 新出现的文件夹（最可靠：离线产物必然是新创建的）
+            // 2) 新出现的文件夹（番号搜索尚未命中时的兜底）
             for dir in dirs {
                 let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
                 if key.isEmpty || knownFolders.contains(key) { continue }
@@ -485,7 +494,7 @@ public final class Pan115Client: @unchecked Sendable {
                 if deleted >= 0 { return deleted }
             }
 
-            // 2) 名字含 keyword 的文件夹兜底
+            // 3) 名字含 keyword 的文件夹兜底
             if !needle.isEmpty {
                 for dir in dirs {
                     let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
