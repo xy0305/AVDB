@@ -13,6 +13,7 @@ struct Pan115PlayerView: View {
     var magnetURL: String? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var vm = Pan115PlayerViewModel()
+    @State private var showEpisodes = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -50,6 +51,24 @@ struct Pan115PlayerView: View {
                 }
             }
 
+            if vm.playURL != nil, vm.episodes.count > 1 {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button { showEpisodes = true } label: {
+                            Image(systemName: "rectangle.stack.badge.play")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(12)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer()
+                }
+                .padding(.top, 12)
+                .padding(.trailing, 12)
+            }
+
             if vm.playURL == nil || vm.errorMessage != nil {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
@@ -65,6 +84,14 @@ struct Pan115PlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.hidden, for: .navigationBar)
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
+        .confirmationDialog("选择集数", isPresented: $showEpisodes) {
+            ForEach(Array(vm.episodes.enumerated()), id: \.element.fileID) { index, file in
+                Button("第 \(index + 1) 集") {
+                    Task { await vm.selectEpisode(index) }
+                }
+            }
+            Button("取消", role: .cancel) {}
+        }
     }
 }
 
@@ -74,6 +101,7 @@ final class Pan115PlayerViewModel: ObservableObject {
     @Published var status = "准备中…"
     @Published var errorMessage: String?
     @Published var fileName = ""
+    @Published var episodes: [Pan115Client.FileItem] = []
     @Published var playURL: URL?
     @Published var streams: [Pan115Client.PlayStream] = []
     @Published var qualityLabel = "原画"
@@ -95,7 +123,6 @@ final class Pan115PlayerViewModel: ObservableObject {
         defer { isLoading = false }
 
         let cookie = settings.cookie
-        let cid = settings.folderCID
         let keyword = movie.displayNumber
         let magnet = magnetURL
             ?? Pan115PlaybackCache.magnet(for: movie.id)
@@ -103,10 +130,11 @@ final class Pan115PlayerViewModel: ObservableObject {
 
         do {
             status = "正在 115 中搜索 \(keyword)…"
-            if let existing = try? await Pan115Client.shared.findMatchedVideo(
-                keyword: keyword, cookie: cookie, folderCID: cid, requireMatch: true
+            if let existing = try? await Pan115Client.shared.findMatchedVideos(
+                keyword: keyword, cookie: cookie, limit: 100
             ) {
-                try await play(file: existing, cookie: cookie)
+                episodes = existing
+                try await play(file: existing[0], cookie: cookie)
                 return
             }
 
@@ -124,9 +152,10 @@ final class Pan115PlayerViewModel: ObservableObject {
                 keyword: keyword, cookie: cookie, timeout: 90)
 
             status = "离线完成，正在匹配 \(keyword)…"
-            let file = try await Pan115Client.shared.findMatchedVideo(
-                keyword: keyword, cookie: cookie, folderCID: cid, requireMatch: true)
-            try await play(file: file, cookie: cookie)
+            let files = try await Pan115Client.shared.findMatchedVideos(
+                keyword: keyword, cookie: cookie, limit: 100)
+            episodes = files
+            try await play(file: files[0], cookie: cookie)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -135,6 +164,19 @@ final class Pan115PlayerViewModel: ObservableObject {
     func select(_ stream: Pan115Client.PlayStream) {
         qualityLabel = stream.name
         playURL = URL(string: stream.url)
+    }
+
+    func selectEpisode(_ index: Int) async {
+        guard episodes.indices.contains(index) else { return }
+        isLoading = true
+        errorMessage = nil
+        playURL = nil
+        do {
+            try await play(file: episodes[index], cookie: Pan115Settings.shared.cookie)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
     }
 
     private func play(file: Pan115Client.FileItem, cookie: String) async throws {

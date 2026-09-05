@@ -301,6 +301,35 @@ public final class Pan115Client: @unchecked Sendable {
         throw lastError
     }
 
+    /// 按番号匹配 115 的全部视频文件，支持同一番号多集。
+    public func findMatchedVideos(
+        keyword: String,
+        cookie: String,
+        limit: Int = 100
+    ) async throws -> [FileItem] {
+        let needle = normalizedKey(keyword)
+        guard !needle.isEmpty else { throw Pan115Error.fileNotFound }
+        var result: [FileItem] = []
+        for variant in searchKeywords(from: keyword) {
+            let files = try await searchFiles(keyword: variant, cookie: cookie, limit: limit)
+            let hits = files.filter { file in
+                !file.isDir && file.isVideo && !file.pickCode.isEmpty
+                    && normalizedKey(file.name).contains(needle)
+            }
+            let known = Set(result.map { $0.fileID.isEmpty ? $0.pickCode : $0.fileID })
+            result.append(contentsOf: hits.filter {
+                !known.contains($0.fileID.isEmpty ? $0.pickCode : $0.fileID)
+            })
+        }
+        guard !result.isEmpty else { throw Pan115Error.fileNotFound }
+        return result.sorted { lhs, rhs in
+            let left = episodeNumber(lhs.name)
+            let right = episodeNumber(rhs.name)
+            if left != right { return left < right }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
     /// 按番号匹配 115 文件：全盘番号搜索优先命中，目录列举与浅层递归兜底。
     public func findMatchedVideo(
         keyword: String,
@@ -616,6 +645,15 @@ public final class Pan115Client: @unchecked Sendable {
             }
         }
         throw Pan115Error.cleanupFailed(lastRemaining)
+    }
+
+    private func episodeNumber(_ name: String) -> Int {
+        let pattern = #"(?:-|_| )([0-9]+)(?:\.[^.]+)?$"#
+        guard let r = try? NSRegularExpression(pattern: pattern),
+              let m = r.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+              let range = Range(m.range(at: 1), in: name),
+              let value = Int(name[range]) else { return 1 }
+        return value
     }
 
     private func pickVideo(from files: [FileItem], keyword: String?, requireMatch: Bool) -> FileItem? {
