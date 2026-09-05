@@ -484,9 +484,16 @@ public final class JavDBSDK {
         )
     }
 
-    /// 按番号前缀搜影片（系列「番号」子分类，如 IPX → 全盘搜索 q=IPX）
+    /// 番号前缀影片：官方接口 filter_by=0:c:{prefix}:，按番号数字倒序分页。
     public func moviesByNumber(_ number: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
-        try await search(keyword: number, page: page, sortBy: .release, limit: limit)
+        try await moviesByTag(
+            filterBy: "0:c:\(number):",
+            type: "0",
+            page: page,
+            limit: limit,
+            sortBy: "digit",
+            orderBy: "desc"
+        )
     }
 
     /// 片商影片：filter_by=0:m:{id}:
