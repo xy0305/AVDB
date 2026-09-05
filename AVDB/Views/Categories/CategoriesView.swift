@@ -403,14 +403,14 @@ struct TagMoviesView: View {
         self.catalogType = catalogType
         let type = catalogType.isEmpty ? "0" : catalogType
         let filter = "\(type):t::\(tag.id)::"
-        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+        _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
             try await JavDBSDK.shared.moviesByTag(
                 filterBy: filter,
                 type: nil,
                 page: page,
                 limit: 24,
-                sortBy: "release",
-                orderBy: "desc"
+                sortBy: sort.sortBy,
+                orderBy: sort.orderBy
             )
         })
     }
@@ -424,6 +424,7 @@ struct TagMoviesView: View {
         }
         .navigationTitle(tag.name ?? tag.id)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }
