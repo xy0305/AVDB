@@ -257,6 +257,9 @@ struct SeriesView: View {
     @State private var letters: [SeriesLetter] = []
     @State private var series: [Series] = []
     @State private var loading = false
+    @State private var lettersPage = 1
+    @State private var seriesPage = 1
+    @State private var hasMore = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -272,11 +275,21 @@ struct SeriesView: View {
                             row(title: item.displayName, subtitle: item.description, count: item.videosCount) {
                                 SeriesNumberMoviesView(number: item.letter ?? item.id, title: item.displayName)
                             }
+                            .onAppear {
+                                if item.id == letters.last?.id {
+                                    Task { await loadMore() }
+                                }
+                            }
                         }
                     } else {
                         ForEach(series) { item in
                             row(title: item.displayName, subtitle: nil, count: item.videosCount) {
                                 SeriesMoviesView(seriesID: item.id, title: item.displayName, type: tab.type)
+                            }
+                            .onAppear {
+                                if item.id == series.last?.id {
+                                    Task { await loadMore() }
+                                }
                             }
                         }
                     }
@@ -290,7 +303,7 @@ struct SeriesView: View {
         .task { await load() }
         .refreshable { await load(force: true) }
         .onChange(of: tab) { _, new in
-            Task { await load(tab: new) }
+            Task { await load(tab: new, force: true) }
         }
     }
 
@@ -327,19 +340,50 @@ struct SeriesView: View {
 
     private func load(tab: SeriesTab? = nil, force: Bool = false) async {
         let current = tab ?? self.tab
-        let isNumber = current == .number
-        let empty = isNumber ? letters.isEmpty : series.isEmpty
-        if force {
+        if force || current != self.tab {
             letters = []
             series = []
+            lettersPage = 1
+            seriesPage = 1
+            hasMore = true
         }
+        let isNumber = current == .number
+        let empty = isNumber ? letters.isEmpty : series.isEmpty
         guard empty, !loading else { return }
         loading = true
         defer { loading = false }
         if isNumber {
-            letters = (try? await JavDBSDK.shared.seriesLetters()) ?? []
+            letters = (try? await JavDBSDK.shared.seriesLetters(page: 1, limit: 100)) ?? []
+            lettersPage = 2
         } else {
-            series = (try? await JavDBSDK.shared.series(type: current.type)) ?? []
+            series = (try? await JavDBSDK.shared.series(type: current.type, page: 1, limit: 100)) ?? []
+            seriesPage = 2
+        }
+        hasMore = !(isNumber ? letters.isEmpty : series.isEmpty)
+    }
+
+    private func loadMore() async {
+        guard hasMore, !loading else { return }
+        loading = true
+        defer { loading = false }
+        if tab == .number {
+            let next = (try? await JavDBSDK.shared.seriesLetters(page: lettersPage, limit: 100)) ?? []
+            if next.isEmpty {
+                hasMore = false
+            } else {
+                let ids = Set(letters.map(\.id))
+                letters.append(contentsOf: next.filter { !ids.contains($0.id) })
+                lettersPage += 1
+            }
+        } else {
+            let next = (try? await JavDBSDK.shared.series(type: tab.type, page: seriesPage, limit: 100)) ?? []
+            if next.isEmpty {
+                hasMore = false
+            } else {
+                let ids = Set(series.map(\.id))
+                series.append(contentsOf: next.filter { !ids.contains($0.id) })
+                seriesPage += 1
+            }
         }
     }
 }

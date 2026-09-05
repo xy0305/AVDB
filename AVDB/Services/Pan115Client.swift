@@ -84,6 +84,9 @@ public final class Pan115Client: @unchecked Sendable {
     public static let shared = Pan115Client()
 
     private let session: URLSession
+    /// 删除接口专用 session：webapi.115.com/rb/delete 在 iOS 上 HTTP/2 会 SSL EOF，
+    /// 用独立 ephemeral session + 强制关闭连接复用，尽量走 HTTP/1.1。
+    private let deleteSession: URLSession
     /// 必须与播放器 UA 一致，否则 115 按 UA 绑定的 m3u8 会 403。
     static let safariUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15"
 
@@ -96,6 +99,14 @@ public final class Pan115Client: @unchecked Sendable {
         config.httpShouldSetCookies = false
         config.httpCookieAcceptPolicy = .never
         session = URLSession(configuration: config)
+
+        let delConfig = URLSessionConfiguration.ephemeral
+        delConfig.timeoutIntervalForRequest = 20
+        delConfig.timeoutIntervalForResource = 40
+        delConfig.httpShouldSetCookies = false
+        delConfig.httpCookieAcceptPolicy = .never
+        delConfig.httpShouldUsePipelining = false
+        deleteSession = URLSession(configuration: delConfig)
     }
 
     /// 推送一条磁力 / ed2k / http 链接到 115 离线
@@ -438,9 +449,11 @@ public final class Pan115Client: @unchecked Sendable {
     /// 夹带一堆 <115MB 的垃圾文件（广告图 / txt / url / 封面图）。而 task_lists 只返回
     /// 「进行中/失败」的任务，已完成任务会立刻消失，无法用 file_id 定位产物。
     ///
-    /// 因此改为：轮询离线目录（o=user_ptime 时间倒序），找到「名字含 keyword 的新文件夹」
-    /// （离线产物文件夹名 = 磁力 dn，如 [javdb.com]...SIMO-021），进入删除其内 <115MB 文件。
-    /// 找不到含 keyword 的文件夹时，兜底删父目录内 <115MB 文件（覆盖单文件磁力直接落根的场景）。
+    /// 定位策略：
+    /// 1. 记录推送前的文件夹集合；
+    /// 2. 轮询离线目录，找「新出现的文件夹」（离线产物必然是推送后才创建的）；
+    /// 3. 找不到新文件夹时，退而用「名字含 keyword」的文件夹兜底；
+    /// 4. 再不行，删父目录内 <115MB 文件（覆盖单文件磁力直接落根的场景）。
     ///
     /// 返回删除数量。供「推送成功后后台清理」复用，不重复推送。
     public func waitAndCleanSmallFiles(
@@ -452,33 +465,37 @@ public final class Pan115Client: @unchecked Sendable {
     ) async throws -> Int {
         let needle = normalizedKey(keyword)
         let start = Date()
-        var lastFolders: Set<String> = []
+        var knownFolders: Set<String> = []
+
+        // 记录推送前已有的文件夹
+        if let initial = try? await listFiles(cid: folderCID, cookie: cookie, limit: 500) {
+            knownFolders = Set(initial.filter { $0.isDir }.map { $0.fileID.isEmpty ? $0.cid : $0.fileID }.filter { !$0.isEmpty })
+        }
 
         while Date().timeIntervalSince(start) < timeout {
             let files = (try? await listFiles(cid: folderCID, cookie: cookie, limit: 500)) ?? []
-
-            // 找「名字含 keyword」的目录（离线产物文件夹，时间倒序第一条通常就是）
             let dirs = files.filter { $0.isDir }
+
+            // 1) 新出现的文件夹（最可靠：离线产物必然是新创建的）
             for dir in dirs {
                 let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
-                if key.isEmpty { continue }
-                // 首次轮询记录已有文件夹，后续只对新出现的做清理
-                if !needle.isEmpty {
-                    let nameKey = normalizedKey(dir.name)
-                    if nameKey.contains(needle) || needle.contains(nameKey) {
-                        // 命中产物文件夹 → 进入删除 <115MB 文件
-                        let deleted = try? await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
-                        if let deleted, deleted >= 0 {
-                            return deleted
-                        }
-                    }
-                }
+                if key.isEmpty || knownFolders.contains(key) { continue }
+                knownFolders.insert(key)
+                let deleted = try await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
+                if deleted >= 0 { return deleted }
             }
 
-            // 记录当前目录集合，用于识别新出现的文件夹
-            let currentSet = Set(dirs.map { $0.fileID.isEmpty ? $0.cid : $0.fileID }.filter { !$0.isEmpty })
-            if lastFolders.isEmpty {
-                lastFolders = currentSet
+            // 2) 名字含 keyword 的文件夹兜底
+            if !needle.isEmpty {
+                for dir in dirs {
+                    let key = dir.fileID.isEmpty ? dir.cid : dir.fileID
+                    if key.isEmpty { continue }
+                    let nameKey = normalizedKey(dir.name)
+                    if nameKey.contains(needle) || needle.contains(nameKey) {
+                        let deleted = try await deleteSmallFiles(in: key, cookie: cookie, thresholdBytes: thresholdBytes)
+                        if deleted >= 0 { return deleted }
+                    }
+                }
             }
 
             try await Task.sleep(nanoseconds: 3_000_000_000)
@@ -492,15 +509,13 @@ public final class Pan115Client: @unchecked Sendable {
 
     /// 删除目录内指定文件（对齐参考脚本 POST webapi.115.com/rb/delete，form pid + fid[N]）。
     /// 返回实际删除数量。
-    /// 注意：只有 webapi.115.com/rb/delete 能成功删除，但该域名偶发 SSL EOF，需多重试。
+    /// 注意：只有 webapi.115.com/rb/delete 能成功删除，但该域名在 iOS 上 SSL EOF 偶发，
+    /// 用独立 session + 多次退避重试。
     @discardableResult
     public func deleteFiles(cid: String, fileIDs: [String], cookie: String) async throws -> Int {
         let ids = fileIDs.filter { !$0.isEmpty }
         guard !ids.isEmpty else { return 0 }
-        let urls = [
-            "https://webapi.115.com/rb/delete",
-            "https://webapi.115.com/rb/delete",  // webapi 偶发 SSL EOF，重试两次
-        ]
+
         var body = URLComponents()
         var items = [URLQueryItem(name: "pid", value: cid), URLQueryItem(name: "ignore_warn", value: "1")]
         for (i, fid) in ids.enumerated() {
@@ -508,21 +523,37 @@ public final class Pan115Client: @unchecked Sendable {
         }
         body.queryItems = items
 
+        let url = URL(string: "https://webapi.115.com/rb/delete")!
         var lastError: Error = Pan115Error.playURLNotFound
-        for u in urls {
-            guard let url = URL(string: u) else { continue }
+        // 多次退避重试：SSL EOF 是偶发的，多试几次大概率成功
+        for attempt in 0..<6 {
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             req.httpBody = body.percentEncodedQuery?.data(using: .utf8)
             req.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
             appendCommonHeaders(&req, cookie: cookie)
             do {
-                let obj = try await json(for: req, retries: 3)
-                if boolState(obj["state"]) || (obj["state"] as? Int) == 1 {
-                    return ids.count
+                let (data, response) = try await deleteSession.data(for: req)
+                if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+                    throw Pan115Error.http(http.statusCode)
+                }
+                guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+                    throw Pan115Error.playURLNotFound
+                }
+                if text.lowercased().contains("<html") || text.contains("登录") {
+                    throw Pan115Error.cookieInvalid
+                }
+                if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    if boolState(obj["state"]) || (obj["state"] as? Int) == 1 {
+                        return ids.count
+                    }
                 }
             } catch {
                 lastError = error
+                // 退避：0.5s, 1s, 1.5s, 2s, 2.5s
+                if attempt < 5 {
+                    try? await Task.sleep(nanoseconds: UInt64(500_000_000 * (attempt + 1)))
+                }
             }
         }
         throw lastError

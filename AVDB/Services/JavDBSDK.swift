@@ -340,31 +340,38 @@ public final class JavDBSDK {
     }
 
     /// 系列字母索引（GET /api/v1/series/letters）——返回 {id, letter, type, description, videos_count, views_count}
-    public func seriesLetters() async throws -> [SeriesLetter] {
+    /// 默认接口只返回 10 条，需传 limit 拉满（分页用 page）。
+    public func seriesLetters(page: Int = 1, limit: Int = 100) async throws -> [SeriesLetter] {
         struct LetterList: Decodable { let letters: [SeriesLetter]? }
-        let resp: JavDBResponse<LetterList> = try await client.get("/api/v1/series/letters")
+        let resp: JavDBResponse<LetterList> = try await client.get(
+            "/api/v1/series/letters",
+            query: ["page": "\(page)", "limit": "\(min(limit, 100))"])
         return resp.data?.letters ?? []
     }
 
     /// 系列列表（GET /api/v1/series?type=N）type: 0有码 1无码 2欧美
-    public func series(type: String = "0", page: Int = 1, limit: Int = 24) async throws -> [Series] {
+    public func series(type: String = "0", page: Int = 1, limit: Int = 50) async throws -> [Series] {
         struct SeriesList: Decodable { let series: [Series]? }
         let resp: JavDBResponse<SeriesList> = try await client.get(
             "/api/v1/series",
-            query: ["type": type, "page": "\(page)", "limit": "\(min(limit, 50))"])
+            query: ["type": type, "page": "\(page)", "limit": "\(min(limit, 100))"])
         return resp.data?.series ?? []
     }
 
-    /// 片商列表（GET /api/v1/makers）
+    /// 片商列表（GET /api/v1/makers）返回 data.makers
     public func makers() async throws -> [Actor] {
-        let resp: JavDBResponse<ActorListData> = try await client.get("/api/v1/makers")
-        return resp.data?.actors ?? []
+        struct MakersData: Decodable { let makers: [Actor]? }
+        let resp: JavDBResponse<MakersData> = try await client.get(
+            "/api/v1/makers", query: ["type": "0", "page": "1", "limit": "100"])
+        return resp.data?.makers ?? []
     }
 
-    /// 导演列表（GET /api/v1/directors）
+    /// 导演列表（GET /api/v1/directors）返回 data.directors
     public func directors() async throws -> [Actor] {
-        let resp: JavDBResponse<ActorListData> = try await client.get("/api/v1/directors")
-        return resp.data?.actors ?? []
+        struct DirectorsData: Decodable { let directors: [Actor]? }
+        let resp: JavDBResponse<DirectorsData> = try await client.get(
+            "/api/v1/directors", query: ["type": "0", "page": "1", "limit": "100"])
+        return resp.data?.directors ?? []
     }
 
     /// 片商详情（GET /api/v1/makers/{id}）
