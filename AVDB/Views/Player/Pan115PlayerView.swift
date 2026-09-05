@@ -123,6 +123,7 @@ final class Pan115PlayerViewModel: ObservableObject {
         defer { isLoading = false }
 
         let cookie = settings.cookie
+        let cid = settings.folderCID
         let keyword = movie.displayNumber
         let magnet = magnetURL
             ?? Pan115PlaybackCache.magnet(for: movie.id)

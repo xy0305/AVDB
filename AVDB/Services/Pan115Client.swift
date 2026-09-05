@@ -501,7 +501,6 @@ public final class Pan115Client: @unchecked Sendable {
         timeout: TimeInterval = 90,
         thresholdBytes: Int64 = 115 * 1024 * 1024
     ) async throws -> Int {
-        let needle = normalizedKey(keyword)
         let start = Date()
         var knownFolders = existingFolderIDs ?? []
 
