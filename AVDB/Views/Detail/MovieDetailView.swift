@@ -75,8 +75,6 @@ struct MovieDetailView: View {
                 summarySection(summary)
             }
 
-            playSection(movie)
-
             // 预告片
             if let trailer = movie.previewVideoURL, let url = URL(string: trailer) {
                 trailerSection(url)
@@ -113,7 +111,7 @@ struct MovieDetailView: View {
     private func heroHeader(_ movie: Movie) -> some View {
         ZStack(alignment: .bottomLeading) {
             JavDBImage(
-                url: movie.hdCoverURL,
+                url: movie.hdCoverURL ?? movie.hdBackdropURL,
                 fallbackURL: movie.coverURL ?? movie.thumbURL,
                 contentMode: .fill
             )

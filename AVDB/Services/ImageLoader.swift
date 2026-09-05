@@ -48,8 +48,10 @@ public enum CoverURLBuilder {
         let seg = String(raw[match])
         // 分离字母前缀与数字
         let prefix = String(seg.prefix { !$0.isNumber })
-        let numStr = String(seg.drop { !$0.isNumber }).trimmingCharacters(in: .whitespaces)
-        guard !prefix.isEmpty, !prefix.contains("-"), let idx = Int(numStr), idx > 0 else {
+            .trimmingCharacters(in: CharacterSet(charactersIn: "- \t"))
+        let numStr = String(seg.drop { !$0.isNumber })
+            .trimmingCharacters(in: CharacterSet(charactersIn: "- \t"))
+        guard !prefix.isEmpty, let idx = Int(numStr), idx > 0 else {
             return (nil, nil)
         }
         let prefixLower = prefix.lowercased()
