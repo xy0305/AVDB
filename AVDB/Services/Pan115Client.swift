@@ -575,23 +575,6 @@ public final class Pan115Client: @unchecked Sendable {
         return deleted
     }
 
-    private func deleteJunkFiles(in cid: String, cookie: String, maxDepth: Int) async throws -> Int {
-        let files = try await listFiles(cid: cid, cookie: cookie, limit: 1150)
-        var deleted = 0
-        let junk = files.filter { isJunkFile($0) }
-        if !junk.isEmpty {
-            deleted += try await deleteFiles(cid: cid, fileIDs: junk.map(\.fileID), cookie: cookie)
-        }
-        guard maxDepth > 0 else { return deleted }
-        for dir in files where dir.isDir {
-            let child = dir.cid.isEmpty ? dir.fileID : dir.cid
-            if !child.isEmpty {
-                deleted += try await deleteJunkFiles(in: child, cookie: cookie, maxDepth: maxDepth - 1)
-            }
-        }
-        return deleted
-    }
-
     /// 删除目录内指定文件（对齐参考脚本 POST webapi.115.com/rb/delete，form pid + fid[N]）。
     /// 返回实际删除数量。
     /// 注意：只有 webapi.115.com/rb/delete 能成功删除，但该域名在 iOS 上 SSL EOF 偶发，
