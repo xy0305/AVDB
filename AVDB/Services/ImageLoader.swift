@@ -161,7 +161,7 @@ public struct JavDBImage: View {
     @State private var loading = false
 
     public init(url: String?, fallbackURL: String? = nil, contentMode: ContentMode = .fill) {
-        self.url = fallbackURL ?? url
+        self.url = url
         self.fallbackURL = fallbackURL
         self.contentMode = contentMode
     }

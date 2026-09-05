@@ -57,8 +57,8 @@ struct MovieDetailView: View {
 
     private func detailContent(_ movie: Movie) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // 头部封面 + 信息
-            headerSection(movie)
+            // 沉浸式高清大海报头部
+            heroHeader(movie)
 
             // 标签
             if let tags = movie.tags, !tags.isEmpty {
@@ -108,6 +108,101 @@ struct MovieDetailView: View {
             relatedListsSection
         }
         .padding(.vertical)
+    }
+
+    private func heroHeader(_ movie: Movie) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            JavDBImage(
+                url: movie.hdCoverURL,
+                fallbackURL: movie.coverURL ?? movie.thumbURL,
+                contentMode: .fill
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 560)
+            .clipped()
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.12), .black.opacity(0.88)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 14) {
+                Spacer()
+
+                Text(movie.displayNumber)
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(.white)
+                    .textSelection(.enabled)
+                    .onTapGesture { UIPasteboard.general.string = movie.displayNumber }
+
+                Text(movie.displayTitle)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+
+                HStack(spacing: 8) {
+                    if let category = movie.category, !category.isEmpty {
+                        Text(category)
+                    }
+                    if let date = movie.releaseDate, !date.isEmpty {
+                        Text(date)
+                    }
+                    if let duration = movie.duration {
+                        Text("\(duration)分钟")
+                    }
+                    if movie.hasCnsub == true { Text("中字") }
+                }
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.9))
+
+                Button { play115 = true } label: {
+                    Label("播放", systemImage: "play.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(.white, in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                HStack {
+                    heroAction("arrow.down.circle", title: "下载") {
+                        if let link = movie.newMagnets?.first?.magnetURL {
+                            UIPasteboard.general.string = link
+                        }
+                    }
+                    Spacer()
+                    heroAction("doc.on.doc", title: "复制番号") {
+                        UIPasteboard.general.string = movie.displayNumber
+                    }
+                    Spacer()
+                    heroAction("heart", title: "收藏") { }
+                    Spacer()
+                    heroAction("rectangle.stack.badge.play", title: "资源") {
+                        withAnimation(.easeInOut) { }
+                    }
+                }
+                .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 24)
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.black)
+    }
+
+    private func heroAction(_ systemName: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: systemName)
+                    .font(.title3.weight(.medium))
+                Text(title)
+                    .font(.caption2)
+            }
+            .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
     }
 
     private func headerSection(_ movie: Movie) -> some View {
