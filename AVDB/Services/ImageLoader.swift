@@ -124,6 +124,10 @@ public final class ImageLoader: ObservableObject {
                 image = img
             }
 
+            // DMM/MGS 某些 ps.jpg 会返回 147x200 的低清占位图，不能用于详情大海报。
+            if isExternalCover(urlString), max(image.size.width, image.size.height) < 500 {
+                throw ImageLoaderError.invalidData
+            }
             cache[urlString] = image
             if cache.count > cacheLimit {
                 cache.removeAll()
@@ -132,6 +136,10 @@ public final class ImageLoader: ObservableObject {
         } catch {
             return nil
         }
+    }
+
+    private func isExternalCover(_ urlString: String) -> Bool {
+        urlString.contains("pics.dmm.co.jp") || urlString.contains("image.mgstage.com")
     }
 
     /// 判断是否为 App 专用加密 CDN（tp.spfcas.com）
