@@ -225,7 +225,8 @@ public final class JavDBSDK {
         page: Int = 1,
         limit: Int = 24,
         sortBy: String = "update",
-        orderBy: String = "desc"
+        orderBy: String = "desc",
+        filterByTags: String? = nil
     ) async throws -> [Movie] {
         var query = [
             "filter_by": filterBy,
@@ -235,6 +236,7 @@ public final class JavDBSDK {
             "order_by": orderBy,
         ]
         if let type { query["type"] = type }
+        if let filterByTags, !filterByTags.isEmpty { query["filter_by_tags"] = filterByTags }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query)
         return resp.data?.movies ?? []
     }
@@ -298,14 +300,16 @@ public final class JavDBSDK {
         page: Int = 1,
         limit: Int = 21,
         type: String = "0",
-        filter: String = ""
+        filter: String = "",
+        filterByTags: String? = nil
     ) async throws -> [Movie] {
         try await moviesByTag(
             filterBy: "\(type):a:\(id):\(filter)",
             type: nil,
             page: page,
             limit: limit,
-            sortBy: "release"
+            sortBy: "release",
+            filterByTags: filterByTags
         )
     }
 

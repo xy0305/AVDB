@@ -359,14 +359,14 @@ struct ActorDetailView: View {
 
     private func filterChip(_ title: String, id: String) -> some View {
         Button {
-            Task { await vm.selectFilter(id) }
+            Task { await vm.selectFilterTag(id) }
         } label: {
             Text(title)
                 .font(.caption.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(vm.filter == id ? Color.accentColor : Color(.systemGray5))
-                .foregroundColor(vm.filter == id ? .white : .primary)
+                .background(vm.filterByTags == id ? Color.accentColor : Color(.systemGray5))
+                .foregroundColor(vm.filterByTags == id ? .white : .primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -386,6 +386,9 @@ final class ActorDetailViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLoadingMovies = false
     @Published var filter = ""
+    // 演员详情的「精选综合 / 4 小时以上 / 中出」属于 filter_by_tags，
+    // 不能拼进 filter_by 的演员筛选段。
+    @Published var filterByTags = ""
     @Published var hasCollected = false
     @Published var isCollecting = false
     @Published var collectHint: String?
@@ -418,6 +421,16 @@ final class ActorDetailViewModel: ObservableObject {
     func selectFilter(_ id: String) async {
         guard filter != id else { return }
         filter = id
+        filterByTags = ""
+        page = 1
+        hasMore = true
+        movies = []
+        await fetchMovies()
+    }
+
+    func selectFilterTag(_ id: String) async {
+        guard filterByTags != id else { return }
+        filterByTags = id
         page = 1
         hasMore = true
         movies = []
@@ -455,7 +468,8 @@ final class ActorDetailViewModel: ObservableObject {
         isLoadingMovies = true
         defer { isLoadingMovies = false }
         let next = (try? await JavDBSDK.shared.actorMovies(
-            actorID, page: page, limit: 21, type: catalogType, filter: filter
+            actorID, page: page, limit: 21, type: catalogType, filter: filter,
+            filterByTags: filterByTags.isEmpty ? nil : filterByTags
         )) ?? []
         if next.isEmpty {
             hasMore = false
