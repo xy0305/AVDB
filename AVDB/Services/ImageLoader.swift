@@ -76,6 +76,88 @@ public enum CoverURLBuilder {
     }
 }
 
+/// 2021-2024 年作品的 Tenhow（日亚商品图）封面解析器。
+/// Tenhow 条目同时包含 DMM cid 与 ASIN 图片名，可用番号对应 cid 后取得高清图。
+public actor TenhowCoverResolver {
+    public static let shared = TenhowCoverResolver()
+
+    private let baseURL = URL(string: "https://www.tenhow.net/")!
+    private var actorPages: [String: String]?
+    private var resultCache: [String: String?] = [:]
+
+    public func coverURL(number: String, releaseDate: String?, actorNames: [String]) async -> String? {
+        guard let year = releaseDate.flatMap({ Int($0.prefix(4)) }), (2021...2024).contains(year),
+              !number.isEmpty, !actorNames.isEmpty else { return nil }
+        let key = number.uppercased()
+        if let cached = resultCache[key] { return cached }
+
+        do {
+            let pages = try await loadActorPages()
+            for name in actorNames {
+                guard let path = pages[name], let pageURL = URL(string: path, relativeTo: baseURL) else { continue }
+                let html = try await downloadText(pageURL)
+                if let asin = asin(in: html, matching: number) {
+                    let result = "https://www.tenhow.net/images/\(asin).jpg"
+                    resultCache[key] = result
+                    return result
+                }
+            }
+        } catch { }
+        resultCache[key] = nil
+        return nil
+    }
+
+    private func loadActorPages() async throws -> [String: String] {
+        if let actorPages { return actorPages }
+        let html = try await downloadText(URL(string: "mokuji.html", relativeTo: baseURL)!)
+        let regex = try NSRegularExpression(pattern: #"href=[\"']([^\"']+\.html)[\"'][^>]*>([^<]+)</a>"#, options: .caseInsensitive)
+        let ns = html as NSString
+        var result: [String: String] = [:]
+        for match in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+            let path = ns.substring(with: match.range(at: 1))
+            let name = ns.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty { result[name] = path }
+        }
+        actorPages = result
+        return result
+    }
+
+    private func asin(in html: String, matching number: String) -> String? {
+        let regex = try? NSRegularExpression(
+            pattern: #"href=[\"'](?:images/)?(B[0-9A-Z]{9})\.jpg[\"'][\s\S]{0,1800}?cid%3D([^%&\"']+)"#,
+            options: .caseInsensitive
+        )
+        guard let regex else { return nil }
+        let ns = html as NSString
+        let target = normalize(number)
+        for match in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+            let cid = ns.substring(with: match.range(at: 2)).removingPercentEncoding ?? ""
+            if normalize(cid) == target { return ns.substring(with: match.range(at: 1)).uppercased() }
+        }
+        return nil
+    }
+
+    private func normalize(_ value: String) -> String {
+        var value = value.uppercased().replacingOccurrences(of: #"[^A-Z0-9]"#, with: "", options: .regularExpression)
+        value = value.replacingOccurrences(of: #"^H\d+"#, with: "", options: .regularExpression)
+        value = value.replacingOccurrences(of: #"^\d+(?=[A-Z])"#, with: "", options: .regularExpression)
+        guard let range = value.range(of: #"\d+$"#, options: .regularExpression) else { return value }
+        let prefix = String(value[..<range.lowerBound])
+        let digits = Int(value[range]) ?? 0
+        return prefix + String(digits)
+    }
+
+    private func downloadText(_ url: URL) async throws -> String {
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 12
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let text = String(data: data, encoding: .utf8) else { throw ImageLoaderError.downloadFailed }
+        return text
+    }
+}
+
 extension String {
     func paddingLeft(toLength: Int, withPad: String) -> String {
         guard toLength > count else { return self }
@@ -167,22 +249,30 @@ public final class ImageLoader: ObservableObject {
 public struct JavDBImage: View {
     let url: String?
     var fallbackURL: String? = nil
+    var secondFallbackURL: String? = nil
     let contentMode: ContentMode
 
     @State private var image: UIImage?
     @State private var loading = false
 
-    public init(url: String?, fallbackURL: String? = nil, contentMode: ContentMode = .fill) {
+    public init(
+        url: String?,
+        fallbackURL: String? = nil,
+        secondFallbackURL: String? = nil,
+        contentMode: ContentMode = .fill
+    ) {
         self.url = url
         self.fallbackURL = fallbackURL
+        self.secondFallbackURL = secondFallbackURL
         self.contentMode = contentMode
     }
 
     private var imageURLs: [String] {
         var result: [String] = []
-        if let url, !url.isEmpty { result.append(url) }
-        if let fallbackURL, !fallbackURL.isEmpty, !result.contains(fallbackURL) {
-            result.append(fallbackURL)
+        for candidate in [url, fallbackURL, secondFallbackURL] {
+            if let candidate, !candidate.isEmpty, !result.contains(candidate) {
+                result.append(candidate)
+            }
         }
         return result
     }
@@ -195,18 +285,19 @@ public struct JavDBImage: View {
                     .aspectRatio(contentMode: contentMode)
             } else {
                 placeholder
-                    .task {
-                        guard !loading else { return }
-                        loading = true
-                        for candidate in imageURLs {
-                            if let img = await ImageLoader.shared.load(candidate) {
-                                image = img
-                                break
-                            }
-                        }
-                        loading = false
-                    }
             }
+        }
+        .task(id: imageURLs.joined(separator: "|")) {
+            guard !loading else { return }
+            loading = true
+            image = nil
+            for candidate in imageURLs {
+                if let img = await ImageLoader.shared.load(candidate) {
+                    image = img
+                    break
+                }
+            }
+            loading = false
         }
     }
 

@@ -13,6 +13,7 @@ struct MovieDetailView: View {
     @StateObject private var vm: MovieDetailViewModel
     @State private var play115 = false
     @State private var showTrailer = false
+    @State private var tenhowCoverURL: String?
 
     init(movieID: String) {
         self.movieID = movieID
@@ -111,14 +112,23 @@ struct MovieDetailView: View {
     private func heroHeader(_ movie: Movie) -> some View {
         ZStack(alignment: .bottomLeading) {
             JavDBImage(
-                // 优先 DMM/MGS 竖版海报；失败再回退 JAVDB 高清封面。
-                url: movie.hdCoverURL ?? movie.coverURL,
-                fallbackURL: movie.coverURL ?? movie.thumbURL,
+                // 2021-2024 优先 Tenhow 的日亚商品图，其余年份保持 DMM/MGS 优先。
+                url: tenhowCoverURL ?? movie.hdCoverURL ?? movie.coverURL,
+                fallbackURL: tenhowCoverURL == nil ? (movie.coverURL ?? movie.thumbURL) : movie.hdCoverURL,
+                secondFallbackURL: tenhowCoverURL == nil ? nil : (movie.coverURL ?? movie.thumbURL),
                 contentMode: .fit
             )
             .frame(maxWidth: .infinity)
             .frame(height: 420)
             .clipped()
+            .task(id: movie.id) {
+                let names = movie.actors?.compactMap(\.name) ?? movie.actorNames ?? []
+                tenhowCoverURL = await TenhowCoverResolver.shared.coverURL(
+                    number: movie.displayNumber,
+                    releaseDate: movie.releaseDate,
+                    actorNames: names
+                )
+            }
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.12), .black.opacity(0.88)],
