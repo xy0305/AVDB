@@ -317,12 +317,10 @@ struct ActorDetailView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(vm.tags.prefix(20)) { tag in
-                                    Text("\(tag.name ?? tag.id)\(tag.count.map { " \($0)" } ?? "")")
-                                        .font(.caption)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(Color(.systemGray6))
-                                        .clipShape(Capsule())
+                                    filterChip(
+                                        "\(tag.name ?? tag.id)\(tag.count.map { " \($0)" } ?? "")",
+                                        id: tag.id
+                                    )
                                 }
                             }
                             .padding(.horizontal)
@@ -468,7 +466,7 @@ final class ActorDetailViewModel: ObservableObject {
         isLoadingMovies = true
         defer { isLoadingMovies = false }
         let next = (try? await JavDBSDK.shared.actorMovies(
-            actorID, page: page, limit: 21, type: catalogType, filter: filter,
+            actorID, page: page, limit: 24, type: catalogType, filter: filter,
             filterByTags: filterByTags.isEmpty ? nil : filterByTags
         )) ?? []
         if next.isEmpty {
