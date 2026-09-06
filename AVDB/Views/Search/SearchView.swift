@@ -49,6 +49,7 @@ struct SearchView: View {
     @State private var keyword = ""
     @State private var submitted = ""
     @State private var category: SearchCategory = .movie
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         Group {
@@ -56,6 +57,7 @@ struct SearchView: View {
                 ContentUnavailableView("搜索", systemImage: "magnifyingglass", description: Text("输入番号、演员名或关键词"))
             } else {
                 SearchResultView(keyword: submitted, category: category)
+                    .id("\(submitted)_\(category.rawValue)")
             }
         }
         .navigationTitle("搜索")
@@ -65,8 +67,12 @@ struct SearchView: View {
                 categoryPicker
             }
         }
+        .focused($isSearchFocused)
         .searchable(text: $keyword, prompt: "番号 / 关键词")
         .onSubmit(of: .search) { submit() }
+        .onChange(of: keyword) { _, new in
+            if new.isEmpty { submitted = "" }
+        }
     }
 
     private var categoryPicker: some View {
@@ -97,6 +103,7 @@ struct SearchView: View {
         let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         submitted = trimmed
+        isSearchFocused = false
     }
 }
 
