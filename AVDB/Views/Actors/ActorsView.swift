@@ -304,9 +304,9 @@ struct ActorDetailView: View {
                     if !vm.filterTags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                filterChip("全部", id: "")
+                                primaryFilterChip("全部", id: "")
                                 ForEach(vm.filterTags) { tag in
-                                    filterChip(tag.name ?? tag.id, id: tag.id)
+                                    primaryFilterChip(tag.name ?? tag.id, id: tag.id)
                                 }
                             }
                             .padding(.horizontal)
@@ -317,7 +317,7 @@ struct ActorDetailView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(vm.tags.prefix(20)) { tag in
-                                    filterChip(
+                                    tagFilterChip(
                                         "\(tag.name ?? tag.id)\(tag.count.map { " \($0)" } ?? "")",
                                         id: tag.id
                                     )
@@ -355,7 +355,22 @@ struct ActorDetailView: View {
         }
     }
 
-    private func filterChip(_ title: String, id: String) -> some View {
+    private func primaryFilterChip(_ title: String, id: String) -> some View {
+        Button {
+            Task { await vm.selectFilter(id) }
+        } label: {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(vm.filter == id && vm.filterByTags.isEmpty ? Color.accentColor : Color(.systemGray5))
+                .foregroundColor(vm.filter == id && vm.filterByTags.isEmpty ? .white : .primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func tagFilterChip(_ title: String, id: String) -> some View {
         Button {
             Task { await vm.selectFilterTag(id) }
         } label: {
@@ -417,7 +432,7 @@ final class ActorDetailViewModel: ObservableObject {
     }
 
     func selectFilter(_ id: String) async {
-        guard filter != id else { return }
+        guard filter != id || !filterByTags.isEmpty else { return }
         filter = id
         filterByTags = ""
         page = 1
@@ -427,7 +442,8 @@ final class ActorDetailViewModel: ObservableObject {
     }
 
     func selectFilterTag(_ id: String) async {
-        guard filterByTags != id else { return }
+        guard filterByTags != id || !filter.isEmpty else { return }
+        filter = ""
         filterByTags = id
         page = 1
         hasMore = true
