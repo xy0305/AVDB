@@ -95,8 +95,9 @@ struct MovieDetailView: View {
     private func detailBackground(_ movie: Movie) -> some View {
         ZStack {
             JavDBImage(
-                url: movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL,
-                fallbackURL: tenhowCoverURL,
+                url: movie.hdBackdropURL,
+                fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
+                secondFallbackURL: movie.coverURL ?? movie.thumbURL,
                 contentMode: .fill
             )
             .scaleEffect(1.35)
@@ -176,9 +177,10 @@ struct MovieDetailView: View {
 
             ZStack(alignment: .bottomTrailing) {
                 JavDBImage(
-                    url: movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL,
-                    fallbackURL: tenhowCoverURL,
-                    secondFallbackURL: movie.hdCoverURL,
+                    // 官方横版 pl 无效时优先首张横版剧照，不再显示 NOW 占位图。
+                    url: movie.hdBackdropURL,
+                    fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
+                    secondFallbackURL: movie.coverURL ?? movie.thumbURL,
                     contentMode: .fill
                 )
                 .frame(width: contentWidth, height: contentWidth / 1.47)
@@ -1078,11 +1080,15 @@ struct DraggableReviewsPanel: View {
             HStack {
                 Text("排序方式").font(.headline)
                 Spacer()
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.up.arrow.down")
-                    Text("热门")
+                Picker("排序方式", selection: $vm.sortBy) {
+                    Text("最新").tag("recently")
+                    Text("最热").tag("hotly")
                 }
-                .font(.subheadline)
+                .pickerStyle(.segmented)
+                .frame(width: 138)
+                .onChange(of: vm.sortBy) { _, _ in
+                    Task { await vm.load(movieID: movieID, force: true) }
+                }
             }
             .padding(.horizontal, 22)
             .frame(height: 70)
@@ -1174,6 +1180,7 @@ struct ReviewsListView: View {
 final class ReviewsListViewModel: ObservableObject {
     @Published var reviews: [Review] = []
     @Published var isLoading = false
+    @Published var sortBy = "hotly"
     private var page = 1
     private var hasMore = true
 
@@ -1194,7 +1201,9 @@ final class ReviewsListViewModel: ObservableObject {
     private func fetch(movieID: String) async {
         isLoading = true
         defer { isLoading = false }
-        let next = (try? await JavDBSDK.shared.movieReviews(movieID, page: page)) ?? []
+        let next = (try? await JavDBSDK.shared.movieReviews(
+            movieID, page: page, sortBy: sortBy, limit: 24
+        )) ?? []
         if next.isEmpty {
             hasMore = false
         } else if page == 1 {

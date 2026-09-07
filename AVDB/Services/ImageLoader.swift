@@ -221,9 +221,13 @@ public final class ImageLoader: ObservableObject {
                 image = img
             }
 
-            // DMM/MGS 某些 ps.jpg 会返回 147x200 的低清占位图，不能用于详情大海报。
-            if isExternalCover(urlString), max(image.size.width, image.size.height) < 500 {
-                throw ImageLoaderError.invalidData
+            // DMM/MGS 某些地址会返回通用 NOW 占位图：ps 为 147x200，
+            // pl 为 590x800。pl 本应是横版剧照，因此竖向 pl 也必须判无效。
+            if isExternalCover(urlString) {
+                let tooSmall = max(image.size.width, image.size.height) < 500
+                let portraitBackdrop = urlString.lowercased().hasSuffix("pl.jpg")
+                    && image.size.height > image.size.width
+                if tooSmall || portraitBackdrop { throw ImageLoaderError.invalidData }
             }
             cache[urlString] = image
             if cache.count > cacheLimit {
