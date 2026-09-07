@@ -14,8 +14,8 @@ struct MovieDetailView: View {
     @State private var play115 = false
     @State private var showTrailer = false
     @State private var tenhowCoverURL: String?
-    @State private var showReviewsSheet = false
-    @State private var reviewSheetDetent: PresentationDetent = .height(82)
+    @State private var reviewPanelHeight: CGFloat = 76
+    @StateObject private var reviewsVM = ReviewsListViewModel()
     @State private var showSearch = false
     @Environment(\.dismiss) private var dismiss
 
@@ -39,6 +39,7 @@ struct MovieDetailView: View {
                     if let movie = vm.movie {
                         detailContent(movie, width: proxy.size.width)
                             .frame(width: proxy.size.width)
+                            .padding(.bottom, 60)
                     } else if vm.isLoading {
                         ProgressView().tint(.white).padding(.top, 120)
                     } else if let err = vm.errorMessage {
@@ -54,24 +55,29 @@ struct MovieDetailView: View {
                 }
                 .frame(width: proxy.size.width)
                 .ignoresSafeArea(edges: .top)
+
+                if let movie = vm.movie {
+                    DraggableReviewsPanel(
+                        movieID: movie.id,
+                        total: movie.reviewsCount ?? movie.commentsCount ?? 0,
+                        panelHeight: $reviewPanelHeight,
+                        vm: reviewsVM,
+                        availableHeight: proxy.size.height
+                    )
+                    .frame(width: proxy.size.width)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .zIndex(10)
+                }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showSearch) { SearchView() }
-        .sheet(isPresented: $showReviewsSheet) {
-            if let movie = vm.movie {
-                ReviewsSheetView(movieID: movie.id, total: movie.reviewsCount ?? movie.commentsCount ?? 0)
-                    .presentationDetents([.height(82), .medium, .large], selection: $reviewSheetDetent)
-                    .presentationDragIndicator(.visible)
-                    .presentationBackgroundInteraction(.enabled(upThrough: .height(82)))
-                    .presentationCornerRadius(32)
-                    .interactiveDismissDisabled()
-            }
-        }
         .task {
             await vm.load()
-            if vm.movie != nil { showReviewsSheet = true }
+            if let movie = vm.movie {
+                await reviewsVM.load(movieID: movie.id)
+            }
         }
         .fullScreenCover(isPresented: $play115) {
             if let movie = vm.movie { Pan115PlayerView(movie: movie) }
@@ -1027,69 +1033,107 @@ struct FlowTags: View {
     }
 }
 
-/// 详情页底部常驻上拉评论面板（仅评论，不显示在线播放标签）。
-struct ReviewsSheetView: View {
+/// 详情页内部的连续拖动评论面板。折叠态只显示把手和标题，避免内容漏出。
+struct DraggableReviewsPanel: View {
     let movieID: String
-    var total: Int = 0
-    @StateObject private var vm = ReviewsListViewModel()
+    let total: Int
+    @Binding var panelHeight: CGFloat
+    @ObservedObject var vm: ReviewsListViewModel
+    let availableHeight: CGFloat
+    @GestureState private var dragDelta: CGFloat = 0
+
+    private let collapsedHeight: CGFloat = 76
+    private var maximumHeight: CGFloat { max(300, availableHeight - 8) }
+    private var displayedHeight: CGFloat {
+        min(maximumHeight, max(collapsedHeight, panelHeight - dragDelta))
+    }
+    private var expanded: Bool { displayedHeight > collapsedHeight + 35 }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("评论")
-                    .font(.system(size: 18, weight: .bold))
-                if total > 0 {
-                    Text("\(total)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            VStack(spacing: 9) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.38))
+                    .frame(width: 42, height: 5)
+                HStack(spacing: 12) {
+                    Text("评论").font(.system(size: 18, weight: .bold))
+                    if total > 0 {
+                        Text("\(total.formatted())")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .padding(.horizontal, 22)
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
+            .frame(height: collapsedHeight)
+            .contentShape(Rectangle())
+            .onTapGesture { snap(to: panelHeight <= collapsedHeight + 10 ? maximumHeight * 0.62 : collapsedHeight) }
+            .gesture(panelDrag)
 
-            Divider()
-
-            HStack {
-                Text("排序方式")
-                    .font(.headline)
-                Spacer()
-                Label("热门", systemImage: "arrow.up.arrow.down")
+            if expanded {
+                Divider()
+                HStack {
+                    Text("排序方式").font(.headline)
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text("热门")
+                    }
                     .font(.subheadline)
-            }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 18)
-
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    if vm.reviews.isEmpty && !vm.isLoading {
-                        Text("暂无评论")
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 50)
-                    }
-                    ForEach(vm.reviews) { review in
-                        ReviewRow(review: review, movieID: movieID)
-                            .padding(14)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
-                            .onAppear {
-                                if review.id == vm.reviews.last?.id {
-                                    Task { await vm.loadMore(movieID: movieID) }
-                                }
-                            }
-                    }
-                    if vm.isLoading {
-                        ProgressView().padding()
-                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 32)
+                .padding(.horizontal, 22)
+                .frame(height: 70)
+
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if vm.reviews.isEmpty && !vm.isLoading {
+                            Text("暂无评论")
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 50)
+                        }
+                        ForEach(vm.reviews) { review in
+                            ReviewRow(review: review, movieID: movieID)
+                                .padding(14)
+                                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                                .onAppear {
+                                    if review.id == vm.reviews.last?.id {
+                                        Task { await vm.loadMore(movieID: movieID) }
+                                    }
+                                }
+                        }
+                        if vm.isLoading { ProgressView().padding() }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 32)
+                }
+                .background(Color(.systemGroupedBackground))
+                .refreshable { await vm.load(movieID: movieID, force: true) }
             }
-            .background(Color(.systemGroupedBackground))
-            .refreshable { await vm.load(movieID: movieID, force: true) }
         }
+        .frame(height: displayedHeight, alignment: .top)
         .background(Color(.systemBackground))
-        .task { await vm.load(movieID: movieID) }
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32))
+        .shadow(color: .black.opacity(0.18), radius: 18, y: -5)
+    }
+
+    private var panelDrag: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .updating($dragDelta) { value, state, _ in state = value.translation.height }
+            .onEnded { value in
+                let projected = panelHeight - value.predictedEndTranslation.height
+                let medium = maximumHeight * 0.58
+                let target: CGFloat
+                if projected < (collapsedHeight + medium) / 2 { target = collapsedHeight }
+                else if projected < (medium + maximumHeight) / 2 { target = medium }
+                else { target = maximumHeight }
+                snap(to: target)
+            }
+    }
+
+    private func snap(to height: CGFloat) {
+        withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.88)) {
+            panelHeight = min(maximumHeight, max(collapsedHeight, height))
+        }
     }
 }
 
