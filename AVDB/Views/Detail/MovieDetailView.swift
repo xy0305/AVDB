@@ -23,30 +23,37 @@ struct MovieDetailView: View {
     }
 
     var body: some View {
-        ZStack {
-            if let movie = vm.movie {
-                detailBackground(movie)
-            } else {
-                Color(.systemBackground).ignoresSafeArea()
-            }
-
-            ScrollView {
+        GeometryReader { proxy in
+            ZStack {
                 if let movie = vm.movie {
-                    detailContent(movie)
-                } else if vm.isLoading {
-                    ProgressView().tint(.white).padding(.top, 120)
-                } else if let err = vm.errorMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 40)).foregroundColor(.orange)
-                        Text(err).foregroundStyle(.white)
-                        Button("重试") { Task { await vm.load() } }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding(.top, 120)
+                    detailBackground(movie)
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                } else {
+                    Color(.systemBackground).ignoresSafeArea()
                 }
+
+                ScrollView(.vertical) {
+                    if let movie = vm.movie {
+                        detailContent(movie, width: proxy.size.width)
+                            .frame(width: proxy.size.width)
+                    } else if vm.isLoading {
+                        ProgressView().tint(.white).padding(.top, 120)
+                    } else if let err = vm.errorMessage {
+                        VStack(spacing: 16) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 40)).foregroundColor(.orange)
+                            Text(err).foregroundStyle(.white)
+                            Button("重试") { Task { await vm.load() } }
+                                .buttonStyle(.borderedProminent)
+                        }
+                        .padding(.top, 120)
+                    }
+                }
+                .frame(width: proxy.size.width)
+                .ignoresSafeArea(edges: .top)
             }
-            .ignoresSafeArea(edges: .top)
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showSearch) { SearchView() }
@@ -81,9 +88,9 @@ struct MovieDetailView: View {
         .ignoresSafeArea()
     }
 
-    private func detailContent(_ movie: Movie) -> some View {
+    private func detailContent(_ movie: Movie, width: CGFloat) -> some View {
         VStack(spacing: 0) {
-            heroHeader(movie)
+            heroHeader(movie, width: width)
 
             VStack(alignment: .leading, spacing: 20) {
                 if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
@@ -105,8 +112,9 @@ struct MovieDetailView: View {
         }
     }
 
-    private func heroHeader(_ movie: Movie) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
+    private func heroHeader(_ movie: Movie, width: CGFloat) -> some View {
+        let contentWidth = max(0, width - 40)
+        return VStack(alignment: .leading, spacing: 22) {
             HStack {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
@@ -150,8 +158,7 @@ struct MovieDetailView: View {
                     secondFallbackURL: movie.hdCoverURL,
                     contentMode: .fill
                 )
-                .frame(maxWidth: .infinity)
-                .aspectRatio(1.47, contentMode: .fit)
+                .frame(width: contentWidth, height: contentWidth / 1.47)
                 .clipped()
 
                 Button { play115 = true } label: {
@@ -177,8 +184,8 @@ struct MovieDetailView: View {
 
             movieInfoCard(movie)
         }
+        .frame(width: contentWidth, alignment: .leading)
         .padding(.horizontal, 20)
-        .padding(.bottom, 18)
     }
 
     private func movieInfoCard(_ movie: Movie) -> some View {
