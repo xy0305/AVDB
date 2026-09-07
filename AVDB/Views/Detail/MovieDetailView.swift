@@ -14,6 +14,8 @@ struct MovieDetailView: View {
     @State private var play115 = false
     @State private var showTrailer = false
     @State private var tenhowCoverURL: String?
+    @State private var showSearch = false
+    @Environment(\.dismiss) private var dismiss
 
     init(movieID: String) {
         self.movieID = movieID
@@ -21,33 +23,36 @@ struct MovieDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
+        ZStack {
             if let movie = vm.movie {
-                detailContent(movie)
-            } else if vm.isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 80)
-            } else if let err = vm.errorMessage {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 40))
-                        .foregroundColor(.orange)
-                    Text(err)
-                    Button("重试") {
-                        Task { await vm.load() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding(.top, 80)
+                detailBackground(movie)
+            } else {
+                Color(.systemBackground).ignoresSafeArea()
             }
+
+            ScrollView {
+                if let movie = vm.movie {
+                    detailContent(movie)
+                } else if vm.isLoading {
+                    ProgressView().tint(.white).padding(.top, 120)
+                } else if let err = vm.errorMessage {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 40)).foregroundColor(.orange)
+                        Text(err).foregroundStyle(.white)
+                        Button("重试") { Task { await vm.load() } }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding(.top, 120)
+                }
+            }
+            .ignoresSafeArea(edges: .top)
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task { await vm.load() }
         .fullScreenCover(isPresented: $play115) {
-            if let movie = vm.movie {
-                Pan115PlayerView(movie: movie)
-            }
+            if let movie = vm.movie { Pan115PlayerView(movie: movie) }
         }
         .fullScreenCover(isPresented: $showTrailer) {
             if let url = vm.movie?.previewVideoURL.flatMap(URL.init) {
@@ -56,72 +61,111 @@ struct MovieDetailView: View {
         }
     }
 
+    private func detailBackground(_ movie: Movie) -> some View {
+        ZStack {
+            JavDBImage(
+                url: movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL,
+                fallbackURL: tenhowCoverURL,
+                contentMode: .fill
+            )
+            .scaleEffect(1.35)
+            .blur(radius: 42)
+            .opacity(0.58)
+            Color(red: 0.43, green: 0.13, blue: 0.15).opacity(0.68)
+            LinearGradient(
+                colors: [.white.opacity(0.20), .clear, .black.opacity(0.12)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea()
+    }
+
     private func detailContent(_ movie: Movie) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // 沉浸式高清大海报头部
+        VStack(spacing: 0) {
             heroHeader(movie)
 
-            // 标签
-            if let tags = movie.tags, !tags.isEmpty {
-                tagsSection(tags)
+            VStack(alignment: .leading, spacing: 20) {
+                if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
+                if let actors = movie.actors, !actors.isEmpty { actorsSection(actors) }
+                if let summary = movie.summary, !summary.isEmpty { summarySection(summary) }
+                if let trailer = movie.previewVideoURL, let url = URL(string: trailer) { trailerSection(url) }
+                if let images = movie.previewImages, !images.isEmpty { previewImagesSection(images) }
+                if (movie.magnetsCount ?? 0) > 0 { magnetsSection(movie) }
+                reviewsSection(movie)
+                if !vm.actorMovies.isEmpty { actorMoviesSection(vm.actorMovies) }
+                if !vm.relatedMovies.isEmpty { relatedSection(vm.relatedMovies) }
+                relatedListsSection
             }
-
-            // 演员
-            if let actors = movie.actors, !actors.isEmpty {
-                actorsSection(actors)
-            }
-
-            // 简介
-            if let summary = movie.summary, !summary.isEmpty {
-                summarySection(summary)
-            }
-
-            // 预告片
-            if let trailer = movie.previewVideoURL, let url = URL(string: trailer) {
-                trailerSection(url)
-            }
-
-            // 剧照
-            if let images = movie.previewImages, !images.isEmpty {
-                previewImagesSection(images)
-            }
-
-            // 磁力链接
-            if (movie.magnetsCount ?? 0) > 0 {
-                magnetsSection(movie)
-            }
-
-            // 影评
-            reviewsSection(movie)
-
-            // Ta 还出演过
-            if !vm.actorMovies.isEmpty {
-                actorMoviesSection(vm.actorMovies)
-            }
-
-            // 相似推荐
-            if !vm.relatedMovies.isEmpty {
-                relatedSection(vm.relatedMovies)
-            }
-
-            relatedListsSection
+            .padding(.top, 26)
+            .padding(.bottom, 40)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemBackground))
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34))
         }
-        .padding(.vertical)
     }
 
     private func heroHeader(_ movie: Movie) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            JavDBImage(
-                // 2021-2026 优先 Tenhow 的无前缀 ASIN 原尺寸竖版 poster。
-                // 官方 ps.jpg 只有 147x200，会被加载器拒绝；最后才回退 JAVDB 横图。
-                url: tenhowCoverURL ?? movie.hdCoverURL,
-                fallbackURL: movie.coverURL,
-                secondFallbackURL: movie.thumbURL,
-                contentMode: .fit
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 420)
-            .clipped()
+        VStack(alignment: .leading, spacing: 22) {
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 27, weight: .medium))
+                        .frame(width: 46, height: 46)
+                }
+                Spacer()
+                Button {
+                    Task { _ = try? await JavDBSDK.shared.codeCollectActions(movie.id) }
+                } label: {
+                    Image(systemName: "bookmark.square")
+                        .font(.system(size: 25, weight: .regular))
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(2).background(.white, in: Circle())
+                                .foregroundStyle(Color(red: 0.45, green: 0.18, blue: 0.19))
+                                .offset(x: 4, y: 4)
+                        }
+                        .frame(width: 46, height: 46)
+                }
+                Button { showSearch = true } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 28, weight: .regular))
+                        .frame(width: 46, height: 46)
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.top, 54)
+
+            Text(movie.displayTitle)
+                .font(.system(size: 28, weight: .bold))
+                .lineSpacing(5)
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ZStack(alignment: .bottomTrailing) {
+                JavDBImage(
+                    url: movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL,
+                    fallbackURL: tenhowCoverURL,
+                    secondFallbackURL: movie.hdCoverURL,
+                    contentMode: .fill
+                )
+                .frame(maxWidth: .infinity)
+                .aspectRatio(1.47, contentMode: .fit)
+                .clipped()
+
+                Button { play115 = true } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 76, height: 76)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(14)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .shadow(color: .black.opacity(0.18), radius: 8, y: 5)
             .task(id: movie.id) {
                 let names = movie.actors?.compactMap(\.name) ?? movie.actorNames ?? []
                 tenhowCoverURL = await TenhowCoverResolver.shared.coverURL(
@@ -131,75 +175,54 @@ struct MovieDetailView: View {
                 )
             }
 
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.12), .black.opacity(0.88)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
+            movieInfoCard(movie)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 18)
+    }
 
-            VStack(alignment: .leading, spacing: 14) {
-                Spacer()
-
-                Text(movie.displayNumber)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(.white)
-                    .textSelection(.enabled)
-                    .onTapGesture { UIPasteboard.general.string = movie.displayNumber }
-
-                Text(movie.displayTitle)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-
-                HStack(spacing: 8) {
-                    if let category = movie.category, !category.isEmpty {
-                        Text(category)
-                    }
-                    if let date = movie.releaseDate, !date.isEmpty {
-                        Text(date)
-                    }
-                    if let duration = movie.duration {
-                        Text("\(duration)分钟")
-                    }
-                    if movie.hasCnsub == true { Text("中字") }
+    private func movieInfoCard(_ movie: Movie) -> some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 20) {
+                detailInfoLine("番号：", movie.displayNumber, underline: true)
+                if let date = movie.releaseDate { detailInfoLine("发行日期：", date) }
+                if let duration = movie.duration { detailInfoLine("长度：", "\(duration) 分钟") }
+                if let director = movie.directorName, !director.isEmpty {
+                    detailInfoLine("导演：", director, underline: true)
                 }
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.9))
-
-                Button { play115 = true } label: {
-                    Label("播放", systemImage: "play.fill")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(.white, in: Capsule())
+                if let maker = movie.makerName, !maker.isEmpty {
+                    detailInfoLine("制作商：", maker, underline: true)
                 }
-                .buttonStyle(.plain)
+                let count = movie.reviewsCount ?? movie.commentsCount ?? 0
+                detailInfoLine("评分：", count > 0 ? "共\(count)人评分" : movie.scoreText)
+            }
+            .padding(20)
+            .padding(.trailing, movie.score == nil ? 0 : 62)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack {
-                    heroAction("arrow.down.circle", title: "下载") {
-                        if let link = movie.newMagnets?.first?.magnetURL {
-                            UIPasteboard.general.string = link
-                        }
-                    }
-                    Spacer()
-                    heroAction("doc.on.doc", title: "复制番号") {
-                        UIPasteboard.general.string = movie.displayNumber
-                    }
-                    Spacer()
-                    heroAction("heart", title: "收藏") { }
-                    Spacer()
-                    heroAction("rectangle.stack.badge.play", title: "资源") {
-                        withAnimation(.easeInOut) { }
-                    }
+            if let score = movie.score, score > 0 {
+                VStack(spacing: 1) {
+                    Text("AvPlay").font(.caption2.weight(.bold))
+                    Text(String(format: "%.1f", score)).font(.system(size: 28, weight: .bold))
                 }
                 .foregroundStyle(.white)
+                .frame(width: 72, height: 86)
+                .background(Color.orange.opacity(0.90))
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18))
+                .padding(.trailing, 18)
             }
-            .padding(.horizontal, 28)
-            .padding(.bottom, 24)
         }
-        .frame(maxWidth: .infinity)
-        .background(Color.black)
+        .foregroundStyle(.white)
+        .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func detailInfoLine(_ label: String, _ value: String, underline: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Text(label)
+            Text(value).underline(underline)
+        }
+        .font(.system(size: 18, weight: .regular))
+        .textSelection(.enabled)
     }
 
     private func heroAction(_ systemName: String, title: String, action: @escaping () -> Void) -> some View {
