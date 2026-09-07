@@ -266,10 +266,9 @@ struct RankingsView: View {
                             .padding(6)
                     }
                 }
-                JavDBImage(url: movie.previewImages?.first?.largeURL ?? movie.coverURL, contentMode: .fill)
+                RankingPreviewCarousel(movie: movie)
                     .frame(maxWidth: .infinity)
                     .frame(height: 200)
-                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             Text(movie.displayTitle)
@@ -290,6 +289,55 @@ struct RankingsView: View {
             }
             .font(.system(size: 13))
         }
+    }
+}
+
+
+/// 排行榜右侧剧照轮播。使用系统分页手势，横滑翻图，圆点显示当前位置。
+private struct RankingPreviewCarousel: View {
+    let movie: Movie
+    @State private var selection = 0
+
+    private var imageURLs: [String] {
+        var urls = (movie.previewImages ?? []).compactMap { $0.largeURL ?? $0.thumbURL }
+        if urls.isEmpty, let backdrop = movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL {
+            urls = [backdrop]
+        }
+        return Array(urls.prefix(8))
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            if imageURLs.isEmpty {
+                Color(.systemGray5)
+            } else {
+                TabView(selection: $selection) {
+                    ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, url in
+                        JavDBImage(url: url, contentMode: .fill)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+            }
+
+            if imageURLs.count > 1 {
+                HStack(spacing: 5) {
+                    ForEach(imageURLs.indices, id: \.self) { index in
+                        Circle()
+                            .fill(index == selection ? Color.accentColor : .white.opacity(0.72))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.bottom, 8)
+                .allowsHitTesting(false)
+            }
+        }
+        .contentShape(Rectangle())
     }
 }
 
