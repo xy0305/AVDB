@@ -14,6 +14,8 @@ struct MovieDetailView: View {
     @State private var play115 = false
     @State private var showTrailer = false
     @State private var tenhowCoverURL: String?
+    @State private var showReviewsSheet = false
+    @State private var reviewSheetDetent: PresentationDetent = .height(82)
     @State private var showSearch = false
     @Environment(\.dismiss) private var dismiss
 
@@ -57,7 +59,20 @@ struct MovieDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showSearch) { SearchView() }
-        .task { await vm.load() }
+        .sheet(isPresented: $showReviewsSheet) {
+            if let movie = vm.movie {
+                ReviewsSheetView(movieID: movie.id, total: movie.reviewsCount ?? movie.commentsCount ?? 0)
+                    .presentationDetents([.height(82), .medium, .large], selection: $reviewSheetDetent)
+                    .presentationDragIndicator(.visible)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .height(82)))
+                    .presentationCornerRadius(32)
+                    .interactiveDismissDisabled()
+            }
+        }
+        .task {
+            await vm.load()
+            if vm.movie != nil { showReviewsSheet = true }
+        }
         .fullScreenCover(isPresented: $play115) {
             if let movie = vm.movie { Pan115PlayerView(movie: movie) }
         }
@@ -99,7 +114,6 @@ struct MovieDetailView: View {
                 if let trailer = movie.previewVideoURL, let url = URL(string: trailer) { trailerSection(url) }
                 if let images = movie.previewImages, !images.isEmpty { previewImagesSection(images) }
                 if (movie.magnetsCount ?? 0) > 0 { magnetsSection(movie) }
-                reviewsSection(movie)
                 if !vm.actorMovies.isEmpty { actorMoviesSection(vm.actorMovies) }
                 if !vm.relatedMovies.isEmpty { relatedSection(vm.relatedMovies) }
                 relatedListsSection
@@ -163,13 +177,18 @@ struct MovieDetailView: View {
 
                 Button { play115 = true } label: {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 76, height: 76)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .frame(width: 56, height: 56)
                         .background(.ultraThinMaterial, in: Circle())
+                        .overlay {
+                            Circle().stroke(.white.opacity(0.28), lineWidth: 0.8)
+                        }
+                        .shadow(color: .white.opacity(0.12), radius: 10)
+                        .shadow(color: .black.opacity(0.16), radius: 8, y: 4)
                 }
                 .buttonStyle(.plain)
-                .padding(14)
+                .padding(12)
             }
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .shadow(color: .black.opacity(0.18), radius: 8, y: 5)
@@ -1005,6 +1024,72 @@ struct FlowTags: View {
                 .foregroundColor(.primary)
             }
         }
+    }
+}
+
+/// 详情页底部常驻上拉评论面板（仅评论，不显示在线播放标签）。
+struct ReviewsSheetView: View {
+    let movieID: String
+    var total: Int = 0
+    @StateObject private var vm = ReviewsListViewModel()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("评论")
+                    .font(.system(size: 18, weight: .bold))
+                if total > 0 {
+                    Text("\(total)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+
+            Divider()
+
+            HStack {
+                Text("排序方式")
+                    .font(.headline)
+                Spacer()
+                Label("热门", systemImage: "arrow.up.arrow.down")
+                    .font(.subheadline)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if vm.reviews.isEmpty && !vm.isLoading {
+                        Text("暂无评论")
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 50)
+                    }
+                    ForEach(vm.reviews) { review in
+                        ReviewRow(review: review, movieID: movieID)
+                            .padding(14)
+                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                            .onAppear {
+                                if review.id == vm.reviews.last?.id {
+                                    Task { await vm.loadMore(movieID: movieID) }
+                                }
+                            }
+                    }
+                    if vm.isLoading {
+                        ProgressView().padding()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
+            }
+            .background(Color(.systemGroupedBackground))
+            .refreshable { await vm.load(movieID: movieID, force: true) }
+        }
+        .background(Color(.systemBackground))
+        .task { await vm.load(movieID: movieID) }
     }
 }
 
