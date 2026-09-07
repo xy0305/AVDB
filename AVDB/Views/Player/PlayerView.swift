@@ -215,6 +215,12 @@ struct KSChromePlayer: View {
             Color.black
             KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
                 .onAppear { applyFillMode() }
+            // KSVideoPlayer 内部是 UIViewRepresentable，会优先吃掉 SwiftUI 父层拖动。
+            // 在播放器上方放独立透明命中层，确保左右半屏手势稳定收到事件。
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { toggleChrome() }
+                .gesture(sideDrag(width: width), including: .all)
             if !hasStarted {
                 ProgressView()
                     .tint(.white)
@@ -231,8 +237,6 @@ struct KSChromePlayer: View {
         .frame(height: height)
         .clipped()
         .contentShape(Rectangle())
-        .onTapGesture { toggleChrome() }
-        .simultaneousGesture(sideDrag(width: width))
     }
 
     private func sideDrag(width: CGFloat) -> some Gesture {
@@ -578,17 +582,29 @@ enum OrientationLock {
 
 private struct HiddenVolumeView: UIViewRepresentable {
     func makeUIView(context: Context) -> MPVolumeView {
-        let v = MPVolumeView(frame: CGRect(x: -1000, y: -1000, width: 1, height: 1))
-        v.alpha = 0.0001
-        v.isUserInteractionEnabled = false
-        DispatchQueue.main.async {
-            SystemVolume.slider = v.subviews.compactMap { $0 as? UISlider }.first
+        let view = MPVolumeView(frame: .zero)
+        view.showsRouteButton = false
+        view.showsVolumeSlider = true
+        view.isUserInteractionEnabled = false
+        captureSlider(from: view)
+        // MPVolumeView 的 slider 有时要到下一轮布局才创建。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            captureSlider(from: view)
         }
-        return v
+        return view
     }
 
     func updateUIView(_ uiView: MPVolumeView, context: Context) {
-        SystemVolume.slider = uiView.subviews.compactMap { $0 as? UISlider }.first
+        captureSlider(from: uiView)
+    }
+
+    private func captureSlider(from view: UIView) {
+        if let slider = findSlider(in: view) { SystemVolume.slider = slider }
+    }
+
+    private func findSlider(in view: UIView) -> UISlider? {
+        if let slider = view as? UISlider { return slider }
+        return view.subviews.lazy.compactMap(findSlider(in:)).first
     }
 }
 

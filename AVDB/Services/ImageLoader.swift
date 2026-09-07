@@ -76,8 +76,8 @@ public enum CoverURLBuilder {
     }
 }
 
-/// 2021-2024 年作品的 Tenhow（日亚商品图）封面解析器。
-/// Tenhow 条目同时包含 DMM cid 与 ASIN 图片名，可用番号对应 cid 后取得高清图。
+/// Tenhow（日亚商品图）竖版封面解析器。
+/// Tenhow 条目同时包含 DMM cid 与 ASIN 图片名，可用番号对应 cid 后取得原尺寸 poster。
 public actor TenhowCoverResolver {
     public static let shared = TenhowCoverResolver()
 
@@ -86,7 +86,7 @@ public actor TenhowCoverResolver {
     private var resultCache: [String: String?] = [:]
 
     public func coverURL(number: String, releaseDate: String?, actorNames: [String]) async -> String? {
-        guard let year = releaseDate.flatMap({ Int($0.prefix(4)) }), (2021...2024).contains(year),
+        guard let year = releaseDate.flatMap({ Int($0.prefix(4)) }), (2021...2026).contains(year),
               !number.isEmpty, !actorNames.isEmpty else { return nil }
         let key = number.uppercased()
         if let cached = resultCache[key] { return cached }
@@ -94,7 +94,9 @@ public actor TenhowCoverResolver {
         do {
             let pages = try await loadActorPages()
             for name in actorNames {
-                guard let path = pages[name], let pageURL = URL(string: path, relativeTo: baseURL) else { continue }
+                let candidates = actorNameCandidates(name)
+                guard let path = candidates.compactMap({ pages[$0] }).first,
+                      let pageURL = URL(string: path, relativeTo: baseURL) else { continue }
                 let html = try await downloadText(pageURL)
                 if let asin = asin(in: html, matching: number) {
                     let result = "https://www.tenhow.net/images/\(asin).jpg"
@@ -107,16 +109,29 @@ public actor TenhowCoverResolver {
         return nil
     }
 
+    private func actorNameCandidates(_ name: String) -> [String] {
+        name.components(separatedBy: CharacterSet(charactersIn: " /／・,，()（）[]【】"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     private func loadActorPages() async throws -> [String: String] {
         if let actorPages { return actorPages }
-        let html = try await downloadText(URL(string: "mokuji.html", relativeTo: baseURL)!)
+        // mokuji.html 的演员目录更新不完整；首页/分类页会包含新演员（如神木麗）。
+        let indexPaths = ["mokuji.html", "index.html", "body.html", "kyonyu.html", "gokujo.html"]
         let regex = try NSRegularExpression(pattern: #"href=[\"']([^\"']+\.html)[\"'][^>]*>([^<]+)</a>"#, options: .caseInsensitive)
-        let ns = html as NSString
         var result: [String: String] = [:]
-        for match in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
-            let path = ns.substring(with: match.range(at: 1))
-            let name = ns.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !name.isEmpty { result[name] = path }
+        for indexPath in indexPaths {
+            guard let url = URL(string: indexPath, relativeTo: baseURL),
+                  let html = try? await downloadText(url) else { continue }
+            let ns = html as NSString
+            for match in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+                let path = ns.substring(with: match.range(at: 1))
+                let rawName = ns.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                for name in actorNameCandidates(rawName) where !name.isEmpty {
+                    result[name] = path
+                }
+            }
         }
         actorPages = result
         return result
@@ -288,11 +303,14 @@ public struct JavDBImage: View {
             }
         }
         .task(id: imageURLs.joined(separator: "|")) {
-            guard !loading else { return }
+            // task(id:) 在候选 URL 改变时会取消旧任务；不能用 loading 拦截，
+            // 否则 Tenhow poster 稍晚解析完成时会继续显示先加载到的横版 thumb。
             loading = true
             image = nil
             for candidate in imageURLs {
+                guard !Task.isCancelled else { return }
                 if let img = await ImageLoader.shared.load(candidate) {
+                    guard !Task.isCancelled else { return }
                     image = img
                     break
                 }

@@ -112,10 +112,11 @@ struct MovieDetailView: View {
     private func heroHeader(_ movie: Movie) -> some View {
         ZStack(alignment: .bottomLeading) {
             JavDBImage(
-                // 2021-2024 优先 Tenhow 的日亚商品图，其余年份保持 DMM/MGS 优先。
-                url: tenhowCoverURL ?? movie.hdCoverURL ?? movie.coverURL,
-                fallbackURL: tenhowCoverURL == nil ? (movie.coverURL ?? movie.thumbURL) : movie.hdCoverURL,
-                secondFallbackURL: tenhowCoverURL == nil ? nil : (movie.coverURL ?? movie.thumbURL),
+                // 2021-2026 优先 Tenhow 的无前缀 ASIN 原尺寸竖版 poster。
+                // 官方 ps.jpg 只有 147x200，会被加载器拒绝；最后才回退 JAVDB 横图。
+                url: tenhowCoverURL ?? movie.hdCoverURL,
+                fallbackURL: movie.coverURL,
+                secondFallbackURL: movie.thumbURL,
                 contentMode: .fit
             )
             .frame(maxWidth: .infinity)
