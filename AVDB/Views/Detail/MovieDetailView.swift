@@ -57,15 +57,18 @@ struct MovieDetailView: View {
                 .ignoresSafeArea(edges: .top)
 
                 if let movie = vm.movie {
+                    // ContentView 的悬浮 Tab Bar 在详情页外层，必须为它预留高度，
+                    // 否则 76pt 的评论折叠栏会被约 94pt 的 Tab Bar 完整遮住。
                     DraggableReviewsPanel(
                         movieID: movie.id,
                         total: movie.reviewsCount ?? movie.commentsCount ?? 0,
                         panelHeight: $reviewPanelHeight,
                         vm: reviewsVM,
-                        availableHeight: proxy.size.height
+                        availableHeight: max(300, proxy.size.height - 94)
                     )
                     .frame(width: proxy.size.width)
                     .frame(maxHeight: .infinity, alignment: .bottom)
+                    .offset(y: -94)
                     .zIndex(10)
                 }
             }
