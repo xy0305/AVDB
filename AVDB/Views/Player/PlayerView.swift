@@ -188,9 +188,14 @@ struct KSChromePlayer: View {
         .ignoresSafeArea()
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .background(HiddenVolumeView().frame(width: 0, height: 0))
+        // 保留一个可布局的 MPVolumeView；尺寸为 0 时系统可能不创建 UISlider，
+        // 导致横屏右侧滑动虽然触发，但音量实际不会变化。
+        .background(HiddenVolumeView().frame(width: 2, height: 2).opacity(0.01))
         .onAppear {
             coordinator.isMaskShow = false
+            // 激活播放音频会话，确保右侧手势修改的是当前播放器音量。
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            try? AVAudioSession.sharedInstance().setActive(true)
             wireCoordinator()
             startTicker()
             scheduleHide()
@@ -591,6 +596,10 @@ enum SystemVolume {
     static weak var slider: UISlider?
 
     static func set(_ value: Float) {
-        slider?.value = max(0, min(1, value))
+        let value = max(0, min(1, value))
+        if let slider {
+            slider.setValue(value, animated: false)
+            slider.sendActions(for: .valueChanged)
+        }
     }
 }
