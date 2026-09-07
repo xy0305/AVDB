@@ -1050,7 +1050,6 @@ struct DraggableReviewsPanel: View {
     private var displayedHeight: CGFloat {
         min(maximumHeight, max(collapsedHeight, panelHeight - dragDelta))
     }
-    private var expanded: Bool { displayedHeight > collapsedHeight + 35 }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1073,45 +1072,45 @@ struct DraggableReviewsPanel: View {
             .onTapGesture { snap(to: panelHeight <= collapsedHeight + 10 ? maximumHeight * 0.62 : collapsedHeight) }
             .gesture(panelDrag)
 
-            if expanded {
-                Divider()
-                HStack {
-                    Text("排序方式").font(.headline)
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.up.arrow.down")
-                        Text("热门")
-                    }
-                    .font(.subheadline)
+            // 内容始终保留在视图树中，仅由外层高度裁切。
+            // 这样拖过展开阈值时不会插入大量评论卡片导致跳帧/抖动。
+            Divider()
+            HStack {
+                Text("排序方式").font(.headline)
+                Spacer()
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.up.arrow.down")
+                    Text("热门")
                 }
-                .padding(.horizontal, 22)
-                .frame(height: 70)
-
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        if vm.reviews.isEmpty && !vm.isLoading {
-                            Text("暂无评论")
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 50)
-                        }
-                        ForEach(vm.reviews) { review in
-                            ReviewRow(review: review, movieID: movieID)
-                                .padding(14)
-                                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
-                                .onAppear {
-                                    if review.id == vm.reviews.last?.id {
-                                        Task { await vm.loadMore(movieID: movieID) }
-                                    }
-                                }
-                        }
-                        if vm.isLoading { ProgressView().padding() }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
-                }
-                .background(Color(.systemGroupedBackground))
-                .refreshable { await vm.load(movieID: movieID, force: true) }
+                .font(.subheadline)
             }
+            .padding(.horizontal, 22)
+            .frame(height: 70)
+
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if vm.reviews.isEmpty && !vm.isLoading {
+                        Text("暂无评论")
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 50)
+                    }
+                    ForEach(vm.reviews) { review in
+                        ReviewRow(review: review, movieID: movieID)
+                            .padding(14)
+                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+                            .onAppear {
+                                if review.id == vm.reviews.last?.id {
+                                    Task { await vm.loadMore(movieID: movieID) }
+                                }
+                            }
+                    }
+                    if vm.isLoading { ProgressView().padding() }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
+            }
+            .background(Color(.systemGroupedBackground))
+            .refreshable { await vm.load(movieID: movieID, force: true) }
         }
         .frame(height: displayedHeight, alignment: .top)
         .background(Color(.systemBackground))
@@ -1120,7 +1119,8 @@ struct DraggableReviewsPanel: View {
     }
 
     private var panelDrag: some Gesture {
-        DragGesture(minimumDistance: 2)
+        // 使用全局坐标：面板自身移动时坐标原点不会跟着移动，手势才能持续跟手。
+        DragGesture(minimumDistance: 2, coordinateSpace: .global)
             .updating($dragDelta) { value, state, _ in state = value.translation.height }
             .onEnded { value in
                 let projected = panelHeight - value.predictedEndTranslation.height
