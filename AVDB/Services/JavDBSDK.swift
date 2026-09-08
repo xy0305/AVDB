@@ -447,6 +447,16 @@ public final class JavDBSDK {
 
     // MARK: - 片单 / 标签 / 影评 / 文章
 
+    /// 收藏/取消收藏清单（POST /api/v1/lists/{id}/collect_actions2）
+    public func toggleListCollection(_ id: String, collect: Bool) async throws -> Bool {
+        let resp: JavDBResponse<EmptyData> = try await client.post(
+            "/api/v1/lists/\(id)/collect_actions2",
+            form: ["name": collect ? "collect" : "uncollect"],
+            useToken: true
+        )
+        return resp.isSuccess
+    }
+
     /// 将影片加入/移出片单（POST /api/v1/lists/{id}/movie_actions）。
     public func listMovieAction(_ listID: String, movieID: String, add: Bool) async throws -> Bool {
         let resp: JavDBResponse<EmptyData> = try await client.post(

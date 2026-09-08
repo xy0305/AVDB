@@ -106,9 +106,12 @@ struct LoginView: View {
             } else {
                 // Token 登录
                 var cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
-                // 移除 Bearer 前缀
-                if cleanToken.lowercased().hasPrefix("bearer ") {
-                    cleanToken = String(cleanToken.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+                // 移除各种可能的前缀
+                for prefix in ["AUTHORIZATION=Bearer ", "Bearer ", "AUTHORIZATION="] {
+                    if cleanToken.hasPrefix(prefix) {
+                        cleanToken = String(cleanToken.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                        break
+                    }
                 }
                 JavDBSDK.shared.setToken(cleanToken)
                 // 验证 Token 并获取用户信息

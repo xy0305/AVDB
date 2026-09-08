@@ -85,10 +85,13 @@ struct ListDetailView: View {
     let listID: String
     let title: String
     @StateObject private var vm: MovieListViewModel
+    @State private var isCollected = false
+    @State private var isCollecting = false
 
-    init(listID: String, title: String) {
+    init(listID: String, title: String, isCollected: Bool = false) {
         self.listID = listID
         self.title = title
+        self._isCollected = State(initialValue: isCollected)
         _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
             try await JavDBSDK.shared.moviesByTag(
                 filterBy: "0:l:\(listID):", type: "0", page: page, limit: 21,
@@ -105,9 +108,34 @@ struct ListDetailView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 16) {
+                    Button {
+                        Task { await toggleCollect() }
+                    } label: {
+                        Image(systemName: isCollected ? "heart.fill" : "heart")
+                            .foregroundColor(isCollected ? .red : .primary)
+                    }
+                    .disabled(isCollecting)
+                    MovieSortToolbar(vm: vm)
+                }
+            }
+        }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
+    }
+
+    private func toggleCollect() async {
+        guard !isCollecting else { return }
+        isCollecting = true
+        defer { isCollecting = false }
+        do {
+            let success = try await JavDBSDK.shared.toggleListCollection(listID, collect: !isCollected)
+            if success { isCollected.toggle() }
+        } catch {
+            print("收藏清单失败: \(error)")
+        }
     }
 }
 
