@@ -139,16 +139,133 @@ struct CollectedView: View {
     }
     let kind: Kind
     @StateObject private var vm = CollectedViewModel()
+    @State private var actorType: String = "all"
+    @State private var isEditing = false
+    @State private var selectedActors: Set<String> = []
 
     var body: some View {
-        List {
-            switch kind {
-            case .actor:
-                ForEach(vm.actors) { actor in
-                    NavigationLink(actor.name ?? "") {
-                        ActorDetailView(actorID: actor.id)
+        VStack(spacing: 0) {
+            if kind == .actor {
+                actorTypeTab
+            }
+            content
+        }
+        .navigationTitle("收藏的\(kind.rawValue)")
+        .toolbar {
+            if kind == .actor {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if isEditing {
+                        HStack(spacing: 16) {
+                            Button("取消") {
+                                isEditing = false
+                                selectedActors.removeAll()
+                            }
+                            Button("删除") {
+                                Task { await deleteSelected() }
+                            }
+                            .disabled(selectedActors.isEmpty)
+                        }
+                    } else {
+                        Button("编辑") {
+                            isEditing = true
+                        }
                     }
                 }
+            }
+        }
+        .task { await vm.load(kind, type: actorType) }
+        .onChange(of: actorType) { _, newValue in
+            Task { await vm.load(kind, type: newValue) }
+        }
+    }
+
+    private var actorTypeTab: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 20) {
+                ForEach([("all", "全部"), ("0", "有码"), ("1", "无码"), ("2", "欧美")], id: \.0) { type, title in
+                    Button {
+                        actorType = type
+                    } label: {
+                        VStack(spacing: 4) {
+                            Text(title)
+                                .foregroundColor(actorType == type ? .blue : .primary)
+                            if actorType == type {
+                                Rectangle()
+                                    .fill(Color.blue)
+                                    .frame(height: 2)
+                            } else {
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .frame(height: 2)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+        }
+        .frame(height: 44)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if kind == .actor {
+            actorGrid
+        } else {
+            listView
+        }
+    }
+
+    private var actorGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                ForEach(vm.actors) { actor in
+                    Button {
+                        if isEditing {
+                            if selectedActors.contains(actor.id) {
+                                selectedActors.remove(actor.id)
+                            } else {
+                                selectedActors.insert(actor.id)
+                            }
+                        }
+                    } label: {
+                        NavigationLink {
+                            ActorDetailView(actorID: actor.id)
+                        } label: {
+                            VStack(spacing: 8) {
+                                ZStack(alignment: .topTrailing) {
+                                    JavDBImage(url: actor.avatarURL, contentMode: .fill)
+                                        .frame(width: 110, height: 110)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    if isEditing {
+                                        Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)
+                                            .padding(6)
+                                    }
+                                }
+                                Text(actor.displayName)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                    .foregroundColor(.primary)
+                            }
+                            .frame(width: 110)
+                        }
+                        .disabled(isEditing)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding()
+            if vm.isLoading { ProgressView().padding() }
+            if let err = vm.errorMessage {
+                Text(err).foregroundColor(.red).padding()
+            }
+        }
+    }
+
+    private var listView: some View {
+        List {
+            switch kind {
             case .maker, .director:
                 ForEach(vm.people) { person in
                     NavigationLink(person.name ?? "") { ActorDetailView(actorID: person.id) }
@@ -165,14 +282,24 @@ struct CollectedView: View {
                         MovieDetailView(movieID: movie.id)
                     }
                 }
+            case .actor:
+                EmptyView()
             }
             if vm.isLoading { ProgressView() }
             if let err = vm.errorMessage {
                 Text(err).foregroundColor(.red).padding()
             }
         }
-        .navigationTitle("收藏的\(kind.rawValue)")
-        .task { await vm.load(kind) }
+    }
+
+    private func deleteSelected() async {
+        // TODO: 调用批量取消收藏接口
+        for actorID in selectedActors {
+            _ = try? await JavDBSDK.shared.collectActor(actorID, collect: false)
+        }
+        selectedActors.removeAll()
+        isEditing = false
+        await vm.load(kind, type: actorType)
     }
 }
 
@@ -185,7 +312,7 @@ final class CollectedViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
-    func load(_ kind: CollectedView.Kind) async {
+    func load(_ kind: CollectedView.Kind, type: String = "all") async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -193,7 +320,7 @@ final class CollectedViewModel: ObservableObject {
         do {
             switch kind {
             case .actor:
-                actors = try await sdk.collectedActors(page: 1, limit: 30)
+                actors = try await sdk.collectedActors(page: 1, limit: 200, type: type)
             case .maker:
                 people = try await sdk.collectedMakers(page: 1, limit: 24)
             case .director:

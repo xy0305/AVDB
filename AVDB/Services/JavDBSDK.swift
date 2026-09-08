@@ -658,9 +658,9 @@ public final class JavDBSDK {
     }
 
     /// 收藏的演员/番号/导演/片商/系列/片单（GET /api/v1/users/collected_*）
-    public func collectedActors(page: Int = 1, limit: Int = 30) async throws -> [Actor] {
+    public func collectedActors(page: Int = 1, limit: Int = 30, type: String = "all") async throws -> [Actor] {
         let resp: JavDBResponse<ActorListData> = try await client.get(
-            "/api/v1/users/collected_actors", query: ["type": "all", "page": "\(page)", "limit": "\(limit)"], useToken: true)
+            "/api/v1/users/collected_actors", query: ["type": type, "page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.actors ?? []
     }
     public func collectedCodes(page: Int = 1, limit: Int = 24) async throws -> [Code] {
