@@ -17,6 +17,10 @@ struct MovieDetailView: View {
     @State private var reviewPanelHeight: CGFloat = 76
     @StateObject private var reviewsVM = ReviewsListViewModel()
     @State private var showSearch = false
+    @State private var showLogin = false
+    @State private var isCodeCollected = false
+    @State private var isCollectingCode = false
+    @State private var collectHint: String?
     @Environment(\.dismiss) private var dismiss
 
     init(movieID: String) {
@@ -92,6 +96,15 @@ struct MovieDetailView: View {
                 TrailerPlayerView(url: url, onClose: { showTrailer = false })
             }
         }
+        .sheet(isPresented: $showLogin) { LoginView() }
+        .alert("收藏", isPresented: Binding(
+            get: { collectHint != nil },
+            set: { if !$0 { collectHint = nil } }
+        )) {
+            Button("确定", role: .cancel) { collectHint = nil }
+        } message: {
+            Text(collectHint ?? "")
+        }
     }
 
     private func detailBackground(_ movie: Movie) -> some View {
@@ -149,9 +162,24 @@ struct MovieDetailView: View {
                 }
                 Spacer()
                 Button {
-                    Task { _ = try? await JavDBSDK.shared.codeCollectActions(movie.id) }
+                    guard APIClient.shared.hasToken else {
+                        showLogin = true
+                        return
+                    }
+                    guard !isCollectingCode else { return }
+                    isCollectingCode = true
+                    Task {
+                        defer { isCollectingCode = false }
+                        do {
+                            let ok = try await JavDBSDK.shared.codeCollectActions(movie.id)
+                            if ok { isCodeCollected.toggle() }
+                            else { collectHint = "收藏失败，请稍后再试" }
+                        } catch {
+                            collectHint = error.localizedDescription
+                        }
+                    }
                 } label: {
-                    Image(systemName: "bookmark.square")
+                    Image(systemName: isCodeCollected ? "bookmark.fill" : "bookmark.square")
                         .font(.system(size: 25, weight: .regular))
                         .overlay(alignment: .bottomTrailing) {
                             Image(systemName: "plus")
