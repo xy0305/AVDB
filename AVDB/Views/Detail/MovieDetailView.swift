@@ -110,9 +110,9 @@ struct MovieDetailView: View {
     private func detailBackground(_ movie: Movie) -> some View {
         ZStack {
             JavDBImage(
-                url: movie.hdBackdropURL,
+                url: movie.coverURL,
                 fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
-                secondFallbackURL: movie.coverURL ?? movie.thumbURL,
+                secondFallbackURL: movie.hdBackdropURL,
                 contentMode: .fill
             )
             .scaleEffect(1.35)
@@ -207,10 +207,10 @@ struct MovieDetailView: View {
 
             ZStack(alignment: .bottomTrailing) {
                 JavDBImage(
-                    // 官方横版 pl 无效时优先首张横版剧照，不再显示 NOW 占位图。
-                    url: movie.hdBackdropURL,
+                    // 优先顺序：JAVDB cover_url 无水印 → 首张剧照 → DMM 横版 → Tenhow 竖版
+                    url: movie.coverURL,
                     fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
-                    secondFallbackURL: movie.coverURL ?? movie.thumbURL,
+                    secondFallbackURL: movie.hdBackdropURL,
                     contentMode: .fill
                 )
                 .frame(width: contentWidth, height: contentWidth / 1.47)
