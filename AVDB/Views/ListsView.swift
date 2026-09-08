@@ -87,6 +87,7 @@ struct ListDetailView: View {
     @StateObject private var vm: MovieListViewModel
     @State private var isCollected = false
     @State private var isCollecting = false
+    @State private var showInfo = false
 
     init(listID: String, title: String, isCollected: Bool = false) {
         self.listID = listID
@@ -112,7 +113,7 @@ struct ListDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
                     Button {
-                        // TODO: 显示清单统计信息
+                        showInfo = true
                     } label: {
                         Image(systemName: "eye")
                             .foregroundColor(.primary)
@@ -124,12 +125,17 @@ struct ListDetailView: View {
                             .foregroundColor(isCollected ? .red : .primary)
                     }
                     .disabled(isCollecting)
-                    MovieSortToolbar(vm: vm)
+                    MovieSortToolbar(vm: vm, sortOptions: CatalogSort.listSortOptions)
                 }
             }
         }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
+        .alert("清單信息", isPresented: $showInfo) {
+            Button("確定", role: .cancel) {}
+        } message: {
+            Text("清單 ID: \(listID)\n共 \(vm.movies.count) 部影片")
+        }
     }
 
     private func toggleCollect() async {

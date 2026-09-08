@@ -77,10 +77,11 @@ class MovieListViewModel: ObservableObject {
 
 struct MovieSortToolbar: View {
     @ObservedObject var vm: MovieListViewModel
+    var sortOptions: [CatalogSort]? = nil
 
     var body: some View {
         Menu {
-            ForEach(CatalogSort.allCases) { sort in
+            ForEach(sortOptions ?? CatalogSort.allCases) { sort in
                 Button {
                     Task { await vm.selectSort(sort) }
                 } label: {

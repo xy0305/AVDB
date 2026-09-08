@@ -137,6 +137,11 @@ enum CatalogSort: String, CaseIterable, Identifiable {
     var orderBy: String {
         self == .releaseAsc ? "asc" : "desc"
     }
+
+    /// 清单专用排序选项（存入时间倒序、创建时间倒序、评分倒序）
+    static var listSortOptions: [CatalogSort] {
+        [.updateDesc, .releaseDesc, .score]
+    }
 }
 
 @MainActor
