@@ -61,7 +61,8 @@ struct MovieDetailView: View {
                     // 否则 76pt 的评论折叠栏会被约 94pt 的 Tab Bar 完整遮住。
                     DraggableReviewsPanel(
                         movieID: movie.id,
-                        total: movie.reviewsCount ?? movie.commentsCount ?? 0,
+                        // 服务端将“最新”和“最热”分别统计在两个字段中，标题显示两者之和。
+                        total: (movie.reviewsCount ?? 0) + (movie.commentsCount ?? 0),
                         panelHeight: $reviewPanelHeight,
                         vm: reviewsVM,
                         availableHeight: max(300, proxy.size.height - 94)
@@ -75,6 +76,7 @@ struct MovieDetailView: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .toolbar(.hidden, for: .navigationBar)
+        .nativeSwipeBackEnabled()
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task {
             await vm.load()
@@ -373,27 +375,35 @@ struct MovieDetailView: View {
     private func actorsSection(_ actors: [Actor]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("演员").font(.headline)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(actors) { actor in
-                        NavigationLink {
-                            ActorDetailView(actorID: actor.id)
-                        } label: {
-                            VStack(spacing: 4) {
-                                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
-                                    .frame(width: 70, height: 70)
-                                    .clipShape(Circle())
-                                Text(actor.name ?? "")
-                                    .font(.caption2)
-                                    .lineLimit(1)
-                                    .frame(width: 70)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
                 .padding(.horizontal)
+
+            // 静态自适应网格，避免横向 ScrollView 让头像被手指拖动。
+            // 演员较多时自动换行，点击进入详情的行为保持不变。
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 70, maximum: 82), spacing: 12)],
+                alignment: .leading,
+                spacing: 12
+            ) {
+                ForEach(actors) { actor in
+                    NavigationLink {
+                        ActorDetailView(actorID: actor.id)
+                    } label: {
+                        VStack(spacing: 4) {
+                            JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                                .frame(width: 70, height: 70)
+                                .clipShape(Circle())
+                                .allowsHitTesting(false)
+                            Text(actor.name ?? "")
+                                .font(.caption2)
+                                .lineLimit(1)
+                                .frame(width: 70)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
+            .padding(.horizontal)
         }
     }
 
