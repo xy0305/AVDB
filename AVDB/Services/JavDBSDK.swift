@@ -607,6 +607,11 @@ public final class JavDBSDK {
         return user
     }
 
+    /// 设置 Token（用于 Token 登录）
+    public func setToken(_ token: String) {
+        client.setToken(token)
+    }
+
     /// 登出
     public func logout() {
         client.setToken(nil)

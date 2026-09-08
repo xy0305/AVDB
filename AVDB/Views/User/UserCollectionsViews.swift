@@ -69,14 +69,22 @@ struct CollectedListsView: View {
     @StateObject private var vm = CollectedListsViewModel()
     var body: some View {
         List {
-            ForEach(vm.lists) { list in
-                NavigationLink { ListDetailView(listID: list.id, title: list.displayName) } label: {
-                    Label(list.displayName, systemImage: "bookmark")
+            if vm.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
                 }
-            }
-            if vm.isLoading { ProgressView() }
-            if let err = vm.errorMessage {
+            } else if let err = vm.errorMessage {
                 Text(err).foregroundColor(.red).padding()
+            } else if vm.lists.isEmpty {
+                Text("暂无收藏的清单").foregroundColor(.secondary).padding()
+            } else {
+                ForEach(vm.lists) { list in
+                    NavigationLink { ListDetailView(listID: list.id, title: list.displayName) } label: {
+                        Label(list.displayName, systemImage: "bookmark")
+                    }
+                }
             }
         }
         .navigationTitle("收藏的清單")
