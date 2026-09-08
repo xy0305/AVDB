@@ -167,6 +167,9 @@ struct CollectedView: View {
                 }
             }
             if vm.isLoading { ProgressView() }
+            if let err = vm.errorMessage {
+                Text(err).foregroundColor(.red).padding()
+            }
         }
         .navigationTitle("收藏的\(kind.rawValue)")
         .task { await vm.load(kind) }
@@ -180,22 +183,28 @@ final class CollectedViewModel: ObservableObject {
     @Published var codes: [Code] = []
     @Published var series: [Movie] = []
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     func load(_ kind: CollectedView.Kind) async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         let sdk = JavDBSDK.shared
-        switch kind {
-        case .actor:
-            actors = (try? await sdk.collectedActors(page: 1, limit: 30)) ?? []
-        case .maker:
-            people = (try? await sdk.collectedMakers(page: 1, limit: 24)) ?? []
-        case .director:
-            people = (try? await sdk.collectedDirectors(page: 1, limit: 24)) ?? []
-        case .code:
-            codes = (try? await sdk.collectedCodes(page: 1, limit: 24)) ?? []
-        case .series:
-            series = (try? await sdk.collectedSeries(page: 1, limit: 24)) ?? []
+        do {
+            switch kind {
+            case .actor:
+                actors = try await sdk.collectedActors(page: 1, limit: 30)
+            case .maker:
+                people = try await sdk.collectedMakers(page: 1, limit: 24)
+            case .director:
+                people = try await sdk.collectedDirectors(page: 1, limit: 24)
+            case .code:
+                codes = try await sdk.collectedCodes(page: 1, limit: 24)
+            case .series:
+                series = try await sdk.collectedSeries(page: 1, limit: 24)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

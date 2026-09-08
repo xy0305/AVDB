@@ -46,12 +46,23 @@ struct MyListsView: View {
         }
         .navigationTitle(movieID == nil ? "我的清單" : "存入清單")
         .task { await vm.load() }
-        .alert("清單", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) { Button("確定", role: .cancel) {} } message: { Text(message ?? "") }
+        .alert("提示", isPresented: Binding(get: { message != nil || vm.errorMessage != nil }, set: { if !$0 { message = nil; vm.errorMessage = nil } })) {
+            Button("確定", role: .cancel) {}
+        } message: {
+            Text(message ?? vm.errorMessage ?? "")
+        }
     }
 }
 @MainActor final class MyListsViewModel: ObservableObject {
     @Published var lists: [MovieList] = []
-    func load() async { lists = (try? await JavDBSDK.shared.lists(page: 1, limit: 24)) ?? [] }
+    @Published var errorMessage: String?
+    func load() async {
+        do {
+            lists = try await JavDBSDK.shared.lists(page: 1, limit: 24)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
 struct CollectedListsView: View {
@@ -69,8 +80,13 @@ struct CollectedListsView: View {
 
 @MainActor final class CollectedListsViewModel: ObservableObject {
     @Published var lists: [MovieList] = []
+    @Published var errorMessage: String?
     func load() async {
-        lists = (try? await JavDBSDK.shared.collectedLists(page: 1, limit: 24)) ?? []
+        do {
+            lists = try await JavDBSDK.shared.collectedLists(page: 1, limit: 24)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
