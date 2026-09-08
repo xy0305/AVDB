@@ -112,6 +112,12 @@ struct ListDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
                     Button {
+                        // TODO: 显示清单统计信息
+                    } label: {
+                        Image(systemName: "eye")
+                            .foregroundColor(.primary)
+                    }
+                    Button {
                         Task { await toggleCollect() }
                     } label: {
                         Image(systemName: isCollected ? "heart.fill" : "heart")

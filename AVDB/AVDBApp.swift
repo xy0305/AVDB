@@ -36,7 +36,22 @@ final class AppState: ObservableObject {
     @Published var currentUser: User?
 
     init() {
-        isLoggedIn = APIClient.shared.hasToken
-        currentUser = APIClient.shared.currentUser
+        // 检查本地是否有保存的 Token
+        if APIClient.shared.hasToken {
+            isLoggedIn = true
+            // 异步验证 Token 并拉取用户信息
+            Task {
+                do {
+                    let user = try await JavDBSDK.shared.userInfo()
+                    self.currentUser = user
+                    self.isLoggedIn = true
+                } catch {
+                    // Token 无效或过期，清除登录状态
+                    JavDBSDK.shared.logout()
+                    self.isLoggedIn = false
+                    self.currentUser = nil
+                }
+            }
+        }
     }
 }
