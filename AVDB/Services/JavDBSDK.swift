@@ -447,13 +447,25 @@ public final class JavDBSDK {
 
     // MARK: - 片单 / 标签 / 影评 / 文章
 
-    /// 收藏/取消收藏清单（POST /api/v1/lists/{id}/collect_actions2）
+    /// 收藏/取消收藏清单（POST /api/v1/lists/{id}/collect_actions2 或 /collect_actions）
     public func toggleListCollection(_ id: String, collect: Bool) async throws -> Bool {
-        let resp: JavDBResponse<EmptyData> = try await client.post(
-            "/api/v1/lists/\(id)/collect_actions2",
-            form: ["name": collect ? "collect" : "uncollect"],
-            useToken: true
-        )
+        // 先尝试 collect_actions2（官方字符串里出现的版本）
+        let form = ["name": collect ? "collect" : "uncollect"]
+        var resp: JavDBResponse<EmptyData>
+        do {
+            resp = try await client.post(
+                "/api/v1/lists/\(id)/collect_actions2",
+                form: form,
+                useToken: true
+            )
+        } catch {
+            // 如果失败，尝试不带 2 的版本
+            resp = try await client.post(
+                "/api/v1/lists/\(id)/collect_actions",
+                form: form,
+                useToken: true
+            )
+        }
         return resp.isSuccess
     }
 
