@@ -328,6 +328,21 @@ public final class JavDBSDK {
         return true
     }
 
+    /// 关注/取消关注演员（POST /api/v1/actors/{id}/collect_actions）
+    /// 官方 App 使用 name=follow / unfollow；收藏使用 collect / uncollect。
+    @discardableResult
+    public func followActor(_ id: String, follow: Bool) async throws -> Bool {
+        let resp: JavDBResponse<EmptyData> = try await client.post(
+            "/api/v1/actors/\(id)/collect_actions",
+            form: ["name": follow ? "follow" : "unfollow"],
+            useToken: true
+        )
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return true
+    }
+
     /// 演员推荐（GET /api/v1/actors/recommend）
     public func recommendActors() async throws -> ActorRecommendData {
         let resp: JavDBResponse<ActorRecommendData> = try await client.get("/api/v1/actors/recommend")

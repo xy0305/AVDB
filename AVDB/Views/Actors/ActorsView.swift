@@ -274,22 +274,24 @@ struct ActorDetailView: View {
                             if let twitter = actor.twitterID, !twitter.isEmpty {
                                 info("@" + twitter)
                             }
-                            Button {
-                                if appState.isLoggedIn {
-                                    Task { await vm.toggleCollect() }
-                                } else {
-                                    showLogin = true
+                            HStack(spacing: 18) {
+                                actorActionButton(
+                                    icon: vm.hasFollowed ? "eye.fill" : "eye",
+                                    title: vm.hasFollowed ? "已关注" : "关注",
+                                    active: vm.hasFollowed
+                                ) {
+                                    if appState.isLoggedIn { Task { await vm.toggleFollow() } }
+                                    else { showLogin = true }
                                 }
-                            } label: {
-                                Text(vm.hasCollected ? "已关注" : "关注")
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(vm.hasCollected ? Color(.systemGray5) : Color.accentColor)
-                                    .foregroundColor(vm.hasCollected ? .primary : .white)
-                                    .clipShape(Capsule())
+                                actorActionButton(
+                                    icon: vm.hasCollected ? "heart.fill" : "heart",
+                                    title: vm.hasCollected ? "已收藏" : "收藏",
+                                    active: vm.hasCollected
+                                ) {
+                                    if appState.isLoggedIn { Task { await vm.toggleCollect() } }
+                                    else { showLogin = true }
+                                }
                             }
-                            .buttonStyle(.plain)
                             .disabled(vm.isCollecting)
                             if let hint = vm.collectHint {
                                 Text(hint)
@@ -355,6 +357,17 @@ struct ActorDetailView: View {
         }
     }
 
+    private func actorActionButton(icon: String, title: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 18, weight: .medium))
+                Text(title).font(.caption)
+            }
+            .foregroundStyle(active ? Color.accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func primaryFilterChip(_ title: String, id: String) -> some View {
         Button {
             Task { await vm.selectFilter(id) }
@@ -403,6 +416,7 @@ final class ActorDetailViewModel: ObservableObject {
     // 不能拼进 filter_by 的演员筛选段。
     @Published var filterByTags = ""
     @Published var hasCollected = false
+    @Published var hasFollowed = false
     @Published var isCollecting = false
     @Published var collectHint: String?
     let actorID: String
@@ -424,6 +438,7 @@ final class ActorDetailViewModel: ObservableObject {
             filterTags = payload.filterTags ?? []
             tags = payload.tags ?? []
             hasCollected = payload.hasCollected ?? false
+            hasFollowed = UserDefaults.standard.bool(forKey: "avdb.followed.actor.\(actorID)")
         }
         page = 1
         hasMore = true
@@ -455,6 +470,21 @@ final class ActorDetailViewModel: ObservableObject {
         guard hasMore, !isLoadingMovies else { return }
         page += 1
         await fetchMovies()
+    }
+
+    func toggleFollow() async {
+        guard !isCollecting else { return }
+        isCollecting = true
+        collectHint = nil
+        defer { isCollecting = false }
+        let next = !hasFollowed
+        do {
+            _ = try await JavDBSDK.shared.followActor(actorID, follow: next)
+            hasFollowed = next
+            UserDefaults.standard.set(next, forKey: "avdb.followed.actor.\(actorID)")
+        } catch {
+            collectHint = error.localizedDescription
+        }
     }
 
     func toggleCollect() async {
