@@ -447,6 +447,16 @@ public final class JavDBSDK {
 
     // MARK: - 片单 / 标签 / 影评 / 文章
 
+    /// 将影片加入/移出片单（POST /api/v1/lists/{id}/movie_actions）。
+    public func listMovieAction(_ listID: String, movieID: String, add: Bool) async throws -> Bool {
+        let resp: JavDBResponse<EmptyData> = try await client.post(
+            "/api/v1/lists/\(listID)/movie_actions",
+            form: ["movie_id": movieID, "action": add ? "add" : "remove"],
+            useToken: true
+        )
+        return resp.isSuccess
+    }
+
     /// 片单列表（GET /api/v1/lists）
     public func lists(page: Int = 1) async throws -> [MovieList] {
         struct ListData: Decodable { let lists: [MovieList]? }

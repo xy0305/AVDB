@@ -35,19 +35,24 @@ struct UserView: View {
                         .padding(.vertical, 4)
                     }
 
+                    Section("我的") {
+                        NavigationLink { LocalMovieListView(title: "我想看的", ids: WantWatchStore.ids) } label: {
+                            Label("我想看的", systemImage: "heart")
+                        }
+                        NavigationLink { LocalMovieListView(title: "我看过的", ids: Array(WatchedStore.ids)) } label: {
+                            Label("我看过的", systemImage: "heart.fill")
+                        }
+                        NavigationLink { MyListsView() } label: {
+                            Label("我的清单", systemImage: "bookmark.fill")
+                        }
+                    }
+
                     Section("我的收藏") {
-                        NavigationLink("收藏的演员") {
-                            CollectedView(kind: .actor)
-                        }
-                        NavigationLink("收藏的番号") {
-                            CollectedView(kind: .code)
-                        }
-                        NavigationLink("收藏的系列") {
-                            CollectedView(kind: .series)
-                        }
-                        NavigationLink("最近浏览") {
-                            RecentViewedView()
-                        }
+                        NavigationLink("我的关注 · 演员") { CollectedView(kind: .actor) }
+                        NavigationLink("我的收藏 · 番号") { CollectedView(kind: .code) }
+                        NavigationLink("我的收藏 · 系列") { CollectedView(kind: .series) }
+                        NavigationLink("我的收藏 · 清单") { CollectedListsView() }
+                        NavigationLink("最近浏览") { RecentViewedView() }
                     }
 
                     Section("会员") {

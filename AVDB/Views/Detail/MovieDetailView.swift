@@ -243,6 +243,29 @@ struct MovieDetailView: View {
             }
 
             movieInfoCard(movie)
+
+            HStack(spacing: 10) {
+                Button {
+                    WantWatchStore.set(movie.id, on: !WantWatchStore.contains(movie.id))
+                } label: {
+                    Label(WantWatchStore.contains(movie.id) ? "已想看" : "想看", systemImage: WantWatchStore.contains(movie.id) ? "heart.fill" : "heart")
+                }
+                .buttonStyle(.borderedProminent)
+                Button {
+                    WatchedStore.mark(movie.id)
+                } label: {
+                    Label("看过", systemImage: "checkmark.circle")
+                }
+                .buttonStyle(.borderedProminent)
+                NavigationLink {
+                    MyListsView(movieID: movie.id)
+                } label: {
+                    Label("存入清单", systemImage: "bookmark")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .font(.caption)
+            .padding(.bottom, 4)
         }
         .frame(width: contentWidth, alignment: .leading)
         .padding(.horizontal, 20)
