@@ -55,7 +55,23 @@ struct MyListsView: View {
 }
 
 struct CollectedListsView: View {
-    var body: some View { MyListsView().navigationTitle("我的收藏清單") }
+    @StateObject private var vm = CollectedListsViewModel()
+    var body: some View {
+        List(vm.lists) { list in
+            NavigationLink { ListDetailView(listID: list.id, title: list.displayName) } label: {
+                Label(list.displayName, systemImage: "bookmark")
+            }
+        }
+        .navigationTitle("收藏的清單")
+        .task { await vm.load() }
+    }
+}
+
+@MainActor final class CollectedListsViewModel: ObservableObject {
+    @Published var lists: [MovieList] = []
+    func load() async {
+        lists = (try? await JavDBSDK.shared.collectedLists(page: 1, limit: 24)) ?? []
+    }
 }
 
 enum WantWatchStore {
