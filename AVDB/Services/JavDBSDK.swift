@@ -447,6 +447,34 @@ public final class JavDBSDK {
 
     // MARK: - 片单 / 标签 / 影评 / 文章
 
+    /// 关注/取消关注标签（POST/DELETE /api/v1/following_tags 或 /api/v1/following_tags/{id}）
+    public func followTag(name: String, value: String) async throws -> Bool {
+        let resp: JavDBResponse<EmptyData> = try await client.post(
+            "/api/v1/following_tags",
+            form: ["name": name, "value": value],
+            useToken: true
+        )
+        return resp.isSuccess
+    }
+
+    public func unfollowTag(_ tagID: Int) async throws -> Bool {
+        // DELETE 需要用 POST 模拟，官方可能用 batch_destroy
+        let resp: JavDBResponse<EmptyData> = try await client.post(
+            "/api/v1/following_tags/\(tagID)",
+            form: [:],
+            useToken: true
+        )
+        return resp.isSuccess
+    }
+
+    /// 获取关注的标签列表（GET /api/v1/following_tags）
+    public func followingTags() async throws -> [FollowingTag] {
+        struct TagData: Decodable { let tags: [FollowingTag]? }
+        let resp: JavDBResponse<TagData> = try await client.get(
+            "/api/v1/following_tags", useToken: true)
+        return resp.data?.tags ?? []
+    }
+
     /// 收藏/取消收藏清单（POST /api/v1/lists/{id}/collect_actions2 或 /collect_actions）
     public func toggleListCollection(_ id: String, collect: Bool) async throws -> Bool {
         // 先尝试 collect_actions2（官方字符串里出现的版本）

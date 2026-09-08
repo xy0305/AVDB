@@ -119,6 +119,14 @@ public struct Wallet: Codable {
     }
 }
 
+/// 关注的标签
+public struct FollowingTag: Codable, Identifiable {
+    public let id: Int
+    public let name: String?
+    public let value: String?
+    public let priority: Double?
+}
+
 /// 磁力列表（字符串字段版本，兼容列表返回）
 public struct MagnetField: Codable {
     public let key: String?

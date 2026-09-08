@@ -87,7 +87,8 @@ struct ListDetailView: View {
     @StateObject private var vm: MovieListViewModel
     @State private var isCollected = false
     @State private var isCollecting = false
-    @State private var showInfo = false
+    @State private var isFollowing = false
+    @State private var isFollowingOp = false
 
     init(listID: String, title: String, isCollected: Bool = false) {
         self.listID = listID
@@ -113,11 +114,12 @@ struct ListDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
                     Button {
-                        showInfo = true
+                        Task { await toggleFollow() }
                     } label: {
-                        Image(systemName: "eye")
-                            .foregroundColor(.primary)
+                        Image(systemName: isFollowing ? "eye.fill" : "eye")
+                            .foregroundColor(isFollowing ? .blue : .primary)
                     }
+                    .disabled(isFollowingOp)
                     Button {
                         Task { await toggleCollect() }
                     } label: {
@@ -131,10 +133,22 @@ struct ListDetailView: View {
         }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
-        .alert("清單信息", isPresented: $showInfo) {
-            Button("確定", role: .cancel) {}
-        } message: {
-            Text("清單 ID: \(listID)\n共 \(vm.movies.count) 部影片")
+    }
+
+    private func toggleFollow() async {
+        guard !isFollowingOp else { return }
+        isFollowingOp = true
+        defer { isFollowingOp = false }
+        do {
+            if isFollowing {
+                // TODO: 取消关注需要先查询 tag id
+                print("取消关注功能待实现")
+            } else {
+                let success = try await JavDBSDK.shared.followTag(name: "list", value: listID)
+                if success { isFollowing = true }
+            }
+        } catch {
+            print("关注清单失败: \(error)")
         }
     }
 
