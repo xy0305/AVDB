@@ -463,16 +463,9 @@ final class ActorDetailViewModel: ObservableObject {
         collectHint = nil
         defer { isCollecting = false }
         let next = !hasCollected
-        let officialName = actor.name ?? actor.otherName ?? actor.displayName
         do {
-            let ok = try await JavDBSDK.shared.collectActor(
-                actorID, name: officialName, collect: next
-            )
-            if ok {
-                hasCollected = next
-            } else {
-                collectHint = "关注失败，请稍后再试"
-            }
+            _ = try await JavDBSDK.shared.collectActor(actorID, collect: next)
+            hasCollected = next
         } catch {
             collectHint = error.localizedDescription
         }

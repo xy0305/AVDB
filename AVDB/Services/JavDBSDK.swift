@@ -313,16 +313,19 @@ public final class JavDBSDK {
         )
     }
 
-    /// 订阅/取消订阅演员（POST /api/v1/actors/{id}/collect_actions）
-    /// form: name=<演员名> collect=1|0，需 token。
+    /// 关注/取消关注演员（POST /api/v1/actors/{id}/collect_actions）
+    /// 官方 App 的 name 是动作名：collect / uncollect，不是演员姓名。
     @discardableResult
-    public func collectActor(_ id: String, name: String, collect: Bool) async throws -> Bool {
+    public func collectActor(_ id: String, collect: Bool) async throws -> Bool {
         let resp: JavDBResponse<EmptyData> = try await client.post(
             "/api/v1/actors/\(id)/collect_actions",
-            form: ["name": name, "collect": collect ? "1" : "0"],
+            form: ["name": collect ? "collect" : "uncollect"],
             useToken: true
         )
-        return resp.isSuccess
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return true
     }
 
     /// 演员推荐（GET /api/v1/actors/recommend）

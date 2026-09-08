@@ -65,8 +65,8 @@ struct MovieDetailView: View {
                     // 否则 76pt 的评论折叠栏会被约 94pt 的 Tab Bar 完整遮住。
                     DraggableReviewsPanel(
                         movieID: movie.id,
-                        // 服务端将“最新”和“最热”分别统计在两个字段中，标题显示两者之和。
-                        total: (movie.reviewsCount ?? 0) + (movie.commentsCount ?? 0),
+                        // 官方 App 的“短评”数量对应 comments_count；reviews_count 是评分人数。
+                        total: movie.commentsCount ?? 0,
                         panelHeight: $reviewPanelHeight,
                         vm: reviewsVM,
                         availableHeight: max(300, proxy.size.height - 94)
