@@ -47,11 +47,11 @@ struct UserView: View {
                         }
                     }
 
+                    Section("我的关注") {
+                        NavigationLink("我的关注") { CollectedView(kind: .actor) }
+                    }
                     Section("我的收藏") {
-                        NavigationLink("我的关注 · 演员") { CollectedView(kind: .actor) }
-                        NavigationLink("我的收藏 · 番号") { CollectedView(kind: .code) }
-                        NavigationLink("我的收藏 · 系列") { CollectedView(kind: .series) }
-                        NavigationLink("我的收藏 · 清单") { CollectedListsView() }
+                        NavigationLink("我的收藏") { FavoritesHubView() }
                         NavigationLink("最近浏览") { RecentViewedView() }
                     }
 
@@ -115,11 +115,27 @@ struct UserView: View {
 }
 
 /// 收藏视图
+struct FavoritesHubView: View {
+    var body: some View {
+        List {
+            NavigationLink("收藏的演员") { CollectedView(kind: .actor) }
+            NavigationLink("收藏的片商") { CollectedView(kind: .maker) }
+            NavigationLink("收藏的系列") { CollectedView(kind: .series) }
+            NavigationLink("收藏的导演") { CollectedView(kind: .director) }
+            NavigationLink("收藏的番号") { CollectedView(kind: .code) }
+            NavigationLink("收藏的清单") { CollectedListsView() }
+        }
+        .navigationTitle("我的收藏")
+    }
+}
+
 struct CollectedView: View {
     enum Kind: String {
         case actor = "演员"
-        case code = "番号"
+        case maker = "片商"
         case series = "系列"
+        case director = "导演"
+        case code = "番号"
     }
     let kind: Kind
     @StateObject private var vm = CollectedViewModel()
@@ -133,9 +149,15 @@ struct CollectedView: View {
                         ActorDetailView(actorID: actor.id)
                     }
                 }
+            case .maker, .director:
+                ForEach(vm.people) { person in
+                    NavigationLink(person.name ?? "") { ActorDetailView(actorID: person.id) }
+                }
             case .code:
                 ForEach(vm.codes) { code in
-                    Text(code.number ?? code.title ?? "")
+                    if let id = code.id {
+                        NavigationLink(code.number ?? code.title ?? "") { MovieDetailView(movieID: id) }
+                    } else { Text(code.number ?? code.title ?? "") }
                 }
             case .series:
                 ForEach(vm.series) { movie in
@@ -154,6 +176,7 @@ struct CollectedView: View {
 @MainActor
 final class CollectedViewModel: ObservableObject {
     @Published var actors: [Actor] = []
+    @Published var people: [Actor] = []
     @Published var codes: [Code] = []
     @Published var series: [Movie] = []
     @Published var isLoading = false
@@ -164,11 +187,15 @@ final class CollectedViewModel: ObservableObject {
         let sdk = JavDBSDK.shared
         switch kind {
         case .actor:
-            actors = (try? await sdk.collectedActors()) ?? []
+            actors = (try? await sdk.collectedActors(page: 1, limit: 30)) ?? []
+        case .maker:
+            people = (try? await sdk.collectedMakers(page: 1, limit: 24)) ?? []
+        case .director:
+            people = (try? await sdk.collectedDirectors(page: 1, limit: 24)) ?? []
         case .code:
-            codes = (try? await sdk.collectedCodes()) ?? []
+            codes = (try? await sdk.collectedCodes(page: 1, limit: 24)) ?? []
         case .series:
-            series = (try? await sdk.collectedSeries()) ?? []
+            series = (try? await sdk.collectedSeries(page: 1, limit: 24)) ?? []
         }
     }
 }

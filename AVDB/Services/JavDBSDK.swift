@@ -458,9 +458,9 @@ public final class JavDBSDK {
     }
 
     /// 片单列表（GET /api/v1/lists）
-    public func lists(page: Int = 1) async throws -> [MovieList] {
+    public func lists(page: Int = 1, limit: Int = 24) async throws -> [MovieList] {
         struct ListData: Decodable { let lists: [MovieList]? }
-        let resp: JavDBResponse<ListData> = try await client.get("/api/v1/lists", query: ["page": "\(page)"])
+        let resp: JavDBResponse<ListData> = try await client.get("/api/v1/lists", query: ["sort_by": "create", "page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.lists ?? []
     }
 
@@ -631,36 +631,36 @@ public final class JavDBSDK {
     }
 
     /// 收藏的演员/番号/导演/片商/系列/片单（GET /api/v1/users/collected_*）
-    public func collectedActors() async throws -> [Actor] {
+    public func collectedActors(page: Int = 1, limit: Int = 30) async throws -> [Actor] {
         let resp: JavDBResponse<ActorListData> = try await client.get(
-            "/api/v1/users/collected_actors", useToken: true)
+            "/api/v1/users/collected_actors", query: ["type": "all", "page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.actors ?? []
     }
-    public func collectedCodes() async throws -> [Code] {
+    public func collectedCodes(page: Int = 1, limit: Int = 24) async throws -> [Code] {
         struct CodeData: Decodable { let codes: [Code]? }
         let resp: JavDBResponse<CodeData> = try await client.get(
-            "/api/v1/users/collected_codes", useToken: true)
+            "/api/v1/users/collected_codes", query: ["page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.codes ?? []
     }
-    public func collectedDirectors() async throws -> [Actor] {
+    public func collectedDirectors(page: Int = 1, limit: Int = 24) async throws -> [Actor] {
         let resp: JavDBResponse<ActorListData> = try await client.get(
-            "/api/v1/users/collected_directors", useToken: true)
+            "/api/v1/users/collected_directors", query: ["page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.actors ?? []
     }
-    public func collectedMakers() async throws -> [Actor] {
+    public func collectedMakers(page: Int = 1, limit: Int = 24) async throws -> [Actor] {
         let resp: JavDBResponse<ActorListData> = try await client.get(
-            "/api/v1/users/collected_makers", useToken: true)
+            "/api/v1/users/collected_makers", query: ["page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.actors ?? []
     }
-    public func collectedSeries() async throws -> [Movie] {
+    public func collectedSeries(page: Int = 1, limit: Int = 24) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v1/users/collected_series", useToken: true)
+            "/api/v1/users/collected_series", query: ["page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.movies ?? []
     }
-    public func collectedLists() async throws -> [MovieList] {
+    public func collectedLists(page: Int = 1, limit: Int = 24) async throws -> [MovieList] {
         struct ListData: Decodable { let lists: [MovieList]? }
         let resp: JavDBResponse<ListData> = try await client.get(
-            "/api/v1/users/collected_lists", useToken: true)
+            "/api/v1/users/collected_lists", query: ["sort_by": "create", "page": "\(page)", "limit": "\(limit)"], useToken: true)
         return resp.data?.lists ?? []
     }
 

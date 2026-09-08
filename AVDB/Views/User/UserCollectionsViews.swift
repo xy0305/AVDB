@@ -51,7 +51,7 @@ struct MyListsView: View {
 }
 @MainActor final class MyListsViewModel: ObservableObject {
     @Published var lists: [MovieList] = []
-    func load() async { lists = (try? await JavDBSDK.shared.collectedLists()) ?? [] }
+    func load() async { lists = (try? await JavDBSDK.shared.lists(page: 1, limit: 24)) ?? [] }
 }
 
 struct CollectedListsView: View {
