@@ -68,9 +68,15 @@ struct MyListsView: View {
 struct CollectedListsView: View {
     @StateObject private var vm = CollectedListsViewModel()
     var body: some View {
-        List(vm.lists) { list in
-            NavigationLink { ListDetailView(listID: list.id, title: list.displayName) } label: {
-                Label(list.displayName, systemImage: "bookmark")
+        List {
+            ForEach(vm.lists) { list in
+                NavigationLink { ListDetailView(listID: list.id, title: list.displayName) } label: {
+                    Label(list.displayName, systemImage: "bookmark")
+                }
+            }
+            if vm.isLoading { ProgressView() }
+            if let err = vm.errorMessage {
+                Text(err).foregroundColor(.red).padding()
             }
         }
         .navigationTitle("收藏的清單")
@@ -81,7 +87,11 @@ struct CollectedListsView: View {
 @MainActor final class CollectedListsViewModel: ObservableObject {
     @Published var lists: [MovieList] = []
     @Published var errorMessage: String?
+    @Published var isLoading = false
     func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
         do {
             lists = try await JavDBSDK.shared.collectedLists(page: 1, limit: 24)
         } catch {
