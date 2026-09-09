@@ -17,10 +17,6 @@ struct MovieDetailView: View {
     @State private var reviewPanelHeight: CGFloat = 76
     @StateObject private var reviewsVM = ReviewsListViewModel()
     @State private var showSearch = false
-    @State private var showLogin = false
-    @State private var isCodeCollected = false
-    @State private var isCollectingCode = false
-    @State private var collectHint: String?
     @Environment(\.dismiss) private var dismiss
 
     init(movieID: String) {
@@ -95,15 +91,6 @@ struct MovieDetailView: View {
                 TrailerPlayerView(url: url, onClose: { showTrailer = false })
             }
         }
-        .sheet(isPresented: $showLogin) { LoginView() }
-        .alert("收藏", isPresented: Binding(
-            get: { collectHint != nil },
-            set: { if !$0 { collectHint = nil } }
-        )) {
-            Button("确定", role: .cancel) { collectHint = nil }
-        } message: {
-            Text(collectHint ?? "")
-        }
     }
 
     private func detailBackground(_ movie: Movie) -> some View {
@@ -167,37 +154,6 @@ struct MovieDetailView: View {
                             .liquidGlassCircle()
                     }
                     Spacer()
-                    Button {
-                        guard APIClient.shared.hasToken else {
-                            showLogin = true
-                            return
-                        }
-                        guard !isCollectingCode else { return }
-                        isCollectingCode = true
-                        Task {
-                            defer { isCollectingCode = false }
-                            do {
-                                let ok = try await JavDBSDK.shared.codeCollectActions(movie.id)
-                                if ok { isCodeCollected.toggle() }
-                                else { collectHint = "收藏失败，请稍后再试" }
-                            } catch {
-                                collectHint = error.localizedDescription
-                            }
-                        }
-                    } label: {
-                        Image(systemName: isCodeCollected ? "bookmark.fill" : "bookmark.square")
-                            .font(.system(size: 25, weight: .regular))
-                            .foregroundStyle(.white)
-                            .overlay(alignment: .bottomTrailing) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(2).background(.white, in: Circle())
-                                    .foregroundStyle(Color(red: 0.45, green: 0.18, blue: 0.19))
-                                    .offset(x: 4, y: 4)
-                            }
-                            .frame(width: 46, height: 46)
-                            .liquidGlassCircle()
-                    }
                     Button { showSearch = true } label: {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 28, weight: .regular))
@@ -1141,7 +1097,7 @@ struct FlowTags: View {
     }
 }
 
-/// 详情页内部的连续拖动评论面板 - 使用原生手势优化
+/// 评论面板：把手拖动改高度，列表用系统 ScrollView，互不抢手势。
 struct DraggableReviewsPanel: View {
     let movieID: String
     let total: Int
@@ -1151,16 +1107,18 @@ struct DraggableReviewsPanel: View {
 
     private let collapsedHeight: CGFloat = 76
     private var maximumHeight: CGFloat { max(300, availableHeight - 8) }
-    
-    // 面板状态：折叠、半展开、全展开
+    private var mediumHeight: CGFloat { collapsedHeight + (maximumHeight - collapsedHeight) * 0.55 }
+
     @State private var panelState: PanelState = .collapsed
+    @State private var dragStartHeight: CGFloat?
+
     enum PanelState {
         case collapsed, medium, expanded
-        
-        func height(collapsed: CGFloat, max: CGFloat) -> CGFloat {
+
+        func height(collapsed: CGFloat, medium: CGFloat, max: CGFloat) -> CGFloat {
             switch self {
             case .collapsed: return collapsed
-            case .medium: return max * 0.6
+            case .medium: return medium
             case .expanded: return max
             }
         }
@@ -1168,99 +1126,65 @@ struct DraggableReviewsPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部把手和标题栏（固定高度）
             headerSection
                 .frame(height: collapsedHeight)
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
-                        panelState = panelState == .collapsed ? .medium : .collapsed
-                        panelHeight = panelState.height(collapsed: collapsedHeight, max: maximumHeight)
-                    }
-                }
+                .gesture(handleDrag)
+                .onTapGesture { toggleFromHeader() }
 
-            // 排序和内容区（可滚动）
             if panelState != .collapsed {
                 sortSection
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                
-                // 使用独立的 ScrollView 避免嵌套冲突
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        if vm.reviews.isEmpty && !vm.isLoading {
-                            Text("暂无评论")
-                                .foregroundStyle(.secondary)
-                                .padding(.vertical, 50)
-                        }
-                        ForEach(vm.reviews) { review in
-                            ReviewRow(review: review, movieID: movieID)
-                                .padding(14)
-                                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .onAppear {
-                                    if review.id == vm.reviews.last?.id {
-                                        Task { await vm.loadMore(movieID: movieID) }
-                                    }
-                                }
-                        }
-                        if vm.isLoading { 
-                            ProgressView()
-                                .padding()
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
-                }
-                // 使用 scrollDismissesKeyboard 确保键盘响应
-                .scrollDismissesKeyboard(.interactively)
-                // 禁用 bounce 避免手势冲突
-                .scrollBounceBehavior(.basedOnSize)
-                .background(Color(.systemGroupedBackground))
-                .refreshable { 
-                    await vm.load(movieID: movieID, force: true) 
-                }
+                reviewsList
             }
         }
         .frame(height: panelHeight, alignment: .top)
-        .frame(maxHeight: panelHeight)
-        .padding(.bottom, 8)
         .background(Color(.systemBackground))
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 16, y: -4)
         .safeAreaPadding(.bottom)
-        .gesture(
-            DragGesture(minimumDistance: 8)
-                .onChanged { value in
-                    // 向下拖动减小高度，向上拖动增加高度
-                    let newHeight = panelHeight - value.translation.height
-                    panelHeight = min(maximumHeight, max(collapsedHeight, newHeight))
-                }
-                .onEnded { value in
-                    let velocity = value.predictedEndLocation.y - value.location.y
-                    let projected = panelHeight - velocity * 0.2
-                    
-                    // 根据位置和速度判断最终状态
-                    let newState: PanelState
-                    if projected < collapsedHeight + (maximumHeight - collapsedHeight) * 0.25 {
-                        newState = .collapsed
-                    } else if projected < collapsedHeight + (maximumHeight - collapsedHeight) * 0.75 {
-                        newState = .medium
-                    } else {
-                        newState = .expanded
-                    }
-                    
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
-                        panelState = newState
-                        panelHeight = newState.height(collapsed: collapsedHeight, max: maximumHeight)
-                    }
-                }
-        )
-        .simultaneousGesture(
-            // 当内容滚动到顶部且继续下拉时，允许折叠面板
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in }
-        )
+        .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.12), value: panelState)
     }
-    
+
+    private var handleDrag: some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .global)
+            .onChanged { value in
+                if dragStartHeight == nil { dragStartHeight = panelHeight }
+                let next = (dragStartHeight ?? panelHeight) - value.translation.height
+                panelHeight = min(maximumHeight, max(collapsedHeight, next))
+            }
+            .onEnded { value in
+                let start = dragStartHeight ?? panelHeight
+                dragStartHeight = nil
+                let predicted = start - value.predictedEndTranslation.height
+                let velocityY = value.predictedEndTranslation.height - value.translation.height
+                snap(to: predicted, velocityY: velocityY)
+            }
+    }
+
+    private func toggleFromHeader() {
+        let next: PanelState = panelState == .collapsed ? .medium : .collapsed
+        panelState = next
+        panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+    }
+
+    private func snap(to predicted: CGFloat, velocityY: CGFloat) {
+        let span = max(1, maximumHeight - collapsedHeight)
+        let next: PanelState
+        if velocityY < -900 {
+            next = .expanded
+        } else if velocityY > 900 {
+            next = .collapsed
+        } else if predicted < collapsedHeight + span * 0.28 {
+            next = .collapsed
+        } else if predicted < collapsedHeight + span * 0.72 {
+            next = .medium
+        } else {
+            next = .expanded
+        }
+        panelState = next
+        panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+    }
+
     private var headerSection: some View {
         VStack(spacing: 9) {
             Capsule()
@@ -1270,7 +1194,7 @@ struct DraggableReviewsPanel: View {
                 HStack(spacing: 8) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.blue.gradient)
+                        .foregroundStyle(.blue)
                     Text("评论")
                         .font(.system(size: 18, weight: .bold))
                 }
@@ -1280,16 +1204,15 @@ struct DraggableReviewsPanel: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: panelState == .collapsed ? "chevron.up" : "chevron.down")
+                Image(systemName: "chevron.up")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(panelState == .collapsed ? 0 : 180))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: panelState)
             }
             .padding(.horizontal, 22)
         }
     }
-    
+
     private var sortSection: some View {
         VStack(spacing: 0) {
             Divider()
@@ -1308,8 +1231,40 @@ struct DraggableReviewsPanel: View {
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.vertical, 16)
+            .padding(.vertical, 12)
             Divider()
+        }
+    }
+
+    private var reviewsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                if vm.reviews.isEmpty && !vm.isLoading {
+                    Text("暂无评论")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 50)
+                }
+                ForEach(vm.reviews) { review in
+                    ReviewRow(review: review, movieID: movieID)
+                        .padding(14)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .onAppear {
+                            if review.id == vm.reviews.last?.id {
+                                Task { await vm.loadMore(movieID: movieID) }
+                            }
+                        }
+                }
+                if vm.isLoading {
+                    ProgressView().padding()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 32)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color(.systemGroupedBackground))
+        .refreshable {
+            await vm.load(movieID: movieID, force: true)
         }
     }
 }
