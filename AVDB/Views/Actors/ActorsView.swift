@@ -164,17 +164,15 @@ struct ActorsView: View {
 
     private func actorCell(_ actor: Actor) -> some View {
         VStack(spacing: 8) {
-            JavDBImage(url: actor.avatarURL ?? actor.coverURL)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .aspectRatio(1, contentMode: .fit)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            ClippedAspectFill(aspectRatio: 1) {
+                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+            }
             Text(actor.name ?? "")
                 .font(.system(size: 13))
                 .foregroundColor(.primary)
                 .lineLimit(1)
         }
+        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
     }
 }

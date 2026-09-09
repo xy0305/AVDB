@@ -39,10 +39,11 @@ struct HomeView: View {
             .background {
                 LiquidGlassBackground()
             }
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    EmptyView()
+                    Color.clear.frame(width: 1, height: 1)
                 }
             }
             .task { await vm.initialLoad() }

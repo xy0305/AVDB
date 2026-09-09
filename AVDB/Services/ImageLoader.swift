@@ -297,16 +297,21 @@ public struct JavDBImage: View {
     }
 
     public var body: some View {
-        Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: contentMode)
-            } else {
-                placeholder
+        // Color.clear 吃父视图提议的尺寸；图片只在 overlay 里绘制。
+        // 直接把 resizable Image 放进网格会按原图像素报告 ideal size，
+        // 把 LazyVGrid 格子撑爆（.clipped() 只裁绘制、不改布局）。
+        Color.clear
+            .overlay {
+                if let image = image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                } else {
+                    placeholder
+                }
             }
-        }
-        .task(id: imageURLs.joined(separator: "|")) {
+            .clipped()
+            .task(id: imageURLs.joined(separator: "|")) {
             // task(id:) 在候选 URL 改变时会取消旧任务；不能用 loading 拦截，
             // 否则 Tenhow poster 稍晚解析完成时会继续显示先加载到的横版 thumb。
             loading = true

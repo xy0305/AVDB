@@ -203,6 +203,22 @@ struct SegmentChipBar<Tab: Hashable>: View {
     }
 }
 
+/// 先用无内容视图定宽高，再 overlay 图片。避免 Image 按原图像素撑开格子。
+struct ClippedAspectFill<Content: View>: View {
+    var aspectRatio: CGFloat
+    var cornerRadius: CGFloat = 8
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        Color.clear
+            .aspectRatio(aspectRatio, contentMode: .fit)
+            .overlay { content() }
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+}
+
 /// 三列海报卡 —— 内容，不用玻璃，干净的圆角图片 + 文字
 struct MoviePosterCard: View {
     let movie: Movie
@@ -210,42 +226,36 @@ struct MoviePosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topLeading) {
-                Color(.systemGray6)
+            ClippedAspectFill(aspectRatio: 0.72) {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                if let rank {
-                    Text("\(rank)")
-                        .font(.caption.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(rank <= 3 ? Color.orange : Color.black.opacity(0.65))
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .padding(6)
-                }
-            }
-            .aspectRatio(0.72, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(alignment: .bottomTrailing) {
-                if let badge = movie.playBadge {
-                    Text(badge)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            badge.contains("中字")
-                                ? JAVDBPalette.cnsubOrange
-                                : JAVDBPalette.playRed
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .padding(5)
-                }
+                    .overlay(alignment: .topLeading) {
+                        if let rank {
+                            Text("\(rank)")
+                                .font(.caption.bold())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(rank <= 3 ? Color.orange : Color.black.opacity(0.65))
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .padding(6)
+                        }
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        if let badge = movie.playBadge {
+                            Text(badge)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(
+                                    badge.contains("中字")
+                                        ? JAVDBPalette.cnsubOrange
+                                        : JAVDBPalette.playRed
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .padding(5)
+                        }
+                    }
             }
 
             Text(movie.displayTitle)
@@ -259,11 +269,13 @@ struct MoviePosterCard: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tint)
                 .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if let date = movie.releaseDate, !date.isEmpty {
                 Text(date)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             HStack(spacing: 4) {
@@ -279,6 +291,7 @@ struct MoviePosterCard: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -295,7 +308,7 @@ struct MoviePosterGrid: View {
     }
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+        Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: columnCount)
     }
 
     var body: some View {
@@ -305,11 +318,9 @@ struct MoviePosterGrid: View {
                     MovieDetailView(movieID: movie.id)
                 } label: {
                     MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .clipped()
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .onAppear {
                     if movie.id == movies.last?.id {
