@@ -75,27 +75,15 @@ struct ContentView: View {
     }
 }
 
-/// 悬浮液态玻璃 Tab Bar —— 真正的 Liquid Glass 用法
+/// 悬浮液态玻璃 Tab Bar
 struct FloatingGlassTabBar: View {
     @Binding var selection: AppTab
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            // iOS 26：系统 GlassEffectContainer 让相邻 Tab 融合成一块玻璃
-            GlassEffectContainer(spacing: 0) {
-                tabBarContent
-            }
+        tabBarContent
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
             .liquidGlass()
-        } else {
-            tabBarContent
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
-        }
     }
 
     private var tabBarContent: some View {
@@ -122,8 +110,6 @@ struct FloatingGlassTabBar: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
     }
 }
 

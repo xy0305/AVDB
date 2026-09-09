@@ -4,22 +4,20 @@
 //
 //  iOS 26 Liquid Glass 组件库
 //  原则：玻璃只用于「悬浮在内容之上的控件」，内容区保持正常底。
-//  iOS 26+ 使用系统 .glassEffect() / GlassEffectContainer；
-//  更低版本回退到干净的 .ultraThinMaterial，不做手绘高光。
+//  编译开关：#if AVDB_LIQUID_GLASS 启用系统 .glassEffect()（需 Xcode 26+ / iOS 26 SDK）；
+//  否则回退到干净的 .ultraThinMaterial。
 //
 
 import SwiftUI
 
-// MARK: - 兼容层：iOS 26 系统玻璃 / 旧系统回退
+// MARK: - 兼容层
 
-/// 悬浮控件的液态玻璃修饰符。
-/// iOS 26+：系统 .glassEffect()（真实折射、阴影、边缘）。
-/// iOS 17–25：.ultraThinMaterial + 连续圆角，不加手绘高光。
+/// 悬浮控件的液态玻璃修饰符（胶囊形）。
 struct LiquidGlassEffect: ViewModifier {
     var tint: Color? = nil
 
-    @ViewBuilder
     func body(content: Content) -> some View {
+        #if AVDB_LIQUID_GLASS
         if #available(iOS 26.0, *) {
             if let tint {
                 content.glassEffect(.regular.tint(tint), in: .capsule)
@@ -27,23 +25,30 @@ struct LiquidGlassEffect: ViewModifier {
                 content.glassEffect(.regular, in: .capsule)
             }
         } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+            fallbackCapsule(content)
         }
+        #else
+        fallbackCapsule(content)
+        #endif
+    }
+
+    private func fallbackCapsule(_ content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
     }
 }
 
-/// 矩形圆角的液态玻璃（卡片、搜索框、面板把手）。
+/// 矩形圆角的液态玻璃。
 struct LiquidGlassRectEffect: ViewModifier {
     var cornerRadius: CGFloat = 16
     var tint: Color? = nil
 
-    @ViewBuilder
     func body(content: Content) -> some View {
+        #if AVDB_LIQUID_GLASS
         if #available(iOS 26.0, *) {
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             if let tint {
@@ -52,21 +57,28 @@ struct LiquidGlassRectEffect: ViewModifier {
                 content.glassEffect(.regular, in: shape)
             }
         } else {
-            content
-                .background(
-                    .ultraThinMaterial,
-                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+            fallbackRect(content)
         }
+        #else
+        fallbackRect(content)
+        #endif
+    }
+
+    private func fallbackRect(_ content: Content) -> some View {
+        content
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 }
 
-/// 多个玻璃控件的融合容器（iOS 26 自动合并相邻玻璃）。
+/// 多个玻璃控件的融合容器。
 struct LiquidGlassContainer<Content: View>: View {
     let content: Content
 
@@ -75,33 +87,34 @@ struct LiquidGlassContainer<Content: View>: View {
     }
 
     var body: some View {
+        #if AVDB_LIQUID_GLASS
         if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 8) {
-                content
-            }
+            GlassEffectContainer(spacing: 8) { content }
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 }
 
 // MARK: - View 扩展
 
 extension View {
-    /// 悬浮胶囊控件玻璃（Tab 栏、播放按钮、小工具按钮）
+    /// 悬浮胶囊控件玻璃
     func liquidGlass(tint: Color? = nil) -> some View {
         modifier(LiquidGlassEffect(tint: tint))
     }
 
-    /// 悬浮矩形控件玻璃（搜索框、筛选栏、面板）
+    /// 悬浮矩形控件玻璃
     func liquidGlassRect(cornerRadius: CGFloat = 16, tint: Color? = nil) -> some View {
         modifier(LiquidGlassRectEffect(cornerRadius: cornerRadius, tint: tint))
     }
 }
 
-// MARK: - 全局氛围背景（极淡，内容下层）
+// MARK: - 全局氛围背景
 
-/// App 最底层的氛围色。非常淡，只为玻璃提供可折射的内容，不抢视觉。
 struct LiquidGlassBackground: View {
     var body: some View {
         ZStack {
@@ -169,7 +182,7 @@ struct GlassButton: View {
     }
 }
 
-// MARK: - 筛选芯片（悬浮在内容之上）
+// MARK: - 筛选芯片
 
 struct LiquidFilterChip: View {
     let title: String
@@ -211,23 +224,13 @@ struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
     @Namespace private var namespace
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            HStack(spacing: 0) {
-                ForEach(Array(T.allCases), id: \.self) { option in
-                    segmentButton(option)
-                }
+        HStack(spacing: 0) {
+            ForEach(Array(T.allCases), id: \.self) { option in
+                segmentButton(option)
             }
-            .padding(3)
-            .liquidGlass()
-        } else {
-            HStack(spacing: 0) {
-                ForEach(Array(T.allCases), id: \.self) { option in
-                    segmentButton(option)
-                }
-            }
-            .padding(3)
-            .background(.ultraThinMaterial, in: Capsule())
         }
+        .padding(3)
+        .liquidGlass()
     }
 
     private func segmentButton(_ option: T) -> some View {
