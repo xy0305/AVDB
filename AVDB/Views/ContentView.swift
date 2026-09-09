@@ -2,7 +2,8 @@
 //  ContentView.swift
 //  AVDB
 //
-//  底部悬浮液态玻璃 Tab（iOS 26 风格），图标更醒目。
+//  底部悬浮 Tab Bar：iOS 26 Liquid Glass（系统 .glassEffect()）
+//  玻璃只在悬浮控件上，内容区保持正常背景。
 //
 
 import SwiftUI
@@ -47,7 +48,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // 液态玻璃氛围背景：柔和渐变洗色
+            // 极淡氛围底，为玻璃提供可折射内容
             LiquidGlassBackground()
                 .ignoresSafeArea()
 
@@ -74,43 +75,30 @@ struct ContentView: View {
     }
 }
 
-/// 全局液态玻璃氛围背景：极淡的多色渐变洗色
-struct LiquidGlassBackground: View {
-    var body: some View {
-        ZStack {
-            Color(.systemBackground)
-
-            // 左上淡蓝光晕
-            RadialGradient(
-                colors: [Color(red: 0.45, green: 0.65, blue: 0.95).opacity(0.12), .clear],
-                center: UnitPoint(x: 0.15, y: 0.05),
-                startRadius: 0,
-                endRadius: 320
-            )
-
-            // 右上淡紫光晕
-            RadialGradient(
-                colors: [Color(red: 0.65, green: 0.5, blue: 0.9).opacity(0.08), .clear],
-                center: UnitPoint(x: 0.9, y: 0.0),
-                startRadius: 0,
-                endRadius: 280
-            )
-
-            // 底部淡青光晕
-            RadialGradient(
-                colors: [Color(red: 0.3, green: 0.75, blue: 0.8).opacity(0.06), .clear],
-                center: UnitPoint(x: 0.5, y: 1.0),
-                startRadius: 0,
-                endRadius: 300
-            )
-        }
-    }
-}
-
+/// 悬浮液态玻璃 Tab Bar —— 真正的 Liquid Glass 用法
 struct FloatingGlassTabBar: View {
     @Binding var selection: AppTab
 
     var body: some View {
+        if #available(iOS 26.0, *) {
+            // iOS 26：系统 GlassEffectContainer 让相邻 Tab 融合成一块玻璃
+            GlassEffectContainer(spacing: 0) {
+                tabBarContent
+            }
+            .liquidGlass()
+        } else {
+            tabBarContent
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.1), radius: 12, y: 4)
+        }
+    }
+
+    private var tabBarContent: some View {
         HStack(spacing: 0) {
             ForEach(AppTab.allCases) { tab in
                 Button {
@@ -119,38 +107,16 @@ struct FloatingGlassTabBar: View {
                     }
                 } label: {
                     VStack(spacing: 4) {
-                        ZStack {
-                            if selection == tab {
-                                Circle()
-                                    .fill(Color.accentColor.opacity(0.18))
-                                    .frame(width: 40, height: 40)
-                                    .overlay {
-                                        Circle()
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [.white.opacity(0.35), .clear],
-                                                    startPoint: .top,
-                                                    endPoint: .center
-                                                )
-                                            )
-                                    }
-                                    .overlay {
-                                        Circle()
-                                            .strokeBorder(.white.opacity(0.4), lineWidth: 0.6)
-                                    }
-                            }
-                            Image(systemName: selection == tab ? tab.selectedIcon : tab.icon)
-                                .font(.system(size: 20, weight: .semibold))
-                                .symbolRenderingMode(.hierarchical)
-                                .scaleEffect(selection == tab ? 1.1 : 1)
-                        }
-                        .frame(height: 40)
+                        Image(systemName: selection == tab ? tab.selectedIcon : tab.icon)
+                            .font(.system(size: 20, weight: .semibold))
+                            .symbolRenderingMode(.hierarchical)
+                            .scaleEffect(selection == tab ? 1.1 : 1)
                         Text(tab.title)
                             .font(.system(size: 10, weight: selection == tab ? .semibold : .medium))
                     }
                     .foregroundStyle(selection == tab ? Color.accentColor : Color.secondary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 8)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -158,13 +124,6 @@ struct FloatingGlassTabBar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .liquidCapsule(
-            material: .ultraThinMaterial,
-            edgeOpacity: 0.52,
-            glowOpacity: 0.24,
-            shadowRadius: 20,
-            shadowY: 10
-        )
     }
 }
 

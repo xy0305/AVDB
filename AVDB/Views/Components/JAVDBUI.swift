@@ -2,8 +2,8 @@
 //  JAVDBUI.swift
 //  AVDB
 //
-//  共用 UI：原生 segmented 选择器、海报卡、网格、区块标题。
-//  iOS 26 液态玻璃风格：镜面高光描边 + 内发光 + 流体圆角。
+//  共用 UI：分段选择器、海报卡、网格、区块标题。
+//  原则：内容（海报、文字）用正常底；悬浮控件（Tab、芯片）用玻璃。
 //
 
 import SwiftUI
@@ -49,7 +49,7 @@ enum RankPeriod: String, CaseIterable, Identifiable {
     }
 }
 
-/// 顶部文字 Tab（原生分段选择器；项多时横向原生按钮）。保留旧名以兼容调用点。
+/// 顶部文字 Tab。保留旧名以兼容调用点。
 struct UnderlineTabBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
@@ -59,112 +59,66 @@ struct UnderlineTabBar<Tab: Hashable>: View {
     }
 }
 
-/// 胶囊筛选条（系统原生分段控件，不滚动、不拖动）。
+/// 胶囊筛选条（≤4 项用分段控件，>4 用等宽按钮）。
 struct CapsuleChipBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
 
     var body: some View {
         if tabs.count <= 4 {
-            HStack(spacing: 0) {
-                ForEach(tabs, id: \.0) { tab, title in
-                    Button {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            selection = tab
-                        }
-                    } label: {
-                        Text(title)
-                            .font(.footnote.weight(selection == tab ? .semibold : .regular))
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .foregroundStyle(selection == tab ? Color.white : Color.secondary)
-                            .background {
-                                if selection == tab {
-                                    Capsule(style: .continuous)
-                                        .fill(Color.accentColor.gradient)
-                                        .overlay {
-                                            Capsule(style: .continuous)
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: [.white.opacity(0.28), .clear],
-                                                        startPoint: .top,
-                                                        endPoint: .center
-                                                    )
-                                                )
-                                        }
-                                        .overlay {
-                                            Capsule(style: .continuous)
-                                                .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
-                                        }
-                                        .shadow(color: Color.accentColor.opacity(0.3), radius: 6, y: 2)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(4)
-            .liquidCapsule(glowOpacity: 0.16, shadowRadius: 10, shadowY: 4)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            SegmentedControlBar(tabs: tabs, selection: $selection)
         } else {
             SegmentChipBar(tabs: tabs, selection: $selection)
         }
     }
 }
 
-/// 顶部分段选择器（原生 SegmentedControl 风格）。
+/// ≤4 项分段控件：悬浮玻璃底 + 选中实心胶囊
+private struct SegmentedControlBar<Tab: Hashable>: View {
+    let tabs: [(Tab, String)]
+    @Binding var selection: Tab
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(tabs, id: \.0) { tab, title in
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                        selection = tab
+                    }
+                } label: {
+                    Text(title)
+                        .font(.footnote.weight(selection == tab ? .semibold : .regular))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .foregroundStyle(selection == tab ? Color.white : Color.secondary)
+                        .background {
+                            if selection == tab {
+                                Capsule(style: .continuous)
+                                    .fill(Color.accentColor)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .liquidGlass()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+}
+
+/// 顶部分段选择器（兼容旧名）。
 struct SegmentedTabBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
 
     var body: some View {
         if tabs.count <= 4 {
-            HStack(spacing: 0) {
-                ForEach(tabs, id: \.0) { tab, title in
-                    Button {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            selection = tab
-                        }
-                    } label: {
-                        Text(title)
-                            .font(.footnote.weight(selection == tab ? .semibold : .regular))
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .foregroundStyle(selection == tab ? Color.white : Color.secondary)
-                            .background {
-                                if selection == tab {
-                                    Capsule(style: .continuous)
-                                        .fill(Color.accentColor.gradient)
-                                        .overlay {
-                                            Capsule(style: .continuous)
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: [.white.opacity(0.28), .clear],
-                                                        startPoint: .top,
-                                                        endPoint: .center
-                                                    )
-                                                )
-                                        }
-                                        .overlay {
-                                            Capsule(style: .continuous)
-                                                .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
-                                        }
-                                        .shadow(color: Color.accentColor.opacity(0.3), radius: 6, y: 2)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(4)
-            .liquidCapsule(glowOpacity: 0.16, shadowRadius: 10, shadowY: 4)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            SegmentedControlBar(tabs: tabs, selection: $selection)
         } else {
-            // 多标签：非滚动、等宽原生按钮，底部玻璃指示条
+            // 多标签：等宽按钮，选中态用轻底色指示（非悬浮，不用玻璃）
             HStack(spacing: 0) {
                 ForEach(tabs, id: \.0) { tab, title in
                     Button {
@@ -181,20 +135,8 @@ struct SegmentedTabBar<Tab: Hashable>: View {
                             .foregroundStyle(selection == tab ? Color.accentColor : Color.secondary)
                             .background {
                                 if selection == tab {
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .fill(Color.accentColor.opacity(0.1))
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: [.white.opacity(0.3), .clear],
-                                                        startPoint: .top,
-                                                        endPoint: .center
-                                                    )
-                                                )
-                                        }
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 2)
                                 }
                             }
                     }
@@ -207,13 +149,13 @@ struct SegmentedTabBar<Tab: Hashable>: View {
     }
 }
 
-/// 分段筛选（原生 SegmentedControl，最多 4 项）。
+/// >4 项的分段筛选。
 struct SegmentChipBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ForEach(tabs, id: \.0) { tab, title in
                 Button {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
@@ -223,54 +165,26 @@ struct SegmentChipBar<Tab: Hashable>: View {
                     Text(title)
                         .font(.subheadline.weight(selection == tab ? .semibold : .regular))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
+                        .padding(.vertical, 6)
                         .foregroundStyle(selection == tab ? Color.white : Color.primary)
                         .background {
                             if selection == tab {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.accentColor.gradient)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [.white.opacity(0.28), .clear],
-                                                    startPoint: .top,
-                                                    endPoint: .center
-                                                )
-                                            )
-                                    }
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
-                                    }
-                                    .shadow(color: Color.accentColor.opacity(0.25), radius: 5, y: 2)
-                            } else {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(.ultraThinMaterial)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [.white.opacity(0.2), .clear],
-                                                    startPoint: .top,
-                                                    endPoint: .center
-                                                )
-                                            )
-                                    }
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.accentColor)
                             }
                         }
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(5)
-        .liquidCapsule(glowOpacity: 0.14, shadowRadius: 10, shadowY: 4)
+        .padding(3)
+        .liquidGlass()
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
     }
 }
 
-/// 三列海报卡（液态玻璃镜面边缘 + 语义字体）。
+/// 三列海报卡 —— 内容，不用玻璃，干净的圆角图片 + 文字
 struct MoviePosterCard: View {
     let movie: Movie
     var rank: Int? = nil
@@ -283,31 +197,16 @@ struct MoviePosterCard: View {
                     .aspectRatio(0.72, contentMode: .fill)
                     .frame(minHeight: 140)
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .glassEdge(cornerRadius: 10, opacity: 0.35)
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-                // 排名角标
                 if let rank {
                     Text("\(rank)")
                         .font(.caption.bold())
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(rank <= 3 ? Color.orange.gradient : Color.black.opacity(0.6).gradient)
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.white.opacity(0.25), .clear],
-                                                startPoint: .top,
-                                                endPoint: .center
-                                            )
-                                        )
-                                }
-                        }
+                        .background(rank <= 3 ? Color.orange : Color.black.opacity(0.65))
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         .padding(6)
                 }
             }
@@ -318,25 +217,12 @@ struct MoviePosterCard: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(
-                                    (badge.contains("中字")
-                                        ? JAVDBPalette.cnsubOrange
-                                        : JAVDBPalette.playRed
-                                    ).gradient
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.white.opacity(0.25), .clear],
-                                                startPoint: .top,
-                                                endPoint: .center
-                                            )
-                                        )
-                                }
-                        }
+                        .background(
+                            badge.contains("中字")
+                                ? JAVDBPalette.cnsubOrange
+                                : JAVDBPalette.playRed
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         .padding(5)
                 }
             }
@@ -428,9 +314,6 @@ struct SectionHeaderBar: View {
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .liquidGlassFlat(cornerRadius: 12, material: .thinMaterial)
                 }
                 .buttonStyle(.plain)
             }
@@ -448,71 +331,5 @@ struct EmptyStateView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-    }
-}
-
-/// 液态玻璃筛选芯片（通用）
-struct LiquidFilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(isSelected ? .semibold : .medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .background {
-                    if isSelected {
-                        Capsule(style: .continuous)
-                            .fill(Color.accentColor.gradient)
-                            .overlay {
-                                Capsule(style: .continuous)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.white.opacity(0.28), .clear],
-                                            startPoint: .top,
-                                            endPoint: .center
-                                        )
-                                    )
-                            }
-                            .overlay {
-                                Capsule(style: .continuous)
-                                    .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
-                            }
-                            .shadow(color: Color.accentColor.opacity(0.3), radius: 5, y: 2)
-                    } else {
-                        Capsule(style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Capsule(style: .continuous)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.white.opacity(0.22), .clear],
-                                            startPoint: .top,
-                                            endPoint: .center
-                                        )
-                                    )
-                            }
-                            .overlay {
-                                Capsule(style: .continuous)
-                                    .strokeBorder(
-                                        LinearGradient(
-                                            colors: [
-                                                .white.opacity(0.4),
-                                                .white.opacity(0.15),
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 0.6
-                                    )
-                            }
-                    }
-                }
-        }
-        .buttonStyle(.plain)
     }
 }

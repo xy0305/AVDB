@@ -299,7 +299,7 @@ struct KSChromePlayer: View {
         }
         .foregroundStyle(.white)
         .padding(16)
-        .liquidGlass(cornerRadius: 16, edgeOpacity: 0.45, glowOpacity: 0.2, shadowRadius: 12, shadowY: 5)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var infoBar: some View {
@@ -461,7 +461,7 @@ struct KSChromePlayer: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 40, height: 40)
-                .liquidCapsule(material: .ultraThinMaterial, edgeOpacity: 0.45, glowOpacity: 0.22, shadowRadius: 8, shadowY: 3)
+                .liquidGlass()
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
@@ -475,7 +475,7 @@ struct KSChromePlayer: View {
                 .frame(width: 30, height: 30)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
-                .liquidCapsule(material: .ultraThinMaterial, edgeOpacity: 0.45, glowOpacity: 0.22, shadowRadius: 6, shadowY: 2)
+                .liquidGlass()
         }
         .buttonStyle(.plain)
     }

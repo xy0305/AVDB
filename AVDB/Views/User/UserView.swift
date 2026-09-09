@@ -22,8 +22,6 @@ struct UserView: View {
                             JavDBImage(url: user.avatarURL)
                                 .frame(width: 60, height: 60)
                                 .clipShape(Circle())
-                                .glassEdge(cornerRadius: 30, opacity: 0.4)
-                                .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(user.displayName)
                                     .font(.headline)
@@ -33,20 +31,7 @@ struct UserView: View {
                                         .foregroundStyle(.white)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
-                                        .background {
-                                            Capsule(style: .continuous)
-                                                .fill(.orange.gradient)
-                                                .overlay {
-                                                    Capsule(style: .continuous)
-                                                        .fill(
-                                                            LinearGradient(
-                                                                colors: [.white.opacity(0.3), .clear],
-                                                                startPoint: .top,
-                                                                endPoint: .center
-                                                            )
-                                                        )
-                                                }
-                                        }
+                                        .background(.orange, in: Capsule())
                                 }
                             }
                         }
@@ -243,9 +228,7 @@ struct CollectedView: View {
                                 ZStack(alignment: .topTrailing) {
                                     JavDBImage(url: actor.avatarURL, contentMode: .fill)
                                         .frame(width: 110, height: 110)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                        .glassEdge(cornerRadius: 10, opacity: 0.35)
-                                        .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                     if isEditing {
                                         Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
                                             .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)
@@ -371,7 +354,7 @@ struct PlansView: View {
                         if let price = plan.price {
                             Text(String(format: "¥%.2f", price))
                                 .font(.title2.bold())
-                                .foregroundStyle(.orange.gradient)
+                                .foregroundColor(.orange)
                         }
                         if let days = plan.days {
                             Text("\(days)天")
@@ -392,7 +375,8 @@ struct PlansView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .liquidGlass(cornerRadius: 16, tint: .orange, edgeOpacity: 0.45, glowOpacity: 0.16, shadowRadius: 12, shadowY: 5)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
             }
             .padding()

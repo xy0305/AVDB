@@ -2,257 +2,124 @@
 //  GlassUI.swift
 //  AVDB
 //
-//  iOS 26 液态玻璃风格 UI 组件库
-//  核心特征：镜面高光描边 + 顶部内发光 + 多层柔和投影 + 流体圆角
+//  iOS 26 Liquid Glass 组件库
+//  原则：玻璃只用于「悬浮在内容之上的控件」，内容区保持正常底。
+//  iOS 26+ 使用系统 .glassEffect() / GlassEffectContainer；
+//  更低版本回退到干净的 .ultraThinMaterial，不做手绘高光。
 //
 
 import SwiftUI
 
-// MARK: - 液态玻璃修饰符
+// MARK: - 兼容层：iOS 26 系统玻璃 / 旧系统回退
 
-/// 液态玻璃材质修饰符：毛玻璃底 + 镜面边缘高光 + 顶部内发光 + 多层阴影
-struct LiquidGlassModifier: ViewModifier {
-    var cornerRadius: CGFloat = 20
-    var material: Material = .ultraThinMaterial
+/// 悬浮控件的液态玻璃修饰符。
+/// iOS 26+：系统 .glassEffect()（真实折射、阴影、边缘）。
+/// iOS 17–25：.ultraThinMaterial + 连续圆角，不加手绘高光。
+struct LiquidGlassEffect: ViewModifier {
     var tint: Color? = nil
-    var edgeOpacity: Double = 0.55
-    var glowOpacity: Double = 0.18
-    var shadowRadius: CGFloat = 16
-    var shadowY: CGFloat = 8
-    var hasBorder: Bool = true
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(material)
-                    .overlay {
-                        // 顶部内发光：模拟光线从上方进入玻璃
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(glowOpacity),
-                                        .white.opacity(glowOpacity * 0.3),
-                                        .clear,
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .center
-                                )
-                            )
-                    }
-                    .overlay {
-                        if let tint {
-                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                .fill(tint.opacity(0.08))
-                        }
-                    }
-                    .overlay {
-                        // 镜面边缘高光：左上亮、右下暗，模拟光线折射
-                        if hasBorder {
-                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(edgeOpacity),
-                                            .white.opacity(edgeOpacity * 0.25),
-                                            .white.opacity(edgeOpacity * 0.15),
-                                            .white.opacity(edgeOpacity * 0.4),
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.8
-                                )
-                        }
-                    }
-                    .shadow(color: .black.opacity(0.08), radius: shadowRadius * 0.4, y: shadowY * 0.4)
-                    .shadow(color: .black.opacity(0.06), radius: shadowRadius, y: shadowY)
+        if #available(iOS 26.0, *) {
+            if let tint {
+                content.glassEffect(.regular.tint(tint), in: .capsule)
+            } else {
+                content.glassEffect(.regular, in: .capsule)
             }
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+        }
     }
 }
 
-/// 胶囊液态玻璃修饰符（Tab Bar / 按钮）
-struct LiquidCapsuleModifier: ViewModifier {
-    var material: Material = .ultraThinMaterial
+/// 矩形圆角的液态玻璃（卡片、搜索框、面板把手）。
+struct LiquidGlassRectEffect: ViewModifier {
+    var cornerRadius: CGFloat = 16
     var tint: Color? = nil
-    var edgeOpacity: Double = 0.5
-    var glowOpacity: Double = 0.22
-    var shadowRadius: CGFloat = 18
-    var shadowY: CGFloat = 8
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .background {
-                Capsule(style: .continuous)
-                    .fill(material)
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(glowOpacity),
-                                        .white.opacity(glowOpacity * 0.25),
-                                        .clear,
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .center
-                                )
-                            )
-                    }
-                    .overlay {
-                        if let tint {
-                            Capsule(style: .continuous)
-                                .fill(tint.opacity(0.1))
-                        }
-                    }
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(edgeOpacity),
-                                        .white.opacity(edgeOpacity * 0.2),
-                                        .white.opacity(edgeOpacity * 0.12),
-                                        .white.opacity(edgeOpacity * 0.38),
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.8
-                            )
-                    }
-                    .shadow(color: .black.opacity(0.1), radius: shadowRadius * 0.5, y: shadowY * 0.5)
-                    .shadow(color: .black.opacity(0.08), radius: shadowRadius, y: shadowY)
+        if #available(iOS 26.0, *) {
+            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            if let tint {
+                content.glassEffect(.regular.tint(tint), in: shape)
+            } else {
+                content.glassEffect(.regular, in: shape)
             }
+        } else {
+            content
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        }
+    }
+}
+
+/// 多个玻璃控件的融合容器（iOS 26 自动合并相邻玻璃）。
+struct LiquidGlassContainer<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 8) {
+                content
+            }
+        } else {
+            content
+        }
     }
 }
 
 // MARK: - View 扩展
 
 extension View {
-    /// 液态玻璃卡片
-    func liquidGlass(
-        cornerRadius: CGFloat = 20,
-        material: Material = .ultraThinMaterial,
-        tint: Color? = nil,
-        edgeOpacity: Double = 0.55,
-        glowOpacity: Double = 0.18,
-        shadowRadius: CGFloat = 16,
-        shadowY: CGFloat = 8
-    ) -> some View {
-        modifier(LiquidGlassModifier(
-            cornerRadius: cornerRadius,
-            material: material,
-            tint: tint,
-            edgeOpacity: edgeOpacity,
-            glowOpacity: glowOpacity,
-            shadowRadius: shadowRadius,
-            shadowY: shadowY
-        ))
+    /// 悬浮胶囊控件玻璃（Tab 栏、播放按钮、小工具按钮）
+    func liquidGlass(tint: Color? = nil) -> some View {
+        modifier(LiquidGlassEffect(tint: tint))
     }
 
-    /// 液态玻璃胶囊
-    func liquidCapsule(
-        material: Material = .ultraThinMaterial,
-        tint: Color? = nil,
-        edgeOpacity: Double = 0.5,
-        glowOpacity: Double = 0.22,
-        shadowRadius: CGFloat = 18,
-        shadowY: CGFloat = 8
-    ) -> some View {
-        modifier(LiquidCapsuleModifier(
-            material: material,
-            tint: tint,
-            edgeOpacity: edgeOpacity,
-            glowOpacity: glowOpacity,
-            shadowRadius: shadowRadius,
-            shadowY: shadowY
-        ))
-    }
-
-    /// 浅玻璃卡片（无阴影，用于内嵌区域）
-    func liquidGlassFlat(
-        cornerRadius: CGFloat = 16,
-        material: Material = .thinMaterial,
-        tint: Color? = nil
-    ) -> some View {
-        modifier(LiquidGlassModifier(
-            cornerRadius: cornerRadius,
-            material: material,
-            tint: tint,
-            edgeOpacity: 0.35,
-            glowOpacity: 0.12,
-            shadowRadius: 6,
-            shadowY: 2
-        ))
-    }
-
-    /// 镜面高光描边叠加（用于图片等已有背景的元素）
-    func glassEdge(
-        cornerRadius: CGFloat = 12,
-        opacity: Double = 0.4
-    ) -> some View {
-        overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(opacity),
-                            .white.opacity(opacity * 0.2),
-                            .white.opacity(opacity * 0.1),
-                            .white.opacity(opacity * 0.35),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.8
-                )
-        }
-    }
-
-    /// 顶部内发光叠加
-    func glassInnerGlow(
-        cornerRadius: CGFloat = 12,
-        opacity: Double = 0.15
-    ) -> some View {
-        overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(opacity),
-                            .white.opacity(opacity * 0.3),
-                            .clear,
-                        ],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
-                .allowsHitTesting(false)
-        }
+    /// 悬浮矩形控件玻璃（搜索框、筛选栏、面板）
+    func liquidGlassRect(cornerRadius: CGFloat = 16, tint: Color? = nil) -> some View {
+        modifier(LiquidGlassRectEffect(cornerRadius: cornerRadius, tint: tint))
     }
 }
 
-// MARK: - 液态玻璃卡片容器
+// MARK: - 全局氛围背景（极淡，内容下层）
 
-struct GlassCard<Content: View>: View {
-    let content: Content
-    var cornerRadius: CGFloat = 20
-    var padding: CGFloat = 16
-    var tint: Color? = nil
-
-    init(cornerRadius: CGFloat = 20, padding: CGFloat = 16, tint: Color? = nil, @ViewBuilder content: () -> Content) {
-        self.cornerRadius = cornerRadius
-        self.padding = padding
-        self.tint = tint
-        self.content = content()
-    }
-
+/// App 最底层的氛围色。非常淡，只为玻璃提供可折射的内容，不抢视觉。
+struct LiquidGlassBackground: View {
     var body: some View {
-        content
-            .padding(padding)
-            .liquidGlass(cornerRadius: cornerRadius, tint: tint)
+        ZStack {
+            Color(.systemBackground)
+
+            RadialGradient(
+                colors: [Color.accentColor.opacity(0.06), .clear],
+                center: UnitPoint(x: 0.2, y: 0.0),
+                startRadius: 0,
+                endRadius: 360
+            )
+            RadialGradient(
+                colors: [Color.orange.opacity(0.04), .clear],
+                center: UnitPoint(x: 0.85, y: 0.05),
+                startRadius: 0,
+                endRadius: 280
+            )
+        }
     }
 }
 
@@ -267,17 +134,11 @@ struct GlassButton: View {
     enum ButtonStyle {
         case primary, secondary, destructive
 
-        var gradient: LinearGradient {
+        var tint: Color? {
             switch self {
-            case .primary:
-                return LinearGradient(colors: [.blue, .blue.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing)
-            case .secondary:
-                return LinearGradient(
-                    colors: [.white.opacity(0.25), .white.opacity(0.1)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-            case .destructive:
-                return LinearGradient(colors: [.red, .red.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            case .primary: return .blue
+            case .secondary: return nil
+            case .destructive: return .red
             }
         }
 
@@ -285,14 +146,6 @@ struct GlassButton: View {
             switch self {
             case .primary, .destructive: return .white
             case .secondary: return .primary
-            }
-        }
-
-        var edgeOpacity: Double {
-            switch self {
-            case .primary: return 0.45
-            case .secondary: return 0.55
-            case .destructive: return 0.4
             }
         }
     }
@@ -310,120 +163,47 @@ struct GlassButton: View {
             .foregroundStyle(style.foreground)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .background {
-                if style == .secondary {
-                    Capsule(style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Capsule(style: .continuous)
-                                .fill(style.gradient)
-                        }
-                        .overlay {
-                            Capsule(style: .continuous)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(style.edgeOpacity),
-                                            .white.opacity(style.edgeOpacity * 0.2),
-                                            .white.opacity(style.edgeOpacity * 0.35),
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.8
-                                )
-                        }
-                        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
-                } else {
-                    Capsule(style: .continuous)
-                        .fill(style.gradient)
-                        .overlay {
-                            Capsule(style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.white.opacity(0.25), .clear],
-                                        startPoint: .top,
-                                        endPoint: .center
-                                    )
-                                )
-                        }
-                        .overlay {
-                            Capsule(style: .continuous)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(style.edgeOpacity),
-                                            .white.opacity(style.edgeOpacity * 0.15),
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.8
-                                )
-                        }
-                        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
-                }
-            }
+            .liquidGlass(tint: style.tint)
         }
         .buttonStyle(.plain)
     }
 }
 
-// MARK: - 液态玻璃标签气泡
+// MARK: - 筛选芯片（悬浮在内容之上）
 
-struct GlassTag: View {
-    let text: String
-    var color: Color = .blue
-    var size: TagSize = .medium
-
-    enum TagSize {
-        case small, medium, large
-
-        var font: Font {
-            switch self {
-            case .small: return .system(size: 11, weight: .medium)
-            case .medium: return .system(size: 13, weight: .medium)
-            case .large: return .system(size: 15, weight: .semibold)
-            }
-        }
-
-        var padding: EdgeInsets {
-            switch self {
-            case .small: return EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
-            case .medium: return EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
-            case .large: return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-            }
-        }
-    }
+struct LiquidFilterChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
 
     var body: some View {
-        Text(text)
-            .font(size.font)
-            .foregroundStyle(.white)
-            .padding(size.padding)
-            .background {
-                Capsule(style: .continuous)
-                    .fill(color.gradient)
-                    .overlay {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(isSelected ? .semibold : .medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .foregroundStyle(isSelected ? .white : .primary)
+                .background {
+                    if isSelected {
                         Capsule(style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.3), .clear],
-                                    startPoint: .top,
-                                    endPoint: .center
-                                )
-                            )
-                    }
-                    .overlay {
+                            .fill(Color.accentColor)
+                    } else {
                         Capsule(style: .continuous)
-                            .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
+                            .fill(.ultraThinMaterial)
                     }
-                    .shadow(color: color.opacity(0.35), radius: 5, y: 2)
-            }
+                }
+                .overlay {
+                    if !isSelected {
+                        Capsule(style: .continuous)
+                            .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 }
 
-// MARK: - 液态玻璃分段选择器
+// MARK: - 分段选择器
 
 struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
     @Binding var selection: T
@@ -431,41 +211,45 @@ struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
     @Namespace private var namespace
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(T.allCases), id: \.self) { option in
-                Button {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                        selection = option
-                    }
-                } label: {
-                    Text(title(option))
-                        .font(.system(size: 14, weight: selection == option ? .semibold : .regular))
-                        .foregroundStyle(selection == option ? .white : .primary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background {
-                            if selection == option {
-                                Capsule(style: .continuous)
-                                    .fill(.blue.gradient)
-                                    .overlay {
-                                        Capsule(style: .continuous)
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [.white.opacity(0.3), .clear],
-                                                    startPoint: .top,
-                                                    endPoint: .center
-                                                )
-                                            )
-                                    }
-                                    .matchedGeometryEffect(id: "segment", in: namespace)
-                            }
-                        }
+        if #available(iOS 26.0, *) {
+            HStack(spacing: 0) {
+                ForEach(Array(T.allCases), id: \.self) { option in
+                    segmentButton(option)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(3)
+            .liquidGlass()
+        } else {
+            HStack(spacing: 0) {
+                ForEach(Array(T.allCases), id: \.self) { option in
+                    segmentButton(option)
+                }
+            }
+            .padding(3)
+            .background(.ultraThinMaterial, in: Capsule())
         }
-        .padding(4)
-        .liquidCapsule(glowOpacity: 0.16, shadowRadius: 10, shadowY: 4)
+    }
+
+    private func segmentButton(_ option: T) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                selection = option
+            }
+        } label: {
+            Text(title(option))
+                .font(.system(size: 14, weight: selection == option ? .semibold : .regular))
+                .foregroundStyle(selection == option ? .white : .primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background {
+                    if selection == option {
+                        Capsule(style: .continuous)
+                            .fill(Color.accentColor)
+                            .matchedGeometryEffect(id: "segment", in: namespace)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -498,51 +282,7 @@ struct RatingStars: View {
     }
 }
 
-// MARK: - 液态玻璃导航栏
-
-struct GlassNavigationBar: View {
-    let title: String
-    var leftButton: (() -> Void)?
-    var rightButton: (() -> Void)?
-    var rightIcon: String = "ellipsis.circle"
-
-    var body: some View {
-        HStack {
-            if let leftAction = leftButton {
-                Button(action: leftAction) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .liquidCapsule(glowOpacity: 0.14, shadowRadius: 8, shadowY: 3)
-                }
-            }
-
-            Spacer()
-
-            Text(title)
-                .font(.system(size: 18, weight: .bold))
-
-            Spacer()
-
-            if let rightAction = rightButton {
-                Button(action: rightAction) {
-                    Image(systemName: rightIcon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .liquidCapsule(glowOpacity: 0.14, shadowRadius: 8, shadowY: 3)
-                }
-            } else {
-                Color.clear.frame(width: 44, height: 44)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-    }
-}
-
-// MARK: - 空状态
+// MARK: - 空状态 / 加载 / 错误
 
 struct GlassEmptyView: View {
     let icon: String
@@ -585,8 +325,6 @@ struct GlassEmptyView: View {
     }
 }
 
-// MARK: - 加载指示器
-
 struct GlassLoadingView: View {
     let message: String?
 
@@ -606,11 +344,9 @@ struct GlassLoadingView: View {
             }
         }
         .frame(width: 120, height: 120)
-        .liquidGlass(cornerRadius: 22, glowOpacity: 0.2, shadowRadius: 14, shadowY: 6)
+        .liquidGlassRect(cornerRadius: 20)
     }
 }
-
-// MARK: - 错误提示
 
 struct ErrorBanner: View {
     let message: String
@@ -634,23 +370,119 @@ struct ErrorBanner: View {
             }
         }
         .padding()
-        .liquidGlass(cornerRadius: 14, glowOpacity: 0.14, shadowRadius: 10, shadowY: 4)
+        .liquidGlassRect(cornerRadius: 12)
         .padding(.horizontal)
     }
 }
 
-// MARK: - 兼容旧调用点
+// MARK: - 兼容旧调用
+
+struct GlassCard<Content: View>: View {
+    let content: Content
+    var cornerRadius: CGFloat = 20
+    var padding: CGFloat = 16
+    var tint: Color? = nil
+
+    init(cornerRadius: CGFloat = 20, padding: CGFloat = 16, tint: Color? = nil, @ViewBuilder content: () -> Content) {
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+        self.tint = tint
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(padding)
+            .liquidGlassRect(cornerRadius: cornerRadius, tint: tint)
+    }
+}
+
+struct GlassTag: View {
+    let text: String
+    var color: Color = .blue
+    var size: TagSize = .medium
+
+    enum TagSize {
+        case small, medium, large
+
+        var font: Font {
+            switch self {
+            case .small: return .system(size: 11, weight: .medium)
+            case .medium: return .system(size: 13, weight: .medium)
+            case .large: return .system(size: 15, weight: .semibold)
+            }
+        }
+
+        var padding: EdgeInsets {
+            switch self {
+            case .small: return EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
+            case .medium: return EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+            case .large: return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+            }
+        }
+    }
+
+    var body: some View {
+        Text(text)
+            .font(size.font)
+            .foregroundStyle(.white)
+            .padding(size.padding)
+            .background(color, in: Capsule())
+    }
+}
+
+struct GlassNavigationBar: View {
+    let title: String
+    var leftButton: (() -> Void)?
+    var rightButton: (() -> Void)?
+    var rightIcon: String = "ellipsis.circle"
+
+    var body: some View {
+        HStack {
+            if let leftAction = leftButton {
+                Button(action: leftAction) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .liquidGlass()
+                }
+            }
+
+            Spacer()
+
+            Text(title)
+                .font(.system(size: 18, weight: .bold))
+
+            Spacer()
+
+            if let rightAction = rightButton {
+                Button(action: rightAction) {
+                    Image(systemName: rightIcon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .liquidGlass()
+                }
+            } else {
+                Color.clear.frame(width: 44, height: 44)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+    }
+}
 
 extension View {
     func glassCard(cornerRadius: CGFloat = 20, padding: CGFloat = 16) -> some View {
         self.padding(padding)
-            .liquidGlass(cornerRadius: cornerRadius)
+            .liquidGlassRect(cornerRadius: cornerRadius)
     }
 
     func glassButton() -> some View {
         self
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .liquidCapsule(shadowRadius: 10, shadowY: 4)
+            .liquidGlass()
     }
 }

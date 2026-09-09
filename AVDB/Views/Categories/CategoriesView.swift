@@ -95,7 +95,7 @@ struct CategoriesView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .liquidGlass(cornerRadius: 0, material: .thinMaterial, edgeOpacity: 0.3, glowOpacity: 0.12, shadowRadius: 8, shadowY: -2)
+            .background(.ultraThinMaterial)
         }
         .padding(.bottom, 88)
     }
