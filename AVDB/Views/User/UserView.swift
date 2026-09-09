@@ -289,7 +289,9 @@ private struct CollectedActorGrid: View {
                             ZStack(alignment: .topTrailing) {
                                 JavDBImage(url: actor.avatarURL, contentMode: .fill)
                                     .frame(width: 110, height: 110)
+                                    .clipped()
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 if isEditing {
                                     Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
                                         .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)

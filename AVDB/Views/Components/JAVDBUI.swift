@@ -211,12 +211,9 @@ struct MoviePosterCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topLeading) {
+                Color(.systemGray6)
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                    .frame(minWidth: 0, maxWidth: .infinity)
-                    .aspectRatio(0.72, contentMode: .fill)
-                    .frame(minHeight: 140)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if let rank {
                     Text("\(rank)")
@@ -229,6 +226,11 @@ struct MoviePosterCard: View {
                         .padding(6)
                 }
             }
+            .aspectRatio(0.72, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
                 if let badge = movie.playBadge {
                     Text(badge)
@@ -307,6 +309,8 @@ struct MoviePosterGrid: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .clipped()
+                .contentShape(Rectangle())
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)

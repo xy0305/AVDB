@@ -347,7 +347,9 @@ public struct MovieCoverCard: View {
             ZStack(alignment: .bottomTrailing) {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                     .frame(width: width, height: width * 1.4)
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .contentShape(RoundedRectangle(cornerRadius: 6))
 
                 if let score = movie.score, score > 0 {
                     Text(String(format: "%.1f", score))

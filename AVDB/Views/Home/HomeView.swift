@@ -182,9 +182,10 @@ struct HomeView: View {
                     HStack(alignment: .top, spacing: 14) {
                         ZStack(alignment: .topTrailing) {
                             JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                                .aspectRatio(2/3, contentMode: .fill)
-                                .frame(width: 100)
+                                .frame(width: 100, height: 150)
+                                .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             
                             if let score = movie.score, score > 0 {
                                 Text(String(format: "%.1f", score))

@@ -213,7 +213,9 @@ struct RankingsView: View {
                 ZStack(alignment: .topLeading) {
                     JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                         .frame(width: coverW, height: coverH)
+                        .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     Text("\(rank)")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.white)
@@ -329,8 +331,11 @@ private struct ActorRankingGridContent: View {
                         VStack(spacing: 8) {
                             ZStack(alignment: .topLeading) {
                                 JavDBImage(url: actor.avatarURL ?? actor.coverURL)
-                                    .aspectRatio(1, contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .aspectRatio(1, contentMode: .fit)
+                                    .clipped()
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 Text("\(idx + 1)")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.white)

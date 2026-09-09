@@ -169,7 +169,9 @@ struct SearchActorResultView: View {
                         VStack(spacing: 6) {
                             JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                                 .frame(width: 90, height: 90)
+                                .clipped()
                                 .clipShape(Circle())
+                                .contentShape(Circle())
                             Text(actor.displayName)
                                 .font(.caption)
                                 .lineLimit(1)
