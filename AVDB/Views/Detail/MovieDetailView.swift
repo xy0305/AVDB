@@ -995,7 +995,7 @@ struct ReviewRow: View {
             HStack(spacing: 8) {
                 Image(systemName: link.isDownloadLink ? "link.circle.fill" : "number.circle.fill")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(link.isDownloadLink ? .green.gradient : .blue.gradient)
+                    .foregroundStyle(link.isDownloadLink ? Color.green : Color.blue)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(link.label)
