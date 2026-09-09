@@ -108,15 +108,17 @@ struct HomeView: View {
 
     private var shortcutRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: AdaptiveLayout.isPad ? 16 : 12) {
-                shortcut("看熱播", "play.rectangle.fill", Color.red) { goHot = true }
-                shortcut("AV資訊", "newspaper.fill", Color.orange) { goArticles = true }
-                shortcut("看短評", "text.bubble.fill", Color.purple) { goReviews = true }
-                shortcut("找磁鏈", "link.circle.fill", Color.green) { goMagnets = true }
-                shortcut("系列", "square.stack.3d.up.fill", Color.blue) { goSeries = true }
-                shortcut("片商", "building.2.fill", Color.teal) { goMakers = true }
-                shortcut("導演", "person.3.fill", Color.indigo) { goDirectors = true }
-                shortcut("TOP250", "crown.fill", Color.yellow) { goRankings = true }
+            LiquidGlassContainer(spacing: AdaptiveLayout.isPad ? 16 : 12) {
+                HStack(spacing: AdaptiveLayout.isPad ? 16 : 12) {
+                    shortcut("看熱播", "play.rectangle.fill", Color.red) { goHot = true }
+                    shortcut("AV資訊", "newspaper.fill", Color.orange) { goArticles = true }
+                    shortcut("看短評", "text.bubble.fill", Color.purple) { goReviews = true }
+                    shortcut("找磁鏈", "link.circle.fill", Color.green) { goMagnets = true }
+                    shortcut("系列", "square.stack.3d.up.fill", Color.blue) { goSeries = true }
+                    shortcut("片商", "building.2.fill", Color.teal) { goMakers = true }
+                    shortcut("導演", "person.3.fill", Color.indigo) { goDirectors = true }
+                    shortcut("TOP250", "crown.fill", Color.yellow) { goRankings = true }
+                }
             }
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
         }
@@ -125,16 +127,11 @@ struct HomeView: View {
     private func shortcut(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                ZStack {
-                    // 悬浮圆形图标：真玻璃
-                    Circle()
-                        .fill(color.opacity(0.15))
-                        .frame(width: 56, height: 56)
-                    Image(systemName: icon)
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(color.gradient)
-                }
-                .liquidGlass()
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(color)
+                    .frame(width: 56, height: 56)
+                    .liquidGlassCircle(tint: color.opacity(0.28))
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.primary)

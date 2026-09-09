@@ -2,8 +2,8 @@
 //  ContentView.swift
 //  AVDB
 //
-//  底部悬浮 Tab Bar：iOS 26 Liquid Glass
-//  iPad 适配：内容居中限宽，Tab Bar 居中悬浮。
+//  系统 TabView：iOS 26 自动使用 Liquid Glass Tab Bar，
+//  不再手绘悬浮条。
 //
 
 import SwiftUI
@@ -31,85 +31,46 @@ enum AppTab: Int, CaseIterable, Identifiable {
         case .me: return "person.crop.circle"
         }
     }
-
-    var selectedIcon: String {
-        switch self {
-        case .home: return "house.fill"
-        case .rankings: return "trophy.fill"
-        case .categories: return "square.grid.2x2.fill"
-        case .actors: return "person.2.fill"
-        case .me: return "person.crop.circle.fill"
-        }
-    }
 }
 
 struct ContentView: View {
     @State private var selectedTab: AppTab = .home
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            LiquidGlassBackground()
-                .ignoresSafeArea()
+        TabView(selection: $selectedTab) {
+            HomeView()
+                .tabItem { Label(AppTab.home.title, systemImage: AppTab.home.icon) }
+                .tag(AppTab.home)
 
-            Group {
-                switch selectedTab {
-                case .home: HomeView()
-                case .rankings: RankingsView()
-                case .categories: CategoriesView()
-                case .actors: ActorsView()
-                case .me: UserView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Color.clear.frame(height: 88)
-            }
+            RankingsView()
+                .tabItem { Label(AppTab.rankings.title, systemImage: AppTab.rankings.icon) }
+                .tag(AppTab.rankings)
 
-            FloatingGlassTabBar(selection: $selectedTab)
-                .padding(.horizontal, AdaptiveLayout.isPad ? 0 : 18)
-                .padding(.bottom, 10)
-                .frame(maxWidth: AdaptiveLayout.isPad ? 520 : .infinity)
-                .frame(maxWidth: .infinity)
+            CategoriesView()
+                .tabItem { Label(AppTab.categories.title, systemImage: AppTab.categories.icon) }
+                .tag(AppTab.categories)
+
+            ActorsView()
+                .tabItem { Label(AppTab.actors.title, systemImage: AppTab.actors.icon) }
+                .tag(AppTab.actors)
+
+            UserView()
+                .tabItem { Label(AppTab.me.title, systemImage: AppTab.me.icon) }
+                .tag(AppTab.me)
         }
-        .ignoresSafeArea(.keyboard)
         .tint(JAVDBPalette.accent)
+        .modifier(LiquidGlassTabBarModifier())
     }
 }
 
-/// 悬浮液态玻璃 Tab Bar
-struct FloatingGlassTabBar: View {
-    @Binding var selection: AppTab
-
-    var body: some View {
-        tabBarContent
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .liquidGlass()
-    }
-
-    private var tabBarContent: some View {
-        HStack(spacing: 0) {
-            ForEach(AppTab.allCases) { tab in
-                Button {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                        selection = tab
-                    }
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: selection == tab ? tab.selectedIcon : tab.icon)
-                            .font(.system(size: 20, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .scaleEffect(selection == tab ? 1.1 : 1)
-                        Text(tab.title)
-                            .font(.system(size: 10, weight: selection == tab ? .semibold : .medium))
-                    }
-                    .foregroundStyle(selection == tab ? Color.accentColor : Color.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
+/// iOS 26：滚动时系统液态玻璃 Tab Bar 自动收起。
+private struct LiquidGlassTabBarModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            content
         }
     }
 }

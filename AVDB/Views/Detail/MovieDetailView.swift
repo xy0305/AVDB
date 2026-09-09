@@ -158,52 +158,54 @@ struct MovieDetailView: View {
     private func heroHeader(_ movie: Movie, width: CGFloat) -> some View {
         let contentWidth = max(0, width - 40)
         return VStack(alignment: .leading, spacing: 22) {
-            HStack {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 27, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: 46, height: 46)
-                        .liquidGlass()
-                }
-                Spacer()
-                Button {
-                    guard APIClient.shared.hasToken else {
-                        showLogin = true
-                        return
+            LiquidGlassContainer(spacing: 10) {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 27, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 46)
+                            .liquidGlassCircle()
                     }
-                    guard !isCollectingCode else { return }
-                    isCollectingCode = true
-                    Task {
-                        defer { isCollectingCode = false }
-                        do {
-                            let ok = try await JavDBSDK.shared.codeCollectActions(movie.id)
-                            if ok { isCodeCollected.toggle() }
-                            else { collectHint = "收藏失败，请稍后再试" }
-                        } catch {
-                            collectHint = error.localizedDescription
+                    Spacer()
+                    Button {
+                        guard APIClient.shared.hasToken else {
+                            showLogin = true
+                            return
                         }
+                        guard !isCollectingCode else { return }
+                        isCollectingCode = true
+                        Task {
+                            defer { isCollectingCode = false }
+                            do {
+                                let ok = try await JavDBSDK.shared.codeCollectActions(movie.id)
+                                if ok { isCodeCollected.toggle() }
+                                else { collectHint = "收藏失败，请稍后再试" }
+                            } catch {
+                                collectHint = error.localizedDescription
+                            }
+                        }
+                    } label: {
+                        Image(systemName: isCodeCollected ? "bookmark.fill" : "bookmark.square")
+                            .font(.system(size: 25, weight: .regular))
+                            .foregroundStyle(.white)
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(2).background(.white, in: Circle())
+                                    .foregroundStyle(Color(red: 0.45, green: 0.18, blue: 0.19))
+                                    .offset(x: 4, y: 4)
+                            }
+                            .frame(width: 46, height: 46)
+                            .liquidGlassCircle()
                     }
-                } label: {
-                    Image(systemName: isCodeCollected ? "bookmark.fill" : "bookmark.square")
-                        .font(.system(size: 25, weight: .regular))
-                        .foregroundStyle(.white)
-                        .overlay(alignment: .bottomTrailing) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(2).background(.white, in: Circle())
-                                .foregroundStyle(Color(red: 0.45, green: 0.18, blue: 0.19))
-                                .offset(x: 4, y: 4)
-                        }
-                        .frame(width: 46, height: 46)
-                        .liquidGlass()
-                }
-                Button { showSearch = true } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 28, weight: .regular))
-                        .foregroundStyle(.white)
-                        .frame(width: 46, height: 46)
-                        .liquidGlass()
+                    Button { showSearch = true } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 28, weight: .regular))
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 46)
+                            .liquidGlassCircle()
+                    }
                 }
             }
             .foregroundStyle(.white)
@@ -231,7 +233,7 @@ struct MovieDetailView: View {
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.96))
                         .frame(width: 56, height: 56)
-                        .liquidGlass()
+                        .liquidGlassCircle()
                 }
                 .buttonStyle(.plain)
                 .padding(12)

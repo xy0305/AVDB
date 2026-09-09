@@ -2,137 +2,166 @@
 //  GlassUI.swift
 //  AVDB
 //
-//  iOS 26 Liquid Glass 组件库
-//  原则：玻璃只用于「悬浮在内容之上的控件」，内容区保持正常底。
-//  编译开关：#if AVDB_LIQUID_GLASS 启用系统 .glassEffect()（需 Xcode 26+ / iOS 26 SDK）；
-//  否则回退到干净的 .ultraThinMaterial。
+//  iOS 26 系统 Liquid Glass。
+//  编译需 Xcode 26 SDK；运行时 iOS 26 走 .glassEffect / .buttonStyle(.glass)，
+//  iOS 17–25 回退 .ultraThinMaterial。
 //
 
 import SwiftUI
 
-// MARK: - 兼容层
+// MARK: - 系统玻璃修饰符
 
-/// 悬浮控件的液态玻璃修饰符（胶囊形）。
+/// 胶囊形系统 Liquid Glass（悬浮控件）。
 struct LiquidGlassEffect: ViewModifier {
     var tint: Color? = nil
+    var interactive: Bool = true
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        #if AVDB_LIQUID_GLASS
         if #available(iOS 26.0, *) {
             if let tint {
-                content.glassEffect(.regular.tint(tint), in: .capsule)
+                content.glassEffect(
+                    interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                    in: Capsule()
+                )
             } else {
-                content.glassEffect(.regular, in: .capsule)
+                content.glassEffect(
+                    interactive ? .regular.interactive() : .regular,
+                    in: Capsule()
+                )
             }
         } else {
-            fallbackCapsule(content)
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                }
         }
-        #else
-        fallbackCapsule(content)
-        #endif
-    }
-
-    private func fallbackCapsule(_ content: Content) -> some View {
-        content
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
     }
 }
 
-/// 矩形圆角的液态玻璃。
+/// 圆角矩形系统 Liquid Glass。
 struct LiquidGlassRectEffect: ViewModifier {
     var cornerRadius: CGFloat = 16
     var tint: Color? = nil
+    var interactive: Bool = true
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        #if AVDB_LIQUID_GLASS
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(iOS 26.0, *) {
-            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             if let tint {
-                content.glassEffect(.regular.tint(tint), in: shape)
+                content.glassEffect(
+                    interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                    in: shape
+                )
             } else {
-                content.glassEffect(.regular, in: shape)
+                content.glassEffect(
+                    interactive ? .regular.interactive() : .regular,
+                    in: shape
+                )
             }
         } else {
-            fallbackRect(content)
+            content
+                .background(.ultraThinMaterial, in: shape)
+                .overlay {
+                    shape.strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+                }
         }
-        #else
-        fallbackRect(content)
-        #endif
-    }
-
-    private func fallbackRect(_ content: Content) -> some View {
-        content
-            .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
     }
 }
 
-/// 多个玻璃控件的融合容器。
+/// 圆形系统 Liquid Glass。
+struct LiquidGlassCircleEffect: ViewModifier {
+    var tint: Color? = nil
+    var interactive: Bool = true
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            if let tint {
+                content.glassEffect(
+                    interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                    in: Circle()
+                )
+            } else {
+                content.glassEffect(
+                    interactive ? .regular.interactive() : .regular,
+                    in: Circle()
+                )
+            }
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay {
+                    Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                }
+        }
+    }
+}
+
+/// 多个玻璃控件融合（iOS 26 GlassEffectContainer）。
 struct LiquidGlassContainer<Content: View>: View {
+    var spacing: CGFloat = 8
     let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init(spacing: CGFloat = 8, @ViewBuilder content: () -> Content) {
+        self.spacing = spacing
         self.content = content()
     }
 
+    @ViewBuilder
     var body: some View {
-        #if AVDB_LIQUID_GLASS
         if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 8) { content }
+            GlassEffectContainer(spacing: spacing) { content }
         } else {
             content
         }
-        #else
-        content
-        #endif
     }
 }
 
 // MARK: - View 扩展
 
 extension View {
-    /// 悬浮胶囊控件玻璃
-    func liquidGlass(tint: Color? = nil) -> some View {
-        modifier(LiquidGlassEffect(tint: tint))
+    /// 悬浮胶囊控件：系统 Liquid Glass
+    func liquidGlass(tint: Color? = nil, interactive: Bool = true) -> some View {
+        modifier(LiquidGlassEffect(tint: tint, interactive: interactive))
     }
 
-    /// 悬浮矩形控件玻璃
-    func liquidGlassRect(cornerRadius: CGFloat = 16, tint: Color? = nil) -> some View {
-        modifier(LiquidGlassRectEffect(cornerRadius: cornerRadius, tint: tint))
+    /// 悬浮圆角矩形：系统 Liquid Glass
+    func liquidGlassRect(cornerRadius: CGFloat = 16, tint: Color? = nil, interactive: Bool = true) -> some View {
+        modifier(LiquidGlassRectEffect(cornerRadius: cornerRadius, tint: tint, interactive: interactive))
+    }
+
+    /// 悬浮圆形：系统 Liquid Glass
+    func liquidGlassCircle(tint: Color? = nil, interactive: Bool = true) -> some View {
+        modifier(LiquidGlassCircleEffect(tint: tint, interactive: interactive))
+    }
+
+    /// 系统玻璃按钮样式（iOS 26 `.glass` / `.glassProminent`）
+    @ViewBuilder
+    func avdbGlassButton(prominent: Bool = false) -> some View {
+        if #available(iOS 26.0, *) {
+            if prominent {
+                self.buttonStyle(.glassProminent)
+            } else {
+                self.buttonStyle(.glass)
+            }
+        } else {
+            if prominent {
+                self.buttonStyle(.borderedProminent)
+            } else {
+                self.buttonStyle(.bordered)
+            }
+        }
     }
 }
 
-// MARK: - 全局氛围背景
+// MARK: - 全局氛围背景（内容区，不是玻璃）
 
 struct LiquidGlassBackground: View {
     var body: some View {
-        ZStack {
-            Color(.systemBackground)
-
-            RadialGradient(
-                colors: [Color.accentColor.opacity(0.06), .clear],
-                center: UnitPoint(x: 0.2, y: 0.0),
-                startRadius: 0,
-                endRadius: 360
-            )
-            RadialGradient(
-                colors: [Color.orange.opacity(0.04), .clear],
-                center: UnitPoint(x: 0.85, y: 0.05),
-                startRadius: 0,
-                endRadius: 280
-            )
-        }
+        Color(.systemBackground)
     }
 }
 
@@ -142,25 +171,10 @@ struct GlassButton: View {
     let title: String
     let icon: String?
     let action: () -> Void
-    var style: ButtonStyle = .primary
+    var style: ButtonKind = .primary
 
-    enum ButtonStyle {
+    enum ButtonKind {
         case primary, secondary, destructive
-
-        var tint: Color? {
-            switch self {
-            case .primary: return .blue
-            case .secondary: return nil
-            case .destructive: return .red
-            }
-        }
-
-        var foreground: Color {
-            switch self {
-            case .primary, .destructive: return .white
-            case .secondary: return .primary
-            }
-        }
     }
 
     var body: some View {
@@ -173,12 +187,9 @@ struct GlassButton: View {
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
             }
-            .foregroundStyle(style.foreground)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .liquidGlass(tint: style.tint)
         }
-        .buttonStyle(.plain)
+        .avdbGlassButton(prominent: style == .primary || style == .destructive)
+        .tint(style == .destructive ? .red : .accentColor)
     }
 }
 
@@ -196,23 +207,14 @@ struct LiquidFilterChip: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .foregroundStyle(isSelected ? .white : .primary)
-                .background {
-                    if isSelected {
-                        Capsule(style: .continuous)
-                            .fill(Color.accentColor)
-                    } else {
-                        Capsule(style: .continuous)
-                            .fill(.ultraThinMaterial)
-                    }
-                }
-                .overlay {
-                    if !isSelected {
-                        Capsule(style: .continuous)
-                            .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
-                    }
-                }
         }
         .buttonStyle(.plain)
+        .background {
+            if isSelected {
+                Capsule(style: .continuous).fill(Color.accentColor)
+            }
+        }
+        .liquidGlass(interactive: true)
     }
 }
 
@@ -230,7 +232,7 @@ struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
             }
         }
         .padding(3)
-        .liquidGlass()
+        .liquidGlass(interactive: false)
     }
 
     private func segmentButton(_ option: T) -> some View {
@@ -347,7 +349,7 @@ struct GlassLoadingView: View {
             }
         }
         .frame(width: 120, height: 120)
-        .liquidGlassRect(cornerRadius: 20)
+        .liquidGlassRect(cornerRadius: 20, interactive: false)
     }
 }
 
@@ -373,7 +375,7 @@ struct ErrorBanner: View {
             }
         }
         .padding()
-        .liquidGlassRect(cornerRadius: 12)
+        .liquidGlassRect(cornerRadius: 12, interactive: false)
         .padding(.horizontal)
     }
 }
@@ -396,7 +398,7 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content
             .padding(padding)
-            .liquidGlassRect(cornerRadius: cornerRadius, tint: tint)
+            .liquidGlassRect(cornerRadius: cornerRadius, tint: tint, interactive: false)
     }
 }
 
@@ -450,6 +452,7 @@ struct GlassNavigationBar: View {
                         .frame(width: 44, height: 44)
                         .liquidGlass()
                 }
+                .buttonStyle(.plain)
             }
 
             Spacer()
@@ -467,6 +470,7 @@ struct GlassNavigationBar: View {
                         .frame(width: 44, height: 44)
                         .liquidGlass()
                 }
+                .buttonStyle(.plain)
             } else {
                 Color.clear.frame(width: 44, height: 44)
             }
@@ -479,7 +483,7 @@ struct GlassNavigationBar: View {
 extension View {
     func glassCard(cornerRadius: CGFloat = 20, padding: CGFloat = 16) -> some View {
         self.padding(padding)
-            .liquidGlassRect(cornerRadius: cornerRadius)
+            .liquidGlassRect(cornerRadius: cornerRadius, interactive: false)
     }
 
     func glassButton() -> some View {

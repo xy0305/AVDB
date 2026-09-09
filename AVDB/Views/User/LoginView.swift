@@ -65,6 +65,7 @@ struct LoginView: View {
                                 .frame(maxWidth: .infinity)
                         }
                     }
+                    .avdbGlassButton(prominent: true)
                     .disabled(isLoginDisabled || isLoading)
                 }
 
