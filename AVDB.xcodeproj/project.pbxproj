@@ -138,6 +138,7 @@
 				7231C462DD413E8C76270418 /* JavDBSDK.swift */,
 				5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */,
 				A115C11E7A7B115C11E7A101 /* Pan115Client.swift */,
+				FOLLTAGS0000000000000002 /* FollowingTagsStore.swift */,
 				B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */,
 			);
 			name = Services;
@@ -365,6 +366,7 @@
 				FOLLOWTAG001E253E75F82001 /* FollowingTagsView.swift in Sources */,
 				A115C11E7A7B115C11E7A111 /* UserCollectionsViews.swift in Sources */,
 				A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */,
+				FOLLTAGS0000000000000001 /* FollowingTagsStore.swift in Sources */,
 				B00BB00CDE000D10DE000002 /* DownloadLinkDetector.swift in Sources */,
 				A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */,
 				A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */,
