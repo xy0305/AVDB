@@ -653,7 +653,11 @@ final class PastRecommendViewModel: ObservableObject {
         periods = (try? await JavDBSDK.shared.recommendPeriods()) ?? []
     }
     func filtered(_ q: String) -> [RecommendPeriod] {
-        q.isEmpty ? periods : periods.filter { $0.searchText.localizedCaseInsensitiveContains(q) }
+        guard !q.isEmpty else { return periods }
+        return periods.filter {
+            $0.titleText.localizedCaseInsensitiveContains(q) ||
+            $0.dateText.localizedCaseInsensitiveContains(q)
+        }
     }
 }
 

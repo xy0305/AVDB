@@ -488,7 +488,7 @@ final class ActorDetailViewModel: ObservableObject {
     }
 
     func toggleCollect() async {
-        guard let actor, !isCollecting else { return }
+        guard actor != nil, !isCollecting else { return }
         isCollecting = true
         collectHint = nil
         defer { isCollecting = false }
