@@ -366,8 +366,10 @@ struct KSChromePlayer: View {
             .padding(.horizontal, 12)
             .padding(.top, 8)
 
-            Spacer(minLength: 0)
-                .allowsHitTesting(false)
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { toggleChrome() }
 
             progressBar
                 .padding(.horizontal, 16)
@@ -415,14 +417,14 @@ struct KSChromePlayer: View {
             .padding(.bottom, 10)
             .padding(.top, 6)
         }
-        .background(
+        .background {
             LinearGradient(
                 colors: [Color.black.opacity(0.55), .clear, .clear, Color.black.opacity(0.7)],
                 startPoint: .top,
                 endPoint: .bottom
             )
-        )
-        .allowsHitTesting(true)
+            .allowsHitTesting(false)
+        }
     }
 
     private var progressBar: some View {
@@ -547,6 +549,7 @@ struct KSChromePlayer: View {
     }
 
     private func toggleChrome() {
+        hideTask?.cancel()
         withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() }
         if showChrome { scheduleHide() }
     }

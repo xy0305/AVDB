@@ -52,18 +52,15 @@ struct Pan115PlayerView: View {
             }
 
             if vm.playURL != nil, vm.episodes.count > 1 {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button { showEpisodes = true } label: {
-                            Image(systemName: "rectangle.stack.badge.play")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .padding(12)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                HStack {
                     Spacer()
+                    Button { showEpisodes = true } label: {
+                        Image(systemName: "rectangle.stack.badge.play")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(12)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.top, 12)
                 .padding(.trailing, 12)
