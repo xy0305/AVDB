@@ -106,7 +106,7 @@ struct GlassTag: View {
 }
 
 // MARK: - 分段选择器（毛玻璃风格）
-struct GlassSegmentedPicker<T: Hashable & CaseIterable & RawRepresentable>: View where T.RawRepresentable.RawValue == String {
+struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
     @Binding var selection: T
     let title: (T) -> String
     
@@ -211,8 +211,8 @@ struct GlassNavigationBar: View {
     }
 }
 
-// MARK: - 空状态视图
-struct EmptyStateView: View {
+// MARK: - 增强空状态视图
+struct GlassEmptyView: View {
     let icon: String
     let title: String
     let subtitle: String?

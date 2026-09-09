@@ -379,7 +379,7 @@ struct HomeView: View {
                         NavigationLink {
                             MovieDetailView(movieID: movie.id)
                         } label: {
-                            MoviePosterCard(movie: movie, showMagnetBadge: true)
+                            MoviePosterCard(movie: movie)
                         }
                         .buttonStyle(.plain)
                     }
@@ -494,60 +494,6 @@ struct ShortcutCard: View {
     }
 }
 
-// MARK: - 电影海报卡片
-struct MoviePosterCard: View {
-    let movie: Movie
-    var showMagnetBadge: Bool = false
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topLeading) {
-                JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                    .aspectRatio(2/3, contentMode: .fill)
-                    .frame(width: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                if showMagnetBadge, let count = movie.magnetsCount, count > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "link")
-                            .font(.system(size: 9, weight: .bold))
-                        Text("\(count)")
-                            .font(.system(size: 10, weight: .bold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(.green.gradient, in: Capsule())
-                    .padding(6)
-                }
-                
-                if let score = movie.score, score > 0 {
-                    Text(String(format: "%.1f", score))
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(.orange.gradient, in: Capsule())
-                        .padding(6)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-            }
-            
-            Text(movie.displayNumber)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: 120, alignment: .leading)
-            
-            Text(movie.displayTitle)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .frame(width: 120, alignment: .leading)
-        }
-    }
-}
-
 // MARK: - ViewModel (保持不变)
 @MainActor
 final class HomeViewModel: ObservableObject {
@@ -603,9 +549,9 @@ struct ArticlesView: View {
     var body: some View {
         ZStack {
             if loading && articles.isEmpty {
-                GlassLoadingView("載入資訊")
+                EmptyStateView(text: "載入資訊")
             } else if articles.isEmpty {
-                EmptyStateView(icon: "newspaper", title: "暫無資訊")
+                EmptyStateView(text: "暫無資訊")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -646,9 +592,9 @@ struct HotReviewsView: View {
     var body: some View {
         ZStack {
             if loading && reviews.isEmpty {
-                GlassLoadingView("載入短評")
+                EmptyStateView(text: "載入短評")
             } else if reviews.isEmpty {
-                EmptyStateView(icon: "bubble.left.and.bubble.right", title: "暫無短評")
+                EmptyStateView(text: "暫無短評")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -719,7 +665,7 @@ struct PeriodMoviesView: View {
     var body: some View {
         Group {
             if loading && movies.isEmpty {
-                GlassLoadingView()
+                EmptyStateView(text: "載入中")
             } else {
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -744,8 +690,3 @@ struct PeriodMoviesView: View {
         }
     }
 }
-
-// 保留原有的其他视图
-struct SeriesView: View { var body: some View { Text("系列") } }
-struct MakersView: View { var body: some View { Text("片商") } }
-struct DirectorsView: View { var body: some View { Text("導演") } }
