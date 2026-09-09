@@ -2,8 +2,8 @@
 //  ContentView.swift
 //  AVDB
 //
-//  底部悬浮 Tab Bar：iOS 26 Liquid Glass（系统 .glassEffect()）
-//  玻璃只在悬浮控件上，内容区保持正常背景。
+//  底部悬浮 Tab Bar：iOS 26 Liquid Glass
+//  iPad 适配：内容居中限宽，Tab Bar 居中悬浮。
 //
 
 import SwiftUI
@@ -48,7 +48,6 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // 极淡氛围底，为玻璃提供可折射内容
             LiquidGlassBackground()
                 .ignoresSafeArea()
 
@@ -67,8 +66,10 @@ struct ContentView: View {
             }
 
             FloatingGlassTabBar(selection: $selectedTab)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, AdaptiveLayout.isPad ? 0 : 18)
                 .padding(.bottom, 10)
+                .frame(maxWidth: AdaptiveLayout.isPad ? 520 : .infinity)
+                .frame(maxWidth: .infinity)
         }
         .ignoresSafeArea(.keyboard)
         .tint(JAVDBPalette.accent)

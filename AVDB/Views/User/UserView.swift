@@ -210,44 +210,49 @@ struct CollectedView: View {
 
     private var actorGrid: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                ForEach(vm.actors) { actor in
-                    Button {
-                        if isEditing {
-                            if selectedActors.contains(actor.id) {
-                                selectedActors.remove(actor.id)
-                            } else {
-                                selectedActors.insert(actor.id)
-                            }
-                        }
-                    } label: {
-                        NavigationLink {
-                            ActorDetailView(actorID: actor.id)
-                        } label: {
-                            VStack(spacing: 8) {
-                                ZStack(alignment: .topTrailing) {
-                                    JavDBImage(url: actor.avatarURL, contentMode: .fill)
-                                        .frame(width: 110, height: 110)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                    if isEditing {
-                                        Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)
-                                            .padding(6)
-                                    }
+            GeometryReader { proxy in
+                let count = AdaptiveLayout.posterColumns(for: proxy.size.width)
+                let cols = Array(repeating: GridItem(.flexible()), count: count)
+                LazyVGrid(columns: cols, spacing: 16) {
+                    ForEach(vm.actors) { actor in
+                        Button {
+                            if isEditing {
+                                if selectedActors.contains(actor.id) {
+                                    selectedActors.remove(actor.id)
+                                } else {
+                                    selectedActors.insert(actor.id)
                                 }
-                                Text(actor.displayName)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                    .foregroundColor(.primary)
                             }
-                            .frame(width: 110)
+                        } label: {
+                            NavigationLink {
+                                ActorDetailView(actorID: actor.id)
+                            } label: {
+                                VStack(spacing: 8) {
+                                    ZStack(alignment: .topTrailing) {
+                                        JavDBImage(url: actor.avatarURL, contentMode: .fill)
+                                            .frame(width: 110, height: 110)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        if isEditing {
+                                            Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
+                                                .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)
+                                                .padding(6)
+                                        }
+                                    }
+                                    Text(actor.displayName)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .foregroundColor(.primary)
+                                }
+                                .frame(width: 110)
+                            }
+                            .disabled(isEditing)
                         }
-                        .disabled(isEditing)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding()
             }
-            .padding()
+            .frame(minHeight: 200)
             if vm.isLoading { ProgressView().padding() }
             if let err = vm.errorMessage {
                 Text(err).foregroundColor(.red).padding()

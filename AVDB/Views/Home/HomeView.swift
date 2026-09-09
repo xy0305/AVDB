@@ -33,6 +33,8 @@ struct HomeView: View {
                     followingSection
                 }
                 .padding(.vertical, 8)
+                .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
+                .frame(maxWidth: .infinity)
             }
             .background {
                 LiquidGlassBackground()
@@ -100,13 +102,13 @@ struct HomeView: View {
             .liquidGlassRect(cornerRadius: 14)
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
         .padding(.top, 8)
     }
 
     private var shortcutRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
+            HStack(spacing: AdaptiveLayout.isPad ? 16 : 12) {
                 shortcut("看熱播", "play.rectangle.fill", Color.red) { goHot = true }
                 shortcut("AV資訊", "newspaper.fill", Color.orange) { goArticles = true }
                 shortcut("看短評", "text.bubble.fill", Color.purple) { goReviews = true }
@@ -116,7 +118,7 @@ struct HomeView: View {
                 shortcut("導演", "person.3.fill", Color.indigo) { goDirectors = true }
                 shortcut("TOP250", "crown.fill", Color.yellow) { goRankings = true }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
         }
     }
 
@@ -171,11 +173,11 @@ struct HomeView: View {
                     .foregroundStyle(.blue)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
 
             if vm.recommended.isEmpty {
                 EmptyStateView(text: "載入推薦…")
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
             } else if let movie = vm.recommended.first {
                 NavigationLink {
                     MovieDetailView(movieID: movie.id)
@@ -224,7 +226,7 @@ struct HomeView: View {
                     }
                     .padding(14)
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
                 }
                 .buttonStyle(.plain)
             }
@@ -255,7 +257,7 @@ struct HomeView: View {
         Button { goRankings = true } label: {
             ZStack {
                 JavDBImage(url: vm.latest.first?.coverURL, contentMode: .fill)
-                    .frame(height: 90)
+                    .frame(height: AdaptiveLayout.isPad ? 120 : 90)
                     .clipped()
                     .overlay(Color.black.opacity(0.35))
                 Text("TOP250")
@@ -263,7 +265,7 @@ struct HomeView: View {
                     .foregroundStyle(.white)
             }
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AdaptiveLayout.gridPadding)
         }
         .buttonStyle(.plain)
     }
@@ -298,12 +300,12 @@ struct HomeView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
             if vm.following.isEmpty {
                 Text("登入後顯示關注內容")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
                     .padding(.bottom, 20)
             } else {
                 MoviePosterGrid(movies: vm.following)

@@ -87,6 +87,7 @@ struct RankingsView: View {
         .background {
             LiquidGlassBackground()
         }
+        .frame(maxWidth: .infinity)
         .navigationTitle("排行榜")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
@@ -165,44 +166,45 @@ struct RankingsView: View {
 
     private var actorRankingGrid: some View {
         ScrollView {
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 14),
-                GridItem(.flexible(), spacing: 14),
-                GridItem(.flexible(), spacing: 14),
-            ], spacing: 16) {
-                ForEach(Array(vm.actors.enumerated()), id: \.element.id) { idx, actor in
-                    NavigationLink {
-                        ActorDetailView(actorID: actor.id)
-                    } label: {
-                        VStack(spacing: 8) {
-                            ZStack(alignment: .topLeading) {
-                                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
-                                    .aspectRatio(1, contentMode: .fill)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                Text("\(idx + 1)")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(idx < 3 ? Color.orange : Color.black.opacity(0.6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                    .padding(6)
+            GeometryReader { proxy in
+                let count = AdaptiveLayout.posterColumns(for: proxy.size.width)
+                let cols = Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+                LazyVGrid(columns: cols, spacing: 16) {
+                    ForEach(Array(vm.actors.enumerated()), id: \.element.id) { idx, actor in
+                        NavigationLink {
+                            ActorDetailView(actorID: actor.id)
+                        } label: {
+                            VStack(spacing: 8) {
+                                ZStack(alignment: .topLeading) {
+                                    JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                                        .aspectRatio(1, contentMode: .fill)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    Text("\(idx + 1)")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(idx < 3 ? Color.orange : Color.black.opacity(0.6))
+                                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                        .padding(6)
+                                }
+                                Text(actor.displayName)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
                             }
-                            Text(actor.displayName)
-                                .font(.system(size: 13))
-                                .foregroundColor(.primary)
-                                .lineLimit(1)
                         }
-                    }
-                    .buttonStyle(.plain)
-                    .onAppear {
-                        if actor.id == vm.actors.last?.id {
-                            Task { await vm.loadMore() }
+                        .buttonStyle(.plain)
+                        .onAppear {
+                            if actor.id == vm.actors.last?.id {
+                                Task { await vm.loadMore() }
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, AdaptiveLayout.gridPadding)
             }
-            .padding(.horizontal, 12)
+            .frame(minHeight: 200)
             .padding(.vertical, 12)
             if vm.isLoading { ProgressView().padding() }
         }
@@ -226,8 +228,10 @@ struct RankingsView: View {
                 }
                 if vm.isLoading { ProgressView().padding() }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AdaptiveLayout.gridPadding)
             .padding(.vertical, 8)
+            .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
+            .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .bottom) {
             Button { showTopFilter = true } label: {
@@ -244,11 +248,13 @@ struct RankingsView: View {
     }
 
     private func top250Row(rank: Int, movie: Movie) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
+        let coverW: CGFloat = AdaptiveLayout.isPad ? 180 : 150
+        let coverH: CGFloat = AdaptiveLayout.isPad ? 240 : 200
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
                 ZStack(alignment: .topLeading) {
                     JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                        .frame(width: 150, height: 200)
+                        .frame(width: coverW, height: coverH)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     Text("\(rank)")
                         .font(.system(size: 13, weight: .bold))
@@ -272,7 +278,7 @@ struct RankingsView: View {
                 }
                 RankingPreviewCarousel(movie: movie)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 200)
+                    .frame(height: coverH)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             Text(movie.displayTitle)

@@ -39,6 +39,7 @@ struct CategoriesView: View {
             .background {
                 LiquidGlassBackground()
             }
+            .frame(maxWidth: .infinity)
             .navigationTitle("類別")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -93,11 +94,12 @@ struct CategoriesView: View {
                     .foregroundStyle(.tint)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
             .padding(.vertical, 10)
             .background(.ultraThinMaterial)
         }
         .padding(.bottom, 88)
+        .frame(maxWidth: .infinity)
     }
 }
 

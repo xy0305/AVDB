@@ -34,7 +34,9 @@ struct MovieGridView: View {
                     }
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, AdaptiveLayout.gridPadding)
+            .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
+            .frame(maxWidth: .infinity)
 
             if viewModel.isLoading && !viewModel.movies.isEmpty {
                 ProgressView()

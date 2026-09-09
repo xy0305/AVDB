@@ -129,8 +129,11 @@ struct MovieDetailView: View {
     }
 
     private func detailContent(_ movie: Movie, width: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            heroHeader(movie, width: width)
+        // iPad：内容居中限宽，避免无限拉伸
+        let maxW = min(width, AdaptiveLayout.contentMaxWidth)
+        let sidePad = max(0, (width - maxW) / 2)
+        return VStack(spacing: 0) {
+            heroHeader(movie, width: maxW)
 
             VStack(alignment: .leading, spacing: 20) {
                 if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
@@ -149,6 +152,7 @@ struct MovieDetailView: View {
             .background(Color(.systemBackground))
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34))
         }
+        .padding(.horizontal, sidePad)
     }
 
     private func heroHeader(_ movie: Movie, width: CGFloat) -> some View {

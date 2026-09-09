@@ -8,6 +8,33 @@
 
 import SwiftUI
 
+// MARK: - iPad / 自适应布局
+
+/// 根据设备和可用宽度提供自适应布局参数。
+enum AdaptiveLayout {
+    /// 是否 iPad（或 Mac Catalyst 等大屏）
+    static var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    /// 根据可用宽度决定海报网格列数
+    static func posterColumns(for width: CGFloat) -> Int {
+        if width >= 1100 { return 6 }
+        if width >= 900 { return 5 }
+        if width >= 700 { return 4 }
+        return 3  // iPhone
+    }
+
+    /// 内容区最大宽度（iPad 居中限制，避免无限拉伸）
+    static var contentMaxWidth: CGFloat { 1100 }
+
+    /// 水平内边距
+    static var horizontalPadding: CGFloat { isPad ? 24 : 16 }
+
+    /// 网格水平内边距
+    static var gridPadding: CGFloat { isPad ? 20 : 12 }
+}
+
 enum JAVDBPalette {
     static let accent = Color.accentColor
     static let magnetGreen = Color(red: 0.20, green: 0.62, blue: 0.38)
@@ -261,37 +288,45 @@ struct MoviePosterCard: View {
     }
 }
 
-/// 三列网格
+/// 自适应列数海报网格（iPhone 3 列，iPad 4–6 列）
 struct MoviePosterGrid: View {
     let movies: [Movie]
     var showRank: Bool = false
     var onAppearLast: ((Movie) -> Void)? = nil
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10),
-    ]
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private func columns(for width: CGFloat) -> [GridItem] {
+        let count = AdaptiveLayout.posterColumns(for: width)
+        return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
+    }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 14) {
-            ForEach(Array(movies.enumerated()), id: \.element.id) { idx, movie in
-                NavigationLink {
-                    MovieDetailView(movieID: movie.id)
-                } label: {
-                    MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onAppear {
-                    if movie.id == movies.last?.id {
-                        onAppearLast?(movie)
+        GeometryReader { proxy in
+            let cols = columns(for: proxy.size.width)
+            let hPad = AdaptiveLayout.gridPadding
+
+            LazyVGrid(columns: cols, spacing: 16) {
+                ForEach(Array(movies.enumerated()), id: \.element.id) { idx, movie in
+                    NavigationLink {
+                        MovieDetailView(movieID: movie.id)
+                    } label: {
+                        MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .onAppear {
+                        if movie.id == movies.last?.id {
+                            onAppearLast?(movie)
+                        }
                     }
                 }
             }
+            .padding(.horizontal, hPad)
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 12)
+        .frame(minHeight: 200)
     }
 }
 
@@ -318,7 +353,7 @@ struct SectionHeaderBar: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
     }
 }
 

@@ -50,11 +50,10 @@ struct ActorsView: View {
     @StateObject private var vm = ActorsHomeViewModel()
     @State private var showSearch = false
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14),
-    ]
+    private func columns(for width: CGFloat) -> [GridItem] {
+        let count = AdaptiveLayout.posterColumns(for: width)
+        return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+    }
 
     var body: some View {
         NavigationStack {
@@ -66,6 +65,7 @@ struct ActorsView: View {
             .background {
                 LiquidGlassBackground()
             }
+            .frame(maxWidth: .infinity)
             .navigationTitle("演員")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -118,19 +118,22 @@ struct ActorsView: View {
                 }
                 Spacer()
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
 
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(actors) { actor in
-                    NavigationLink {
-                        ActorDetailView(actorID: actor.id)
-                    } label: {
-                        actorCell(actor)
+            GeometryReader { proxy in
+                LazyVGrid(columns: columns(for: proxy.size.width), spacing: 16) {
+                    ForEach(actors) { actor in
+                        NavigationLink {
+                            ActorDetailView(actorID: actor.id)
+                        } label: {
+                            actorCell(actor)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, AdaptiveLayout.gridPadding)
             }
-            .padding(.horizontal, 12)
+            .frame(minHeight: 100)
         }
     }
 
@@ -139,22 +142,25 @@ struct ActorsView: View {
             if vm.isLoading && vm.list.isEmpty {
                 EmptyStateView(text: "載入演員…")
             } else {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(vm.list) { actor in
-                        NavigationLink {
-                            ActorDetailView(actorID: actor.id)
-                        } label: {
-                            actorCell(actor)
-                        }
-                        .buttonStyle(.plain)
-                        .onAppear {
-                            if actor.id == vm.list.last?.id {
-                                Task { await vm.loadMore() }
+                GeometryReader { proxy in
+                    LazyVGrid(columns: columns(for: proxy.size.width), spacing: 16) {
+                        ForEach(vm.list) { actor in
+                            NavigationLink {
+                                ActorDetailView(actorID: actor.id)
+                            } label: {
+                                actorCell(actor)
+                            }
+                            .buttonStyle(.plain)
+                            .onAppear {
+                                if actor.id == vm.list.last?.id {
+                                    Task { await vm.loadMore() }
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, AdaptiveLayout.gridPadding)
                 }
-                .padding(.horizontal, 12)
+                .frame(minHeight: 200)
                 .padding(.vertical, 12)
                 if vm.isLoading { ProgressView().padding() }
             }
