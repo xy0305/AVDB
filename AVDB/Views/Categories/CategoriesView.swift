@@ -44,9 +44,8 @@ struct CategoriesView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button { } label: { Image(systemName: "eye") }
-                        Button { showSearch = true } label: { Image(systemName: "magnifyingglass") }
+                    Button { showSearch = true } label: {
+                        Image(systemName: "magnifyingglass")
                     }
                 }
             }
@@ -96,9 +95,8 @@ struct CategoriesView: View {
             }
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
             .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
+            .background(.bar)
         }
-        .padding(.bottom, 88)
         .frame(maxWidth: .infinity)
     }
 }

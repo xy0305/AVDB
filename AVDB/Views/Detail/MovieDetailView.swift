@@ -61,25 +61,24 @@ struct MovieDetailView: View {
                 .ignoresSafeArea(edges: .top)
 
                 if let movie = vm.movie {
-                    // ContentView 的悬浮 Tab Bar 在详情页外层，必须为它预留高度，
-                    // 否则 76pt 的评论折叠栏会被约 94pt 的 Tab Bar 完整遮住。
                     DraggableReviewsPanel(
                         movieID: movie.id,
                         // 官方 App 的“短评”数量对应 comments_count；reviews_count 是评分人数。
                         total: movie.commentsCount ?? 0,
                         panelHeight: $reviewPanelHeight,
                         vm: reviewsVM,
-                        availableHeight: max(300, proxy.size.height - 94)
+                        availableHeight: max(280, proxy.size.height)
                     )
                     .frame(width: proxy.size.width)
                     .frame(maxHeight: .infinity, alignment: .bottom)
-                    .offset(y: -94)
+                    .ignoresSafeArea(edges: .bottom)
                     .zIndex(10)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .nativeSwipeBackEnabled()
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task {
@@ -1223,9 +1222,11 @@ struct DraggableReviewsPanel: View {
         }
         .frame(height: panelHeight, alignment: .top)
         .frame(maxHeight: panelHeight)
+        .padding(.bottom, 8)
         .background(Color(.systemBackground))
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 16, y: -4)
+        .safeAreaPadding(.bottom)
         .gesture(
             DragGesture(minimumDistance: 8)
                 .onChanged { value in

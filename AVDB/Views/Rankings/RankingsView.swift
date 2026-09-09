@@ -91,16 +91,16 @@ struct RankingsView: View {
         .navigationTitle("排行榜")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            if tab == .top250 {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showTopFilter = true } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
-                    if tab == .top250 {
-                        Button { showTopFilter = true } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                        }
-                    }
-                    Button { showSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                    }
+                Button { showSearch = true } label: {
+                    Image(systemName: "magnifyingglass")
                 }
             }
         }
@@ -191,7 +191,7 @@ struct RankingsView: View {
             .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
             .frame(maxWidth: .infinity)
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaInset(edge: .bottom, spacing: 8) {
             Button { showTopFilter = true } label: {
                 Text("篩選")
                     .font(.headline)
@@ -200,8 +200,8 @@ struct RankingsView: View {
                     .padding(.vertical, 12)
             }
             .liquidGlass()
-            .padding(.horizontal, 16)
-            .padding(.bottom, 88)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 6)
         }
     }
 
