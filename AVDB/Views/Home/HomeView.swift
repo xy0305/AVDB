@@ -2,7 +2,7 @@
 //  HomeView.swift
 //  AVDB
 //
-//  首页：iOS 26 液态玻璃风格重构
+//  首页：快捷入口、佳片推荐、最新上架、TOP250、近期磁链、我的关注。
 //
 
 import SwiftUI
@@ -10,491 +10,269 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @State private var goSearch = false
-    @State private var selectedSection: HomeSection? = nil
-    
-    enum HomeSection: Hashable {
-        case rankings, hot, latest, magnets, articles, reviews
-        case series, makers, directors, pastRecommend
-    }
-    
+    @State private var goRankings = false
+    @State private var goHot = false
+    @State private var goLatest = false
+    @State private var goMagnets = false
+    @State private var goArticles = false
+    @State private var goReviews = false
+    @State private var goSeries = false
+    @State private var goMakers = false
+    @State private var goDirectors = false
+
     var body: some View {
         NavigationStack {
-            ZStack {
-                // 背景渐变
-                LinearGradient(
-                    colors: [Color(.systemBackground), Color.blue.opacity(0.05)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(spacing: 20) {
-                        // 搜索栏
-                        searchButton
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        
-                        // 快捷入口网格
-                        shortcutsGrid
-                            .padding(.horizontal)
-                        
-                        // 佳片推荐卡片
-                        if !vm.recommended.isEmpty {
-                            recommendCard
-                                .padding(.horizontal)
-                        }
-                        
-                        // 最新上架
-                        latestSection
-                        
-                        // TOP250 横幅
-                        top250Banner
-                            .padding(.horizontal)
-                        
-                        // 近期磁链
-                        magnetSection
-                        
-                        // 我的关注
-                        if !vm.following.isEmpty {
-                            followingSection
-                        }
-                    }
-                    .padding(.vertical)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    searchBar
+                    shortcutRow
+                    recommendSection
+                    latestSection
+                    top250Banner
+                    magnetSection
+                    followingSection
                 }
+                .padding(.vertical, 8)
             }
+            .background(Color(.systemBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.blue.gradient)
-                        Text("AVDB")
-                            .font(.system(size: 20, weight: .bold))
-                    }
+                    EmptyView()
                 }
             }
             .task { await vm.initialLoad() }
             .refreshable { await vm.initialLoad() }
-            .navigationDestination(isPresented: $goSearch) { SearchView() }
-            .navigationDestination(item: $selectedSection) { section in
-                destinationView(for: section)
+            .navigationDestination(isPresented: $goSearch) {
+                SearchView()
+            }
+            .navigationDestination(isPresented: $goRankings) {
+                RankingsView(embedded: true, initialTab: .top250)
+            }
+            .navigationDestination(isPresented: $goHot) {
+                RankingsView(embedded: true, initialTab: .playback)
+            }
+            .navigationDestination(isPresented: $goLatest) {
+                CatalogListView(title: "最新上架", type: .censored, source: .latest)
+            }
+            .navigationDestination(isPresented: $goMagnets) {
+                CatalogListView(title: "近期磁鏈", type: .censored, source: .latest)
+            }
+            .navigationDestination(isPresented: $goArticles) {
+                ArticlesView()
+            }
+            .navigationDestination(isPresented: $goReviews) {
+                HotReviewsView()
+            }
+            .navigationDestination(isPresented: $goSeries) {
+                SeriesView()
+            }
+            .navigationDestination(isPresented: $goMakers) {
+                MakersView()
+            }
+            .navigationDestination(isPresented: $goDirectors) {
+                DirectorsView()
             }
         }
     }
-    
-    // MARK: - 搜索按钮
-    private var searchButton: some View {
+
+    /// 首页顶部原生搜索框（点击进入搜索页）
+    private var searchBar: some View {
         Button {
             goSearch = true
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.secondary)
-                
-                Text("搜索番號 / 關鍵詞")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.secondary)
-                
+                    .foregroundColor(.secondary)
+                Text("搜索番号 / 关键词")
+                    .foregroundColor(.secondary)
                 Spacer()
-                
-                Image(systemName: "barcode.viewfinder")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.blue)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+    }
+
+    private var shortcutRow: some View {
+        HStack(spacing: 0) {
+            shortcut("看熱播", "play.rectangle.fill", Color.blue) { goHot = true }
+            shortcut("AV資訊", "newspaper.fill", Color.red) { goArticles = true }
+            shortcut("看短評", "text.bubble.fill", Color.orange) { goReviews = true }
+            shortcut("找磁鏈", "link", Color.green) { goMagnets = true }
+            shortcut("系列", "square.stack", Color.purple) { goSeries = true }
+            shortcut("片商", "building.2", Color.teal) { goMakers = true }
+            shortcut("导演", "person.3", Color.indigo) { goDirectors = true }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 4)
+    }
+
+    private func shortcut(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(color)
+                    .frame(width: 44, height: 44)
+                    .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+            }
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
     }
-    
-    // MARK: - 快捷入口网格
-    private var shortcutsGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12)
-        ], spacing: 12) {
-            ShortcutCard(icon: "flame.fill", title: "熱播", color: .red) {
-                selectedSection = .hot
-            }
-            ShortcutCard(icon: "sparkles", title: "最新", color: .blue) {
-                selectedSection = .latest
-            }
-            ShortcutCard(icon: "link.circle.fill", title: "磁鏈", color: .green) {
-                selectedSection = .magnets
-            }
-            ShortcutCard(icon: "crown.fill", title: "TOP250", color: .yellow) {
-                selectedSection = .rankings
-            }
-            ShortcutCard(icon: "newspaper.fill", title: "資訊", color: .purple) {
-                selectedSection = .articles
-            }
-            ShortcutCard(icon: "bubble.left.and.bubble.right.fill", title: "短評", color: .orange) {
-                selectedSection = .reviews
-            }
-            ShortcutCard(icon: "square.stack.3d.up.fill", title: "系列", color: .teal) {
-                selectedSection = .series
-            }
-            ShortcutCard(icon: "building.2.fill", title: "片商", color: .indigo) {
-                selectedSection = .makers
-            }
-        }
-    }
-    
-    // MARK: - 佳片推荐卡片
-    private var recommendCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // 头部
+
+    private var recommendSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.yellow.gradient)
-                    Text("佳片推薦")
-                        .font(.system(size: 18, weight: .bold))
-                }
-                
-                GlassTag(text: vm.periodLabel, color: .blue, size: .small)
-                
+                Text("佳片推薦")
+                    .font(.headline)
+                Text(vm.periodLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color(.systemGray6), in: Capsule())
                 Spacer()
-                
-                Button {
-                    selectedSection = .pastRecommend
+                NavigationLink {
+                    PastRecommendView()
                 } label: {
-                    HStack(spacing: 4) {
-                        Text("往期")
-                            .font(.system(size: 14, weight: .medium))
+                    HStack(spacing: 2) {
+                        Text("往期推薦")
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.caption.weight(.semibold))
                     }
-                    .foregroundStyle(.blue)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
             }
-            .padding()
-            
-            Divider()
-            
-            // 推荐内容
-            if let movie = vm.recommended.first {
+            .padding(.horizontal, 16)
+
+            if vm.recommended.isEmpty {
+                EmptyStateView(text: "載入推薦…")
+            } else if let movie = vm.recommended.first {
                 NavigationLink {
                     MovieDetailView(movieID: movie.id)
                 } label: {
-                    HStack(alignment: .top, spacing: 14) {
-                        // 封面
-                        ZStack(alignment: .topTrailing) {
-                            JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                                .aspectRatio(2/3, contentMode: .fill)
-                                .frame(width: 100)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            
-                            if let score = movie.score, score > 0 {
-                                Text(String(format: "%.1f", score))
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(.orange.gradient, in: Capsule())
-                                    .padding(6)
-                            }
-                        }
-                        
-                        // 信息
+                    HStack(alignment: .top, spacing: 12) {
+                        JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+                            .frame(width: 110, height: 150)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(movie.displayNumber)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.blue)
-                            
-                            Text(movie.displayTitle)
-                                .font(.system(size: 15, weight: .medium))
+                            Text(movie.displayNumber + "  " + movie.displayTitle)
+                                .font(.subheadline.weight(.medium))
                                 .foregroundStyle(.primary)
                                 .lineLimit(3)
-                            
-                            Spacer()
-                            
                             if let score = movie.score, score > 0 {
-                                RatingStars(rating: score / 2, size: 14, color: .orange)
+                                HStack(spacing: 4) {
+                                    ForEach(0..<5, id: \.self) { i in
+                                        Image(systemName: i < Int(score.rounded()) ? "star.fill" : "star")
+                                            .font(.caption)
+                                            .foregroundStyle(.orange)
+                                    }
+                                    Text(String(format: "%.2f", score))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Spacer(minLength: 0)
                     }
-                    .padding()
+                    .padding(.horizontal, 16)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
     }
-    
-    // MARK: - 最新上架
+
     private var latestSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.blue.gradient)
-                    Text("最新上架")
-                        .font(.system(size: 18, weight: .bold))
-                }
-                .padding(.leading)
-                
-                Spacer()
-                
-                Button {
-                    selectedSection = .latest
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("查看全部")
-                            .font(.system(size: 14, weight: .medium))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(.blue)
-                }
-                .padding(.trailing)
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeaderBar(title: "最新上架") { goLatest = true }
+            if vm.latest.isEmpty {
+                EmptyStateView(text: "載入最新…")
+            } else {
+                MoviePosterGrid(movies: Array(vm.latest.prefix(9)))
             }
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(vm.latest.prefix(12), id: \.id) { movie in
-                        NavigationLink {
-                            MovieDetailView(movieID: movie.id)
-                        } label: {
-                            MoviePosterCard(movie: movie)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-            }
-            
             Button {
                 Task { await vm.shuffleLatest() }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("換一組")
-                        .font(.system(size: 15, weight: .medium))
-                }
-                .foregroundStyle(.blue)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                Text("換一組")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
             }
-            .padding(.horizontal)
         }
     }
-    
-    // MARK: - TOP250横幅
+
     private var top250Banner: some View {
-        Button {
-            selectedSection = .rankings
-        } label: {
-            ZStack(alignment: .leading) {
-                // 背景图
-                if let coverURL = vm.latest.first?.coverURL {
-                    JavDBImage(url: coverURL, contentMode: .fill)
-                        .frame(height: 140)
-                        .blur(radius: 40)
-                }
-                
-                // 渐变遮罩
-                LinearGradient(
-                    colors: [.yellow.opacity(0.9), .orange.opacity(0.8)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .frame(height: 140)
-                
-                // 内容
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 24, weight: .bold))
-                            Text("TOP 250")
-                                .font(.system(size: 32, weight: .black))
-                        }
-                        .foregroundStyle(.white)
-                        
-                        Text("觀看評分最高影片")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.white)
-                }
-                .padding(20)
+        Button { goRankings = true } label: {
+            ZStack {
+                JavDBImage(url: vm.latest.first?.coverURL, contentMode: .fill)
+                    .frame(height: 90)
+                    .clipped()
+                    .overlay(Color.black.opacity(0.35))
+                Text("TOP250")
+                    .font(.largeTitle.weight(.heavy))
+                    .foregroundStyle(.white)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(color: .orange.opacity(0.3), radius: 15, y: 8)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, 12)
         }
         .buttonStyle(.plain)
     }
-    
-    // MARK: - 近期磁链
+
     private var magnetSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "link.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.green.gradient)
-                    Text("近期磁鏈")
-                        .font(.system(size: 18, weight: .bold))
-                }
-                .padding(.leading)
-                
-                Spacer()
-                
-                Button {
-                    selectedSection = .magnets
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("查看全部")
-                            .font(.system(size: 14, weight: .medium))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(.green)
-                }
-                .padding(.trailing)
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeaderBar(title: "近期磁鏈更新") { goMagnets = true }
+            if vm.magnets.isEmpty {
+                EmptyStateView(text: "載入磁鏈…")
+            } else {
+                MoviePosterGrid(movies: Array(vm.magnets.prefix(9)))
             }
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(vm.magnets.prefix(12), id: \.id) { movie in
-                        NavigationLink {
-                            MovieDetailView(movieID: movie.id)
-                        } label: {
-                            MoviePosterCard(movie: movie)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-            }
-            
             Button {
                 Task { await vm.shuffleMagnets() }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("換一組")
-                        .font(.system(size: 15, weight: .medium))
-                }
-                .foregroundStyle(.green)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                Text("換一組")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
             }
-            .padding(.horizontal)
         }
     }
-    
-    // MARK: - 我的关注
+
     private var followingSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.pink.gradient)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
                 Text("我的關注")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.headline)
+                Spacer()
+                Text("更新時間倒序")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(vm.following.prefix(12), id: \.id) { movie in
-                        NavigationLink {
-                            MovieDetailView(movieID: movie.id)
-                        } label: {
-                            MoviePosterCard(movie: movie)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
+            .padding(.horizontal, 16)
+            if vm.following.isEmpty {
+                Text("登入後顯示關注內容")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+            } else {
+                MoviePosterGrid(movies: vm.following)
             }
-        }
-    }
-    
-    // MARK: - 路由辅助
-    @ViewBuilder
-    private func destinationView(for section: HomeSection) -> some View {
-        switch section {
-        case .rankings:
-            RankingsView(embedded: true, initialTab: .top250)
-        case .hot:
-            RankingsView(embedded: true, initialTab: .playback)
-        case .latest:
-            CatalogListView(title: "最新上架", type: .censored, source: .latest)
-        case .magnets:
-            CatalogListView(title: "近期磁鏈", type: .censored, source: .latest)
-        case .articles:
-            ArticlesView()
-        case .reviews:
-            HotReviewsView()
-        case .series:
-            SeriesView()
-        case .makers:
-            MakersView()
-        case .directors:
-            DirectorsView()
-        case .pastRecommend:
-            PastRecommendView()
         }
     }
 }
 
-// MARK: - 快捷卡片组件
-struct ShortcutCard: View {
-    let icon: String
-    let title: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.15))
-                        .frame(width: 56, height: 56)
-                    
-                    Image(systemName: icon)
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(color.gradient)
-                }
-                
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.primary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - ViewModel (保持不变)
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var recommended: [Movie] = []
@@ -509,8 +287,8 @@ final class HomeViewModel: ObservableObject {
 
     func initialLoad() async {
         async let rec = try? sdk.recommendMovies(page: 1)
-        async let latestTask = try? sdk.latestMovies(page: 1, limit: 24, type: "all", filterBy: "can_play", sortBy: "update")
-        async let magTask = try? sdk.latestMovies(page: 2, limit: 24, type: "all", filterBy: "can_play", sortBy: "update")
+        async let latestTask = try? sdk.latestMovies(page: 1, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
+        async let magTask = try? sdk.latestMovies(page: 2, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
         async let periodsTask = try? sdk.recommendPeriods()
         async let followTask = try? sdk.recentViewed()
 
@@ -527,52 +305,40 @@ final class HomeViewModel: ObservableObject {
 
     func shuffleLatest() async {
         latestPage += 1
-        let next = (try? await sdk.latestMovies(page: latestPage, limit: 24, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
+        let next = (try? await sdk.latestMovies(page: latestPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
         if next.isEmpty { latestPage = 1 }
         else { latest = next }
     }
 
     func shuffleMagnets() async {
         magnetPage += 1
-        let next = (try? await sdk.latestMovies(page: magnetPage, limit: 24, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
+        let next = (try? await sdk.latestMovies(page: magnetPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
         let filtered = next.filter { ($0.magnetsCount ?? 0) > 0 }
         if filtered.isEmpty { magnetPage = 1 }
         else { magnets = filtered }
     }
 }
 
-// MARK: - 辅助视图(保留原有实现，后续单独重构)
 struct ArticlesView: View {
     @State private var articles: [Article] = []
     @State private var loading = true
 
     var body: some View {
-        ZStack {
+        Group {
             if loading && articles.isEmpty {
-                EmptyStateView(text: "載入資訊")
-            } else if articles.isEmpty {
-                EmptyStateView(text: "暫無資訊")
+                EmptyStateView(text: "載入資訊…")
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(articles, id: \.stableArticleID) { article in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(article.title ?? "")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.primary)
-                                if let date = article.createdAt {
-                                    Text(date)
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                List(articles, id: \.stableArticleID) { article in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(article.title ?? "")
+                            .font(.system(size: 15, weight: .medium))
+                        if let date = article.createdAt {
+                            Text(date).font(.caption).foregroundColor(.secondary)
                         }
                     }
-                    .padding()
+                    .padding(.vertical, 4)
                 }
+                .listStyle(.plain)
             }
         }
         .navigationTitle("AV資訊")
@@ -590,21 +356,15 @@ struct HotReviewsView: View {
     @State private var loading = true
 
     var body: some View {
-        ZStack {
+        Group {
             if loading && reviews.isEmpty {
-                EmptyStateView(text: "載入短評")
-            } else if reviews.isEmpty {
-                EmptyStateView(text: "暫無短評")
+                EmptyStateView(text: "載入短評…")
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(reviews, id: \.stableReviewID) { review in
-                            ReviewRow(review: review)
-                                .padding(.horizontal)
-                        }
-                    }
-                    .padding(.vertical)
+                List(reviews, id: \.stableReviewID) { review in
+                    ReviewRow(review: review)
+                        .listRowSeparator(.hidden)
                 }
+                .listStyle(.plain)
             }
         }
         .navigationTitle("看短評")
@@ -617,80 +377,119 @@ struct HotReviewsView: View {
     }
 }
 
+/// 往期推薦：/api/v1/movies/recommend_periods
 struct PastRecommendView: View {
     @StateObject private var vm = PastRecommendViewModel()
     @State private var query = ""
+    @State private var showSearch = false
 
     var body: some View {
         List {
-            ForEach(vm.filtered(query), id: \.id) { period in
+            ForEach(Array(vm.filtered(query).enumerated()), id: \.element.id) { idx, period in
                 NavigationLink {
                     PeriodMoviesView(period: period)
                 } label: {
                     HStack(spacing: 8) {
                         Text(period.titleText)
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 16))
+                            .foregroundColor(.primary)
                         if !period.dateText.isEmpty {
                             Text("(\(period.dateText))")
-                                .font(.system(size: 14))
+                                .font(.system(size: 16))
                                 .foregroundColor(.secondary)
                         }
+                        Spacer()
+                    }
+                    .padding(.vertical, 10)
+                }
+                .listRowBackground(idx % 2 == 0 ? Color(.systemBackground) : Color(.systemGray5))
+                .listRowSeparator(.hidden)
+                .onAppear {
+                    if period.id == vm.periods.last?.id {
+                        Task { await vm.loadMore() }
                     }
                 }
             }
+            if vm.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+            }
         }
-        .searchable(text: $query, prompt: "搜索推薦期數")
+        .listStyle(.plain)
         .navigationTitle("往期推薦")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await vm.load() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showSearch.toggle()
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+            }
+        }
+        .searchable(text: $query, isPresented: $showSearch, prompt: "搜尋期數")
+        .task { await vm.loadMore() }
     }
 }
 
 @MainActor
 final class PastRecommendViewModel: ObservableObject {
     @Published var periods: [RecommendPeriod] = []
-    func load() async {
-        periods = (try? await JavDBSDK.shared.recommendPeriods()) ?? []
-    }
-    func filtered(_ q: String) -> [RecommendPeriod] {
+    @Published var isLoading = false
+    private var page = 1
+    private var hasMore = true
+
+    func filtered(_ query: String) -> [RecommendPeriod] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return periods }
         return periods.filter {
-            $0.titleText.localizedCaseInsensitiveContains(q) ||
-            $0.dateText.localizedCaseInsensitiveContains(q)
+            $0.titleText.contains(q) || $0.dateText.contains(q) || "\($0.period ?? 0)".contains(q)
         }
+    }
+
+    func loadMore() async {
+        guard !isLoading, hasMore else { return }
+        isLoading = true
+        defer { isLoading = false }
+        let next = (try? await JavDBSDK.shared.recommendPeriods(page: page, limit: 24)) ?? []
+        if next.isEmpty {
+            hasMore = false
+            return
+        }
+        let ids = Set(periods.map(\.id))
+        periods.append(contentsOf: next.filter { !ids.contains($0.id) })
+        page += 1
     }
 }
 
 struct PeriodMoviesView: View {
     let period: RecommendPeriod
-    @State private var movies: [Movie] = []
-    @State private var loading = true
+    @StateObject private var vm: MovieListViewModel
+
+    init(period: RecommendPeriod) {
+        self.period = period
+        let p = period.period
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.recommendMovies(page: page, period: p)
+        })
+    }
 
     var body: some View {
-        Group {
-            if loading && movies.isEmpty {
-                EmptyStateView(text: "載入中")
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        ForEach(movies, id: \.id) { movie in
-                            NavigationLink {
-                                MovieDetailView(movieID: movie.id)
-                            } label: {
-                                MoviePosterCard(movie: movie)
-                            }
-                        }
-                    }
-                    .padding()
-                }
-            }
+        ScrollView {
+            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                vm.loadMoreIfNeeded(current: movie)
+            })
+            if vm.isLoading { ProgressView().padding() }
+            // 底部占位：避开悬浮 Tab 栏，让最后一行作品完整露出
+            Color.clear.frame(height: 100)
         }
-        .navigationTitle(period.titleText)
+        .navigationTitle(period.dateText.isEmpty ? period.titleText : "\(period.titleText)  \(period.dateText)")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            loading = true
-            movies = (try? await JavDBSDK.shared.recommendMovies(period: period.period)) ?? []
-            loading = false
-        }
+        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .refreshable { await vm.refresh() }
     }
 }
