@@ -75,12 +75,21 @@ struct FollowingTagsView: View {
                         }
                     }
                 }
+                .refreshable {
+                    await vm.load()
+                }
             }
         }
         .navigationTitle("管理我的標籤")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
+                if vm.tags.isEmpty {
+                    Button("刷新") {
+                        Task { await vm.load() }
+                    }
+                } else {
+                    EditButton()
+                }
             }
         }
         .environment(\.editMode, $editMode)

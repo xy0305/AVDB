@@ -659,7 +659,16 @@ public final class JavDBSDK {
     /// 用户信息（GET /api/v1/users，需 token）
     public func userInfo() async throws -> (user: User, followingTags: [FollowingTag]) {
         let resp: JavDBResponse<UserData> = try await client.get("/api/v1/users", useToken: true)
-        print("📍 userInfo response: success=\(resp.isSuccess), data.user=\(resp.data?.user?.id ?? -1), followingTags.count=\(resp.data?.followingTags?.count ?? 0)")
+        
+        // 打印原始 JSON 用于调试
+        if let data = resp.data {
+            print("📍 userInfo raw data:")
+            print("  - user.id: \(data.user?.id ?? -1)")
+            print("  - followingTags: \(String(describing: data.followingTags))")
+        } else {
+            print("❌ userInfo: resp.data is nil")
+        }
+        
         guard resp.isSuccess, let user = resp.data?.user else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
