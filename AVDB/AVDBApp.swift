@@ -42,7 +42,7 @@ final class AppState: ObservableObject {
             // 异步验证 Token 并拉取用户信息
             Task {
                 do {
-                    let user = try await JavDBSDK.shared.userInfo()
+                    let (user, _) = try await JavDBSDK.shared.userInfo()
                     self.currentUser = user
                     self.isLoggedIn = true
                 } catch {

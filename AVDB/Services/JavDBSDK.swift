@@ -468,13 +468,6 @@ public final class JavDBSDK {
     }
 
     /// 获取关注的标签列表（GET /api/v1/following_tags）
-    public func followingTags() async throws -> [FollowingTag] {
-        struct TagData: Decodable { let tags: [FollowingTag]? }
-        let resp: JavDBResponse<TagData> = try await client.get(
-            "/api/v1/following_tags", useToken: true)
-        return resp.data?.tags ?? []
-    }
-
     /// 收藏/取消收藏清单（POST /api/v1/lists/{id}/collect_actions2 或 /collect_actions）
     public func toggleListCollection(_ id: String, collect: Bool) async throws -> Bool {
         // 先尝试 collect_actions2（官方字符串里出现的版本）
@@ -607,11 +600,6 @@ public final class JavDBSDK {
     }
 
     /// 关注的标签（GET /api/v1/following_tags）
-    public func followingTags() async throws -> [Tag] {
-        let resp: JavDBResponse<TagListData> = try await client.get("/api/v1/following_tags", useToken: true)
-        return resp.data?.tags ?? []
-    }
-
     /// 标签（GET /api/v2/tags）
     public func tags() async throws -> [Tag] {
         let resp: JavDBResponse<TagListData> = try await client.get("/api/v2/tags")
@@ -669,13 +657,13 @@ public final class JavDBSDK {
     }
 
     /// 用户信息（GET /api/v1/users，需 token）
-    public func userInfo() async throws -> User {
+    public func userInfo() async throws -> (user: User, followingTags: [FollowingTag]) {
         let resp: JavDBResponse<UserData> = try await client.get("/api/v1/users", useToken: true)
         guard resp.isSuccess, let user = resp.data?.user else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
         client.currentUser = user
-        return user
+        return (user, resp.data?.followingTags ?? [])
     }
 
     /// 最近浏览（GET /api/v1/users/recent_viewed）

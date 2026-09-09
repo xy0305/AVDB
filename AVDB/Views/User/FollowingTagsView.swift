@@ -74,7 +74,8 @@ final class FollowingTagsViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            tags = try await JavDBSDK.shared.followingTags()
+            let (_, followingTags) = try await JavDBSDK.shared.userInfo()
+            tags = followingTags
         } catch {
             errorMessage = error.localizedDescription
         }

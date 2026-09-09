@@ -52,6 +52,12 @@ public struct SessionData: Codable {
 /// 用户信息响应 data
 public struct UserData: Codable {
     public let user: User?
+    public let followingTags: [FollowingTag]?
+    
+    enum CodingKeys: String, CodingKey {
+        case user
+        case followingTags = "following_tags"
+    }
 }
 
 /// 启动配置响应 data
