@@ -220,7 +220,7 @@ struct KSChromePlayer: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture { toggleChrome() }
-                .gesture(sideDrag(width: width), including: .all)
+                .highPriorityGesture(sideDrag(width: width, height: height))
             if !hasStarted {
                 ProgressView()
                     .tint(.white)
@@ -228,6 +228,7 @@ struct KSChromePlayer: View {
             }
             if let overlay {
                 overlayHUD(overlay)
+                    .allowsHitTesting(false)
             }
             if showChrome {
                 chromeOverlay
@@ -239,32 +240,35 @@ struct KSChromePlayer: View {
         .contentShape(Rectangle())
     }
 
-    private func sideDrag(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 16)
+    private func sideDrag(width: CGFloat, height: CGFloat) -> some Gesture {
+        // 半屏上下滑走完 0→1；右侧从画面中线起就算音量，避免贴边才生效。
+        let travel = max(140, height * 0.42)
+        return DragGesture(minimumDistance: 4)
             .onChanged { value in
                 let dx = abs(value.translation.width)
                 let dy = abs(value.translation.height)
                 if !verticalDrag && overlay == nil {
-                    guard dy > dx, dy > 12 else { return }
+                    guard dy > dx, dy > 6 else { return }
                     verticalDrag = true
-                    if value.startLocation.x < width / 2 {
+                    hideTask?.cancel()
+                    if value.startLocation.x < width * 0.5 {
                         overlay = .brightness
                         dragStart = UIScreen.main.brightness
                     } else {
                         overlay = .volume
-                        dragStart = Double(AVAudioSession.sharedInstance().outputVolume)
+                        dragStart = Double(SystemVolume.current)
                     }
                     overlayValue = dragStart
                 }
                 guard verticalDrag, overlay != nil else { return }
-                let delta = -value.translation.height / 240
-                let next = min(1, max(0, dragStart + delta))
+                let next = min(1, max(0, dragStart - value.translation.height / travel))
                 overlayValue = next
                 applyOverlay(next)
             }
             .onEnded { _ in
                 verticalDrag = false
                 overlay = nil
+                if showChrome { scheduleHide() }
             }
     }
 
@@ -362,7 +366,8 @@ struct KSChromePlayer: View {
             .padding(.horizontal, 12)
             .padding(.top, 8)
 
-            Spacer()
+            Spacer(minLength: 0)
+                .allowsHitTesting(false)
 
             progressBar
                 .padding(.horizontal, 16)
@@ -611,11 +616,22 @@ private struct HiddenVolumeView: UIViewRepresentable {
 enum SystemVolume {
     static weak var slider: UISlider?
 
+    static var current: Float {
+        if let slider { return slider.value }
+        return AVAudioSession.sharedInstance().outputVolume
+    }
+
     static func set(_ value: Float) {
         let value = max(0, min(1, value))
         if let slider {
             slider.setValue(value, animated: false)
             slider.sendActions(for: .valueChanged)
+            return
+        }
+        // MPVolumeView 还没建好时，先保证手势 HUD 不丢；下一帧再补一次。
+        DispatchQueue.main.async {
+            slider?.setValue(value, animated: false)
+            slider?.sendActions(for: .valueChanged)
         }
     }
 }
