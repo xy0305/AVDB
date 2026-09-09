@@ -210,49 +210,7 @@ struct CollectedView: View {
 
     private var actorGrid: some View {
         ScrollView {
-            GeometryReader { proxy in
-                let count = AdaptiveLayout.posterColumns(for: proxy.size.width)
-                let cols = Array(repeating: GridItem(.flexible()), count: count)
-                LazyVGrid(columns: cols, spacing: 16) {
-                    ForEach(vm.actors) { actor in
-                        Button {
-                            if isEditing {
-                                if selectedActors.contains(actor.id) {
-                                    selectedActors.remove(actor.id)
-                                } else {
-                                    selectedActors.insert(actor.id)
-                                }
-                            }
-                        } label: {
-                            NavigationLink {
-                                ActorDetailView(actorID: actor.id)
-                            } label: {
-                                VStack(spacing: 8) {
-                                    ZStack(alignment: .topTrailing) {
-                                        JavDBImage(url: actor.avatarURL, contentMode: .fill)
-                                            .frame(width: 110, height: 110)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                        if isEditing {
-                                            Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
-                                                .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)
-                                                .padding(6)
-                                        }
-                                    }
-                                    Text(actor.displayName)
-                                        .font(.caption)
-                                        .lineLimit(1)
-                                        .foregroundColor(.primary)
-                                }
-                                .frame(width: 110)
-                            }
-                            .disabled(isEditing)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding()
-            }
-            .frame(minHeight: 200)
+            CollectedActorGrid(vm: vm, isEditing: isEditing, selectedActors: $selectedActors)
             if vm.isLoading { ProgressView().padding() }
             if let err = vm.errorMessage {
                 Text(err).foregroundColor(.red).padding()
@@ -297,6 +255,60 @@ struct CollectedView: View {
         selectedActors.removeAll()
         isEditing = false
         await vm.load(kind, type: actorType)
+    }
+}
+
+/// 收藏演员网格（自适应列数）
+private struct CollectedActorGrid: View {
+    @ObservedObject var vm: CollectedViewModel
+    var isEditing: Bool
+    @Binding var selectedActors: Set<String>
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var columns: [GridItem] {
+        let count = sizeClass == .regular ? 5 : 3
+        return Array(repeating: GridItem(.flexible()), count: count)
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(vm.actors) { actor in
+                Button {
+                    if isEditing {
+                        if selectedActors.contains(actor.id) {
+                            selectedActors.remove(actor.id)
+                        } else {
+                            selectedActors.insert(actor.id)
+                        }
+                    }
+                } label: {
+                    NavigationLink {
+                        ActorDetailView(actorID: actor.id)
+                    } label: {
+                        VStack(spacing: 8) {
+                            ZStack(alignment: .topTrailing) {
+                                JavDBImage(url: actor.avatarURL, contentMode: .fill)
+                                    .frame(width: 110, height: 110)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                if isEditing {
+                                    Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)
+                                        .padding(6)
+                                }
+                            }
+                            Text(actor.displayName)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 110)
+                    }
+                    .disabled(isEditing)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding()
     }
 }
 

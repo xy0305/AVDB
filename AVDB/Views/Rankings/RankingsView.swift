@@ -165,49 +165,7 @@ struct RankingsView: View {
     }
 
     private var actorRankingGrid: some View {
-        ScrollView {
-            GeometryReader { proxy in
-                let count = AdaptiveLayout.posterColumns(for: proxy.size.width)
-                let cols = Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
-                LazyVGrid(columns: cols, spacing: 16) {
-                    ForEach(Array(vm.actors.enumerated()), id: \.element.id) { idx, actor in
-                        NavigationLink {
-                            ActorDetailView(actorID: actor.id)
-                        } label: {
-                            VStack(spacing: 8) {
-                                ZStack(alignment: .topLeading) {
-                                    JavDBImage(url: actor.avatarURL ?? actor.coverURL)
-                                        .aspectRatio(1, contentMode: .fill)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                    Text("\(idx + 1)")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 3)
-                                        .background(idx < 3 ? Color.orange : Color.black.opacity(0.6))
-                                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                        .padding(6)
-                                }
-                                Text(actor.displayName)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .onAppear {
-                            if actor.id == vm.actors.last?.id {
-                                Task { await vm.loadMore() }
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, AdaptiveLayout.gridPadding)
-            }
-            .frame(minHeight: 200)
-            .padding(.vertical, 12)
-            if vm.isLoading { ProgressView().padding() }
-        }
+        ActorRankingGridContent(vm: vm)
     }
 
     private var top250List: some View {
@@ -348,6 +306,58 @@ private struct RankingPreviewCarousel: View {
             }
         }
         .contentShape(Rectangle())
+    }
+}
+
+/// 演员排行网格（自适应列数，不用 GeometryReader）
+private struct ActorRankingGridContent: View {
+    @ObservedObject var vm: RankingsViewModel
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var columns: [GridItem] {
+        let count = sizeClass == .regular ? 5 : 3
+        return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(Array(vm.actors.enumerated()), id: \.element.id) { idx, actor in
+                    NavigationLink {
+                        ActorDetailView(actorID: actor.id)
+                    } label: {
+                        VStack(spacing: 8) {
+                            ZStack(alignment: .topLeading) {
+                                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                                    .aspectRatio(1, contentMode: .fill)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                Text("\(idx + 1)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(idx < 3 ? Color.orange : Color.black.opacity(0.6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    .padding(6)
+                            }
+                            Text(actor.displayName)
+                                .font(.system(size: 13))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .onAppear {
+                        if actor.id == vm.actors.last?.id {
+                            Task { await vm.loadMore() }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, AdaptiveLayout.gridPadding)
+            .padding(.vertical, 12)
+            if vm.isLoading { ProgressView().padding() }
+        }
     }
 }
 
