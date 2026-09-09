@@ -28,6 +28,7 @@
 		FOLLOWTAG001E253E75F82001 /* FollowingTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLOWTAG001E253E75F82002 /* FollowingTagsView.swift */; };
 		A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A101 /* Pan115Client.swift */; };
 		B00BB00CDE000D10DE000002 /* DownloadLinkDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */; };
+		GLASSUI0000000000000001 /* GlassUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = GLASSUI0000000000000002 /* GlassUI.swift */; };
 		A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */; };
 		A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A103 /* JSONFlex.swift */; };
 		A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */; };
@@ -63,6 +64,7 @@
 		A115C11E7A7B115C11E7A110 /* UserCollectionsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserCollectionsViews.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A101 /* Pan115Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115Client.swift; sourceTree = "<group>"; };
 		B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadLinkDetector.swift; sourceTree = "<group>"; };
+		GLASSUI0000000000000002 /* GlassUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassUI.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115SettingsView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A103 /* JSONFlex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONFlex.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVDBUI.swift; sourceTree = "<group>"; };
@@ -241,6 +243,7 @@
 			children = (
 				4FD2D4F5DD8440D59ECADE97 /* MovieGridView.swift */,
 				A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */,
+				GLASSUI0000000000000002 /* GlassUI.swift */,
 			);
 			name = Components;
 			 path = "Components";
@@ -364,6 +367,7 @@
 				A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */,
 				A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */,
 				A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */,
+				GLASSUI0000000000000001 /* GlassUI.swift in Sources */,
 				A115C11E7A7B115C11E7A005 /* RankingsView.swift in Sources */,
 				A115C11E7A7B115C11E7A006 /* CategoriesView.swift in Sources */,
 				A115C11E7A7B115C11E7A007 /* Pan115PlayerView.swift in Sources */,
