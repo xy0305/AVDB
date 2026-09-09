@@ -81,110 +81,147 @@ struct HomeView: View {
         Button {
             goSearch = true
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.secondary)
-                Text("搜索番号 / 关键词")
+                Text("搜索番號 / 關鍵詞")
+                    .font(.system(size: 16))
                     .foregroundColor(.secondary)
                 Spacer()
+                Image(systemName: "barcode.viewfinder")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.blue)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
-        .padding(.top, 4)
+        .padding(.top, 8)
     }
 
     private var shortcutRow: some View {
-        HStack(spacing: 0) {
-            shortcut("看熱播", "play.rectangle.fill", Color.blue) { goHot = true }
-            shortcut("AV資訊", "newspaper.fill", Color.red) { goArticles = true }
-            shortcut("看短評", "text.bubble.fill", Color.orange) { goReviews = true }
-            shortcut("找磁鏈", "link", Color.green) { goMagnets = true }
-            shortcut("系列", "square.stack", Color.purple) { goSeries = true }
-            shortcut("片商", "building.2", Color.teal) { goMakers = true }
-            shortcut("导演", "person.3", Color.indigo) { goDirectors = true }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                shortcut("看熱播", "play.rectangle.fill", Color.red) { goHot = true }
+                shortcut("AV資訊", "newspaper.fill", Color.orange) { goArticles = true }
+                shortcut("看短評", "text.bubble.fill", Color.purple) { goReviews = true }
+                shortcut("找磁鏈", "link.circle.fill", Color.green) { goMagnets = true }
+                shortcut("系列", "square.stack.3d.up.fill", Color.blue) { goSeries = true }
+                shortcut("片商", "building.2.fill", Color.teal) { goMakers = true }
+                shortcut("導演", "person.3.fill", Color.indigo) { goDirectors = true }
+                shortcut("TOP250", "crown.fill", Color.yellow) { goRankings = true }
+            }
+            .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 4)
     }
 
     private func shortcut(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundStyle(color)
-                    .frame(width: 44, height: 44)
-                    .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: icon)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(color.gradient)
+                }
                 Text(title)
-                    .font(.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.primary)
             }
-            .frame(maxWidth: .infinity)
+            .frame(width: 72)
         }
         .buttonStyle(.plain)
     }
 
     private var recommendSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("佳片推薦")
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.yellow.gradient)
+                    Text("佳片推薦")
+                        .font(.system(size: 17, weight: .bold))
+                }
                 Text(vm.periodLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color(.systemGray6), in: Capsule())
+                    .padding(.vertical, 4)
+                    .background(.blue.gradient, in: Capsule())
                 Spacer()
                 NavigationLink {
                     PastRecommendView()
                 } label: {
-                    HStack(spacing: 2) {
-                        Text("往期推薦")
+                    HStack(spacing: 4) {
+                        Text("往期")
+                            .font(.system(size: 14, weight: .medium))
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                            .font(.system(size: 12, weight: .semibold))
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.blue)
                 }
             }
             .padding(.horizontal, 16)
 
             if vm.recommended.isEmpty {
                 EmptyStateView(text: "載入推薦…")
+                    .padding(.horizontal, 16)
             } else if let movie = vm.recommended.first {
                 NavigationLink {
                     MovieDetailView(movieID: movie.id)
                 } label: {
-                    HStack(alignment: .top, spacing: 12) {
-                        JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                            .frame(width: 110, height: 150)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    HStack(alignment: .top, spacing: 14) {
+                        ZStack(alignment: .topTrailing) {
+                            JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+                                .aspectRatio(2/3, contentMode: .fill)
+                                .frame(width: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            
+                            if let score = movie.score, score > 0 {
+                                Text(String(format: "%.1f", score))
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.orange.gradient, in: Capsule())
+                                    .padding(6)
+                            }
+                        }
+                        
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(movie.displayNumber + "  " + movie.displayTitle)
-                                .font(.subheadline.weight(.medium))
+                            Text(movie.displayNumber)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.blue)
+                            
+                            Text(movie.displayTitle)
+                                .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(.primary)
                                 .lineLimit(3)
+                            
+                            Spacer()
+                            
                             if let score = movie.score, score > 0 {
-                                HStack(spacing: 4) {
+                                HStack(spacing: 3) {
                                     ForEach(0..<5, id: \.self) { i in
-                                        Image(systemName: i < Int(score.rounded()) ? "star.fill" : "star")
-                                            .font(.caption)
-                                            .foregroundStyle(.orange)
+                                        Image(systemName: i < Int(score / 2) ? "star.fill" : "star")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.orange.gradient)
                                     }
-                                    Text(String(format: "%.2f", score))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
                                 }
                             }
                         }
-                        Spacer(minLength: 0)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .padding(14)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
                     .padding(.horizontal, 16)
                 }
                 .buttonStyle(.plain)
