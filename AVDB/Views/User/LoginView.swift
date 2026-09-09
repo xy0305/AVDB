@@ -115,7 +115,7 @@ struct LoginView: View {
                 }
                 JavDBSDK.shared.setToken(cleanToken)
                 // 验证 Token 并获取用户信息
-                let user = try await JavDBSDK.shared.userInfo()
+                let (user, _) = try await JavDBSDK.shared.userInfo()
                 appState.currentUser = user
                 appState.isLoggedIn = true
             }
