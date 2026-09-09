@@ -48,7 +48,7 @@ struct UserView: View {
                     }
 
                     Section("我的关注") {
-                        NavigationLink("我的关注") { CollectedView(kind: .actor) }
+                        NavigationLink("我的关注") { FollowingTagsView() }
                     }
                     Section("我的收藏") {
                         NavigationLink("我的收藏") { FavoritesHubView() }
