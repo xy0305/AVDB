@@ -659,11 +659,14 @@ public final class JavDBSDK {
     /// 用户信息（GET /api/v1/users，需 token）
     public func userInfo() async throws -> (user: User, followingTags: [FollowingTag]) {
         let resp: JavDBResponse<UserData> = try await client.get("/api/v1/users", useToken: true)
+        print("📍 userInfo response: success=\(resp.isSuccess), data.user=\(resp.data?.user?.id ?? -1), followingTags.count=\(resp.data?.followingTags?.count ?? 0)")
         guard resp.isSuccess, let user = resp.data?.user else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
         client.currentUser = user
-        return (user, resp.data?.followingTags ?? [])
+        let tags = resp.data?.followingTags ?? []
+        print("📍 userInfo returning user \(user.id) with \(tags.count) following tags")
+        return (user, tags)
     }
 
     /// 最近浏览（GET /api/v1/users/recent_viewed）

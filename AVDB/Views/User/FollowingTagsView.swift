@@ -12,42 +12,69 @@ struct FollowingTagsView: View {
     @State private var editMode: EditMode = .inactive
     
     var body: some View {
-        List {
-            ForEach(vm.tags) { tag in
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tag.displayName)
-                            .font(.body)
-                        if let typeText = tag.typeText {
-                            Text(typeText)
-                                .font(.caption)
+        ZStack {
+            if vm.isLoading && vm.tags.isEmpty {
+                VStack(spacing: 16) {
+                    ProgressView()
+                    Text("載入中...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else if let err = vm.errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 48))
+                        .foregroundColor(.orange)
+                    Text(err)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                    Button("重試") {
+                        Task { await vm.load() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            } else if vm.tags.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "heart.slash")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    Text("暂无关注")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Text("在清单详情页点击眼睛图标可以关注清单更新")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+            } else {
+                List {
+                    ForEach(vm.tags) { tag in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(tag.displayName)
+                                    .font(.body)
+                                if let typeText = tag.typeText {
+                                    Text(typeText)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "line.3.horizontal")
                                 .foregroundColor(.secondary)
                         }
                     }
-                    Spacer()
-                    Image(systemName: "line.3.horizontal")
-                        .foregroundColor(.secondary)
+                    .onMove { from, to in
+                        vm.tags.move(fromOffsets: from, toOffset: to)
+                    }
+                    .onDelete { indexSet in
+                        Task {
+                            await vm.deleteTags(at: indexSet)
+                        }
+                    }
                 }
-            }
-            .onMove { from, to in
-                vm.tags.move(fromOffsets: from, toOffset: to)
-            }
-            .onDelete { indexSet in
-                Task {
-                    await vm.deleteTags(at: indexSet)
-                }
-            }
-            
-            if vm.isLoading {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-            }
-            
-            if let err = vm.errorMessage {
-                Text(err).foregroundColor(.red).padding()
             }
         }
         .navigationTitle("管理我的標籤")
@@ -75,8 +102,13 @@ final class FollowingTagsViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             let (_, followingTags) = try await JavDBSDK.shared.userInfo()
+            print("📍 FollowingTagsViewModel: loaded \(followingTags.count) tags")
+            for tag in followingTags {
+                print("  - Tag ID: \(tag.id), name: \(tag.name ?? "nil"), value: \(tag.value ?? "nil")")
+            }
             tags = followingTags
         } catch {
+            print("❌ FollowingTagsViewModel load error: \(error)")
             errorMessage = error.localizedDescription
         }
     }
