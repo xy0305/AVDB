@@ -130,7 +130,7 @@ public struct FollowingTag: Codable, Identifiable {
     public let id: Int
     public let name: String?
     public let value: String?
-    public let priority: Double?
+    public var priority: Double?
 }
 
 /// 磁力列表（字符串字段版本，兼容列表返回）

@@ -448,13 +448,27 @@ public final class JavDBSDK {
     // MARK: - 片单 / 标签 / 影评 / 文章
 
     /// 关注/取消关注标签（POST/DELETE /api/v1/following_tags 或 /api/v1/following_tags/{id}）
-    public func followTag(name: String, value: String) async throws -> Bool {
-        let resp: JavDBResponse<EmptyData> = try await client.post(
+    public func followTag(name: String, value: String) async throws -> FollowingTag? {
+        struct TagResponse: Decodable {
+            let id: Int
+            let name: String?
+            let value: String?
+            let priority: Double?
+        }
+        let resp: JavDBResponse<TagResponse> = try await client.post(
             "/api/v1/following_tags",
             form: ["name": name, "value": value],
             useToken: true
         )
-        return resp.isSuccess
+        guard resp.isSuccess, let data = resp.data else {
+            return nil
+        }
+        return FollowingTag(
+            id: data.id,
+            name: data.name,
+            value: data.value,
+            priority: data.priority
+        )
     }
 
     public func unfollowTag(_ tagID: Int) async throws -> Bool {

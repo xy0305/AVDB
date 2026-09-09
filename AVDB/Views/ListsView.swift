@@ -144,8 +144,13 @@ struct ListDetailView: View {
                 // TODO: 取消关注需要先查询 tag id
                 print("取消关注功能待实现")
             } else {
-                let success = try await JavDBSDK.shared.followTag(name: "list", value: listID)
-                if success { isFollowing = true }
+                if let tag = try await JavDBSDK.shared.followTag(name: "list", value: listID) {
+                    isFollowing = true
+                    await FollowingTagsStore.shared.add(tag)
+                    print("✅ 已关注清单并保存到本地")
+                } else {
+                    print("❌ 关注失败")
+                }
             }
         } catch {
             print("关注清单失败: \(error)")

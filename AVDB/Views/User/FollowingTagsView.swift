@@ -8,33 +8,13 @@
 import SwiftUI
 
 struct FollowingTagsView: View {
-    @StateObject private var vm = FollowingTagsViewModel()
+    @StateObject private var store = FollowingTagsStore.shared
     @State private var editMode: EditMode = .inactive
+    @State private var isLoading = false
     
     var body: some View {
         ZStack {
-            if vm.isLoading && vm.tags.isEmpty {
-                VStack(spacing: 16) {
-                    ProgressView()
-                    Text("載入中...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            } else if let err = vm.errorMessage {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 48))
-                        .foregroundColor(.orange)
-                    Text(err)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                    Button("重試") {
-                        Task { await vm.load() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            } else if vm.tags.isEmpty {
+            if store.tags.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "heart.slash")
                         .font(.system(size: 48))
@@ -50,7 +30,7 @@ struct FollowingTagsView: View {
                 }
             } else {
                 List {
-                    ForEach(vm.tags) { tag in
+                    ForEach(store.tags) { tag in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(tag.displayName)
@@ -67,67 +47,39 @@ struct FollowingTagsView: View {
                         }
                     }
                     .onMove { from, to in
-                        vm.tags.move(fromOffsets: from, toOffset: to)
+                        store.move(from: from, to: to)
                     }
                     .onDelete { indexSet in
                         Task {
-                            await vm.deleteTags(at: indexSet)
+                            await deleteTagsRemote(at: indexSet)
                         }
                     }
-                }
-                .refreshable {
-                    await vm.load()
                 }
             }
         }
         .navigationTitle("管理我的標籤")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if vm.tags.isEmpty {
-                    Button("刷新") {
-                        Task { await vm.load() }
-                    }
-                } else {
+                if !store.tags.isEmpty {
                     EditButton()
                 }
             }
         }
         .environment(\.editMode, $editMode)
-        .task {
-            await vm.load()
-        }
-    }
-}
-
-@MainActor
-final class FollowingTagsViewModel: ObservableObject {
-    @Published var tags: [FollowingTag] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    
-    func load() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        do {
-            let (_, followingTags) = try await JavDBSDK.shared.userInfo()
-            print("📍 FollowingTagsViewModel: loaded \(followingTags.count) tags")
-            for tag in followingTags {
-                print("  - Tag ID: \(tag.id), name: \(tag.name ?? "nil"), value: \(tag.value ?? "nil")")
-            }
-            tags = followingTags
-        } catch {
-            print("❌ FollowingTagsViewModel load error: \(error)")
-            errorMessage = error.localizedDescription
-        }
     }
     
-    func deleteTags(at indexSet: IndexSet) async {
+    /// 删除标签（调用远程API + 本地删除）
+    private func deleteTagsRemote(at indexSet: IndexSet) async {
         for index in indexSet {
-            let tag = tags[index]
-            _ = try? await JavDBSDK.shared.unfollowTag(tag.id)
+            let tag = store.tags[index]
+            do {
+                _ = try await JavDBSDK.shared.unfollowTag(tag.id)
+                print("✅ Deleted tag \(tag.id) from server")
+            } catch {
+                print("❌ Failed to delete tag \(tag.id): \(error)")
+            }
         }
-        tags.remove(atOffsets: indexSet)
+        store.remove(at: indexSet)
     }
 }
 
