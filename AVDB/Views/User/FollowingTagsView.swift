@@ -2,7 +2,7 @@
 //  FollowingTagsView.swift
 //  AVDB
 //
-//  管理我的标签（关注的标签列表）
+//  我的关注：POST /following_tags/batch_push 拉列表。
 //
 
 import SwiftUI
@@ -10,28 +10,33 @@ import SwiftUI
 struct FollowingTagsView: View {
     @StateObject private var store = FollowingTagsStore.shared
     @State private var editMode: EditMode = .inactive
-    @State private var isLoading = false
-    
+
     var body: some View {
-        ZStack {
-            if store.tags.isEmpty {
+        Group {
+            if store.tags.isEmpty && store.isLoading {
+                ProgressView()
+            } else if store.tags.isEmpty {
                 VStack(spacing: 16) {
-                    Image(systemName: "heart.slash")
+                    Image(systemName: "eye.slash")
                         .font(.system(size: 48))
                         .foregroundColor(.secondary)
-                    Text("暂无关注")
+                    Text("暫無關注")
                         .font(.headline)
-                        .foregroundColor(.primary)
-                    Text("在清单详情页点击眼睛图标可以关注清单更新")
+                    Text("在演員 / 類別 / 清單頁可以加入關注")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                    if let err = store.errorMessage {
+                        Text(err).font(.caption).foregroundColor(.red)
+                    }
                 }
             } else {
                 List {
                     ForEach(store.tags) { tag in
-                        HStack {
+                        NavigationLink {
+                            FollowingTagDestination(tag: tag)
+                        } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(tag.displayName)
                                     .font(.body)
@@ -41,23 +46,15 @@ struct FollowingTagsView: View {
                                         .foregroundColor(.secondary)
                                 }
                             }
-                            Spacer()
-                            Image(systemName: "line.3.horizontal")
-                                .foregroundColor(.secondary)
                         }
-                    }
-                    .onMove { from, to in
-                        store.move(from: from, to: to)
                     }
                     .onDelete { indexSet in
-                        Task {
-                            await deleteTagsRemote(at: indexSet)
-                        }
+                        Task { await deleteTagsRemote(at: indexSet) }
                     }
                 }
             }
         }
-        .navigationTitle("管理我的標籤")
+        .navigationTitle("我的關注")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if !store.tags.isEmpty {
@@ -66,44 +63,81 @@ struct FollowingTagsView: View {
             }
         }
         .environment(\.editMode, $editMode)
-    }
-    
-    /// 删除标签（调用远程API + 本地删除）
-    private func deleteTagsRemote(at indexSet: IndexSet) async {
-        for index in indexSet {
-            let tag = store.tags[index]
-            do {
-                _ = try await JavDBSDK.shared.unfollowTag(tag.id)
-                print("✅ Deleted tag \(tag.id) from server")
-            } catch {
-                print("❌ Failed to delete tag \(tag.id): \(error)")
-            }
+        .task {
+            await store.refreshFromServer()
         }
-        store.remove(at: indexSet)
+        .refreshable {
+            await store.refreshFromServer()
+        }
+    }
+
+    private func deleteTagsRemote(at indexSet: IndexSet) async {
+        let ids = indexSet.map { store.tags[$0].id }
+        for id in ids {
+            _ = try? await JavDBSDK.shared.unfollowTag(id)
+            store.remove(id)
+        }
     }
 }
 
-extension FollowingTag {
-    var displayName: String {
-        guard let name = name, let value = value else {
-            return "未知標籤"
-        }
-        switch name {
-        case "list":
-            return value // 清单 ID，后续可通过接口获取清单名称
-        case "tag":
-            return value // 标签名称
-        default:
-            return value
+/// 点进关注项：演员走详情，片单走 ListDetail，其它走 movies/tags filter_by。
+struct FollowingTagDestination: View {
+    let tag: FollowingTag
+
+    var body: some View {
+        if let actorID = tag.parsedActorID {
+            ActorDetailView(actorID: actorID)
+        } else if tag.name == "list", let listID = tag.value, !listID.isEmpty {
+            ListDetailView(listID: listID, title: tag.displayName)
+        } else if let filter = tag.moviesFilterBy {
+            FollowingTagMoviesView(title: tag.displayName, filterBy: filter)
+        } else {
+            Text("無法打開此關注")
+                .foregroundColor(.secondary)
+                .navigationTitle(tag.displayName)
         }
     }
-    
-    var typeText: String? {
-        guard let name = name else { return nil }
-        switch name {
-        case "list": return "清單"
-        case "tag": return "標籤"
-        default: return name
-        }
+}
+
+struct FollowingTagMoviesView: View {
+    let title: String
+    let filterBy: String
+    @StateObject private var vm: MovieListViewModel
+
+    init(title: String, filterBy: String) {
+        self.title = title
+        self.filterBy = filterBy
+        _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
+            try await JavDBSDK.shared.moviesByTag(
+                filterBy: filterBy,
+                type: nil,
+                page: page,
+                limit: 21,
+                sortBy: sort.sortBy,
+                orderBy: sort.orderBy
+            )
+        })
+    }
+
+    var body: some View {
+        MovieGridView(title: title, viewModel: vm)
+    }
+}
+
+struct ReviewMoviesView: View {
+    let title: String
+    let status: String
+    @StateObject private var vm: MovieListViewModel
+
+    init(title: String, status: String) {
+        self.title = title
+        self.status = status
+        _vm = StateObject(wrappedValue: MovieListViewModel { page in
+            try await JavDBSDK.shared.reviewMovies(status: status, page: page, limit: 24)
+        })
+    }
+
+    var body: some View {
+        MovieGridView(title: title, viewModel: vm)
     }
 }

@@ -47,6 +47,12 @@ public struct User: Codable, Identifiable, Hashable {
 public struct SessionData: Codable {
     public let token: String?
     public let user: User?
+    public let followingTags: [FollowingTag]?
+
+    enum CodingKeys: String, CodingKey {
+        case token, user
+        case followingTags = "following_tags"
+    }
 }
 
 /// 用户信息响应 data
@@ -131,6 +137,46 @@ public struct FollowingTag: Codable, Identifiable {
     public let name: String?
     public let value: String?
     public var priority: Double?
+
+    /// 列表展示名：官方 name 已是「字幕」「有碼,西村妮娜」；片单 name 固定为 list。
+    public var displayName: String {
+        if let name, name != "list", !name.isEmpty { return name }
+        if name == "list", let value, !value.isEmpty { return "片單 \(value)" }
+        return value ?? "關注"
+    }
+
+    public var typeText: String? {
+        if name == "list" { return "清單" }
+        guard let value else { return name }
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        if parts.count >= 2 {
+            switch parts[1] {
+            case "a": return "演員"
+            case "t": return "標籤"
+            case "m": return "片商"
+            case "s": return "系列"
+            case "d": return "導演"
+            case "l": return "清單"
+            case "c": return "番號"
+            default: break
+            }
+        }
+        return name
+    }
+
+    public var parsedActorID: String? {
+        guard let value else { return nil }
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count >= 3, parts[1] == "a" else { return nil }
+        let id = String(parts[2])
+        return id.isEmpty ? nil : id
+    }
+
+    public var moviesFilterBy: String? {
+        if let value, value.contains(":") { return value }
+        if name == "list", let value, !value.isEmpty { return "0:l:\(value):" }
+        return nil
+    }
 }
 
 /// 磁力列表（字符串字段版本，兼容列表返回）

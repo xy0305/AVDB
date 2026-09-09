@@ -39,23 +39,59 @@ struct UserView: View {
                     }
 
                     Section("我的") {
-                        NavigationLink { LocalMovieListView(title: "我想看的", ids: WantWatchStore.ids) } label: {
-                            Label("我想看的", systemImage: "heart")
+                        NavigationLink {
+                            ReviewMoviesView(title: "我想看", status: "want_watch")
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("我想看")
+                                    if let n = user.wantWatchCount {
+                                        Text("我想看 \(n) 部影片")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            } icon: {
+                                Image(systemName: "heart")
+                            }
                         }
-                        NavigationLink { LocalMovieListView(title: "我看过的", ids: Array(WatchedStore.ids)) } label: {
-                            Label("我看过的", systemImage: "heart.fill")
+                        NavigationLink {
+                            ReviewMoviesView(title: "我看過的", status: "watched")
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("我看過的")
+                                    if let n = user.watchedCount {
+                                        Text("我已看過 \(n) 部影片")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            } icon: {
+                                Image(systemName: "heart.fill")
+                            }
                         }
                         NavigationLink { MyListsView() } label: {
-                            Label("我的清单", systemImage: "bookmark.fill")
+                            Label("我的清單", systemImage: "bookmark.fill")
                         }
                     }
 
-                    Section("我的关注") {
-                        NavigationLink("我的关注") { FollowingTagsView() }
-                    }
-                    Section("我的收藏") {
-                        NavigationLink("我的收藏") { FavoritesHubView() }
-                        NavigationLink("最近浏览") { RecentViewedView() }
+                    Section {
+                        NavigationLink {
+                            FollowingTagsView()
+                        } label: {
+                            Label("我的關注", systemImage: "eye")
+                        }
+                        NavigationLink {
+                            FavoritesHubView()
+                        } label: {
+                            Label("我的收藏", systemImage: "plus.circle")
+                        }
+                        NavigationLink {
+                            RecentViewedView()
+                        } label: {
+                            Label("近期瀏覽", systemImage: "clock")
+                        }
                     }
 
                     Section("会员") {
@@ -347,14 +383,15 @@ final class CollectedViewModel: ObservableObject {
     }
 }
 
-/// 最近浏览
+/// 最近浏览（接口一次返回全部，page/limit 无效）
 struct RecentViewedView: View {
-    @StateObject private var vm: MovieListViewModel = MovieListViewModel { _ in
-        try await JavDBSDK.shared.recentViewed()
+    @StateObject private var vm: MovieListViewModel = MovieListViewModel { page in
+        if page > 1 { return [] }
+        return try await JavDBSDK.shared.recentViewed()
     }
 
     var body: some View {
-        MovieGridView(title: "最近浏览", viewModel: vm)
+        MovieGridView(title: "近期瀏覽", viewModel: vm)
     }
 }
 

@@ -131,7 +131,10 @@ struct ListDetailView: View {
                 }
             }
         }
-        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .task {
+            isFollowing = FollowingTagsStore.shared.tags.contains { $0.name == "list" && $0.value == listID }
+            if vm.movies.isEmpty { await vm.loadMore() }
+        }
         .refreshable { await vm.refresh() }
     }
 
@@ -141,15 +144,15 @@ struct ListDetailView: View {
         defer { isFollowingOp = false }
         do {
             if isFollowing {
-                // TODO: 取消关注需要先查询 tag id
-                print("取消关注功能待实现")
+                if let existing = FollowingTagsStore.shared.tags.first(where: { $0.name == "list" && $0.value == listID }) {
+                    _ = try await JavDBSDK.shared.unfollowTag(existing.id)
+                    FollowingTagsStore.shared.remove(existing.id)
+                }
+                isFollowing = false
             } else {
                 if let tag = try await JavDBSDK.shared.followTag(name: "list", value: listID) {
                     isFollowing = true
-                    await FollowingTagsStore.shared.add(tag)
-                    print("✅ 已关注清单并保存到本地")
-                } else {
-                    print("❌ 关注失败")
+                    FollowingTagsStore.shared.add(tag)
                 }
             }
         } catch {

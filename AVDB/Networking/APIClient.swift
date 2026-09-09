@@ -131,6 +131,26 @@ public final class APIClient: @unchecked Sendable {
         return try await perform(request: request, useToken: useToken)
     }
 
+    /// 发送 DELETE 请求并解码
+    public func delete<T: Decodable>(
+        _ path: String,
+        form: [String: String] = [:],
+        useToken: Bool = false
+    ) async throws -> T {
+        guard let url = makeURL(path: path, query: nil) else {
+            throw JavDBError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        if !form.isEmpty {
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            var body = URLComponents()
+            body.queryItems = form.map { URLQueryItem(name: $0.key, value: $0.value) }
+            request.httpBody = body.percentEncodedQuery?.data(using: .utf8)
+        }
+        return try await perform(request: request, useToken: useToken)
+    }
+
     /// 以表单/JSON 混合优先，直接请求
     private func request<T: Decodable>(
         url: URL,

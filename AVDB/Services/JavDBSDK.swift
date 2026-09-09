@@ -447,38 +447,57 @@ public final class JavDBSDK {
 
     // MARK: - 片单 / 标签 / 影评 / 文章
 
-    /// 关注/取消关注标签（POST/DELETE /api/v1/following_tags 或 /api/v1/following_tags/{id}）
+    /// 创建关注（POST /api/v1/following_tags，form name+value 必填）
     public func followTag(name: String, value: String) async throws -> FollowingTag? {
-        struct TagResponse: Decodable {
-            let id: Int
-            let name: String?
-            let value: String?
-            let priority: Double?
-        }
-        let resp: JavDBResponse<TagResponse> = try await client.post(
+        let resp: JavDBResponse<FollowingTag> = try await client.post(
             "/api/v1/following_tags",
             form: ["name": name, "value": value],
             useToken: true
         )
-        guard resp.isSuccess, let data = resp.data else {
-            return nil
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
-        return FollowingTag(
-            id: data.id,
-            name: data.name,
-            value: data.value,
-            priority: data.priority
-        )
+        return resp.data
     }
 
+    /// 取消关注（DELETE /api/v1/following_tags/{id}）
     public func unfollowTag(_ tagID: Int) async throws -> Bool {
-        // DELETE 需要用 POST 模拟，官方可能用 batch_destroy
-        let resp: JavDBResponse<EmptyData> = try await client.post(
+        let resp: JavDBResponse<FollowingTag> = try await client.delete(
             "/api/v1/following_tags/\(tagID)",
-            form: [:],
             useToken: true
         )
         return resp.isSuccess
+    }
+
+    /// 批量取消关注（POST /api/v1/following_tags/batch_destroy，form ids）
+    public func unfollowTags(_ ids: [Int]) async throws -> Bool {
+        guard !ids.isEmpty else { return true }
+        let resp: JavDBResponse<EmptyData> = try await client.post(
+            "/api/v1/following_tags/batch_destroy",
+            form: ["ids": ids.map(String.init).joined(separator: ",")],
+            useToken: true
+        )
+        return resp.isSuccess
+    }
+
+    /// 拉取关注列表。官方没有 GET /following_tags（404）。
+    /// 登录后用 POST /api/v1/following_tags/batch_push + tags=[] 拉全量。
+    public func followingTags() async throws -> [FollowingTag] {
+        struct FollowListData: Decodable {
+            let followingTags: [FollowingTag]?
+            enum CodingKeys: String, CodingKey {
+                case followingTags = "following_tags"
+            }
+        }
+        let resp: JavDBResponse<FollowListData> = try await client.post(
+            "/api/v1/following_tags/batch_push",
+            form: ["tags": "[]"],
+            useToken: true
+        )
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return (resp.data?.followingTags ?? []).sorted { ($0.priority ?? 0) < ($1.priority ?? 0) }
     }
 
     /// 获取关注的标签列表（GET /api/v1/following_tags）
@@ -656,6 +675,11 @@ public final class JavDBSDK {
         }
         client.setToken(token)
         client.currentUser = user
+        if let tags = resp.data?.followingTags {
+            await FollowingTagsStore.shared.replace(tags)
+        } else {
+            await FollowingTagsStore.shared.refreshFromServer()
+        }
         return user
     }
 
@@ -668,27 +692,25 @@ public final class JavDBSDK {
     public func logout() {
         client.setToken(nil)
         client.currentUser = nil
+        Task { @MainActor in
+            FollowingTagsStore.shared.clear()
+        }
     }
 
-    /// 用户信息（GET /api/v1/users，需 token）
+    /// 用户信息（GET /api/v1/users，需 token）。关注列表不在此接口，需另走 batch_push。
     public func userInfo() async throws -> (user: User, followingTags: [FollowingTag]) {
         let resp: JavDBResponse<UserData> = try await client.get("/api/v1/users", useToken: true)
-        
-        // 打印原始 JSON 用于调试
-        if let data = resp.data {
-            print("📍 userInfo raw data:")
-            print("  - user.id: \(data.user?.id ?? -1)")
-            print("  - followingTags: \(String(describing: data.followingTags))")
-        } else {
-            print("❌ userInfo: resp.data is nil")
-        }
-        
         guard resp.isSuccess, let user = resp.data?.user else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
         client.currentUser = user
-        let tags = resp.data?.followingTags ?? []
-        print("📍 userInfo returning user \(user.id) with \(tags.count) following tags")
+        let tags: [FollowingTag]
+        if let cached = resp.data?.followingTags, !cached.isEmpty {
+            tags = cached
+        } else {
+            tags = (try? await followingTags()) ?? []
+        }
+        await FollowingTagsStore.shared.replace(tags)
         return (user, tags)
     }
 
@@ -743,10 +765,15 @@ public final class JavDBSDK {
         return resp.isSuccess
     }
 
-    /// 用户的影评影片（GET /api/v2/users/review_movies）
-    public func reviewMovies() async throws -> [Movie] {
+    /// 我想看 / 我看过（GET /api/v2/users/review_movies?status=want_watch|watched）
+    public func reviewMovies(status: String, page: Int = 1, limit: Int = 24) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v2/users/review_movies", useToken: true)
+            "/api/v2/users/review_movies",
+            query: ["status": status, "page": "\(page)", "limit": "\(min(limit, 50))"],
+            useToken: true)
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
         return resp.data?.movies ?? []
     }
 
