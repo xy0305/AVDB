@@ -84,7 +84,9 @@ struct RankingsView: View {
 
             content
         }
-        .background(Color(.systemBackground))
+        .background {
+            LiquidGlassBackground()
+        }
         .navigationTitle("排行榜")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
@@ -176,14 +178,28 @@ struct RankingsView: View {
                             ZStack(alignment: .topLeading) {
                                 JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                                     .aspectRatio(1, contentMode: .fill)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .glassEdge(cornerRadius: 10, opacity: 0.35)
+                                    .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
                                 Text("\(idx + 1)")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
-                                    .background(idx < 3 ? Color.orange : Color.black.opacity(0.6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .background {
+                                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                            .fill((idx < 3 ? Color.orange : Color.black.opacity(0.6)).gradient)
+                                            .overlay {
+                                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                                    .fill(
+                                                        LinearGradient(
+                                                            colors: [.white.opacity(0.25), .clear],
+                                                            startPoint: .top,
+                                                            endPoint: .center
+                                                        )
+                                                    )
+                                            }
+                                    }
                                     .padding(6)
                             }
                             Text(actor.displayName)
@@ -231,10 +247,12 @@ struct RankingsView: View {
             Button { showTopFilter = true } label: {
                 Text("篩選")
                     .font(.headline)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
             }
-            .background(.bar)
+            .liquidGlass(cornerRadius: 16, edgeOpacity: 0.45, glowOpacity: 0.18, shadowRadius: 12, shadowY: 4)
+            .padding(.horizontal, 16)
             .padding(.bottom, 88)
         }
     }
@@ -245,14 +263,28 @@ struct RankingsView: View {
                 ZStack(alignment: .topLeading) {
                     JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                         .frame(width: 150, height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .glassEdge(cornerRadius: 10, opacity: 0.35)
+                        .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
                     Text("\(rank)")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 4)
-                        .background(rank <= 3 ? Color.orange : Color.black.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .background {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill((rank <= 3 ? Color.orange : Color.black.opacity(0.6)).gradient)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.25), .clear],
+                                                startPoint: .top,
+                                                endPoint: .center
+                                            )
+                                        )
+                                }
+                        }
                         .padding(6)
                     if let badge = movie.playBadge {
                         Text(badge)
@@ -260,8 +292,10 @@ struct RankingsView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(badge.contains("中字") ? JAVDBPalette.cnsubOrange : JAVDBPalette.playRed)
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                            .background {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill((badge.contains("中字") ? JAVDBPalette.cnsubOrange : JAVDBPalette.playRed).gradient)
+                            }
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             .padding(6)
                     }
@@ -269,7 +303,8 @@ struct RankingsView: View {
                 RankingPreviewCarousel(movie: movie)
                     .frame(maxWidth: .infinity)
                     .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .glassEdge(cornerRadius: 10, opacity: 0.3)
             }
             Text(movie.displayTitle)
                 .font(.system(size: 15))
@@ -332,7 +367,7 @@ private struct RankingPreviewCarousel: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 7)
-                .background(.ultraThinMaterial, in: Capsule())
+                .liquidCapsule(glowOpacity: 0.18, shadowRadius: 8, shadowY: 3)
                 .padding(.bottom, 8)
                 .allowsHitTesting(false)
             }
@@ -539,7 +574,9 @@ struct Top250FilterSheet: View {
                 }
                 .padding(16)
             }
-            .background(Color(.systemGray6))
+            .background {
+                LiquidGlassBackground()
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
@@ -565,12 +602,55 @@ struct Top250FilterSheet: View {
     private func chip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 14, weight: on ? .semibold : .medium))
                 .foregroundColor(on ? .white : .primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(on ? JAVDBPalette.chipSelected : Color(.systemGray5))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background {
+                    if on {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(JAVDBPalette.chipSelected.gradient)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.28), .clear],
+                                            startPoint: .top,
+                                            endPoint: .center
+                                        )
+                                    )
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
+                            }
+                            .shadow(color: JAVDBPalette.chipSelected.opacity(0.3), radius: 5, y: 2)
+                    } else {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.2), .clear],
+                                            startPoint: .top,
+                                            endPoint: .center
+                                        )
+                                    )
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.4), .white.opacity(0.15)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 0.6
+                                    )
+                            }
+                    }
+                }
         }
         .buttonStyle(.plain)
     }

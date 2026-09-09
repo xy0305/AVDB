@@ -63,7 +63,9 @@ struct ActorsView: View {
                     .padding(.top, 4)
                 content
             }
-            .background(Color(.systemBackground))
+            .background {
+                LiquidGlassBackground()
+            }
             .navigationTitle("演員")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -164,7 +166,9 @@ struct ActorsView: View {
             JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                 .aspectRatio(1, contentMode: .fill)
                 .frame(minWidth: 0, maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .glassEdge(cornerRadius: 10, opacity: 0.35)
+                .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
             Text(actor.name ?? "")
                 .font(.system(size: 13))
                 .foregroundColor(.primary)
@@ -369,33 +373,21 @@ struct ActorDetailView: View {
     }
 
     private func primaryFilterChip(_ title: String, id: String) -> some View {
-        Button {
+        LiquidFilterChip(
+            title: title,
+            isSelected: vm.filter == id && vm.filterByTags.isEmpty
+        ) {
             Task { await vm.selectFilter(id) }
-        } label: {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(vm.filter == id && vm.filterByTags.isEmpty ? Color.accentColor : Color(.systemGray5))
-                .foregroundColor(vm.filter == id && vm.filterByTags.isEmpty ? .white : .primary)
-                .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
     }
 
     private func tagFilterChip(_ title: String, id: String) -> some View {
-        Button {
+        LiquidFilterChip(
+            title: title,
+            isSelected: vm.filterByTags == id
+        ) {
             Task { await vm.selectFilterTag(id) }
-        } label: {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(vm.filterByTags == id ? Color.accentColor : Color(.systemGray5))
-                .foregroundColor(vm.filterByTags == id ? .white : .primary)
-                .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
     }
 
     private func info(_ text: String) -> some View {

@@ -34,7 +34,9 @@ struct HomeView: View {
                 }
                 .padding(.vertical, 8)
             }
-            .background(Color(.systemBackground))
+            .background {
+                LiquidGlassBackground()
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -95,8 +97,7 @@ struct HomeView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+            .liquidGlass(cornerRadius: 16, edgeOpacity: 0.45, glowOpacity: 0.18, shadowRadius: 12, shadowY: 4)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -123,9 +124,40 @@ struct HomeView: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 ZStack {
+                    // 液态玻璃圆形底座：材质 + 色调 + 镜面高光
                     Circle()
-                        .fill(color.opacity(0.15))
+                        .fill(.ultraThinMaterial)
                         .frame(width: 56, height: 56)
+                        .overlay {
+                            Circle()
+                                .fill(color.opacity(0.12))
+                        }
+                        .overlay {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.3), .clear],
+                                        startPoint: .top,
+                                        endPoint: .center
+                                    )
+                                )
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [
+                                            .white.opacity(0.5),
+                                            .white.opacity(0.15),
+                                            .white.opacity(0.35),
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.8
+                                )
+                        }
+                        .shadow(color: color.opacity(0.15), radius: 8, y: 3)
                     Image(systemName: icon)
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(color.gradient)
@@ -154,7 +186,24 @@ struct HomeView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(.blue.gradient, in: Capsule())
+                    .background {
+                        Capsule(style: .continuous)
+                            .fill(.blue.gradient)
+                            .overlay {
+                                Capsule(style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.3), .clear],
+                                            startPoint: .top,
+                                            endPoint: .center
+                                        )
+                                    )
+                            }
+                            .overlay {
+                                Capsule(style: .continuous)
+                                    .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
+                            }
+                    }
                 Spacer()
                 NavigationLink {
                     PastRecommendView()
@@ -190,7 +239,20 @@ struct HomeView: View {
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(.orange.gradient, in: Capsule())
+                                    .background {
+                                        Capsule(style: .continuous)
+                                            .fill(.orange.gradient)
+                                            .overlay {
+                                                Capsule(style: .continuous)
+                                                    .fill(
+                                                        LinearGradient(
+                                                            colors: [.white.opacity(0.3), .clear],
+                                                            startPoint: .top,
+                                                            endPoint: .center
+                                                        )
+                                                    )
+                                            }
+                                    }
                                     .padding(6)
                             }
                         }
@@ -220,8 +282,7 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(14)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+                    .liquidGlass(cornerRadius: 18, tint: .blue, edgeOpacity: 0.5, glowOpacity: 0.16, shadowRadius: 14, shadowY: 6)
                     .padding(.horizontal, 16)
                 }
                 .buttonStyle(.plain)
@@ -255,12 +316,24 @@ struct HomeView: View {
                 JavDBImage(url: vm.latest.first?.coverURL, contentMode: .fill)
                     .frame(height: 90)
                     .clipped()
-                    .overlay(Color.black.opacity(0.35))
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                .black.opacity(0.25),
+                                .black.opacity(0.45),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
                 Text("TOP250")
                     .font(.largeTitle.weight(.heavy))
                     .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .glassEdge(cornerRadius: 12, opacity: 0.4)
+            .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
             .padding(.horizontal, 12)
         }
         .buttonStyle(.plain)

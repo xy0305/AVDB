@@ -79,24 +79,18 @@ struct SearchView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(SearchCategory.allCases) { cat in
-                    Button {
+                    LiquidFilterChip(
+                        title: cat.title,
+                        isSelected: category == cat
+                    ) {
                         category = cat
-                    } label: {
-                        Text(cat.title)
-                            .font(.caption.weight(.medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(category == cat ? Color.accentColor : Color(.systemGray6))
-                            .foregroundColor(category == cat ? .white : .primary)
-                            .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
-        .background(Color(.systemBackground))
+        .background(Color(.systemBackground).opacity(0.92))
     }
 
     private func submit() {

@@ -158,7 +158,30 @@ struct MovieDetailView: View {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 27, weight: .medium))
+                        .foregroundStyle(.white)
                         .frame(width: 46, height: 46)
+                        .background {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.2))
+                                }
+                                .overlay {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.25), .clear],
+                                                startPoint: .top,
+                                                endPoint: .center
+                                            )
+                                        )
+                                }
+                                .overlay {
+                                    Circle()
+                                        .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
+                                }
+                        }
                 }
                 Spacer()
                 Button {
@@ -181,6 +204,7 @@ struct MovieDetailView: View {
                 } label: {
                     Image(systemName: isCodeCollected ? "bookmark.fill" : "bookmark.square")
                         .font(.system(size: 25, weight: .regular))
+                        .foregroundStyle(.white)
                         .overlay(alignment: .bottomTrailing) {
                             Image(systemName: "plus")
                                 .font(.system(size: 10, weight: .bold))
@@ -189,11 +213,56 @@ struct MovieDetailView: View {
                                 .offset(x: 4, y: 4)
                         }
                         .frame(width: 46, height: 46)
+                        .background {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.2))
+                                }
+                                .overlay {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.25), .clear],
+                                                startPoint: .top,
+                                                endPoint: .center
+                                            )
+                                        )
+                                }
+                                .overlay {
+                                    Circle()
+                                        .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
+                                }
+                        }
                 }
                 Button { showSearch = true } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 28, weight: .regular))
+                        .foregroundStyle(.white)
                         .frame(width: 46, height: 46)
+                        .background {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.2))
+                                }
+                                .overlay {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.25), .clear],
+                                                startPoint: .top,
+                                                endPoint: .center
+                                            )
+                                        )
+                                }
+                                .overlay {
+                                    Circle()
+                                        .strokeBorder(.white.opacity(0.35), lineWidth: 0.6)
+                                }
+                        }
                 }
             }
             .foregroundStyle(.white)
@@ -221,17 +290,13 @@ struct MovieDetailView: View {
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.96))
                         .frame(width: 56, height: 56)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay {
-                            Circle().stroke(.white.opacity(0.28), lineWidth: 0.8)
-                        }
-                        .shadow(color: .white.opacity(0.12), radius: 10)
-                        .shadow(color: .black.opacity(0.16), radius: 8, y: 4)
+                        .liquidCapsule(material: .ultraThinMaterial, edgeOpacity: 0.55, glowOpacity: 0.28, shadowRadius: 14, shadowY: 5)
                 }
                 .buttonStyle(.plain)
                 .padding(12)
             }
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .glassEdge(cornerRadius: 10, opacity: 0.3)
             .shadow(color: .black.opacity(0.18), radius: 8, y: 5)
             .task(id: movie.id) {
                 let names = movie.actors?.compactMap(\.name) ?? movie.actorNames ?? []
@@ -297,13 +362,53 @@ struct MovieDetailView: View {
                 }
                 .foregroundStyle(.white)
                 .frame(width: 72, height: 86)
-                .background(Color.orange.opacity(0.90))
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18))
+                .background {
+                    UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+                        .fill(.orange.gradient)
+                        .overlay {
+                            UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.28), .clear],
+                                        startPoint: .top,
+                                        endPoint: .center
+                                    )
+                                )
+                        }
+                }
                 .padding(.trailing, 18)
             }
         }
         .foregroundStyle(.white)
-        .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.black.opacity(0.28))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.1), .clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.3),
+                                    .white.opacity(0.08),
+                                    .white.opacity(0.18),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.8
+                        )
+                }
+        }
     }
 
     private func detailInfoLine(_ label: String, _ value: String, underline: Bool = false) -> some View {
@@ -413,8 +518,7 @@ struct MovieDetailView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(Color(.systemGray6))
-                            .clipShape(Capsule())
+                            .liquidGlassFlat(cornerRadius: 10, material: .thinMaterial)
                     }
                     .buttonStyle(.plain)
                 }
@@ -513,8 +617,7 @@ struct MovieDetailView: View {
                         .foregroundColor(.gray)
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .liquidGlass(cornerRadius: 12, edgeOpacity: 0.4, glowOpacity: 0.14, shadowRadius: 8, shadowY: 3)
             }
             .buttonStyle(.plain)
         }
@@ -660,8 +763,7 @@ struct MovieDetailView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(12)
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .liquidGlassFlat(cornerRadius: 12, material: .thinMaterial)
                     }
                     .buttonStyle(.plain)
                     .onAppear {
@@ -1049,11 +1151,7 @@ struct ReviewRow: View {
             }
         }
         .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-        }
+        .liquidGlassFlat(cornerRadius: 12, material: .thinMaterial)
     }
 
     private func copyText(_ text: String) {
@@ -1133,8 +1231,7 @@ struct FlowTags: View {
                         .font(.caption2.monospaced())
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color(.systemGray5))
-                        .clipShape(Capsule())
+                        .liquidGlassFlat(cornerRadius: 8, material: .thinMaterial)
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.primary)
@@ -1197,8 +1294,7 @@ struct DraggableReviewsPanel: View {
                         ForEach(vm.reviews) { review in
                             ReviewRow(review: review, movieID: movieID)
                                 .padding(14)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+                                .liquidGlassFlat(cornerRadius: 16, material: .thinMaterial)
                                 .onAppear {
                                     if review.id == vm.reviews.last?.id {
                                         Task { await vm.loadMore(movieID: movieID) }
@@ -1225,9 +1321,38 @@ struct DraggableReviewsPanel: View {
         }
         .frame(height: panelHeight, alignment: .top)
         .frame(maxHeight: panelHeight)
-        .background(Color(.systemBackground))
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32))
-        .shadow(color: .black.opacity(0.18), radius: 18, y: -5)
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
+                .fill(Color(.systemBackground))
+                .overlay {
+                    UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.15), .clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                }
+                .overlay {
+                    UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.45),
+                                    .white.opacity(0.12),
+                                    .white.opacity(0.25),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.8
+                        )
+                }
+        }
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, y: -4)
+        .shadow(color: .black.opacity(0.06), radius: 24, y: -8)
         .gesture(
             DragGesture(minimumDistance: 8)
                 .onChanged { value in

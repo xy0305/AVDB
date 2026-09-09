@@ -22,13 +22,31 @@ struct UserView: View {
                             JavDBImage(url: user.avatarURL)
                                 .frame(width: 60, height: 60)
                                 .clipShape(Circle())
+                                .glassEdge(cornerRadius: 30, opacity: 0.4)
+                                .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(user.displayName)
                                     .font(.headline)
                                 if user.isVip == true {
                                     Text("VIP 会员")
                                         .font(.caption)
-                                        .foregroundColor(.orange)
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background {
+                                            Capsule(style: .continuous)
+                                                .fill(.orange.gradient)
+                                                .overlay {
+                                                    Capsule(style: .continuous)
+                                                        .fill(
+                                                            LinearGradient(
+                                                                colors: [.white.opacity(0.3), .clear],
+                                                                startPoint: .top,
+                                                                endPoint: .center
+                                                            )
+                                                        )
+                                                }
+                                        }
                                 }
                             }
                         }
@@ -181,30 +199,19 @@ struct CollectedView: View {
 
     private var actorTypeTab: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 20) {
+            HStack(spacing: 10) {
                 ForEach([("all", "全部"), ("0", "有码"), ("1", "无码"), ("2", "欧美")], id: \.0) { type, title in
-                    Button {
+                    LiquidFilterChip(
+                        title: title,
+                        isSelected: actorType == type
+                    ) {
                         actorType = type
-                    } label: {
-                        VStack(spacing: 4) {
-                            Text(title)
-                                .foregroundColor(actorType == type ? .blue : .primary)
-                            if actorType == type {
-                                Rectangle()
-                                    .fill(Color.blue)
-                                    .frame(height: 2)
-                            } else {
-                                Rectangle()
-                                    .fill(Color.clear)
-                                    .frame(height: 2)
-                            }
-                        }
                     }
                 }
             }
             .padding(.horizontal)
         }
-        .frame(height: 44)
+        .frame(height: 48)
     }
 
     @ViewBuilder
@@ -236,7 +243,9 @@ struct CollectedView: View {
                                 ZStack(alignment: .topTrailing) {
                                     JavDBImage(url: actor.avatarURL, contentMode: .fill)
                                         .frame(width: 110, height: 110)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .glassEdge(cornerRadius: 10, opacity: 0.35)
+                                        .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
                                     if isEditing {
                                         Image(systemName: selectedActors.contains(actor.id) ? "checkmark.circle.fill" : "circle")
                                             .foregroundColor(selectedActors.contains(actor.id) ? .blue : .gray)
@@ -362,7 +371,7 @@ struct PlansView: View {
                         if let price = plan.price {
                             Text(String(format: "¥%.2f", price))
                                 .font(.title2.bold())
-                                .foregroundColor(.orange)
+                                .foregroundStyle(.orange.gradient)
                         }
                         if let days = plan.days {
                             Text("\(days)天")
@@ -383,8 +392,7 @@ struct PlansView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .liquidGlass(cornerRadius: 16, tint: .orange, edgeOpacity: 0.45, glowOpacity: 0.16, shadowRadius: 12, shadowY: 5)
                 }
             }
             .padding()

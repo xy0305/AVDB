@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  AVDB
 //
-//  底部悬浮液态玻璃 Tab（对齐 CamWeb），图标更醒目。
+//  底部悬浮液态玻璃 Tab（iOS 26 风格），图标更醒目。
 //
 
 import SwiftUI
@@ -47,6 +47,10 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
+            // 液态玻璃氛围背景：柔和渐变洗色
+            LiquidGlassBackground()
+                .ignoresSafeArea()
+
             Group {
                 switch selectedTab {
                 case .home: HomeView()
@@ -70,6 +74,39 @@ struct ContentView: View {
     }
 }
 
+/// 全局液态玻璃氛围背景：极淡的多色渐变洗色
+struct LiquidGlassBackground: View {
+    var body: some View {
+        ZStack {
+            Color(.systemBackground)
+
+            // 左上淡蓝光晕
+            RadialGradient(
+                colors: [Color(red: 0.45, green: 0.65, blue: 0.95).opacity(0.12), .clear],
+                center: UnitPoint(x: 0.15, y: 0.05),
+                startRadius: 0,
+                endRadius: 320
+            )
+
+            // 右上淡紫光晕
+            RadialGradient(
+                colors: [Color(red: 0.65, green: 0.5, blue: 0.9).opacity(0.08), .clear],
+                center: UnitPoint(x: 0.9, y: 0.0),
+                startRadius: 0,
+                endRadius: 280
+            )
+
+            // 底部淡青光晕
+            RadialGradient(
+                colors: [Color(red: 0.3, green: 0.75, blue: 0.8).opacity(0.06), .clear],
+                center: UnitPoint(x: 0.5, y: 1.0),
+                startRadius: 0,
+                endRadius: 300
+            )
+        }
+    }
+}
+
 struct FloatingGlassTabBar: View {
     @Binding var selection: AppTab
 
@@ -82,16 +119,38 @@ struct FloatingGlassTabBar: View {
                     }
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: selection == tab ? tab.selectedIcon : tab.icon)
-                            .font(.system(size: 20, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .scaleEffect(selection == tab ? 1.12 : 1)
+                        ZStack {
+                            if selection == tab {
+                                Circle()
+                                    .fill(Color.accentColor.opacity(0.18))
+                                    .frame(width: 40, height: 40)
+                                    .overlay {
+                                        Circle()
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [.white.opacity(0.35), .clear],
+                                                    startPoint: .top,
+                                                    endPoint: .center
+                                                )
+                                            )
+                                    }
+                                    .overlay {
+                                        Circle()
+                                            .strokeBorder(.white.opacity(0.4), lineWidth: 0.6)
+                                    }
+                            }
+                            Image(systemName: selection == tab ? tab.selectedIcon : tab.icon)
+                                .font(.system(size: 20, weight: .semibold))
+                                .symbolRenderingMode(.hierarchical)
+                                .scaleEffect(selection == tab ? 1.1 : 1)
+                        }
+                        .frame(height: 40)
                         Text(tab.title)
                             .font(.system(size: 10, weight: selection == tab ? .semibold : .medium))
                     }
                     .foregroundStyle(selection == tab ? Color.accentColor : Color.secondary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -99,30 +158,13 @@ struct FloatingGlassTabBar: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background {
-            Capsule(style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Capsule(style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.42),
-                                    Color.white.opacity(0.08),
-                                    Color.white.opacity(0.18),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .blendMode(.overlay)
-                }
-                .overlay {
-                    Capsule(style: .continuous)
-                        .stroke(Color.white.opacity(0.38), lineWidth: 0.8)
-                }
-                .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
-        }
+        .liquidCapsule(
+            material: .ultraThinMaterial,
+            edgeOpacity: 0.52,
+            glowOpacity: 0.24,
+            shadowRadius: 20,
+            shadowY: 10
+        )
     }
 }
 

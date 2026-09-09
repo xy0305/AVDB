@@ -36,7 +36,9 @@ struct CategoriesView: View {
 
                 filterBar
             }
-            .background(Color(.systemBackground))
+            .background {
+                LiquidGlassBackground()
+            }
             .navigationTitle("類別")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -63,7 +65,6 @@ struct CategoriesView: View {
 
     private var filterBar: some View {
         VStack(spacing: 0) {
-            Divider()
             HStack {
                 Button { showFilter = true } label: {
                     Text("篩選")
@@ -94,7 +95,7 @@ struct CategoriesView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color(.systemBackground))
+            .liquidGlass(cornerRadius: 0, material: .thinMaterial, edgeOpacity: 0.3, glowOpacity: 0.12, shadowRadius: 8, shadowY: -2)
         }
         .padding(.bottom, 88)
     }
@@ -271,7 +272,9 @@ struct CategoryFilterSheet: View {
                 }
                 .padding(16)
             }
-            .background(Color(.systemGray6))
+            .background {
+                LiquidGlassBackground()
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -344,18 +347,12 @@ struct FlexibleChipWrap: View {
     var body: some View {
         FlowLayout(spacing: 8) {
             ForEach(tags) { tag in
-                let on = selected == tag.id
-                Button {
+                LiquidFilterChip(
+                    title: tag.name ?? tag.id,
+                    isSelected: selected == tag.id
+                ) {
                     toggle(tag.id)
-                } label: {
-                    Text(tag.name ?? tag.id)
-                        .font(.subheadline)
-                        .foregroundStyle(on ? Color.white : Color.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(on ? Color.accentColor : Color(.systemGray5), in: Capsule())
                 }
-                .buttonStyle(.plain)
             }
         }
     }
