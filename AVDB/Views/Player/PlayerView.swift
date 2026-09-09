@@ -221,6 +221,8 @@ struct KSChromePlayer: View {
                 .contentShape(Rectangle())
                 .onTapGesture { toggleChrome() }
                 .highPriorityGesture(sideDrag(width: width, height: height))
+                .padding(.top, 72)
+                .padding(.bottom, 92)
             if !hasStarted {
                 ProgressView()
                     .tint(.white)
@@ -328,14 +330,16 @@ struct KSChromePlayer: View {
 
     private var chromeOverlay: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 10) {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 52, height: 52)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .zIndex(20)
 
                 Text(title.isEmpty ? "正在播放" : title)
                     .font(.subheadline.weight(.medium))
@@ -363,8 +367,9 @@ struct KSChromePlayer: View {
                         .frame(width: 36, height: 36)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.leading, 12)
 
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

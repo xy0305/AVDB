@@ -69,13 +69,14 @@ struct Pan115PlayerView: View {
             if vm.playURL == nil || vm.errorMessage != nil {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 52, height: 52)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 16)
-                .padding(.top, 12)
+                .padding(.leading, 20)
+                .padding(.top, 16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
