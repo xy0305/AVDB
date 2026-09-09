@@ -9,7 +9,7 @@ import SwiftUI
 
 struct FollowingTagsView: View {
     @StateObject private var vm = FollowingTagsViewModel()
-    @State private var isEditing = false
+    @State private var editMode: EditMode = .inactive
     
     var body: some View {
         List {
@@ -56,7 +56,7 @@ struct FollowingTagsView: View {
                 EditButton()
             }
         }
-        .environment(\.editMode, $isEditing ? .constant(.active) : .constant(.inactive))
+        .environment(\.editMode, $editMode)
         .task {
             await vm.load()
         }
