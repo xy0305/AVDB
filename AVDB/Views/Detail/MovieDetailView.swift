@@ -208,21 +208,23 @@ struct MovieDetailView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    WantWatchStore.set(movie.id, on: !WantWatchStore.contains(movie.id))
+                    Task { await vm.setReviewStatus("want_watch") }
                 } label: {
-                    Label(WantWatchStore.contains(movie.id) ? "已想看" : "想看", systemImage: WantWatchStore.contains(movie.id) ? "heart.fill" : "heart")
+                    Label(vm.reviewStatus == "want_watch" ? "已想看" : "想看",
+                          systemImage: vm.reviewStatus == "want_watch" ? "heart.fill" : "heart")
                 }
                 .buttonStyle(.borderedProminent)
                 Button {
-                    WatchedStore.mark(movie.id)
+                    Task { await vm.setReviewStatus("watched") }
                 } label: {
-                    Label("看过", systemImage: "checkmark.circle")
+                    Label(vm.reviewStatus == "watched" ? "已看過" : "看過",
+                          systemImage: vm.reviewStatus == "watched" ? "checkmark.circle.fill" : "checkmark.circle")
                 }
                 .buttonStyle(.borderedProminent)
                 NavigationLink {
                     MyListsView(movieID: movie.id)
                 } label: {
-                    Label("存入清单", systemImage: "bookmark")
+                    Label("存入清單", systemImage: "bookmark")
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -646,6 +648,7 @@ final class MovieDetailViewModel: ObservableObject {
     @Published var magnets: [Magnet] = []
     @Published var reviews: [Review] = []
     @Published var relatedLists: [MovieList] = []
+    @Published var reviewStatus: String?
     @Published var isLoading = false
     @Published var loadingMagnets = false
     @Published var loadingLists = false
@@ -672,7 +675,7 @@ final class MovieDetailViewModel: ObservableObject {
             actorMovies = full.movie?.actorMovies
                 ?? full.actorMovies
                 ?? []
-            WatchedStore.mark(movieID)
+            reviewStatus = full.movie?.review?.status
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -691,6 +694,16 @@ final class MovieDetailViewModel: ObservableObject {
         guard !movieID.isEmpty, reviews.isEmpty else { return }
         if let r = try? await sdk.movieReviews(movieID) {
             reviews = r
+        }
+    }
+
+    func setReviewStatus(_ status: String) async {
+        guard !movieID.isEmpty else { return }
+        do {
+            let review = try await sdk.setMovieReview(movieID, status: status)
+            reviewStatus = review?.status ?? status
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

@@ -524,27 +524,53 @@ public final class JavDBSDK {
     }
 
     /// 将影片加入/移出片单（POST /api/v1/lists/{id}/movie_actions）。
+    /// 官方 form 是 name=add|remove + movie_id，不是 action=。
     public func listMovieAction(_ listID: String, movieID: String, add: Bool) async throws -> Bool {
         let resp: JavDBResponse<EmptyData> = try await client.post(
             "/api/v1/lists/\(listID)/movie_actions",
-            form: ["movie_id": movieID, "action": add ? "add" : "remove"],
+            form: ["movie_id": movieID, "name": add ? "add" : "remove"],
             useToken: true
         )
-        return resp.isSuccess
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return true
     }
 
-    /// 片单列表（GET /api/v1/lists）
+    /// 片单列表（GET /api/v1/lists，sort_by 必填，缺了 HTTP 500）
     public func lists(page: Int = 1, limit: Int = 24) async throws -> [MovieList] {
         struct ListData: Decodable { let lists: [MovieList]? }
-        let resp: JavDBResponse<ListData> = try await client.get("/api/v1/lists", query: ["sort_by": "create", "page": "\(page)", "limit": "\(limit)"], useToken: true)
+        let resp: JavDBResponse<ListData> = try await client.get(
+            "/api/v1/lists",
+            query: ["sort_by": "create", "page": "\(page)", "limit": "\(limit)"],
+            useToken: true
+        )
         return resp.data?.lists ?? []
     }
 
-    /// 简单片单（GET /api/v1/lists/simple）
-    public func simpleLists() async throws -> [MovieList] {
+    /// 我的片单（GET /api/v1/lists/simple）。传 movie_id 时每项带 has_movie。
+    public func simpleLists(movieID: String? = nil) async throws -> [MovieList] {
         struct ListData: Decodable { let lists: [MovieList]? }
-        let resp: JavDBResponse<ListData> = try await client.get("/api/v1/lists/simple")
+        var query: [String: String] = [:]
+        if let movieID { query["movie_id"] = movieID }
+        let resp: JavDBResponse<ListData> = try await client.get(
+            "/api/v1/lists/simple", query: query, useToken: true)
         return resp.data?.lists ?? []
+    }
+
+    /// 想看 / 看过（POST /api/v1/movies/{id}/reviews，form status=want_watch|watched）
+    @discardableResult
+    public func setMovieReview(_ movieID: String, status: String) async throws -> Review? {
+        struct Wrap: Decodable { let review: Review? }
+        let resp: JavDBResponse<Wrap> = try await client.post(
+            "/api/v1/movies/\(movieID)/reviews",
+            form: ["status": status],
+            useToken: true
+        )
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return resp.data?.review
     }
 
     /// 相关片单（GET /api/v1/lists/related?movie_id=）

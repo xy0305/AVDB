@@ -29,14 +29,16 @@ struct MyListsView: View {
         List(vm.lists) { list in
             if let movieID {
                 Button {
-                    Task {
-                        do {
-                            guard try await JavDBSDK.shared.listMovieAction(list.id, movieID: movieID, add: true) else { throw JavDBError.apiError(action: nil, message: "加入清單失敗") }
-                            message = "已存入「\(list.displayName)」"
-                        } catch { message = error.localizedDescription }
-                    }
+                    Task { await toggle(list, movieID: movieID) }
                 } label: {
-                    Label(list.displayName, systemImage: "bookmark")
+                    HStack {
+                        Label(list.displayName, systemImage: list.hasMovie == true ? "bookmark.fill" : "bookmark")
+                        Spacer()
+                        if list.hasMovie == true {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             } else {
                 NavigationLink { ListDetailView(listID: list.id, title: list.displayName) } label: {
@@ -45,20 +47,31 @@ struct MyListsView: View {
             }
         }
         .navigationTitle(movieID == nil ? "我的清單" : "存入清單")
-        .task { await vm.load() }
+        .task { await vm.load(movieID: movieID) }
         .alert("提示", isPresented: Binding(get: { message != nil || vm.errorMessage != nil }, set: { if !$0 { message = nil; vm.errorMessage = nil } })) {
             Button("確定", role: .cancel) {}
         } message: {
             Text(message ?? vm.errorMessage ?? "")
         }
     }
+
+    private func toggle(_ list: MovieList, movieID: String) async {
+        let adding = list.hasMovie != true
+        do {
+            _ = try await JavDBSDK.shared.listMovieAction(list.id, movieID: movieID, add: adding)
+            message = adding ? "已將影片保存至清單\(list.displayName)中" : "已從清單\(list.displayName)中移除"
+            await vm.load(movieID: movieID)
+        } catch {
+            message = error.localizedDescription
+        }
+    }
 }
 @MainActor final class MyListsViewModel: ObservableObject {
     @Published var lists: [MovieList] = []
     @Published var errorMessage: String?
-    func load() async {
+    func load(movieID: String? = nil) async {
         do {
-            lists = try await JavDBSDK.shared.lists(page: 1, limit: 24)
+            lists = try await JavDBSDK.shared.simpleLists(movieID: movieID)
         } catch {
             errorMessage = error.localizedDescription
         }

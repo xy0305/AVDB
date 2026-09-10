@@ -295,19 +295,59 @@ struct HomeView: View {
                 Text("我的關注")
                     .font(.headline)
                 Spacer()
-                Text("更新時間倒序")
+                NavigationLink {
+                    FollowingTagsView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("管理")
+                        Image(systemName: "plus")
+                    }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
             }
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-            if vm.following.isEmpty {
+
+            if vm.followTags.isEmpty {
                 Text("登入後顯示關注內容")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, AdaptiveLayout.horizontalPadding)
                     .padding(.bottom, 20)
             } else {
-                MoviePosterGrid(movies: vm.following)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(vm.followTags) { tag in
+                            Button {
+                                Task { await vm.selectFollowTag(tag) }
+                            } label: {
+                                Text(tag.displayName)
+                                    .font(.caption.weight(vm.selectedFollowTag?.id == tag.id ? .semibold : .regular))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .foregroundStyle(vm.selectedFollowTag?.id == tag.id ? Color.white : Color.primary)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(vm.selectedFollowTag?.id == tag.id ? Color.accentColor : Color(.systemGray6))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                }
+
+                if vm.following.isEmpty && vm.followLoading {
+                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
+                } else if vm.following.isEmpty {
+                    Text("暫無更新")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                        .padding(.bottom, 12)
+                } else {
+                    MoviePosterGrid(movies: vm.following)
+                }
             }
         }
     }
@@ -319,6 +359,9 @@ final class HomeViewModel: ObservableObject {
     @Published var latest: [Movie] = []
     @Published var magnets: [Movie] = []
     @Published var following: [Movie] = []
+    @Published var followTags: [FollowingTag] = []
+    @Published var selectedFollowTag: FollowingTag?
+    @Published var followLoading = false
     @Published var periodLabel = "週一/四更新"
     @Published var periods: [RecommendPeriod] = []
     private var latestPage = 1
@@ -330,17 +373,54 @@ final class HomeViewModel: ObservableObject {
         async let latestTask = try? sdk.latestMovies(page: 1, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
         async let magTask = try? sdk.latestMovies(page: 2, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
         async let periodsTask = try? sdk.recommendPeriods()
-        async let followTask = try? sdk.recentViewed()
 
         recommended = await rec ?? []
         latest = await latestTask ?? []
         magnets = (await magTask ?? []).filter { ($0.magnetsCount ?? 0) > 0 }
         if magnets.isEmpty { magnets = latest }
         periods = await periodsTask ?? []
-        following = await followTask ?? []
         if let created = periods.first?.createdAt, created.count >= 10 {
             periodLabel = String(created.prefix(10))
         }
+        await loadFollowTags()
+    }
+
+    func loadFollowTags() async {
+        let tags = await FollowingTagsStore.shared.refreshFromServer()
+        followTags = tags
+        if let current = selectedFollowTag, tags.contains(where: { $0.id == current.id }) {
+            await selectFollowTag(current)
+        } else if let first = tags.first {
+            await selectFollowTag(first)
+        } else {
+            selectedFollowTag = nil
+            following = []
+        }
+    }
+
+    func selectFollowTag(_ tag: FollowingTag) async {
+        selectedFollowTag = tag
+        followLoading = true
+        defer { followLoading = false }
+        following = await movies(for: tag)
+    }
+
+    private func movies(for tag: FollowingTag) async -> [Movie] {
+        if let actorID = tag.parsedActorID {
+            return (try? await sdk.actorMovies(actorID, page: 1, limit: 9, type: actorType(from: tag.value))) ?? []
+        }
+        if let filter = tag.moviesFilterBy {
+            return (try? await sdk.moviesByTag(
+                filterBy: filter, type: nil, page: 1, limit: 9,
+                sortBy: "update", orderBy: "desc"
+            )) ?? []
+        }
+        return []
+    }
+
+    private func actorType(from value: String?) -> String {
+        guard let value, let first = value.split(separator: ":").first else { return "0" }
+        return String(first)
     }
 
     func shuffleLatest() async {

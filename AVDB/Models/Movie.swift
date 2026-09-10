@@ -58,6 +58,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
     public let previewVideoURL: String?
     public let relativeMovies: [Movie]?
     public let actorMovies: [Movie]?
+    public let review: Review?
 
     // 派生字段
     public var displayTitle: String { title ?? number ?? "未知影片" }
@@ -109,6 +110,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
         case previewVideoURL = "preview_video_url"
         case relativeMovies = "relative_movies"
         case actorMovies = "actor_movies"
+        case review
     }
 
     public init(from decoder: Decoder) throws {
@@ -165,6 +167,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
         previewVideoURL = try? c.decode(String.self, forKey: .previewVideoURL)
         relativeMovies = try? c.decode([Movie].self, forKey: .relativeMovies)
         actorMovies = try? c.decode([Movie].self, forKey: .actorMovies)
+        review = try? c.decode(Review.self, forKey: .review)
     }
 
     /// 播放角标。官方 `play_subtitle` 经常是 1/0，不是文案。
@@ -602,11 +605,16 @@ public struct MovieList: Decodable, Identifiable, Hashable {
     public let userName: String?
     public let isFavorite: Bool?
     public let isPrivate: Bool?
+    public let hasMovie: Bool?
+    public let privacy: String?
 
-    public var displayName: String { name ?? title ?? "片单" }
+    public var displayName: String {
+        if name == "default" { return "預設清單" }
+        return name ?? title ?? "片单"
+    }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, title, description
+        case id, name, title, description, privacy
         case coverURL = "cover_url"
         case movieCount = "movie_count"
         case moviesCount = "movies_count"
@@ -619,6 +627,7 @@ public struct MovieList: Decodable, Identifiable, Hashable {
         case userName = "user_name"
         case isFavorite = "is_favorite"
         case isPrivate = "is_private"
+        case hasMovie = "has_movie"
     }
 
     public init(from decoder: Decoder) throws {
@@ -638,6 +647,8 @@ public struct MovieList: Decodable, Identifiable, Hashable {
         userName = try? c.decode(String.self, forKey: .userName)
         isFavorite = JSONFlex.bool(c, .isFavorite)
         isPrivate = JSONFlex.bool(c, .isPrivate)
+        hasMovie = JSONFlex.bool(c, .hasMovie)
+        privacy = try? c.decode(String.self, forKey: .privacy)
     }
 }
 
@@ -652,14 +663,19 @@ public struct Review: Decodable, Identifiable, Hashable {
     public let createdAt: String?
     public let likeCount: Int?
     public let isLiked: Bool?
+    public let status: String?
+    public let statusTitle: String?
 
     public var identifier: String { stableReviewID }
     public var stableReviewID: String {
         id ?? "\(userID ?? 0)-\(content ?? "")-\(createdAt ?? "")"
     }
 
+    public var isWantWatch: Bool { status == "want_watch" }
+    public var isWatched: Bool { status == "watched" }
+
     enum CodingKeys: String, CodingKey {
-        case id, content, score
+        case id, content, score, status
         case movieID = "movie_id"
         case userID = "user_id"
         case userName = "user_name"
@@ -669,6 +685,7 @@ public struct Review: Decodable, Identifiable, Hashable {
         case likesCount = "likes_count"
         case liked
         case username
+        case statusTitle = "status_title"
     }
 
     public init(from decoder: Decoder) throws {
@@ -683,6 +700,8 @@ public struct Review: Decodable, Identifiable, Hashable {
         createdAt = JSONFlex.string(c, .createdAt)
         likeCount = JSONFlex.int(c, .likeCount) ?? JSONFlex.int(c, .likesCount)
         isLiked = JSONFlex.bool(c, .isLiked) ?? JSONFlex.bool(c, .liked)
+        status = try? c.decode(String.self, forKey: .status)
+        statusTitle = try? c.decode(String.self, forKey: .statusTitle)
     }
 }
 
