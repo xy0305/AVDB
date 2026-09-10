@@ -251,7 +251,8 @@ struct ActorDetailView: View {
 
     @EnvironmentObject private var appState: AppState
     @State private var showLogin = false
-    @State private var showAllFilters = false
+    @State private var filterPanelHeight: CGFloat = 0
+    @GestureState private var filterDrag: CGFloat = 0
 
     var body: some View {
         ScrollView {
@@ -330,8 +331,15 @@ struct ActorDetailView: View {
         }
         .navigationTitle(vm.actor.map { "演員 - \($0.displayName)" } ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
+        .overlay {
+            if filterPanelHeight > 0.5 {
+                Color.black.opacity(min(0.28, filterPanelHeight / 900))
+                    .ignoresSafeArea()
+                    .onTapGesture { collapseFilterPanel() }
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            actorFilterBar
+            interactiveFilterPanel
         }
         .task { await vm.load() }
         .sheet(isPresented: $showLogin) {
@@ -349,104 +357,135 @@ struct ActorDetailView: View {
             .presentationDetents([.height(280)])
             .presentationDragIndicator(.hidden)
         }
-        .sheet(isPresented: $showAllFilters) {
-            ActorAllFiltersSheet(vm: vm)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground {
-                    if #available(iOS 26.0, *) {
-                        Color.clear
-                    } else {
-                        Color(.systemBackground).opacity(0.92)
-                    }
-                }
-        }
     }
 
-    private var actorFilterBar: some View {
+    private var collapsedFilterHeight: CGFloat { 118 }
+    private var expandedFilterHeight: CGFloat {
+        min(UIScreen.main.bounds.height * 0.72, 640)
+    }
+    private var currentFilterHeight: CGFloat {
+        min(expandedFilterHeight, max(collapsedFilterHeight, collapsedFilterHeight + filterPanelHeight + filterDrag))
+    }
+    private var isFilterExpanded: Bool {
+        currentFilterHeight > collapsedFilterHeight + 80
+    }
+
+    private var interactiveFilterPanel: some View {
         VStack(spacing: 0) {
-            Button {
-                showAllFilters = true
-            } label: {
+            VStack(spacing: 0) {
                 Capsule()
                     .fill(Color.secondary.opacity(0.35))
                     .frame(width: 36, height: 5)
                     .padding(.top, 8)
                     .padding(.bottom, 6)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
+                actorFilterHeader
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("展開全部分類")
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("篩選")
-                        .font(.headline)
-                    Spacer()
-                    Button {
-                        vm.showYearPicker = true
-                    } label: {
-                        Text(vm.yearTitle)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.tint)
-                    }
-                    Menu {
-                        ForEach(CatalogSort.allCases) { item in
-                            Button {
-                                Task { await vm.selectSort(item) }
-                            } label: {
-                                if vm.sort == item {
-                                    Label(item.title, systemImage: "checkmark")
-                                } else {
-                                    Text(item.title)
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(vm.sort.title)
-                            Image(systemName: "arrow.up.arrow.down")
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.tint)
-                    }
-                }
-                .padding(.horizontal, 16)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        primaryFilterChip("全部", id: "")
-                        ForEach(vm.filterTags) { tag in
-                            primaryFilterChip(tag.name ?? tag.id, id: tag.id)
-                        }
-                        ForEach(vm.tags) { tag in
-                            tagFilterChip(
-                                "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
-                                id: tag.id
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .gesture(filterPanelDrag)
+            .onTapGesture {
+                withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.86)) {
+                    filterPanelHeight = isFilterExpanded ? 0 : (expandedFilterHeight - collapsedFilterHeight)
                 }
             }
-            .padding(.bottom, 10)
+
+            if isFilterExpanded {
+                ActorAllFiltersContent(vm: vm) {
+                    collapseFilterPanel()
+                }
+            } else {
+                actorFilterChips
+                    .padding(.bottom, 10)
+            }
         }
+        .frame(height: currentFilterHeight, alignment: .top)
+        .frame(maxWidth: .infinity)
         .background {
             if #available(iOS 26.0, *) {
-                Rectangle().fill(.clear).glassEffect(.regular, in: Rectangle())
+                UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 18, style: .continuous)
+                    .fill(.clear)
+                    .glassEffect(.regular, in: UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 18, style: .continuous))
             } else {
-                Rectangle().fill(.ultraThinMaterial)
+                UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 18, style: .continuous)
+                    .fill(.ultraThinMaterial)
             }
         }
-        .gesture(
-            DragGesture(minimumDistance: 12)
-                .onEnded { value in
-                    if value.translation.height < -40 {
-                        showAllFilters = true
+        .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86), value: filterPanelHeight)
+    }
+
+    private var filterPanelDrag: some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .global)
+            .updating($filterDrag) { value, state, _ in
+                state = -value.translation.height
+            }
+            .onEnded { value in
+                let projected = filterPanelHeight - value.translation.height - value.predictedEndTranslation.height * 0.35
+                let mid = (expandedFilterHeight - collapsedFilterHeight) * 0.45
+                withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.86)) {
+                    filterPanelHeight = projected > mid ? (expandedFilterHeight - collapsedFilterHeight) : 0
+                }
+            }
+    }
+
+    private func collapseFilterPanel() {
+        withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.86)) {
+            filterPanelHeight = 0
+        }
+    }
+
+    private var actorFilterHeader: some View {
+        HStack {
+            Text("篩選")
+                .font(.headline)
+            Spacer()
+            Button {
+                vm.showYearPicker = true
+            } label: {
+                Text(vm.yearTitle)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.tint)
+            }
+            Menu {
+                ForEach(CatalogSort.allCases) { item in
+                    Button {
+                        Task { await vm.selectSort(item) }
+                    } label: {
+                        if vm.sort == item {
+                            Label(item.title, systemImage: "checkmark")
+                        } else {
+                            Text(item.title)
+                        }
                     }
                 }
-        )
+            } label: {
+                HStack(spacing: 4) {
+                    Text(vm.sort.title)
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    private var actorFilterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                primaryFilterChip("全部", id: "")
+                ForEach(vm.filterTags) { tag in
+                    primaryFilterChip(tag.name ?? tag.id, id: tag.id)
+                }
+                ForEach(vm.tags) { tag in
+                    tagFilterChip(
+                        "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
+                        id: tag.id
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+        }
     }
 
     private func actorActionButton(icon: String, title: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -633,65 +672,43 @@ final class ActorDetailViewModel: ObservableObject {
     }
 }
 
-/// 演员分类上拉面板：液态玻璃 + 全部标签换行展示。
-struct ActorAllFiltersSheet: View {
+/// 演员分类展开内容：跟手面板内部滚动，点选后收起。
+struct ActorAllFiltersContent: View {
     @ObservedObject var vm: ActorDetailViewModel
-    @Environment(\.dismiss) private var dismiss
+    var onPick: () -> Void
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if !vm.filterTags.isEmpty {
-                        sectionTitle("快捷")
-                        chipWrap {
-                            sheetChip("全部", selected: vm.filter.isEmpty && vm.filterByTags.isEmpty) {
-                                Task { await vm.selectFilter(""); dismiss() }
-                            }
-                            ForEach(vm.filterTags) { tag in
-                                sheetChip(tag.name ?? tag.id, selected: vm.filter == tag.id && vm.filterByTags.isEmpty) {
-                                    Task { await vm.selectFilter(tag.id); dismiss() }
-                                }
-                            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if !vm.filterTags.isEmpty {
+                    sectionTitle("快捷")
+                    chipWrap {
+                        sheetChip("全部", selected: vm.filter.isEmpty && vm.filterByTags.isEmpty) {
+                            Task { await vm.selectFilter(""); onPick() }
                         }
-                    }
-                    if !vm.tags.isEmpty {
-                        sectionTitle("分類")
-                        chipWrap {
-                            ForEach(vm.tags) { tag in
-                                sheetChip(
-                                    "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
-                                    selected: vm.filterByTags == tag.id
-                                ) {
-                                    Task { await vm.selectFilterTag(tag.id); dismiss() }
-                                }
+                        ForEach(vm.filterTags) { tag in
+                            sheetChip(tag.name ?? tag.id, selected: vm.filter == tag.id && vm.filterByTags.isEmpty) {
+                                Task { await vm.selectFilter(tag.id); onPick() }
                             }
                         }
                     }
                 }
-                .padding(16)
-            }
-            .background {
-                if #available(iOS 26.0, *) {
-                    Color.clear
-                } else {
-                    Color.clear.background(.ultraThinMaterial)
+                if !vm.tags.isEmpty {
+                    sectionTitle("分類")
+                    chipWrap {
+                        ForEach(vm.tags) { tag in
+                            sheetChip(
+                                "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
+                                selected: vm.filterByTags == tag.id
+                            ) {
+                                Task { await vm.selectFilterTag(tag.id); onPick() }
+                            }
+                        }
+                    }
                 }
             }
-            .navigationTitle("全部分類")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("關閉") { dismiss() }
-                }
-            }
-        }
-        .background {
-            if #available(iOS 26.0, *) {
-                Rectangle().fill(.clear).glassEffect(.regular, in: Rectangle())
-            } else {
-                Rectangle().fill(.ultraThinMaterial)
-            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
         }
     }
 
