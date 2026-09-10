@@ -26,7 +26,7 @@ struct MovieDetailView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack {
+            ZStack(alignment: .bottom) {
                 if let movie = vm.movie {
                     detailBackground(movie)
                         .frame(width: proxy.size.width, height: proxy.size.height)
@@ -65,8 +65,7 @@ struct MovieDetailView: View {
                         vm: reviewsVM,
                         availableHeight: max(280, proxy.size.height)
                     )
-                    .frame(width: proxy.size.width)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .frame(width: proxy.size.width, height: reviewPanelHeight, alignment: .top)
                     .ignoresSafeArea(edges: .bottom)
                     .zIndex(10)
                 }
@@ -378,6 +377,7 @@ struct MovieDetailView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(Color(.systemGray6), in: Capsule())
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -406,12 +406,12 @@ struct MovieDetailView: View {
                             JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                                 .frame(width: 70, height: 70)
                                 .clipShape(Circle())
-                                .allowsHitTesting(false)
                             Text(actor.name ?? "")
                                 .font(.caption2)
                                 .lineLimit(1)
                                 .frame(width: 70)
                         }
+                        .frame(width: 70)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -1151,8 +1151,10 @@ struct DraggableReviewsPanel: View {
             }
         }
         .frame(height: panelHeight, alignment: .top)
+        .frame(maxWidth: .infinity)
         .background(Color(.systemBackground))
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
+        .contentShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 16, y: -4)
         .safeAreaPadding(.bottom)
         .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.12), value: panelState)
