@@ -465,7 +465,7 @@ struct CatalogListView: View {
     @State private var sort: CatalogSort = .updateDesc
     @StateObject private var vm = MovieListViewModel { _ in [] }
 
-    private let listSorts: [CatalogSort] = [.updateDesc, .releaseDesc, .releaseAsc, .score]
+    private let listSorts: [CatalogSort] = [.updateDesc, .releaseDesc]
 
     init(title: String, type: MovieCatalogType = .all, source: CatalogSource) {
         self.title = title

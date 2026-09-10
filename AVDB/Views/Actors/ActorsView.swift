@@ -251,6 +251,7 @@ struct ActorDetailView: View {
 
     @EnvironmentObject private var appState: AppState
     @State private var showLogin = false
+    @State private var showAllFilters = false
 
     var body: some View {
         ScrollView {
@@ -348,63 +349,104 @@ struct ActorDetailView: View {
             .presentationDetents([.height(280)])
             .presentationDragIndicator(.hidden)
         }
+        .sheet(isPresented: $showAllFilters) {
+            ActorAllFiltersSheet(vm: vm)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground {
+                    if #available(iOS 26.0, *) {
+                        Color.clear
+                    } else {
+                        Color(.systemBackground).opacity(0.92)
+                    }
+                }
+        }
     }
 
     private var actorFilterBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("篩選")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    vm.showYearPicker = true
-                } label: {
-                    Text(vm.yearTitle)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.tint)
-                }
-                Menu {
-                    ForEach(CatalogSort.allCases) { item in
-                        Button {
-                            Task { await vm.selectSort(item) }
-                        } label: {
-                            if vm.sort == item {
-                                Label(item.title, systemImage: "checkmark")
-                            } else {
-                                Text(item.title)
+        VStack(spacing: 0) {
+            Button {
+                showAllFilters = true
+            } label: {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.35))
+                    .frame(width: 36, height: 5)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("展開全部分類")
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("篩選")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        vm.showYearPicker = true
+                    } label: {
+                        Text(vm.yearTitle)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.tint)
+                    }
+                    Menu {
+                        ForEach(CatalogSort.allCases) { item in
+                            Button {
+                                Task { await vm.selectSort(item) }
+                            } label: {
+                                if vm.sort == item {
+                                    Label(item.title, systemImage: "checkmark")
+                                } else {
+                                    Text(item.title)
+                                }
                             }
                         }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(vm.sort.title)
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.tint)
-                }
-            }
-            .padding(.horizontal, 16)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    primaryFilterChip("全部", id: "")
-                    ForEach(vm.filterTags) { tag in
-                        primaryFilterChip(tag.name ?? tag.id, id: tag.id)
-                    }
-                    ForEach(vm.tags) { tag in
-                        tagFilterChip(
-                            "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
-                            id: tag.id
-                        )
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(vm.sort.title)
+                            Image(systemName: "arrow.up.arrow.down")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.tint)
                     }
                 }
                 .padding(.horizontal, 16)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        primaryFilterChip("全部", id: "")
+                        ForEach(vm.filterTags) { tag in
+                            primaryFilterChip(tag.name ?? tag.id, id: tag.id)
+                        }
+                        ForEach(vm.tags) { tag in
+                            tagFilterChip(
+                                "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
+                                id: tag.id
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.bottom, 10)
+        }
+        .background {
+            if #available(iOS 26.0, *) {
+                Rectangle().fill(.clear).glassEffect(.regular, in: Rectangle())
+            } else {
+                Rectangle().fill(.ultraThinMaterial)
             }
         }
-        .padding(.top, 12)
-        .padding(.bottom, 10)
-        .background(.bar)
+        .gesture(
+            DragGesture(minimumDistance: 12)
+                .onEnded { value in
+                    if value.translation.height < -40 {
+                        showAllFilters = true
+                    }
+                }
+        )
     }
 
     private func actorActionButton(icon: String, title: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -588,6 +630,91 @@ final class ActorDetailViewModel: ObservableObject {
             let ids = Set(movies.map(\.id))
             movies.append(contentsOf: next.filter { !ids.contains($0.id) })
         }
+    }
+}
+
+/// 演员分类上拉面板：液态玻璃 + 全部标签换行展示。
+struct ActorAllFiltersSheet: View {
+    @ObservedObject var vm: ActorDetailViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if !vm.filterTags.isEmpty {
+                        sectionTitle("快捷")
+                        chipWrap {
+                            sheetChip("全部", selected: vm.filter.isEmpty && vm.filterByTags.isEmpty) {
+                                Task { await vm.selectFilter(""); dismiss() }
+                            }
+                            ForEach(vm.filterTags) { tag in
+                                sheetChip(tag.name ?? tag.id, selected: vm.filter == tag.id && vm.filterByTags.isEmpty) {
+                                    Task { await vm.selectFilter(tag.id); dismiss() }
+                                }
+                            }
+                        }
+                    }
+                    if !vm.tags.isEmpty {
+                        sectionTitle("分類")
+                        chipWrap {
+                            ForEach(vm.tags) { tag in
+                                sheetChip(
+                                    "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
+                                    selected: vm.filterByTags == tag.id
+                                ) {
+                                    Task { await vm.selectFilterTag(tag.id); dismiss() }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background {
+                if #available(iOS 26.0, *) {
+                    Color.clear
+                } else {
+                    Color.clear.background(.ultraThinMaterial)
+                }
+            }
+            .navigationTitle("全部分類")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("關閉") { dismiss() }
+                }
+            }
+        }
+        .background {
+            if #available(iOS 26.0, *) {
+                Rectangle().fill(.clear).glassEffect(.regular, in: Rectangle())
+            } else {
+                Rectangle().fill(.ultraThinMaterial)
+            }
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    private func chipWrap<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        FlowLayout(spacing: 8) { content() }
+    }
+
+    private func sheetChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(selected ? .semibold : .regular))
+                .foregroundStyle(selected ? Color.white : Color.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(selected ? Color.accentColor : Color(.systemGray5), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 
