@@ -52,10 +52,10 @@ struct HomeView: View {
                 RankingsView(embedded: true, initialTab: .playback)
             }
             .navigationDestination(isPresented: $goLatest) {
-                CatalogListView(title: "最新上架", type: .censored, source: .latest)
+                CatalogListView(title: "最新上架", source: .latest)
             }
             .navigationDestination(isPresented: $goMagnets) {
-                CatalogListView(title: "近期磁鏈", type: .censored, source: .latest)
+                CatalogListView(title: "近期磁鏈更新", source: .magnets)
             }
             .navigationDestination(isPresented: $goArticles) {
                 ArticlesView()
@@ -242,6 +242,26 @@ struct HomeView: View {
                 Text("我的關注")
                     .font(.headline)
                 Spacer()
+                Menu {
+                    ForEach([CatalogSort.releaseDesc, CatalogSort.updateDesc]) { item in
+                        Button {
+                            Task { await vm.selectFollowSort(item) }
+                        } label: {
+                            if vm.followSort == item {
+                                Label(item.title, systemImage: "checkmark")
+                            } else {
+                                Text(item.title)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(vm.followSort.title)
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
                 NavigationLink {
                     FollowingTagsView()
                 } label: {
@@ -309,6 +329,7 @@ final class HomeViewModel: ObservableObject {
     @Published var followTags: [FollowingTag] = []
     @Published var selectedFollowTag: FollowingTag?
     @Published var followLoading = false
+    @Published var followSort: CatalogSort = .updateDesc
     @Published var periodLabel = "週一/四更新"
     @Published var periods: [RecommendPeriod] = []
     private var latestPage = 1
@@ -352,14 +373,27 @@ final class HomeViewModel: ObservableObject {
         following = await movies(for: tag)
     }
 
+    func selectFollowSort(_ sort: CatalogSort) async {
+        guard followSort != sort else { return }
+        followSort = sort
+        if let tag = selectedFollowTag {
+            followLoading = true
+            defer { followLoading = false }
+            following = await movies(for: tag)
+        }
+    }
+
     private func movies(for tag: FollowingTag) async -> [Movie] {
         if let actorID = tag.parsedActorID {
-            return (try? await sdk.actorMovies(actorID, page: 1, limit: 9, type: actorType(from: tag.value))) ?? []
+            return (try? await sdk.actorMovies(
+                actorID, page: 1, limit: 9, type: actorType(from: tag.value),
+                sortBy: followSort.sortBy, orderBy: followSort.orderBy
+            )) ?? []
         }
         if let filter = tag.moviesFilterBy {
             return (try? await sdk.moviesByTag(
                 filterBy: filter, type: nil, page: 1, limit: 9,
-                sortBy: "update", orderBy: "desc"
+                sortBy: followSort.sortBy, orderBy: followSort.orderBy
             )) ?? []
         }
         return []

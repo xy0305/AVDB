@@ -17,7 +17,7 @@ struct CategoriesView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 UnderlineTabBar(
-                    tabs: MovieCatalogType.allCases.map { ($0, $0.title) },
+                    tabs: MovieCatalogType.categoryTabs.map { ($0, $0.title) },
                     selection: $catalog
                 )
                 .padding(.top, 4)
@@ -434,39 +434,143 @@ struct TagMoviesView: View {
 
 enum CatalogSource {
     case latest
+    case magnets
     case rankings
+}
+
+/// 最新上架 / 近期磁鏈：官方 filter_by（latest 接口）
+enum LatestListFilter: String, CaseIterable, Identifiable {
+    case all = ""
+    case magnets = "magnets"
+    case playable = "can_play"
+    case subtitle = "subtitle"
+
+    var id: String { rawValue.isEmpty ? "all" : rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "全部"
+        case .magnets: return "含磁鏈"
+        case .playable: return "可播放"
+        case .subtitle: return "字幕"
+        }
+    }
 }
 
 struct CatalogListView: View {
     let title: String
-    let type: MovieCatalogType
-    let source: CatalogSource
-    @StateObject private var vm: MovieListViewModel
+    var source: CatalogSource = .latest
+    @State private var catalog: MovieCatalogType = .all
+    @State private var filter: LatestListFilter
+    @State private var sort: CatalogSort = .updateDesc
+    @StateObject private var vm = MovieListViewModel { _ in [] }
 
-    init(title: String, type: MovieCatalogType, source: CatalogSource) {
+    private let listSorts: [CatalogSort] = [.updateDesc, .releaseDesc, .releaseAsc, .score]
+
+    init(title: String, type: MovieCatalogType = .all, source: CatalogSource) {
         self.title = title
-        self.type = type
         self.source = source
-        _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            switch source {
-            case .latest:
-                return try await JavDBSDK.shared.latestMovies(page: page, limit: 21, type: type.rawValue)
-            case .rankings:
-                return try await JavDBSDK.shared.rankings(type: type.rawValue, period: "daily", page: page)
-            }
-        })
+        _catalog = State(initialValue: type == .censored ? .all : type)
+        _filter = State(initialValue: source == .magnets ? .magnets : .all)
     }
 
     var body: some View {
-        ScrollView {
-            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
-                vm.loadMoreIfNeeded(current: movie)
-            })
-            if vm.isLoading { ProgressView().padding() }
+        VStack(spacing: 0) {
+            UnderlineTabBar(
+                tabs: MovieCatalogType.allCases.map { ($0, $0.title) },
+                selection: $catalog
+            )
+            .padding(.top, 4)
+
+            filterSortBar
+
+            ScrollView {
+                MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                    vm.loadMoreIfNeeded(current: movie)
+                })
+                if vm.isLoading { ProgressView().padding() }
+            }
         }
+        .background { LiquidGlassBackground() }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .task { if vm.movies.isEmpty { await vm.loadMore() } }
+        .task { await reload() }
+        .onChange(of: catalog) { _, _ in Task { await reload() } }
+        .onChange(of: filter) { _, _ in Task { await reload() } }
+        .onChange(of: sort) { _, _ in Task { await reload() } }
         .refreshable { await vm.refresh() }
+    }
+
+    private var filterSortBar: some View {
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(LatestListFilter.allCases) { item in
+                        let selected = filter == item
+                        Button {
+                            filter = item
+                        } label: {
+                            Text(item.title)
+                                .font(.subheadline.weight(selected ? .semibold : .regular))
+                                .foregroundStyle(selected ? Color.white : Color.secondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    selected ? Color.accentColor.opacity(0.85) : Color(.systemGray6),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            Menu {
+                ForEach(listSorts) { item in
+                    Button {
+                        sort = item
+                    } label: {
+                        if sort == item {
+                            Label(item.title, systemImage: "checkmark")
+                        } else {
+                            Text(item.title)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(sort.title)
+                    Image(systemName: "chevron.down")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color(.systemGray6), in: Capsule())
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    @MainActor
+    private func reload() async {
+        let type = catalog.rawValue
+        let filterBy = filter.rawValue.isEmpty ? nil : filter.rawValue
+        let sortBy = sort.sortBy
+        vm.replaceFetcher { page in
+            switch source {
+            case .rankings:
+                return try await JavDBSDK.shared.rankings(type: type, period: "daily", page: page)
+            case .latest, .magnets:
+                return try await JavDBSDK.shared.latestMovies(
+                    page: page,
+                    limit: 21,
+                    type: type,
+                    filterBy: filterBy,
+                    sortBy: sortBy
+                )
+            }
+        }
+        await vm.refresh()
     }
 }

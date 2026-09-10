@@ -354,14 +354,22 @@ public final class JavDBSDK {
         limit: Int = 21,
         type: String = "0",
         filter: String = "",
-        filterByTags: String? = nil
+        filterByTags: String? = nil,
+        sortBy: String = "release",
+        orderBy: String = "desc",
+        year: String? = nil
     ) async throws -> [Movie] {
-        try await moviesByTag(
-            filterBy: "\(type):a:\(id):\(filter)",
+        var filterBy = "\(type):a:\(id):\(filter)"
+        if let year, !year.isEmpty {
+            filterBy += ":\(year)"
+        }
+        return try await moviesByTag(
+            filterBy: filterBy,
             type: nil,
             page: page,
             limit: limit,
-            sortBy: "release",
+            sortBy: sortBy,
+            orderBy: orderBy,
             filterByTags: filterByTags
         )
     }

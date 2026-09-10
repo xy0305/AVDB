@@ -17,8 +17,15 @@ class MovieListViewModel: ObservableObject {
     @Published var sort: CatalogSort = .updateDesc
 
     private var currentPage = 1
-    private let fetchPage: (Int) async throws -> [Movie]
-    private let fetchSortedPage: ((Int, CatalogSort) async throws -> [Movie])?
+    private var fetchPage: (Int) async throws -> [Movie]
+    private var fetchSortedPage: ((Int, CatalogSort) async throws -> [Movie])?
+
+    func replaceFetcher(_ fetchPage: @escaping (Int) async throws -> [Movie]) {
+        self.fetchPage = fetchPage
+        self.fetchSortedPage = nil
+        currentPage = 1
+        hasMore = true
+    }
 
     init(fetchPage: @escaping (Int) async throws -> [Movie]) {
         self.fetchPage = fetchPage

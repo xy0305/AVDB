@@ -37,6 +37,7 @@ enum JAVDBPalette {
 }
 
 enum MovieCatalogType: String, CaseIterable, Identifiable {
+    case all = "all"
     case censored = "0"
     case uncensored = "1"
     case western = "2"
@@ -47,12 +48,18 @@ enum MovieCatalogType: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .all: return "全部"
         case .censored: return "有碼"
         case .uncensored: return "無碼"
         case .western: return "歐美"
         case .fc2: return "FC2"
         case .anime: return "動漫"
         }
+    }
+
+    /// 類別頁不展示「全部」，只保留有碼/無碼/歐美/FC2/動漫。
+    static var categoryTabs: [MovieCatalogType] {
+        [.censored, .uncensored, .western, .fc2, .anime]
     }
 }
 
@@ -68,13 +75,38 @@ enum RankPeriod: String, CaseIterable, Identifiable {
     }
 }
 
-/// 顶部文字 Tab。保留旧名以兼容调用点。
+/// 官方下划线 Tab（全部 / 有碼 / 無碼 …）
 struct UnderlineTabBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
 
     var body: some View {
-        SegmentedTabBar(tabs: tabs, selection: $selection)
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(tabs, id: \.0) { tab, title in
+                        Button {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                                selection = tab
+                            }
+                        } label: {
+                            VStack(spacing: 8) {
+                                Text(title)
+                                    .font(.subheadline.weight(selection == tab ? .semibold : .regular))
+                                    .foregroundStyle(selection == tab ? Color.accentColor : Color.primary)
+                                Rectangle()
+                                    .fill(selection == tab ? Color.accentColor : Color.clear)
+                                    .frame(height: 2)
+                            }
+                            .padding(.horizontal, 14)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+            Divider()
+        }
     }
 }
 

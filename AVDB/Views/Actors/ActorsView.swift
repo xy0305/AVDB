@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 enum ActorTab: String, CaseIterable, Identifiable {
     case recommend
@@ -307,32 +308,6 @@ struct ActorDetailView: View {
                     }
                     .padding(.horizontal)
 
-                    if !vm.filterTags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                primaryFilterChip("全部", id: "")
-                                ForEach(vm.filterTags) { tag in
-                                    primaryFilterChip(tag.name ?? tag.id, id: tag.id)
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-
-                    if !vm.tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(vm.tags.prefix(20)) { tag in
-                                    tagFilterChip(
-                                        "\(tag.name ?? tag.id)\(tag.count.map { " \($0)" } ?? "")",
-                                        id: tag.id
-                                    )
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-
                     if vm.movies.isEmpty {
                         if vm.isLoadingMovies {
                             ProgressView().frame(maxWidth: .infinity).padding(.top, 24)
@@ -352,13 +327,84 @@ struct ActorDetailView: View {
                 ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
             }
         }
-        .navigationTitle(vm.actor?.displayName ?? "演員")
+        .navigationTitle(vm.actor.map { "演員 - \($0.displayName)" } ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            actorFilterBar
+        }
         .task { await vm.load() }
         .sheet(isPresented: $showLogin) {
             LoginView()
                 .environmentObject(appState)
         }
+        .sheet(isPresented: $vm.showYearPicker) {
+            YearWheelPicker(
+                years: vm.yearOptions,
+                selection: vm.year,
+                onConfirm: { year in
+                    Task { await vm.selectYear(year) }
+                }
+            )
+            .presentationDetents([.height(280)])
+            .presentationDragIndicator(.hidden)
+        }
+    }
+
+    private var actorFilterBar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("篩選")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    vm.showYearPicker = true
+                } label: {
+                    Text(vm.yearTitle)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.tint)
+                }
+                Menu {
+                    ForEach(CatalogSort.allCases) { item in
+                        Button {
+                            Task { await vm.selectSort(item) }
+                        } label: {
+                            if vm.sort == item {
+                                Label(item.title, systemImage: "checkmark")
+                            } else {
+                                Text(item.title)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(vm.sort.title)
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.tint)
+                }
+            }
+            .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    primaryFilterChip("全部", id: "")
+                    ForEach(vm.filterTags) { tag in
+                        primaryFilterChip(tag.name ?? tag.id, id: tag.id)
+                    }
+                    ForEach(vm.tags) { tag in
+                        tagFilterChip(
+                            "\(tag.name ?? tag.id)\(tag.count.map { "(\($0))" } ?? "")",
+                            id: tag.id
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(.bar)
     }
 
     private func actorActionButton(icon: String, title: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -407,6 +453,9 @@ final class ActorDetailViewModel: ObservableObject {
     // 演员详情的「精选综合 / 4 小时以上 / 中出」属于 filter_by_tags，
     // 不能拼进 filter_by 的演员筛选段。
     @Published var filterByTags = ""
+    @Published var sort: CatalogSort = .releaseDesc
+    @Published var year: String? = nil
+    @Published var showYearPicker = false
     @Published var hasCollected = false
     @Published var hasFollowed = false
     @Published var isCollecting = false
@@ -416,6 +465,15 @@ final class ActorDetailViewModel: ObservableObject {
     private var hasMore = true
     /// 有码女优详情页官方固定 filter_by=0:a:{id}:，不要拿 actor.type（欧美/无码会串片）
     private let catalogType = "0"
+
+    var yearTitle: String {
+        year.map { "\($0)" } ?? "全部年份"
+    }
+
+    var yearOptions: [String?] {
+        let current = Calendar.current.component(.year, from: Date())
+        return [nil] + (1990...current).reversed().map { String($0) }
+    }
 
     init(actorID: String) {
         self.actorID = actorID
@@ -452,6 +510,25 @@ final class ActorDetailViewModel: ObservableObject {
         guard filterByTags != id || !filter.isEmpty else { return }
         filter = ""
         filterByTags = id
+        page = 1
+        hasMore = true
+        movies = []
+        await fetchMovies()
+    }
+
+    func selectSort(_ sort: CatalogSort) async {
+        guard self.sort != sort else { return }
+        self.sort = sort
+        page = 1
+        hasMore = true
+        movies = []
+        await fetchMovies()
+    }
+
+    func selectYear(_ year: String?) async {
+        showYearPicker = false
+        guard self.year != year else { return }
+        self.year = year
         page = 1
         hasMore = true
         movies = []
@@ -498,7 +575,10 @@ final class ActorDetailViewModel: ObservableObject {
         defer { isLoadingMovies = false }
         let next = (try? await JavDBSDK.shared.actorMovies(
             actorID, page: page, limit: 24, type: catalogType, filter: filter,
-            filterByTags: filterByTags.isEmpty ? nil : filterByTags
+            filterByTags: filterByTags.isEmpty ? nil : filterByTags,
+            sortBy: sort.sortBy,
+            orderBy: sort.orderBy,
+            year: year
         )) ?? []
         if next.isEmpty {
             hasMore = false
@@ -508,5 +588,57 @@ final class ActorDetailViewModel: ObservableObject {
             let ids = Set(movies.map(\.id))
             movies.append(contentsOf: next.filter { !ids.contains($0.id) })
         }
+    }
+}
+
+/// 官方演员页年份滚轮：全部年份 + 逐年，滚动时轻震动。
+struct YearWheelPicker: View {
+    let years: [String?]
+    let selection: String?
+    let onConfirm: (String?) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var index: Int = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(title(for: index))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.tint)
+                .padding(.top, 18)
+                .padding(.bottom, 8)
+
+            Picker("", selection: $index) {
+                ForEach(years.indices, id: \.self) { i in
+                    Text(title(for: i)).tag(i)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 160)
+            .onChange(of: index) { _, _ in
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+
+            HStack {
+                Button("取消") { dismiss() }
+                    .frame(maxWidth: .infinity)
+                Button("确认") {
+                    let year = years.indices.contains(index) ? years[index] : nil
+                    onConfirm(year)
+                    dismiss()
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .font(.body.weight(.medium))
+            .foregroundStyle(.tint)
+            .padding(.vertical, 12)
+        }
+        .onAppear {
+            index = years.firstIndex(where: { $0 == selection }) ?? 0
+        }
+    }
+
+    private func title(for i: Int) -> String {
+        guard years.indices.contains(i), let year = years[i] else { return "全部年份" }
+        return year
     }
 }
