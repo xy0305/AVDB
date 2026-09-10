@@ -90,12 +90,14 @@ public struct StartupData: Codable {
     public let user: User?
     public let backupDomainsData: String?
     public let recentKeywords: [String]?
+    public let recentMagnetKeywords: [String]?
 
     enum CodingKeys: String, CodingKey {
         case user
         case splashAd = "splash_ad"
         case backupDomainsData = "backup_domains_data"
         case recentKeywords = "recent_keywords"
+        case recentMagnetKeywords = "recent_magnet_keywords"
     }
 }
 

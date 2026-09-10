@@ -1257,12 +1257,12 @@ struct DraggableReviewsPanel: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 50)
                 }
-                ForEach(vm.reviews) { review in
+                ForEach(vm.reviews, id: \.stableReviewID) { review in
                     ReviewRow(review: review, movieID: movieID)
                         .padding(14)
                         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .onAppear {
-                            if review.id == vm.reviews.last?.id {
+                            if review.stableReviewID == vm.reviews.last?.stableReviewID {
                                 Task { await vm.loadMore(movieID: movieID) }
                             }
                         }
@@ -1290,12 +1290,12 @@ struct ReviewsListView: View {
 
     var body: some View {
         List {
-            ForEach(vm.reviews) { review in
+            ForEach(vm.reviews, id: \.stableReviewID) { review in
                 ReviewRow(review: review, movieID: movieID)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .onAppear {
-                        if review.id == vm.reviews.last?.id {
+                        if review.stableReviewID == vm.reviews.last?.stableReviewID {
                             Task { await vm.loadMore(movieID: movieID) }
                         }
                     }
@@ -1324,29 +1324,35 @@ final class ReviewsListViewModel: ObservableObject {
         if !force, !reviews.isEmpty { return }
         page = 1
         hasMore = true
-        reviews = []
-        await fetch(movieID: movieID)
+        await fetch(movieID: movieID, replace: true)
     }
 
     func loadMore(movieID: String) async {
         guard hasMore, !isLoading else { return }
         page += 1
-        await fetch(movieID: movieID)
+        await fetch(movieID: movieID, replace: false)
     }
 
-    private func fetch(movieID: String) async {
+    private func fetch(movieID: String, replace: Bool) async {
         isLoading = true
         defer { isLoading = false }
-        let next = (try? await JavDBSDK.shared.movieReviews(
-            movieID, page: page, sortBy: sortBy, limit: 24
-        )) ?? []
-        if next.isEmpty {
-            hasMore = false
-        } else if page == 1 {
-            reviews = next
-        } else {
-            let ids = Set(reviews.map(\.stableReviewID))
-            reviews.append(contentsOf: next.filter { !ids.contains($0.stableReviewID) })
+        do {
+            let next = try await JavDBSDK.shared.movieReviews(
+                movieID, page: page, sortBy: sortBy, limit: 24
+            )
+            if replace {
+                reviews = next
+            } else if !next.isEmpty {
+                let ids = Set(reviews.map(\.stableReviewID))
+                reviews.append(contentsOf: next.filter { !ids.contains($0.stableReviewID) })
+            }
+            hasMore = !next.isEmpty
+        } catch {
+            if replace {
+                page = 1
+            } else {
+                page = max(1, page - 1)
+            }
         }
     }
 }

@@ -49,12 +49,18 @@ struct SearchView: View {
     @State private var keyword = ""
     @State private var submitted = ""
     @State private var category: SearchCategory = .movie
+    @StateObject private var suggest = SearchSuggestStore.shared
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         Group {
             if submitted.isEmpty {
-                ContentUnavailableView("搜索", systemImage: "magnifyingglass", description: Text("输入番号、演员名或关键词"))
+                SearchIdleView(
+                    hotKeywords: suggest.hotKeywords,
+                    history: suggest.history,
+                    onPick: { pick($0) },
+                    onClearHistory: { suggest.clearHistory() }
+                )
             } else {
                 SearchResultView(keyword: submitted, category: category)
                     .id("\(submitted)_\(category.rawValue)")
@@ -68,11 +74,12 @@ struct SearchView: View {
             }
         }
         .focused($isSearchFocused)
-        .searchable(text: $keyword, prompt: "番号 / 关键词")
+        .searchable(text: $keyword, prompt: "輸入演員或番號等關鍵字")
         .onSubmit(of: .search) { submit() }
         .onChange(of: keyword) { _, new in
             if new.isEmpty { submitted = "" }
         }
+        .task { await suggest.loadHotKeywords() }
     }
 
     private var categoryPicker: some View {
@@ -94,10 +101,108 @@ struct SearchView: View {
     }
 
     private func submit() {
-        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        pick(keyword)
+    }
+
+    private func pick(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        keyword = trimmed
         submitted = trimmed
+        suggest.addHistory(trimmed)
         isSearchFocused = false
+    }
+}
+
+/// 空搜索页：近期热搜（startup.recent_keywords）+ 本地历史。
+private struct SearchIdleView: View {
+    let hotKeywords: [String]
+    let history: [String]
+    let onPick: (String) -> Void
+    let onClearHistory: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                if !hotKeywords.isEmpty {
+                    keywordSection(title: "近期熱搜", words: hotKeywords)
+                }
+                if !history.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        keywordSection(title: "歷史搜索", words: history)
+                        Button("清空", action: onClearHistory)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 4)
+                    }
+                }
+                if hotKeywords.isEmpty && history.isEmpty {
+                    ContentUnavailableView("搜索", systemImage: "magnifyingglass", description: Text("输入番号、演员名或关键词"))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private func keywordSection(title: String, words: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.system(size: 18, weight: .bold))
+            FlowLayout(spacing: 8) {
+                ForEach(words, id: \.self) { word in
+                    Button {
+                        onPick(word)
+                    } label: {
+                        Text(word)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+final class SearchSuggestStore: ObservableObject {
+    static let shared = SearchSuggestStore()
+
+    @Published private(set) var hotKeywords: [String] = []
+    @Published private(set) var history: [String] = []
+
+    private let historyKey = "avdb.search.history"
+    private let historyLimit = 30
+
+    private init() {
+        history = UserDefaults.standard.stringArray(forKey: historyKey) ?? []
+    }
+
+    func loadHotKeywords() async {
+        if let words = try? await JavDBSDK.shared.startup().recentKeywords, !words.isEmpty {
+            hotKeywords = words
+        }
+    }
+
+    func addHistory(_ keyword: String) {
+        var next = history.filter { $0.caseInsensitiveCompare(keyword) != .orderedSame }
+        next.insert(keyword, at: 0)
+        if next.count > historyLimit { next = Array(next.prefix(historyLimit)) }
+        history = next
+        UserDefaults.standard.set(next, forKey: historyKey)
+    }
+
+    func clearHistory() {
+        history = []
+        UserDefaults.standard.removeObject(forKey: historyKey)
     }
 }
 

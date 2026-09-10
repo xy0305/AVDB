@@ -815,7 +815,7 @@ public final class JavDBSDK {
     /// 启动配置（GET /api/v1/startup）
     public func startup() async throws -> StartupData {
         let resp: JavDBResponse<StartupData> = try await client.get("/api/v1/startup")
-        return resp.data ?? StartupData(splashAd: nil, user: nil, backupDomainsData: nil, recentKeywords: nil)
+        return resp.data ?? StartupData(splashAd: nil, user: nil, backupDomainsData: nil, recentKeywords: nil, recentMagnetKeywords: nil)
     }
 
     /// 关于（GET /api/v1/about）
