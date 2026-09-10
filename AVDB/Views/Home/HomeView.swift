@@ -39,13 +39,7 @@ struct HomeView: View {
             .background {
                 LiquidGlassBackground()
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Color.clear.frame(width: 1, height: 1)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .task { await vm.initialLoad() }
             .refreshable { await vm.initialLoad() }
             .navigationDestination(isPresented: $goSearch) {

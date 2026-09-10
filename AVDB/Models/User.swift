@@ -99,6 +99,25 @@ public struct StartupData: Codable {
         case recentKeywords = "recent_keywords"
         case recentMagnetKeywords = "recent_magnet_keywords"
     }
+
+    /// startup 的 user 经常只有 promotion_code，没有 id；不能拖垮整包解码。
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        splashAd = try? c.decode(SplashAd.self, forKey: .splashAd)
+        user = try? c.decode(User.self, forKey: .user)
+        backupDomainsData = try? c.decode(String.self, forKey: .backupDomainsData)
+        recentKeywords = try? c.decode([String].self, forKey: .recentKeywords)
+        recentMagnetKeywords = try? c.decode([String].self, forKey: .recentMagnetKeywords)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(splashAd, forKey: .splashAd)
+        try c.encodeIfPresent(user, forKey: .user)
+        try c.encodeIfPresent(backupDomainsData, forKey: .backupDomainsData)
+        try c.encodeIfPresent(recentKeywords, forKey: .recentKeywords)
+        try c.encodeIfPresent(recentMagnetKeywords, forKey: .recentMagnetKeywords)
+    }
 }
 
 /// 会员计划
