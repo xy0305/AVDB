@@ -176,58 +176,8 @@ struct HomeView: View {
             if vm.recommended.isEmpty {
                 EmptyStateView(text: "載入推薦…")
                     .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-            } else if let movie = vm.recommended.first {
-                NavigationLink {
-                    MovieDetailView(movieID: movie.id)
-                } label: {
-                    HStack(alignment: .top, spacing: 14) {
-                        ZStack(alignment: .topTrailing) {
-                            JavDBImage(url: movie.coverURL ?? movie.thumbURL)
-                                .frame(width: 100, height: 150)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            
-                            if let score = movie.score, score > 0 {
-                                Text(String(format: "%.1f", score))
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(.orange, in: Capsule())
-                                    .padding(6)
-                            }
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(movie.displayNumber)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.blue)
-                            
-                            Text(movie.displayTitle)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(.primary)
-                                .lineLimit(3)
-                            
-                            Spacer()
-                            
-                            if let score = movie.score, score > 0 {
-                                HStack(spacing: 3) {
-                                    ForEach(0..<5, id: \.self) { i in
-                                        Image(systemName: i < Int(score / 2) ? "star.fill" : "star")
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(.orange.gradient)
-                                    }
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(14)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                }
-                .buttonStyle(.plain)
+            } else {
+                RecommendCarousel(movies: vm.recommended)
             }
         }
     }
@@ -436,6 +386,98 @@ final class HomeViewModel: ObservableObject {
         let filtered = next.filter { ($0.magnetsCount ?? 0) > 0 }
         if filtered.isEmpty { magnetPage = 1 }
         else { magnets = filtered }
+    }
+}
+
+/// 官方首页「佳片推薦」：大图横向轮播，下一张露出一点；可滑动，约 4 秒自动翻页。
+private struct RecommendCarousel: View {
+    let movies: [Movie]
+    @State private var currentID: String?
+    @State private var isDragging = false
+
+    private var bannerHeight: CGFloat { AdaptiveLayout.isPad ? 280 : 200 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            GeometryReader { geo in
+                let cardWidth = max(geo.size.width - AdaptiveLayout.horizontalPadding - 36, 200)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(movies) { movie in
+                            NavigationLink {
+                                MovieDetailView(movieID: movie.id)
+                            } label: {
+                                RecommendBannerCard(movie: movie)
+                                    .frame(width: cardWidth, height: geo.size.height)
+                            }
+                            .buttonStyle(.plain)
+                            .id(movie.id)
+                        }
+                    }
+                    .scrollTargetLayout()
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $currentID)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 8)
+                        .onChanged { _ in isDragging = true }
+                        .onEnded { _ in
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                isDragging = false
+                            }
+                        }
+                )
+            }
+            .frame(height: bannerHeight)
+            .onAppear {
+                if currentID == nil { currentID = movies.first?.id }
+            }
+            .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
+                guard movies.count > 1, !isDragging else { return }
+                let ids = movies.map(\.id)
+                let current = currentID ?? ids[0]
+                guard let i = ids.firstIndex(of: current) else { return }
+                withAnimation(.easeInOut(duration: 0.45)) {
+                    currentID = ids[(i + 1) % ids.count]
+                }
+            }
+
+            if let movie = movies.first(where: { $0.id == currentID }) ?? movies.first {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(movie.displayNumber)  \(movie.displayTitle)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if let score = movie.score, score > 0 {
+                        HStack(spacing: 4) {
+                            ForEach(0..<5, id: \.self) { i in
+                                Image(systemName: i < Int((score / 2).rounded()) ? "star.fill" : "star")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.orange)
+                            }
+                            Text(String(format: "%.2f", score))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+            }
+        }
+    }
+}
+
+private struct RecommendBannerCard: View {
+    let movie: Movie
+
+    var body: some View {
+        JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
     }
 }
 
