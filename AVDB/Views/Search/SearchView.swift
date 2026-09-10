@@ -2,12 +2,12 @@
 //  SearchView.swift
 //  AVDB
 //
-//  系统搜索栏：支持按 影片/演员/系列/片商/导演/清单/番号 分类搜索。
+//  固定搜索栏 + 官方 /api/v2/search 的 type / movie_filter_by / movie_sort_by。
 //
 
 import SwiftUI
 
-/// 搜索分类
+/// 搜索分类（对应 /api/v2/search 的 type）
 enum SearchCategory: String, CaseIterable, Identifiable {
     case movie
     case actor
@@ -31,55 +31,89 @@ enum SearchCategory: String, CaseIterable, Identifiable {
         }
     }
 
-    /// /api/v2/search 的 type 值
-    var typeValue: String {
-        switch self {
-        case .movie: return "movie"
-        case .actor: return "actor"
-        case .series: return "series"
-        case .maker: return "maker"
-        case .director: return "director"
-        case .list: return "list"
-        case .code: return "code"
-        }
-    }
+    var typeValue: String { rawValue }
+
+    var showsMovieFilters: Bool { self == .movie }
 }
 
 struct SearchView: View {
     @State private var keyword = ""
     @State private var submitted = ""
     @State private var category: SearchCategory = .movie
+    @State private var sortBy: MovieSortBy = .relevance
+    @State private var filterBy: MovieFilterBy = .all
     @StateObject private var suggest = SearchSuggestStore.shared
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
-        Group {
-            if submitted.isEmpty {
-                SearchIdleView(
-                    hotKeywords: suggest.hotKeywords,
-                    history: suggest.history,
-                    onPick: { pick($0) },
-                    onClearHistory: { suggest.clearHistory() }
-                )
-            } else {
-                SearchResultView(keyword: submitted, category: category)
-                    .id("\(submitted)_\(category.rawValue)")
-            }
-        }
-        .navigationTitle("搜索")
-        .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .top, spacing: 0) {
+        VStack(spacing: 0) {
+            pinnedSearchBar
+
             if !submitted.isEmpty {
                 categoryPicker
+                if category.showsMovieFilters {
+                    movieFilterSortBar
+                }
+            }
+
+            Group {
+                if submitted.isEmpty {
+                    SearchIdleView(
+                        hotKeywords: suggest.hotKeywords,
+                        history: suggest.history,
+                        onPick: { pick($0) },
+                        onClearHistory: { suggest.clearHistory() }
+                    )
+                } else {
+                    SearchResultView(
+                        keyword: submitted,
+                        category: category,
+                        sortBy: sortBy,
+                        filterBy: filterBy
+                    )
+                    .id("\(submitted)_\(category.rawValue)_\(sortBy.rawValue)_\(filterBy.rawValue)")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(Color(.systemBackground))
+        .navigationTitle("搜索")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .task { await suggest.loadHotKeywords() }
+        .onAppear { isSearchFocused = submitted.isEmpty }
+    }
+
+    /// 钉在顶部，不随列表滚动、不走系统 searchable。
+    private var pinnedSearchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField("搜索番號 / 關鍵詞", text: $keyword)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($isSearchFocused)
+                .onSubmit { submit() }
+            if !keyword.isEmpty {
+                Button {
+                    keyword = ""
+                    submitted = ""
+                    isSearchFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .focused($isSearchFocused)
-        .searchable(text: $keyword, prompt: "輸入演員或番號等關鍵字")
-        .onSubmit(of: .search) { submit() }
-        .onChange(of: keyword) { _, new in
-            if new.isEmpty { submitted = "" }
-        }
-        .task { await suggest.loadHotKeywords() }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6), in: Capsule(style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color(.systemBackground))
     }
 
     private var categoryPicker: some View {
@@ -97,7 +131,44 @@ struct SearchView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
-        .background(Color(.systemBackground).opacity(0.92))
+        .background(Color(.systemBackground))
+    }
+
+    private var movieFilterSortBar: some View {
+        HStack(spacing: 8) {
+            ForEach(MovieFilterBy.allCases) { item in
+                LiquidFilterChip(
+                    title: item.title,
+                    isSelected: filterBy == item
+                ) {
+                    filterBy = item
+                }
+            }
+            Spacer(minLength: 8)
+            Menu {
+                ForEach(MovieSortBy.allCases) { item in
+                    Button {
+                        sortBy = item
+                    } label: {
+                        if sortBy == item {
+                            Label(item.title, systemImage: "checkmark")
+                        } else {
+                            Text(item.title)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(sortBy.title)
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
+        .background(Color(.systemBackground))
     }
 
     private func submit() {
@@ -209,19 +280,19 @@ final class SearchSuggestStore: ObservableObject {
 struct SearchResultView: View {
     let keyword: String
     let category: SearchCategory
+    var sortBy: MovieSortBy = .relevance
+    var filterBy: MovieFilterBy = .all
 
     var body: some View {
         switch category {
         case .movie:
-            SearchMovieResultView(keyword: keyword)
+            SearchMovieResultView(keyword: keyword, type: "movie", sortBy: sortBy, filterBy: filterBy)
         case .actor:
             SearchActorResultView(keyword: keyword)
         case .list:
             SearchListResultView(keyword: keyword)
-        case .series, .maker, .director:
+        case .series, .maker, .director, .code:
             SearchNamedResultView(keyword: keyword, category: category)
-        case .code:
-            SearchMovieResultView(keyword: keyword, asCode: true)
         }
     }
 }
@@ -229,14 +300,24 @@ struct SearchResultView: View {
 /// 影片 / 番号 结果
 struct SearchMovieResultView: View {
     let keyword: String
-    var asCode: Bool = false
+    var type: String = "movie"
+    var sortBy: MovieSortBy = .relevance
+    var filterBy: MovieFilterBy = .all
     @StateObject private var vm: MovieListViewModel
 
-    init(keyword: String, asCode: Bool = false) {
+    init(keyword: String, type: String = "movie", sortBy: MovieSortBy = .relevance, filterBy: MovieFilterBy = .all) {
         self.keyword = keyword
-        self.asCode = asCode
+        self.type = type
+        self.sortBy = sortBy
+        self.filterBy = filterBy
         _vm = StateObject(wrappedValue: MovieListViewModel { page in
-            try await JavDBSDK.shared.search(keyword: keyword, page: page)
+            try await JavDBSDK.shared.search(
+                keyword: keyword,
+                page: page,
+                type: type,
+                sortBy: sortBy,
+                filterBy: filterBy
+            )
         })
     }
 
@@ -345,12 +426,13 @@ struct SearchNamedResultView: View {
     private func namedDestination(_ item: NamedResult) -> some View {
         switch category {
         case .series:
-            // 系列详情走影片列表
             SeriesMoviesView(seriesID: item.id, title: item.name ?? item.id)
         case .maker:
             MakerMoviesView(makerID: item.id, title: item.name ?? item.id)
         case .director:
             DirectorMoviesView(directorID: item.id, title: item.name ?? item.id)
+        case .code:
+            SeriesNumberMoviesView(number: item.id, title: item.name ?? item.id)
         default:
             Text(item.name ?? item.id)
         }

@@ -8,21 +8,41 @@
 
 import Foundation
 
-/// 排序方式枚举
-public enum MovieSortBy: String {
+/// 排序方式枚举（搜索：movie_sort_by）
+public enum MovieSortBy: String, CaseIterable, Identifiable {
     case relevance = "relevance"
     case release = "release"
     case rating = "rating"
     case date = "date"
 
+    public var id: String { rawValue }
     public static var `default`: MovieSortBy { .release }
+
+    public var title: String {
+        switch self {
+        case .relevance: return "相關"
+        case .release: return "發行"
+        case .rating: return "評分"
+        case .date: return "日期"
+        }
+    }
 }
 
-/// 影片筛选
-public enum MovieFilterBy: String {
+/// 影片筛选（搜索：movie_filter_by）
+public enum MovieFilterBy: String, CaseIterable, Identifiable {
     case all = "all"
     case cnsub = "has_cnsub"
     case playable = "can_play"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .all: return "全部"
+        case .cnsub: return "中字"
+        case .playable: return "可播放"
+        }
+    }
 }
 
 /// JAVDB SDK
@@ -949,7 +969,7 @@ public struct NamedListData: Decodable {
     public let items: [NamedResult]?
 
     enum CodingKeys: String, CodingKey {
-        case series, makers, directors
+        case series, makers, directors, codes
     }
 
     public init(from decoder: Decoder) throws {
@@ -957,6 +977,7 @@ public struct NamedListData: Decodable {
         items = try c.decodeIfPresent([NamedResult].self, forKey: .series)
             ?? c.decodeIfPresent([NamedResult].self, forKey: .makers)
             ?? c.decodeIfPresent([NamedResult].self, forKey: .directors)
+            ?? c.decodeIfPresent([NamedResult].self, forKey: .codes)
     }
 }
 

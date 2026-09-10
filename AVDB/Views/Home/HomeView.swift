@@ -75,7 +75,7 @@ struct HomeView: View {
         }
     }
 
-    /// 首页顶部搜索框（悬浮玻璃）
+    /// 首页顶部搜索框（整条可点，避免 Spacer 吃掉右半边点击）
     private var searchBar: some View {
         Button {
             goSearch = true
@@ -87,16 +87,19 @@ struct HomeView: View {
                 Text("搜索番號 / 關鍵詞")
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
-                Spacer()
+                Spacer(minLength: 0)
                 Image(systemName: "barcode.viewfinder")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.blue)
+                    .allowsHitTesting(false)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .liquidGlassRect(cornerRadius: 14)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .liquidGlassRect(cornerRadius: 14, interactive: false)
         }
         .buttonStyle(.plain)
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.horizontal, AdaptiveLayout.horizontalPadding)
         .padding(.top, 8)
     }
