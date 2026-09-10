@@ -571,6 +571,20 @@ struct KSChromePlayer: View {
 
 enum OrientationLock {
     static func set(_ mask: UIInterfaceOrientationMask, keepLocked: Bool = false) {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        // iPad 点 X 关播放器时若 requestGeometryUpdate(.portrait)，窗口会被踢出全屏 / Stage Manager。
+        if isPad, mask == .portrait {
+            apply(.all, requestGeometry: false, keepLocked: true)
+            return
+        }
+        apply(mask, requestGeometry: true, keepLocked: keepLocked)
+    }
+
+    private static func apply(
+        _ mask: UIInterfaceOrientationMask,
+        requestGeometry: Bool,
+        keepLocked: Bool
+    ) {
         KSOptions.supportedInterfaceOrientations = mask
         guard let windowScene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
@@ -579,9 +593,11 @@ enum OrientationLock {
             rootVC.setNeedsUpdateOfSupportedInterfaceOrientations()
         }
         DispatchQueue.main.async {
-            windowScene.requestGeometryUpdate(
-                UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
-            ) { _ in }
+            if requestGeometry {
+                windowScene.requestGeometryUpdate(
+                    UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
+                ) { _ in }
+            }
             guard !keepLocked else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 KSOptions.supportedInterfaceOrientations = .allButUpsideDown
