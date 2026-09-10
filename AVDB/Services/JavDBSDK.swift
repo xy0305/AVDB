@@ -8,39 +8,66 @@
 
 import Foundation
 
-/// 排序方式枚举（搜索：movie_sort_by）
+/// 搜索排序（官方：movie_sort_by）
 public enum MovieSortBy: String, CaseIterable, Identifiable {
     case relevance = "relevance"
     case release = "release"
-    case rating = "rating"
-    case date = "date"
+    case update = "update"
+    case score = "score"
 
     public var id: String { rawValue }
-    public static var `default`: MovieSortBy { .release }
+    public static var `default`: MovieSortBy { .relevance }
 
     public var title: String {
         switch self {
-        case .relevance: return "相關"
-        case .release: return "發行"
-        case .rating: return "評分"
-        case .date: return "日期"
+        case .relevance: return "相關度"
+        case .release: return "發佈時間"
+        case .update: return "更新時間"
+        case .score: return "評分"
         }
     }
 }
 
-/// 影片筛选（搜索：movie_filter_by）
+/// 搜索筛选（官方：movie_filter_by）
 public enum MovieFilterBy: String, CaseIterable, Identifiable {
     case all = "all"
-    case cnsub = "has_cnsub"
     case playable = "can_play"
+    case magnets = "magnets"
+    case subtitle = "subtitle"
+    case single = "single"
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
         case .all: return "全部"
-        case .cnsub: return "中字"
         case .playable: return "可播放"
+        case .magnets: return "含磁鏈"
+        case .subtitle: return "字幕"
+        case .single: return "單體"
+        }
+    }
+}
+
+/// 搜索類型（官方：movie_type，空=全部，0–4 對應有碼/無碼/歐美/FC2/動漫）
+public enum SearchMovieType: String, CaseIterable, Identifiable {
+    case all = ""
+    case censored = "0"
+    case uncensored = "1"
+    case western = "2"
+    case fc2 = "3"
+    case anime = "4"
+
+    public var id: String { rawValue.isEmpty ? "all" : rawValue }
+
+    public var title: String {
+        switch self {
+        case .all: return "全部"
+        case .censored: return "有碼"
+        case .uncensored: return "無碼"
+        case .western: return "歐美"
+        case .fc2: return "FC2"
+        case .anime: return "動漫"
         }
     }
 }
@@ -63,16 +90,22 @@ public final class JavDBSDK {
         type: String = "movie",
         sortBy: MovieSortBy = .relevance,
         filterBy: MovieFilterBy = .all,
+        movieType: SearchMovieType = .all,
         limit: Int = 20
     ) async throws -> [Movie] {
-        let query: [String: String] = [
+        var query: [String: String] = [
             "q": keyword,
             "page": "\(page)",
             "type": type,
             "movie_sort_by": sortBy.rawValue,
-            "movie_filter_by": filterBy.rawValue,
             "limit": "\(min(limit, 50))",
         ]
+        if filterBy != .all {
+            query["movie_filter_by"] = filterBy.rawValue
+        }
+        if movieType != .all {
+            query["movie_type"] = movieType.rawValue
+        }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v2/search", query: query)
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)

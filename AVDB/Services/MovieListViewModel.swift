@@ -42,8 +42,24 @@ class MovieListViewModel: ObservableObject {
     func refresh() async {
         currentPage = 1
         hasMore = true
-        movies = []
-        await loadMore()
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let result: [Movie]
+            if let fetchSortedPage {
+                result = try await fetchSortedPage(1, sort)
+            } else {
+                result = try await fetchPage(1)
+            }
+            if result.isEmpty {
+                hasMore = false
+            } else {
+                movies = result
+                currentPage = 2
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func loadMore() async {
