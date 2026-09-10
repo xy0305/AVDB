@@ -85,12 +85,32 @@ public struct StartupData: Codable {
         public let enabled: Bool?
         public let overtime: Int?
         public let ad: AdInfo?
+
+        public init(enabled: Bool? = nil, overtime: Int? = nil, ad: AdInfo? = nil) {
+            self.enabled = enabled
+            self.overtime = overtime
+            self.ad = ad
+        }
     }
     public let splashAd: SplashAd?
     public let user: User?
     public let backupDomainsData: String?
     public let recentKeywords: [String]?
     public let recentMagnetKeywords: [String]?
+
+    public init(
+        splashAd: SplashAd? = nil,
+        user: User? = nil,
+        backupDomainsData: String? = nil,
+        recentKeywords: [String]? = nil,
+        recentMagnetKeywords: [String]? = nil
+    ) {
+        self.splashAd = splashAd
+        self.user = user
+        self.backupDomainsData = backupDomainsData
+        self.recentKeywords = recentKeywords
+        self.recentMagnetKeywords = recentMagnetKeywords
+    }
 
     enum CodingKeys: String, CodingKey {
         case user
@@ -144,6 +164,18 @@ public struct Wallet: Codable {
     public let coin: Double?
     public let totalIncome: Double?
     public let pendingIncome: Double?
+
+    public init(
+        balance: Double? = nil,
+        coin: Double? = nil,
+        totalIncome: Double? = nil,
+        pendingIncome: Double? = nil
+    ) {
+        self.balance = balance
+        self.coin = coin
+        self.totalIncome = totalIncome
+        self.pendingIncome = pendingIncome
+    }
 
     enum CodingKeys: String, CodingKey {
         case balance, coin

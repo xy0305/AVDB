@@ -702,7 +702,7 @@ public final class JavDBSDK {
         client.setToken(token)
         client.currentUser = user
         if let tags = resp.data?.followingTags {
-            await FollowingTagsStore.shared.replace(tags)
+            FollowingTagsStore.shared.replace(tags)
         } else {
             await FollowingTagsStore.shared.refreshFromServer()
         }
@@ -736,7 +736,7 @@ public final class JavDBSDK {
         } else {
             tags = (try? await followingTags()) ?? []
         }
-        await FollowingTagsStore.shared.replace(tags)
+        FollowingTagsStore.shared.replace(tags)
         return (user, tags)
     }
 
