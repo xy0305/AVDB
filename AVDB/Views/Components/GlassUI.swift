@@ -175,6 +175,24 @@ extension View {
     func liquidGlassPage() -> some View {
         self.background { LiquidGlassBackground() }
     }
+
+    /// 详情点番号/导演/片商后的二级列表。
+    /// iPad 的系统 Tab 在顶部，会和导航栏叠成一大块玻璃，把第一排海报盖住。
+    func nestedMovieListChrome() -> some View {
+        modifier(NestedMovieListChrome())
+    }
+}
+
+private struct NestedMovieListChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        if AdaptiveLayout.isPad {
+            content
+                .toolbar(.hidden, for: .tabBar)
+                .safeAreaPadding(.top, 8)
+        } else {
+            content
+        }
+    }
 }
 
 /// iOS 26：系统 Tab / Navigation 自动 Liquid Glass。

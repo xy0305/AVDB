@@ -329,6 +329,7 @@ struct ActorDetailView: View {
                 ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
             }
         }
+        .nestedMovieListChrome()
         .navigationTitle(vm.actor.map { "演員 - \($0.displayName)" } ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {

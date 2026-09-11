@@ -425,6 +425,7 @@ struct TagMoviesView: View {
             })
             if vm.isLoading { ProgressView().padding() }
         }
+        .nestedMovieListChrome()
         .navigationTitle(tag.name ?? tag.id)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -494,6 +495,7 @@ struct CatalogListView: View {
             }
         }
         .background { LiquidGlassBackground() }
+        .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }

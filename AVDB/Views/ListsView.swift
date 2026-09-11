@@ -110,6 +110,7 @@ struct ListDetailView: View {
             if vm.isLoading { ProgressView().padding() }
         }
         .liquidGlassPage()
+        .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -201,6 +202,7 @@ struct SeriesMoviesView: View {
             if vm.isLoading { ProgressView().padding() }
         }
         .liquidGlassPage()
+        .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -236,6 +238,7 @@ struct SeriesNumberMoviesView: View {
             if vm.isLoading { ProgressView().padding() }
         }
         .liquidGlassPage()
+        .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -270,6 +273,7 @@ struct MakerMoviesView: View {
             if vm.isLoading { ProgressView().padding() }
         }
         .liquidGlassPage()
+        .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -304,6 +308,7 @@ struct DirectorMoviesView: View {
             if vm.isLoading { ProgressView().padding() }
         }
         .liquidGlassPage()
+        .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
