@@ -43,6 +43,7 @@ struct MovieGridView: View {
                     .padding()
             }
         }
+        .liquidGlassPage()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .task {

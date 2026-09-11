@@ -374,7 +374,7 @@ struct MovieDetailView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(Color(.systemGray6), in: Capsule())
+                            .liquidGlass(interactive: false)
                             .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
@@ -1150,7 +1150,10 @@ struct DraggableReviewsPanel: View {
         }
         .frame(height: panelHeight, alignment: .top)
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
         .contentShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 16, y: -4)

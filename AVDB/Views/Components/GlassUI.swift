@@ -157,13 +157,58 @@ extension View {
             }
         }
     }
+
+    /// 系统导航栏 / Tab 走液态玻璃。iOS 26 用系统默认；更早系统回退材质。
+    /// 全屏不加 glassEffect，避免再吃点击。
+    func liquidGlassChrome() -> some View {
+        modifier(LiquidGlassChromeModifier())
+    }
+
+    /// 列表透出氛围背景。
+    func liquidGlassList() -> some View {
+        self
+            .scrollContentBackground(.hidden)
+            .background { LiquidGlassBackground() }
+    }
+
+    /// 页面氛围背景（不抢点击）。
+    func liquidGlassPage() -> some View {
+        self.background { LiquidGlassBackground() }
+    }
 }
 
-// MARK: - 全局氛围背景（内容区，不是玻璃）
+/// iOS 26：系统 Tab / Navigation 自动 Liquid Glass。
+/// 更早系统：导航栏和 Tab 用薄材质。
+private struct LiquidGlassChromeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+        } else {
+            content
+                .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+                .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        }
+    }
+}
+
+// MARK: - 全局氛围背景（内容区，不是控件玻璃）
 
 struct LiquidGlassBackground: View {
     var body: some View {
-        Color(.systemBackground)
+        ZStack {
+            Color(.systemBackground)
+            LinearGradient(
+                colors: [
+                    Color.blue.opacity(0.10),
+                    Color.cyan.opacity(0.05),
+                    Color.clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }
 

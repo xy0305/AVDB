@@ -43,6 +43,7 @@ struct ListsView: View {
                 }
             }
             .navigationTitle("片单")
+            .liquidGlassList()
             .task {
                 if vm.lists.isEmpty { await vm.load() }
             }
@@ -108,6 +109,7 @@ struct ListDetailView: View {
             })
             if vm.isLoading { ProgressView().padding() }
         }
+        .liquidGlassPage()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -198,6 +200,7 @@ struct SeriesMoviesView: View {
             })
             if vm.isLoading { ProgressView().padding() }
         }
+        .liquidGlassPage()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -229,6 +232,7 @@ struct SeriesNumberMoviesView: View {
             })
             if vm.isLoading { ProgressView().padding() }
         }
+        .liquidGlassPage()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -262,6 +266,7 @@ struct MakerMoviesView: View {
             })
             if vm.isLoading { ProgressView().padding() }
         }
+        .liquidGlassPage()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -295,6 +300,7 @@ struct DirectorMoviesView: View {
             })
             if vm.isLoading { ProgressView().padding() }
         }
+        .liquidGlassPage()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
@@ -379,6 +385,7 @@ struct SeriesView: View {
                 if loading { ProgressView().padding() }
             }
         }
+        .liquidGlassPage()
         .navigationTitle("系列")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -530,6 +537,7 @@ struct MakersView: View {
             }
         }
         .navigationTitle("片商")
+        .liquidGlassPage()
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load(force: true) }
@@ -646,6 +654,7 @@ struct DirectorsView: View {
             }
         }
         .navigationTitle("导演")
+        .liquidGlassPage()
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load(force: true) }
@@ -755,6 +764,7 @@ struct NamedListView: View {
             if loading { ProgressView().padding() }
         }
         .navigationTitle(kind.title)
+        .liquidGlassPage()
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load(force: true) }

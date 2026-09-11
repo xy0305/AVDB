@@ -79,7 +79,7 @@ struct SearchView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Color(.systemBackground))
+        .liquidGlassPage()
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -115,7 +115,7 @@ struct SearchView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color(.systemGray6), in: Capsule(style: .continuous))
+            .liquidGlassRect(cornerRadius: 22, interactive: false)
 
             Button("取消") {
                 if submitted.isEmpty, keyword.isEmpty {
@@ -131,7 +131,6 @@ struct SearchView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color(.systemBackground))
     }
 
     private var categoryPicker: some View {
@@ -159,7 +158,6 @@ struct SearchView: View {
             }
             Divider()
         }
-        .background(Color(.systemBackground))
     }
 
     /// 官方搜索页：類型 / 篩選 / 排序 三行芯片。
@@ -171,7 +169,6 @@ struct SearchView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color(.systemBackground))
     }
 
     private func officialChipRow<T: Hashable & Identifiable>(
@@ -197,10 +194,12 @@ struct SearchView: View {
                                 .foregroundStyle(selected ? Color.white : Color.primary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(
-                                    selected ? Color.accentColor : Color(.systemGray5),
-                                    in: Capsule()
-                                )
+                                .background {
+                                    if selected {
+                                        Capsule(style: .continuous).fill(Color.accentColor)
+                                    }
+                                }
+                                .liquidGlass(interactive: false)
                         }
                         .buttonStyle(.plain)
                     }
@@ -272,7 +271,7 @@ private struct SearchIdleView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .liquidGlassRect(cornerRadius: 8, interactive: false)
                     }
                     .buttonStyle(.plain)
                 }

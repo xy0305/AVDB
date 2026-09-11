@@ -146,6 +146,7 @@ struct UserView: View {
                 }
             }
             .navigationTitle("我的")
+            .liquidGlassList()
             .sheet(isPresented: $showLogin) {
                 LoginView()
             }
@@ -165,6 +166,7 @@ struct FavoritesHubView: View {
             NavigationLink("收藏的清单") { CollectedListsView() }
         }
         .navigationTitle("我的收藏")
+        .liquidGlassList()
     }
 }
 
@@ -190,6 +192,7 @@ struct CollectedView: View {
             content
         }
         .navigationTitle("收藏的\(kind.rawValue)")
+        .liquidGlassPage()
         .toolbar {
             if kind == .actor {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -438,6 +441,7 @@ struct PlansView: View {
             .padding()
         }
         .navigationTitle("VIP 会员")
+        .liquidGlassList()
         .task { await vm.load() }
     }
 }
@@ -480,6 +484,7 @@ struct WalletView: View {
             }
         }
         .navigationTitle("钱包")
+        .liquidGlassList()
         .task { await vm.load() }
     }
 }
@@ -513,6 +518,7 @@ struct AboutView: View {
             .padding()
         }
         .navigationTitle("关于")
+        .liquidGlassPage()
         .task {
             content = try? await JavDBSDK.shared.about()
         }

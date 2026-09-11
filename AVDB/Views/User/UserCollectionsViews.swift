@@ -47,6 +47,7 @@ struct MyListsView: View {
             }
         }
         .navigationTitle(movieID == nil ? "我的清單" : "存入清單")
+        .liquidGlassList()
         .task { await vm.load(movieID: movieID) }
         .alert("提示", isPresented: Binding(get: { message != nil || vm.errorMessage != nil }, set: { if !$0 { message = nil; vm.errorMessage = nil } })) {
             Button("確定", role: .cancel) {}
@@ -101,6 +102,7 @@ struct CollectedListsView: View {
             }
         }
         .navigationTitle("收藏的清單")
+        .liquidGlassList()
         .task { await vm.load() }
     }
 }

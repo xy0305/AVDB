@@ -79,6 +79,7 @@ struct LoginView: View {
             }
             .navigationTitle("登录")
             .navigationBarTitleDisplayMode(.inline)
+            .liquidGlassList()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }

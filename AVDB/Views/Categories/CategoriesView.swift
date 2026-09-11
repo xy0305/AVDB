@@ -515,10 +515,12 @@ struct CatalogListView: View {
                                 .foregroundStyle(selected ? Color.white : Color.secondary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 7)
-                                .background(
-                                    selected ? Color.accentColor.opacity(0.85) : Color(.systemGray6),
-                                    in: Capsule()
-                                )
+                                .background {
+                                    if selected {
+                                        Capsule(style: .continuous).fill(Color.accentColor)
+                                    }
+                                }
+                                .liquidGlass(interactive: false)
                         }
                         .buttonStyle(.plain)
                     }
@@ -545,7 +547,7 @@ struct CatalogListView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(Color(.systemGray6), in: Capsule())
+                .liquidGlass(interactive: false)
             }
         }
         .padding(.horizontal, 12)

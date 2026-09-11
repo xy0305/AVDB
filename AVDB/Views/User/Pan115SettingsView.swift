@@ -73,6 +73,7 @@ struct Pan115SettingsView: View {
             }
         }
         .navigationTitle("115 离线")
+        .liquidGlassList()
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             cookieDraft = settings.cookie

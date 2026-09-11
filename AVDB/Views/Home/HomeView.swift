@@ -294,10 +294,12 @@ struct HomeView: View {
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
                                     .foregroundStyle(vm.selectedFollowTag?.id == tag.id ? Color.white : Color.primary)
-                                    .background(
-                                        Capsule(style: .continuous)
-                                            .fill(vm.selectedFollowTag?.id == tag.id ? Color.accentColor : Color(.systemGray6))
-                                    )
+                                    .background {
+                                        if vm.selectedFollowTag?.id == tag.id {
+                                            Capsule(style: .continuous).fill(Color.accentColor)
+                                        }
+                                    }
+                                    .liquidGlass(interactive: false)
                             }
                             .buttonStyle(.plain)
                         }

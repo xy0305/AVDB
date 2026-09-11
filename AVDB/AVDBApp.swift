@@ -25,6 +25,7 @@ struct AVDBApp: App {
             ContentView()
                 .environmentObject(appState)
                 .preferredColorScheme(.light)
+                .liquidGlassChrome()
         }
     }
 }

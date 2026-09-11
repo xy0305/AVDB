@@ -55,6 +55,7 @@ struct FollowingTagsView: View {
             }
         }
         .navigationTitle("我的關注")
+        .liquidGlassList()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if !store.tags.isEmpty {
