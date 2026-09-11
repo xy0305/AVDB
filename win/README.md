@@ -4,7 +4,7 @@
 
 ## 运行
 
-从 [Releases](https://github.com/xy0305/AVDB/releases) 下载 `AVDB.exe`，双击即可。自包含 .NET 8，Win11 x64 不需要另装运行时。
+从 [Releases](https://github.com/xy0305/AVDB/releases) 下载 `AVDB-win-x64.zip`，解压后双击 `AVDB.exe`。自包含 .NET 8，Win11 x64 不需要另装运行时。请把整个文件夹一起放，不要只拷贝 exe。
 
 - 左侧导航：首页 / 最新上架 / 近期磁链 / 搜索
 - 登录 token 保存在 `%AppData%\AVDB\token.txt`
@@ -13,5 +13,5 @@
 ## 本地构建
 
 ```bat
-dotnet publish win\AVDB.Win\AVDB.Win.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o win\publish
+dotnet publish win\AVDB.Win\AVDB.Win.csproj -c Release -r win-x64 --self-contained true -o win\publish
 ```

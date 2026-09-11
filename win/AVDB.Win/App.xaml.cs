@@ -1,3 +1,4 @@
+using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -16,20 +17,32 @@ public partial class App : Application
     static void OnUiException(object sender, DispatcherUnhandledExceptionEventArgs args)
     {
         args.Handled = true;
-        try
-        {
-            MessageBox.Show(args.Exception.Message, "AVDB", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        catch { }
+        ShowError(args.Exception);
     }
 
     static void OnDomainException(object sender, UnhandledExceptionEventArgs args)
     {
-        // 避免未处理异常直接闪退到桌面且无提示。
+        if (args.ExceptionObject is Exception ex)
+            ShowError(ex);
     }
 
     static void OnTaskException(object? sender, UnobservedTaskExceptionEventArgs args)
     {
         args.SetObserved();
+        ShowError(args.Exception);
+    }
+
+    static void ShowError(Exception ex)
+    {
+        try
+        {
+            var sb = new StringBuilder();
+            for (var e = ex; e != null; e = e.InnerException)
+            {
+                sb.AppendLine(e.GetType().Name + ": " + e.Message);
+            }
+            MessageBox.Show(sb.ToString(), "AVDB", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch { }
     }
 }

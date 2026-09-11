@@ -18,24 +18,25 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - name: Publish self-contained WinExe
+      - name: Publish self-contained WinExe folder
         run: |
           dotnet publish win/AVDB.Win/AVDB.Win.csproj -c Release -r win-x64 --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true `
-            -p:EnableCompressionInSingleFile=true `
+            -p:PublishSingleFile=false `
             -p:DebugType=None `
             -p:DebugSymbols=false `
             -o win/publish
+      - name: Zip package
+        run: |
+          Compress-Archive -Path win/publish/* -DestinationPath AVDB-win-x64.zip -Force
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: AVDB-win-x64
-          path: win/publish/AVDB.exe
+          path: AVDB-win-x64.zip
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: win-${{ github.run_number }}
           name: AVDB Windows ${{ github.run_number }}
-          files: win/publish/AVDB.exe
+          files: AVDB-win-x64.zip
           generate_release_notes: true

@@ -5,8 +5,8 @@
         Width="1280" Height="800"
         MinWidth="960" MinHeight="640"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource Bg}"
-        FontFamily="Segoe UI Variable, Segoe UI"
+        Background="#F3F3F3"
+        FontFamily="Segoe UI"
         FontSize="14">
   <Grid>
     <Grid.ColumnDefinitions>
@@ -14,11 +14,11 @@
       <ColumnDefinition Width="*"/>
     </Grid.ColumnDefinitions>
 
-    <Border Grid.Column="0" Background="{StaticResource Pane}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+    <Border Grid.Column="0" Background="#F7F7F7" BorderBrush="#E6E6E6" BorderThickness="0,0,1,0">
       <DockPanel Margin="12">
         <TextBlock DockPanel.Dock="Top" Text="AVDB" FontSize="22" FontWeight="SemiBold" Margin="8,8,8,18"/>
         <StackPanel DockPanel.Dock="Bottom" Margin="8">
-          <TextBlock x:Name="UserLabel" Text="未登录" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,8"/>
+          <TextBlock x:Name="UserLabel" Text="未登录" Foreground="#5B5B5B" FontSize="12" Margin="0,0,0,8"/>
           <Button x:Name="LoginButton" Content="登录" Click="OnLoginClick"/>
         </StackPanel>
         <StackPanel>
@@ -31,7 +31,7 @@
     </Border>
 
     <DockPanel Grid.Column="1">
-      <Border DockPanel.Dock="Top" Background="#F7F7F7" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="16,12">
+      <Border DockPanel.Dock="Top" Background="#F7F7F7" BorderBrush="#E6E6E6" BorderThickness="0,0,0,1" Padding="16,12">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
