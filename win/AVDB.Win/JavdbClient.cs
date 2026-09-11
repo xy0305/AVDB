@@ -8,15 +8,16 @@ namespace AVDB.Win;
 
 public sealed class JavdbClient
 {
-    public static readonly JavdbClient Shared = new();
-
     const string Str1 = "71cf27bb3c0bcdf207b64abecddc970098c7421ee7203b9cdae54478478a199e7d5a6e1a57691123c1a931c057842fb73ba3b3c83bcd69c17ccf174081e3d8aa";
     const string Str2 = "lpw6vgqzsp";
     static readonly string[] Bases = ["https://jdforrepam.com", "https://apidd.spthgb.com"];
+    static readonly Lazy<JavdbClient> LazyShared = new(() => new JavdbClient());
+
+    public static JavdbClient Shared => LazyShared.Value;
 
     readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(28) };
     readonly object _gate = new();
-    string _base = Bases[0];
+    string _base = "https://jdforrepam.com";
     string? _token;
 
     public JavdbClient()
@@ -38,7 +39,10 @@ public sealed class JavdbClient
 
     static string DataDir()
     {
-        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AVDB");
+        var root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (string.IsNullOrEmpty(root))
+            root = Path.GetTempPath();
+        var dir = Path.Combine(root, "AVDB");
         Directory.CreateDirectory(dir);
         return dir;
     }
