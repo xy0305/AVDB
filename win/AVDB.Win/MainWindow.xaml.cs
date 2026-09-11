@@ -10,7 +10,6 @@ namespace AVDB.Win;
 public partial class MainWindow : Window
 {
     readonly JavdbClient _api = JavdbClient.Shared;
-    string _page = "home";
     string _catalog = "all";
     string _filter = "";
     string _sort = "update";
@@ -33,9 +32,9 @@ public partial class MainWindow : Window
 
     async void OnNav(object sender, RoutedEventArgs e)
     {
-        if (sender == NavHome) { _page = "home"; await LoadHome(); }
-        else if (sender == NavLatest) { _page = "latest"; _filter = ""; await LoadLatest(); }
-        else if (sender == NavMagnets) { _page = "magnets"; _filter = "magnets"; await LoadLatest(); }
+        if (sender == NavHome) await LoadHome();
+        else if (sender == NavLatest) { _filter = ""; await LoadLatest(); }
+        else if (sender == NavMagnets) { _filter = "magnets"; await LoadLatest(); }
         else if (sender == NavSearch) ShowMessage("输入关键词后点搜索");
     }
 
@@ -49,7 +48,6 @@ public partial class MainWindow : Window
     {
         var q = SearchBox.Text.Trim();
         if (q.Length == 0) return;
-        _page = "search";
         NavSearch.IsChecked = true;
         ShowMessage("搜索中…");
         try
@@ -58,7 +56,8 @@ public partial class MainWindow : Window
             {
                 ["q"] = q, ["type"] = "movie", ["page"] = "1", ["limit"] = "24", ["movie_sort_by"] = "relevance"
             });
-            RenderGrid("搜索：" + q, JavdbClient.MoviesOf(json));
+            ContentRoot.Children.Clear();
+            ContentRoot.Children.Add(Section("搜索：" + q, JavdbClient.MoviesOf(json)));
         }
         catch (Exception ex) { ShowMessage(ex.Message); }
     }
