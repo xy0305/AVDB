@@ -145,14 +145,18 @@ final class Pan115PlayerViewModel: ObservableObject {
             let result = try await Pan115Client.shared.addOfflineTask(
                 url: magnet, cookie: cookie, folderCID: cid)
             Pan115PlaybackCache.save(movieID: movie.id, magnet: magnet)
-            status = result.message + "，等待离线完成…"
+            switch result {
+            case .failed(let msg):
+                throw Pan115Error.api(msg)
+            case .exists:
+                status = "任务已存在，正在打开已下载文件…"
+            case .success:
+                status = "已推送，等待离线完成…"
+            }
 
-            _ = try await Pan115Client.shared.waitOfflineReady(
-                keyword: keyword, cookie: cookie, timeout: 90)
-
-            status = "离线完成，正在匹配 \(keyword)…"
-            let files = try await Pan115Client.shared.findMatchedVideos(
-                keyword: keyword, cookie: cookie, limit: 100)
+            let files = try await waitUntilPlayable(
+                keyword: keyword, cookie: cookie, folderCID: cid,
+                timeout: result == .exists ? 20 : 90)
             episodes = files
             try await play(file: files[0], cookie: cookie)
         } catch {
@@ -176,6 +180,43 @@ final class Pan115PlayerViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func waitUntilPlayable(
+        keyword: String, cookie: String, folderCID: String, timeout: TimeInterval
+    ) async throws -> [Pan115Client.FileItem] {
+        let start = Date()
+        while Date().timeIntervalSince(start) < timeout {
+            if let files = try? await Pan115Client.shared.findMatchedVideos(
+                keyword: keyword, cookie: cookie, limit: 100
+            ), !files.isEmpty {
+                return files
+            }
+            if let file = try? await Pan115Client.shared.findMatchedVideo(
+                keyword: keyword, cookie: cookie, folderCID: folderCID, requireMatch: true
+            ) {
+                return [file]
+            }
+            let tasks = (try? await Pan115Client.shared.listOfflineTasks(cookie: cookie)) ?? []
+            if let hit = tasks.first(where: {
+                $0.name.localizedCaseInsensitiveContains(keyword)
+                    || $0.url.localizedCaseInsensitiveContains(keyword)
+            }) {
+                if hit.isFailed { throw Pan115Error.taskFailed(hit.name) }
+                if hit.isRunning {
+                    status = "离线中 \(Int(hit.percent))%…"
+                }
+            } else {
+                status = "任务已完成，正在匹配文件…"
+            }
+            try await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+        if let files = try? await Pan115Client.shared.findMatchedVideos(
+            keyword: keyword, cookie: cookie, limit: 100
+        ), !files.isEmpty {
+            return files
+        }
+        throw Pan115Error.timeout
     }
 
     private func play(file: Pan115Client.FileItem, cookie: String) async throws {
