@@ -1,0 +1,53 @@
+<Window x:Class="AVDB.Win.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AVDB"
+        Width="1280" Height="800"
+        MinWidth="960" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Bg}"
+        FontFamily="Segoe UI Variable, Segoe UI"
+        FontSize="14">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="220"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <Border Grid.Column="0" Background="{StaticResource Pane}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+      <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Text="AVDB" FontSize="22" FontWeight="SemiBold" Margin="8,8,8,18"/>
+        <StackPanel DockPanel.Dock="Bottom" Margin="8">
+          <TextBlock x:Name="UserLabel" Text="未登录" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,8"/>
+          <Button x:Name="LoginButton" Content="登录" Click="OnLoginClick"/>
+        </StackPanel>
+        <StackPanel>
+          <RadioButton x:Name="NavHome" Content="首页" GroupName="nav" IsChecked="True" Margin="0,0,0,6" Click="OnNav"/>
+          <RadioButton x:Name="NavLatest" Content="最新上架" GroupName="nav" Margin="0,0,0,6" Click="OnNav"/>
+          <RadioButton x:Name="NavMagnets" Content="近期磁链" GroupName="nav" Margin="0,0,0,6" Click="OnNav"/>
+          <RadioButton x:Name="NavSearch" Content="搜索" GroupName="nav" Margin="0,0,0,6" Click="OnNav"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <DockPanel Grid.Column="1">
+      <Border DockPanel.Dock="Top" Background="#F7F7F7" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="16,12">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Border Background="White" CornerRadius="18" BorderBrush="#D0D0D0" BorderThickness="1" Padding="12,6">
+            <TextBox x:Name="SearchBox" BorderThickness="0" VerticalContentAlignment="Center"
+                     KeyDown="OnSearchKey"/>
+          </Border>
+          <Button Grid.Column="1" Content="搜索" Margin="10,0,0,0" Click="OnSearchClick"/>
+        </Grid>
+      </Border>
+
+      <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" Padding="20">
+        <StackPanel x:Name="ContentRoot"/>
+      </ScrollViewer>
+    </DockPanel>
+  </Grid>
+</Window>

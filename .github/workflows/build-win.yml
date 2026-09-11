@@ -1,0 +1,41 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "win/**"
+      - ".github/workflows/build-win.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Publish self-contained WinExe
+        run: |
+          dotnet publish win/AVDB.Win/AVDB.Win.csproj -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o win/publish
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AVDB-win-x64
+          path: win/publish/AVDB.exe
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: win-${{ github.run_number }}
+          name: AVDB Windows ${{ github.run_number }}
+          files: win/publish/AVDB.exe
+          generate_release_notes: true
