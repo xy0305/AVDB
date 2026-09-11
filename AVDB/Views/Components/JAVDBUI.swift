@@ -92,6 +92,7 @@ struct UnderlineTabBar<Tab: Hashable>: View {
             } else {
                 tabRow(flexible: true)
                     .padding(.horizontal, 4)
+                    .tabSwipe(tabs: tabs.map(\.0), selection: $selection)
             }
             Divider()
         }
@@ -172,6 +173,7 @@ private struct SegmentedControlBar<Tab: Hashable>: View {
         .liquidGlass()
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
+        .tabSwipe(tabs: tabs.map(\.0), selection: $selection)
     }
 }
 
@@ -247,6 +249,35 @@ struct SegmentChipBar<Tab: Hashable>: View {
         .liquidGlass()
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
+        .tabSwipe(tabs: tabs.map(\.0), selection: $selection)
+    }
+}
+
+/// 条子固定，左右滑只切选中项，不把按钮拖走。
+private struct TabSwipeModifier<Tab: Hashable>: ViewModifier {
+    let tabs: [Tab]
+    @Binding var selection: Tab
+
+    func body(content: Content) -> some View {
+        content.highPriorityGesture(
+            DragGesture(minimumDistance: 24, coordinateSpace: .local)
+                .onEnded { value in
+                    let dx = value.translation.width
+                    guard abs(dx) > abs(value.translation.height), abs(dx) > 40 else { return }
+                    guard let idx = tabs.firstIndex(of: selection) else { return }
+                    let next = dx < 0 ? idx + 1 : idx - 1
+                    guard tabs.indices.contains(next) else { return }
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                        selection = tabs[next]
+                    }
+                }
+        )
+    }
+}
+
+private extension View {
+    func tabSwipe<Tab: Hashable>(tabs: [Tab], selection: Binding<Tab>) -> some View {
+        modifier(TabSwipeModifier(tabs: tabs, selection: selection))
     }
 }
 

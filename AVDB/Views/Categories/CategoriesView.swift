@@ -507,29 +507,11 @@ struct CatalogListView: View {
 
     private var filterSortBar: some View {
         HStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(LatestListFilter.allCases) { item in
-                        let selected = filter == item
-                        Button {
-                            filter = item
-                        } label: {
-                            Text(item.title)
-                                .font(.subheadline.weight(selected ? .semibold : .regular))
-                                .foregroundStyle(selected ? Color.white : Color.secondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background {
-                                    if selected {
-                                        Capsule(style: .continuous).fill(Color.accentColor)
-                                    }
-                                }
-                                .liquidGlass(interactive: false)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+            CapsuleChipBar(
+                tabs: LatestListFilter.allCases.map { ($0, $0.title) },
+                selection: $filter
+            )
+            .padding(.horizontal, 0)
             Menu {
                 ForEach(listSorts) { item in
                     Button {
@@ -553,9 +535,9 @@ struct CatalogListView: View {
                 .padding(.vertical, 7)
                 .liquidGlass(interactive: false)
             }
+            .padding(.trailing, 12)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 2)
     }
 
     @MainActor
