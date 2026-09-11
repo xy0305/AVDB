@@ -40,6 +40,7 @@ struct HomeView: View {
                 LiquidGlassBackground()
             }
             .toolbar(.hidden, for: .navigationBar)
+            .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
             .task { await vm.initialLoad() }
             .refreshable { await vm.initialLoad() }
             .navigationDestination(isPresented: $goSearch) {

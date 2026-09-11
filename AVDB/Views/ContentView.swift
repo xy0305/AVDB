@@ -67,7 +67,7 @@ struct ContentView: View {
 private struct LiquidGlassTabBarModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *), !AdaptiveLayout.isPad {
             content.tabBarMinimizeBehavior(.onScrollDown)
         } else {
             content

@@ -25,55 +25,52 @@ struct MovieDetailView: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
+        ScrollView(.vertical) {
+            if let movie = vm.movie {
+                detailContent(movie)
+            } else if vm.isLoading {
+                ProgressView().tint(.white).padding(.top, 120)
+            } else if let err = vm.errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 40)).foregroundColor(.orange)
+                    Text(err).foregroundStyle(.white)
+                    Button("重试") { Task { await vm.load() } }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(.top, 120)
+            }
+        }
+        .scrollIndicators(.hidden)
+        .background {
+            Group {
                 if let movie = vm.movie {
                     detailBackground(movie)
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
                 } else {
-                    Color(.systemBackground).ignoresSafeArea()
-                }
-
-                ScrollView(.vertical) {
-                    if let movie = vm.movie {
-                        detailContent(movie, width: proxy.size.width)
-                            .frame(width: proxy.size.width)
-                            .padding(.bottom, 60)
-                    } else if vm.isLoading {
-                        ProgressView().tint(.white).padding(.top, 120)
-                    } else if let err = vm.errorMessage {
-                        VStack(spacing: 16) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 40)).foregroundColor(.orange)
-                            Text(err).foregroundStyle(.white)
-                            Button("重试") { Task { await vm.load() } }
-                                .buttonStyle(.borderedProminent)
-                        }
-                        .padding(.top, 120)
-                    }
-                }
-                .frame(width: proxy.size.width)
-                .ignoresSafeArea(edges: .top)
-
-                if let movie = vm.movie {
-                    DraggableReviewsPanel(
-                        movieID: movie.id,
-                        // 官方 App 的“短评”数量对应 comments_count；reviews_count 是评分人数。
-                        total: movie.commentsCount ?? 0,
-                        panelHeight: $reviewPanelHeight,
-                        vm: reviewsVM,
-                        availableHeight: max(280, proxy.size.height)
-                    )
-                    .frame(width: proxy.size.width, height: reviewPanelHeight, alignment: .top)
-                    .ignoresSafeArea(edges: .bottom)
-                    .zIndex(10)
+                    Color(.systemBackground)
                 }
             }
-            .frame(width: proxy.size.width, height: proxy.size.height)
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            detailChrome
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let movie = vm.movie {
+                DraggableReviewsPanel(
+                    movieID: movie.id,
+                    // 官方 App 的“短评”数量对应 comments_count；reviews_count 是评分人数。
+                    total: movie.commentsCount ?? 0,
+                    panelHeight: $reviewPanelHeight,
+                    vm: reviewsVM,
+                    availableHeight: max(280, UIScreen.main.bounds.height)
+                )
+                .frame(height: reviewPanelHeight, alignment: .top)
+            }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
+        .toolbar(AdaptiveLayout.isPad ? .visible : .hidden, for: .tabBar)
         .nativeSwipeBackEnabled()
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task {
@@ -90,6 +87,31 @@ struct MovieDetailView: View {
                 TrailerPlayerView(url: url, onClose: { showTrailer = false })
             }
         }
+    }
+
+    private var detailChrome: some View {
+        HStack {
+            chromeButton("chevron.left") { dismiss() }
+            Spacer(minLength: 0)
+            chromeButton("magnifyingglass") { showSearch = true }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+    }
+
+    private func chromeButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .liquidGlassCircle(interactive: false)
+        }
+        .buttonStyle(.plain)
+        .frame(width: 44, height: 44)
+        .contentShape(Circle())
     }
 
     private func detailBackground(_ movie: Movie) -> some View {
@@ -113,12 +135,9 @@ struct MovieDetailView: View {
         .ignoresSafeArea()
     }
 
-    private func detailContent(_ movie: Movie, width: CGFloat) -> some View {
-        // iPad：内容居中限宽，避免无限拉伸
-        let maxW = min(width, AdaptiveLayout.contentMaxWidth)
-        let sidePad = max(0, (width - maxW) / 2)
-        return VStack(spacing: 0) {
-            heroHeader(movie, width: maxW)
+    private func detailContent(_ movie: Movie) -> some View {
+        VStack(spacing: 0) {
+            heroHeader(movie)
 
             VStack(alignment: .leading, spacing: 20) {
                 if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
@@ -137,34 +156,12 @@ struct MovieDetailView: View {
             .background(Color(.systemBackground))
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34))
         }
-        .padding(.horizontal, sidePad)
+        .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
+        .frame(maxWidth: .infinity)
     }
 
-    private func heroHeader(_ movie: Movie, width: CGFloat) -> some View {
-        let contentWidth = max(0, width - 40)
-        return VStack(alignment: .leading, spacing: 22) {
-            LiquidGlassContainer(spacing: 10) {
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 27, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 46, height: 46)
-                            .liquidGlassCircle()
-                    }
-                    Spacer()
-                    Button { showSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 28, weight: .regular))
-                            .foregroundStyle(.white)
-                            .frame(width: 46, height: 46)
-                            .liquidGlassCircle()
-                    }
-                }
-            }
-            .foregroundStyle(.white)
-            .padding(.top, 54)
-
+    private func heroHeader(_ movie: Movie) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
             Text(movie.displayTitle)
                 .font(.system(size: 28, weight: .bold))
                 .lineSpacing(5)
@@ -179,7 +176,8 @@ struct MovieDetailView: View {
                     secondFallbackURL: movie.hdBackdropURL,
                     contentMode: .fill
                 )
-                .frame(width: contentWidth, height: contentWidth / 1.47)
+                .frame(maxWidth: .infinity)
+                .aspectRatio(1.47, contentMode: .fit)
                 .clipped()
 
                 Button { play115 = true } label: {
@@ -230,8 +228,8 @@ struct MovieDetailView: View {
             .font(.caption)
             .padding(.bottom, 4)
         }
-        .frame(width: contentWidth, alignment: .leading)
         .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func movieInfoCard(_ movie: Movie) -> some View {
@@ -1392,6 +1390,13 @@ struct NativeSwipeBackEnabler: UIViewControllerRepresentable {
     }
 
     final class Controller: UIViewController {
+        override func loadView() {
+            let v = UIView(frame: .zero)
+            v.isUserInteractionEnabled = false
+            v.backgroundColor = .clear
+            view = v
+        }
+
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
             enableWhenAvailable()
@@ -1411,6 +1416,11 @@ struct NativeSwipeBackEnabler: UIViewControllerRepresentable {
 
 extension View {
     func nativeSwipeBackEnabled() -> some View {
-        background(NativeSwipeBackEnabler().frame(width: 0, height: 0))
+        background {
+            NativeSwipeBackEnabler()
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }

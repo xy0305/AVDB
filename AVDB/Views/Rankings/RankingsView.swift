@@ -199,9 +199,9 @@ struct RankingsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
             }
-            .liquidGlass()
+            .liquidGlass(interactive: false)
             .padding(.horizontal, 20)
-            .padding(.bottom, 6)
+            .padding(.bottom, AdaptiveLayout.isPad ? 4 : 6)
         }
     }
 

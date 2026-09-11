@@ -14,7 +14,7 @@ import SwiftUI
 /// 胶囊形系统 Liquid Glass（悬浮控件）。
 struct LiquidGlassEffect: ViewModifier {
     var tint: Color? = nil
-    var interactive: Bool = true
+    var interactive: Bool = false
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -44,7 +44,7 @@ struct LiquidGlassEffect: ViewModifier {
 struct LiquidGlassRectEffect: ViewModifier {
     var cornerRadius: CGFloat = 16
     var tint: Color? = nil
-    var interactive: Bool = true
+    var interactive: Bool = false
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -74,7 +74,7 @@ struct LiquidGlassRectEffect: ViewModifier {
 /// 圆形系统 Liquid Glass。
 struct LiquidGlassCircleEffect: ViewModifier {
     var tint: Color? = nil
-    var interactive: Bool = true
+    var interactive: Bool = false
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -112,7 +112,9 @@ struct LiquidGlassContainer<Content: View>: View {
 
     @ViewBuilder
     var body: some View {
-        if #available(iOS 26.0, *) {
+        // iPad 上 GlassEffectContainer 会把整块区域（含子控件空隙）做成命中层，
+        // 返回/搜索/快捷入口/Tab 都会点不进去。融合效果只在 iPhone 上保留。
+        if #available(iOS 26.0, *), !AdaptiveLayout.isPad {
             GlassEffectContainer(spacing: spacing) { content }
         } else {
             content
@@ -124,17 +126,17 @@ struct LiquidGlassContainer<Content: View>: View {
 
 extension View {
     /// 悬浮胶囊控件：系统 Liquid Glass
-    func liquidGlass(tint: Color? = nil, interactive: Bool = true) -> some View {
+    func liquidGlass(tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(LiquidGlassEffect(tint: tint, interactive: interactive))
     }
 
     /// 悬浮圆角矩形：系统 Liquid Glass
-    func liquidGlassRect(cornerRadius: CGFloat = 16, tint: Color? = nil, interactive: Bool = true) -> some View {
+    func liquidGlassRect(cornerRadius: CGFloat = 16, tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(LiquidGlassRectEffect(cornerRadius: cornerRadius, tint: tint, interactive: interactive))
     }
 
     /// 悬浮圆形：系统 Liquid Glass
-    func liquidGlassCircle(tint: Color? = nil, interactive: Bool = true) -> some View {
+    func liquidGlassCircle(tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(LiquidGlassCircleEffect(tint: tint, interactive: interactive))
     }
 
@@ -214,7 +216,7 @@ struct LiquidFilterChip: View {
                 Capsule(style: .continuous).fill(Color.accentColor)
             }
         }
-        .liquidGlass(interactive: true)
+        .liquidGlass(interactive: false)
     }
 }
 

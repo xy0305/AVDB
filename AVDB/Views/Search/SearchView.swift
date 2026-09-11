@@ -83,6 +83,7 @@ struct SearchView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
         .task { await suggest.loadHotKeywords() }
         .onAppear { isSearchFocused = submitted.isEmpty }
     }

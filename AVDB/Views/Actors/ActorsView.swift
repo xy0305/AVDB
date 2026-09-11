@@ -334,7 +334,7 @@ struct ActorDetailView: View {
         .overlay {
             if filterPanelHeight > 0.5 {
                 Color.black.opacity(min(0.28, filterPanelHeight / 900))
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(edges: .top)
                     .onTapGesture { collapseFilterPanel() }
             }
         }
