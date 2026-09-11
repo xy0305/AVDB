@@ -9,7 +9,7 @@
     <RootNamespace>AVDB.Win</RootNamespace>
     <Product>AVDB</Product>
     <Company>xy0305</Company>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <InvariantGlobalization>false</InvariantGlobalization>
     <PublishSingleFile>false</PublishSingleFile>

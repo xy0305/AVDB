@@ -1,8 +1,8 @@
+using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.IO;
 
 namespace AVDB.Win;
 
@@ -64,7 +64,10 @@ public sealed class JavdbClient
         try
         {
             var p = TokenPath();
-            if (string.IsNullOrEmpty(token)) File.Delete(p);
+            if (string.IsNullOrEmpty(token))
+            {
+                if (File.Exists(p)) File.Delete(p);
+            }
             else File.WriteAllText(p, token);
         }
         catch { }
@@ -77,7 +80,15 @@ public sealed class JavdbClient
         return $"{ts}.{Str2}.{md5}";
     }
 
-    public async Task<JsonElement> GetAsync(string path, Dictionary<string, string>? query = null, bool useToken = false, CancellationToken ct = default)
+    public Task<JsonElement> GetAsync(string path, Dictionary<string, string>? query = null, bool useToken = false, CancellationToken ct = default)
+        => SendAsync(HttpMethod.Get, path, query, null, useToken, ct);
+
+    public Task<JsonElement> PostFormAsync(string path, Dictionary<string, string> form, bool useToken = false, CancellationToken ct = default)
+        => SendAsync(HttpMethod.Post, path, null, form, useToken, ct);
+
+    async Task<JsonElement> SendAsync(
+        HttpMethod method, string path, Dictionary<string, string>? query,
+        Dictionary<string, string>? form, bool useToken, CancellationToken ct)
     {
         var q = new Dictionary<string, string>
         {
@@ -88,50 +99,55 @@ public sealed class JavdbClient
             ["system_version"] = "18.0",
         };
         if (query != null)
-            foreach (var kv in query) q[kv.Key] = kv.Value;
+            foreach (var kv in query)
+                if (kv.Value != null) q[kv.Key] = kv.Value;
         var qs = string.Join("&", q.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"));
-        Exception? last = null;
-        var bases = new List<string> { _base };
-        bases.AddRange(Bases.Where(b => b != _base));
-        foreach (var host in bases)
-        {
-            try
-            {
-                using var req = new HttpRequestMessage(HttpMethod.Get, $"{host}{path}?{qs}");
-                ApplyHeaders(req, useToken);
-                using var resp = await _http.SendAsync(req, ct);
-                var json = await resp.Content.ReadAsStringAsync(ct);
-                if ((int)resp.StatusCode >= 500) { last = new Exception($"HTTP {(int)resp.StatusCode}"); continue; }
-                _base = host;
-                using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json);
-                return doc.RootElement.Clone();
-            }
-            catch (Exception ex) { last = ex; }
-        }
-        throw last ?? new Exception("请求失败");
-    }
 
-    public async Task<JsonElement> PostFormAsync(string path, Dictionary<string, string> form, bool useToken = false, CancellationToken ct = default)
-    {
-        var q = "platform=ios&app_channel=official&app_version=official&app_version_number=1.9.28&system_version=18.0";
         Exception? last = null;
         var bases = new List<string> { _base };
-        bases.AddRange(Bases.Where(b => b != _base));
+        foreach (var b in Bases)
+            if (!string.Equals(b, _base, StringComparison.Ordinal)) bases.Add(b);
+
         foreach (var host in bases)
         {
             try
             {
-                using var req = new HttpRequestMessage(HttpMethod.Post, $"{host}{path}?{q}");
+                using var req = new HttpRequestMessage(method, $"{host}{path}?{qs}");
                 ApplyHeaders(req, useToken);
-                req.Content = new FormUrlEncodedContent(form);
-                using var resp = await _http.SendAsync(req, ct);
-                var json = await resp.Content.ReadAsStringAsync(ct);
-                if ((int)resp.StatusCode >= 500) { last = new Exception($"HTTP {(int)resp.StatusCode}"); continue; }
+                if (form != null) req.Content = new FormUrlEncodedContent(form);
+                using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+                var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var code = (int)resp.StatusCode;
+                if (code >= 500)
+                {
+                    last = new Exception($"HTTP {code}");
+                    continue;
+                }
+                if (string.IsNullOrWhiteSpace(json) || json[0] is not ('{' or '['))
+                {
+                    last = new Exception(code >= 400 ? $"HTTP {code}" : "响应不是 JSON");
+                    if (code >= 400) continue;
+                    throw last;
+                }
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement.Clone();
                 _base = host;
-                using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json);
-                return doc.RootElement.Clone();
+                if (root.ValueKind == JsonValueKind.Object &&
+                    root.TryGetProperty("success", out var suc) &&
+                    suc.ValueKind == JsonValueKind.Number &&
+                    suc.GetDouble() == 0)
+                {
+                    var msg = "请求失败";
+                    if (root.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String)
+                        msg = m.GetString() ?? msg;
+                    throw new Exception(msg);
+                }
+                return root;
             }
-            catch (Exception ex) { last = ex; }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                last = ex;
+            }
         }
         throw last ?? new Exception("请求失败");
     }
@@ -148,10 +164,18 @@ public sealed class JavdbClient
     public static List<MovieItem> MoviesOf(JsonElement root)
     {
         var list = new List<MovieItem>();
-        if (!root.TryGetProperty("data", out var data)) return list;
-        if (!data.TryGetProperty("movies", out var movies) || movies.ValueKind != JsonValueKind.Array) return list;
+        JsonElement movies = default;
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var data))
+        {
+            if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("movies", out var m))
+                movies = m;
+            else if (data.ValueKind == JsonValueKind.Array)
+                movies = data;
+        }
+        if (movies.ValueKind != JsonValueKind.Array) return list;
         foreach (var m in movies.EnumerateArray())
-            list.Add(MovieItem.From(m));
+            if (m.ValueKind == JsonValueKind.Object)
+                list.Add(MovieItem.From(m));
         return list;
     }
 }
@@ -166,21 +190,31 @@ public sealed class MovieItem
 
     public static MovieItem From(JsonElement m) => new()
     {
-        Id = Str(m, "id"),
-        Number = Str(m, "number"),
+        Id = Any(m, "id"),
+        Number = Any(m, "number"),
         Title = First(m, "title", "origin_title"),
         Cover = First(m, "cover_url", "thumb_url"),
-        Date = Str(m, "release_date"),
+        Date = Any(m, "release_date"),
     };
 
-    static string Str(JsonElement e, string k) =>
-        e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+    static string Any(JsonElement e, string k)
+    {
+        if (e.ValueKind != JsonValueKind.Object || !e.TryGetProperty(k, out var v)) return "";
+        return v.ValueKind switch
+        {
+            JsonValueKind.String => v.GetString() ?? "",
+            JsonValueKind.Number => v.ToString(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            _ => ""
+        };
+    }
 
     static string First(JsonElement e, params string[] keys)
     {
         foreach (var k in keys)
         {
-            var s = Str(e, k);
+            var s = Any(e, k);
             if (!string.IsNullOrEmpty(s)) return s;
         }
         return "";

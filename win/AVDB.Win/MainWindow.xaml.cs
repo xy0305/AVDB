@@ -14,13 +14,32 @@ public partial class MainWindow : Window
     string _filter = "";
     string _sort = "update";
 
+    static readonly SolidColorBrush AccentBrush = BrushFrom(0x00, 0x67, 0xC0);
+    static readonly SolidColorBrush TextBrush = BrushFrom(0x1A, 0x1A, 0x1A);
+    static readonly SolidColorBrush MutedBrush = BrushFrom(0x5B, 0x5B, 0x5B);
+    static readonly SolidColorBrush ChipBrush = BrushFrom(0xF0, 0xF0, 0xF0);
+
+    static SolidColorBrush BrushFrom(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
+
     public MainWindow()
     {
         InitializeComponent();
         Loaded += async (_, _) =>
         {
-            RefreshUser();
-            await LoadHome();
+            try
+            {
+                RefreshUser();
+                await LoadHome();
+            }
+            catch (Exception ex)
+            {
+                ShowMessage(ex.Message);
+            }
         };
     }
 
@@ -103,8 +122,8 @@ public partial class MainWindow : Window
             {
                 Content = title,
                 Margin = new Thickness(0, 0, 8, 8),
-                Background = on ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromRgb(240, 240, 240)),
-                Foreground = on ? Brushes.White : (Brush)FindResource("Text")
+                Background = on ? AccentBrush : ChipBrush,
+                Foreground = on ? Brushes.White : TextBrush,
             };
             b.Click += async (_, _) => { act(); await LoadLatest(); };
             panel.Children.Add(b);
@@ -132,7 +151,7 @@ public partial class MainWindow : Window
     {
         var wrap = new WrapPanel();
         if (movies.Count == 0)
-            wrap.Children.Add(new TextBlock { Text = "没有内容", Foreground = (Brush)FindResource("Muted") });
+            wrap.Children.Add(new TextBlock { Text = "没有内容", Foreground = MutedBrush });
         foreach (var m in movies) wrap.Children.Add(MovieCard(m));
         return wrap;
     }
@@ -149,9 +168,9 @@ public partial class MainWindow : Window
         };
         var stack = new StackPanel();
         stack.Children.Add(new Border { CornerRadius = new CornerRadius(10, 10, 0, 0), ClipToBounds = true, Child = img });
-        stack.Children.Add(new TextBlock { Text = m.Number, Foreground = (Brush)FindResource("Accent"), Margin = new Thickness(8, 8, 8, 0), FontWeight = FontWeights.SemiBold });
+        stack.Children.Add(new TextBlock { Text = m.Number, Foreground = AccentBrush, Margin = new Thickness(8, 8, 8, 0), FontWeight = FontWeights.SemiBold });
         stack.Children.Add(new TextBlock { Text = m.Title, TextWrapping = TextWrapping.Wrap, MaxHeight = 40, Margin = new Thickness(8, 2, 8, 0) });
-        stack.Children.Add(new TextBlock { Text = m.Date, Foreground = (Brush)FindResource("Muted"), FontSize = 12, Margin = new Thickness(8, 4, 8, 10) });
+        stack.Children.Add(new TextBlock { Text = m.Date, Foreground = MutedBrush, FontSize = 12, Margin = new Thickness(8, 4, 8, 10) });
         card.Child = stack;
         card.MouseLeftButtonUp += async (_, _) => await OpenMovie(m.Id);
         return card;
@@ -159,8 +178,13 @@ public partial class MainWindow : Window
 
     async Task FillCover(Image img, string url)
     {
-        var bmp = await CoverLoader.LoadAsync(url);
-        if (bmp != null) img.Source = bmp;
+        if (string.IsNullOrWhiteSpace(url)) return;
+        try
+        {
+            var bmp = await CoverLoader.LoadAsync(url).ConfigureAwait(true);
+            if (bmp != null) img.Source = bmp;
+        }
+        catch { }
     }
 
     async Task OpenMovie(string id)
@@ -169,8 +193,13 @@ public partial class MainWindow : Window
         try
         {
             var json = await _api.GetAsync("/api/v4/movies/" + Uri.EscapeDataString(id), useToken: _api.LoggedIn);
-            JsonElement data = json.TryGetProperty("data", out var d) ? d : json;
-            if (data.TryGetProperty("movie", out var nested)) data = nested;
+            var data = json;
+            if (json.ValueKind == JsonValueKind.Object && json.TryGetProperty("data", out var d))
+                data = d;
+            if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("movie", out var nested) && nested.ValueKind == JsonValueKind.Object)
+                data = nested;
+            if (data.ValueKind != JsonValueKind.Object)
+                throw new Exception("详情解析失败");
             var title = GetStr(data, "number") + " " + GetStr(data, "title");
             var cover = GetStr(data, "cover_url");
             var summary = GetStr(data, "summary");
@@ -178,7 +207,10 @@ public partial class MainWindow : Window
             try
             {
                 var mj = await _api.GetAsync("/api/v1/movies/" + Uri.EscapeDataString(id) + "/magnets", new() { ["page"] = "1" });
-                if (mj.TryGetProperty("data", out var md) && md.TryGetProperty("magnets", out var arr)) magnets = arr;
+                if (mj.ValueKind == JsonValueKind.Object &&
+                    mj.TryGetProperty("data", out var md) && md.ValueKind == JsonValueKind.Object &&
+                    md.TryGetProperty("magnets", out var arr))
+                    magnets = arr;
             }
             catch { }
 
@@ -192,7 +224,7 @@ public partial class MainWindow : Window
             Grid.SetColumn(left, 0);
             var right = new StackPanel();
             right.Children.Add(new TextBlock { Text = title, FontSize = 22, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-            right.Children.Add(new TextBlock { Text = GetStr(data, "release_date"), Foreground = (Brush)FindResource("Muted"), Margin = new Thickness(0, 6, 0, 12) });
+            right.Children.Add(new TextBlock { Text = GetStr(data, "release_date"), Foreground = MutedBrush, Margin = new Thickness(0, 6, 0, 12) });
             if (data.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array)
             {
                 var chips = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
@@ -207,7 +239,7 @@ public partial class MainWindow : Window
                     });
                 right.Children.Add(chips);
             }
-            right.Children.Add(new TextBlock { Text = summary, TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("Muted"), Margin = new Thickness(0, 0, 0, 16) });
+            right.Children.Add(new TextBlock { Text = summary, TextWrapping = TextWrapping.Wrap, Foreground = MutedBrush, Margin = new Thickness(0, 0, 0, 16) });
             right.Children.Add(new TextBlock { Text = "磁力", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
             if (magnets.ValueKind == JsonValueKind.Array)
             {
@@ -257,43 +289,58 @@ public partial class MainWindow : Window
                 ["app_version"] = "official",
                 ["app_version_number"] = "1.9.28",
             });
-            var ok = json.TryGetProperty("success", out var s) && s.ValueKind == JsonValueKind.Number && s.GetDouble() == 1;
+            var ok = json.ValueKind == JsonValueKind.Object &&
+                     json.TryGetProperty("success", out var s) && s.ValueKind == JsonValueKind.Number && s.GetDouble() == 1;
             if (!ok)
             {
-                var msg = json.TryGetProperty("message", out var m) ? m.GetString() : "登录失败";
+                var msg = "登录失败";
+                if (json.ValueKind == JsonValueKind.Object && json.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String)
+                    msg = m.GetString() ?? msg;
                 MessageBox.Show(msg, "AVDB");
                 return;
             }
-            if (json.TryGetProperty("data", out var data) && data.TryGetProperty("token", out var t))
+            if (json.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object &&
+                data.TryGetProperty("token", out var t) && t.ValueKind == JsonValueKind.String)
                 _api.Token = t.GetString();
             RefreshUser();
         }
         catch (Exception ex) { MessageBox.Show(ex.Message, "AVDB"); }
     }
 
-    static string? Prompt(string title, bool password = false)
+    string? Prompt(string title, bool password = false)
     {
         var w = new Window
         {
-            Title = title, Width = 360, Height = 160, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize, Background = Brushes.White
+            Title = title,
+            Width = 360,
+            Height = 160,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Background = Brushes.White,
+            ShowInTaskbar = false
         };
+        if (IsLoaded) w.Owner = this;
+        else w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var box = password ? new PasswordBox { Margin = new Thickness(16) } : null;
         var tb = password ? null : new TextBox { Margin = new Thickness(16) };
         var ok = new Button { Content = "确定", Width = 80, Margin = new Thickness(0, 0, 16, 16), HorizontalAlignment = HorizontalAlignment.Right };
-        ok.Click += (_, _) => w.DialogResult = true;
+        ok.Click += (_, _) => { try { w.DialogResult = true; } catch { w.Close(); } };
         var dock = new DockPanel();
         DockPanel.SetDock(ok, Dock.Bottom);
         dock.Children.Add(ok);
         dock.Children.Add(password ? box! : tb!);
         w.Content = dock;
-        w.Owner = Application.Current.MainWindow;
         return w.ShowDialog() == true ? (password ? box!.Password : tb!.Text) : null;
     }
 
     void ShowMessage(string text)
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ShowMessage(text));
+            return;
+        }
         ContentRoot.Children.Clear();
-        ContentRoot.Children.Add(new TextBlock { Text = text, Foreground = (Brush)FindResource("Muted"), Margin = new Thickness(0, 40, 0, 0) });
+        ContentRoot.Children.Add(new TextBlock { Text = text, Foreground = MutedBrush, Margin = new Thickness(0, 40, 0, 0) });
     }
 }
