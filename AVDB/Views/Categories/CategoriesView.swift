@@ -18,7 +18,8 @@ struct CategoriesView: View {
             VStack(spacing: 0) {
                 UnderlineTabBar(
                     tabs: MovieCatalogType.categoryTabs.map { ($0, $0.title) },
-                    selection: $catalog
+                    selection: $catalog,
+                    scrolls: false
                 )
                 .padding(.top, 4)
 
@@ -478,7 +479,8 @@ struct CatalogListView: View {
         VStack(spacing: 0) {
             UnderlineTabBar(
                 tabs: MovieCatalogType.allCases.map { ($0, $0.title) },
-                selection: $catalog
+                selection: $catalog,
+                scrolls: false
             )
             .padding(.top, 4)
 

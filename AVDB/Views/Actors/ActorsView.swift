@@ -60,7 +60,7 @@ struct ActorsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                UnderlineTabBar(tabs: ActorTab.allCases.map { ($0, $0.title) }, selection: $tab)
+                UnderlineTabBar(tabs: ActorTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                     .padding(.top, 4)
                 content
             }
