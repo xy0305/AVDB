@@ -204,27 +204,15 @@ public final class Pan115Client: @unchecked Sendable {
             if let hit = tasks.first(where: { task in
                 task.name.lowercased().contains(needle)
                     || task.url.lowercased().contains(needle)
-                    || (!task.infoHash.isEmpty && needle.contains(task.infoHash.lowercased()))
+                    || needle.contains(task.infoHash.lowercased())
             }) {
                 last = hit
                 if hit.isDone { return hit }
                 if hit.isFailed { throw Pan115Error.taskFailed(hit.name) }
-            } else if let file = try? await findMatchedVideo(keyword: keyword, cookie: cookie, requireMatch: true) {
-                // 已完成任务会从 task_lists 消失，文件在网盘里就能播。
-                return OfflineTask(
-                    name: file.name, status: 2, percent: 100,
-                    infoHash: "", fileID: file.fileID, dirID: file.cid, url: ""
-                )
             }
             try await Task.sleep(nanoseconds: 2_000_000_000)
         }
         if let last, last.isDone { return last }
-        if let file = try? await findMatchedVideo(keyword: keyword, cookie: cookie, requireMatch: true) {
-            return OfflineTask(
-                name: file.name, status: 2, percent: 100,
-                infoHash: "", fileID: file.fileID, dirID: file.cid, url: ""
-            )
-        }
         throw Pan115Error.timeout
     }
 
@@ -723,12 +711,6 @@ public final class Pan115Client: @unchecked Sendable {
         if upper != trimmed {
             variants.append(upper) // 大写 + 连字符
         }
-        let spaced = trimmed.replacingOccurrences(of: ".", with: " ")
-        if spaced != trimmed { variants.append(spaced) }
-        if let r = trimmed.range(of: #"^[A-Za-z]+"#, options: .regularExpression) {
-            let prefix = String(trimmed[r])
-            if prefix.count >= 3 { variants.append(prefix) }
-        }
         return variants.uniqued
     }
 
@@ -977,7 +959,6 @@ public enum Pan115Error: Error, LocalizedError {
     case taskFailed(String)
     case fileNotFound
     case playURLNotFound
-    case api(String)
     case cleanupFailed(Int)
     case cleanupFolderNotFound
 
@@ -992,7 +973,6 @@ public enum Pan115Error: Error, LocalizedError {
         case .taskFailed(let msg): return "115 离线失败：\(msg)"
         case .fileNotFound: return "离线目录里没找到与当前番号匹配的视频"
         case .playURLNotFound: return "无法获取 115 原画播放地址"
-        case .api(let msg): return msg
         case .cleanupFailed(let count): return "115 垃圾文件仍剩余 \(count) 个"
         case .cleanupFolderNotFound: return "115 离线后未找到新建文件夹，未删除父目录文件"        }
     }
