@@ -79,33 +79,48 @@ enum RankPeriod: String, CaseIterable, Identifiable {
 struct UnderlineTabBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
+    /// 排行等少量标签应铺满且不可拖；类别/演员字母多时才横向滚动。
+    var scrolls: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
-                    ForEach(tabs, id: \.0) { tab, title in
-                        Button {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                                selection = tab
-                            }
-                        } label: {
-                            VStack(spacing: 8) {
-                                Text(title)
-                                    .font(.subheadline.weight(selection == tab ? .semibold : .regular))
-                                    .foregroundStyle(selection == tab ? Color.accentColor : Color.primary)
-                                Rectangle()
-                                    .fill(selection == tab ? Color.accentColor : Color.clear)
-                                    .frame(height: 2)
-                            }
-                            .padding(.horizontal, 14)
-                        }
-                        .buttonStyle(.plain)
-                    }
+            if scrolls {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    tabRow(flexible: false)
+                        .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
+            } else {
+                tabRow(flexible: true)
+                    .padding(.horizontal, 4)
             }
             Divider()
+        }
+    }
+
+    private func tabRow(flexible: Bool) -> some View {
+        HStack(spacing: 0) {
+            ForEach(tabs, id: \.0) { tab, title in
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                        selection = tab
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Text(title)
+                            .font(.subheadline.weight(selection == tab ? .semibold : .regular))
+                            .lineLimit(1)
+                            .minimumScaleFactor(flexible ? 0.7 : 1)
+                            .foregroundStyle(selection == tab ? Color.accentColor : Color.primary)
+                            .frame(maxWidth: flexible ? .infinity : nil)
+                        Rectangle()
+                            .fill(selection == tab ? Color.accentColor : Color.clear)
+                            .frame(height: 2)
+                    }
+                    .padding(.horizontal, flexible ? 2 : 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 }

@@ -156,7 +156,7 @@ final class Pan115PlayerViewModel: ObservableObject {
 
             let files = try await waitUntilPlayable(
                 keyword: keyword, cookie: cookie, folderCID: cid,
-                timeout: result == .exists ? 20 : 90)
+                timeout: result == .exists ? 45 : 90)
             episodes = files
             try await play(file: files[0], cookie: cookie)
         } catch {

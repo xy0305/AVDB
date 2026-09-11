@@ -322,18 +322,25 @@ public final class Pan115Client: @unchecked Sendable {
         let needle = normalizedKey(keyword)
         guard !needle.isEmpty else { throw Pan115Error.fileNotFound }
         var result: [FileItem] = []
+        var lastError: Error = Pan115Error.fileNotFound
         for variant in searchKeywords(from: keyword) {
-            let files = try await searchFiles(keyword: variant, cookie: cookie, limit: limit)
+            let files: [FileItem]
+            do {
+                files = try await searchFiles(keyword: variant, cookie: cookie, limit: limit)
+            } catch {
+                lastError = error
+                continue
+            }
             let hits = files.filter { file in
                 !file.isDir && file.isVideo && !file.pickCode.isEmpty
-                    && normalizedKey(file.name).contains(needle)
+                    && nameMatches(file.name, keyword: keyword)
             }
             let known = Set(result.map { $0.fileID.isEmpty ? $0.pickCode : $0.fileID })
             result.append(contentsOf: hits.filter {
                 !known.contains($0.fileID.isEmpty ? $0.pickCode : $0.fileID)
             })
         }
-        guard !result.isEmpty else { throw Pan115Error.fileNotFound }
+        guard !result.isEmpty else { throw lastError }
         return result.sorted { lhs, rhs in
             let left = episodeNumber(lhs.name)
             let right = episodeNumber(rhs.name)
@@ -674,10 +681,8 @@ public final class Pan115Client: @unchecked Sendable {
         }
         let scored: [FileItem]
         if let keyword, !keyword.isEmpty {
-            let n = normalizedKey(keyword)
             let hits = videos.filter { file in
-                let name = normalizedKey(file.name)
-                return name.contains(n)
+                nameMatches(file.name, keyword: keyword)
             }
             scored = hits.isEmpty && !requireMatch ? videos : hits
         } else {
@@ -719,17 +724,57 @@ public final class Pan115Client: @unchecked Sendable {
 
         // 保留连字符，只做大小写两种变体（去连字符会搜索失败）
         var variants: [String] = []
-        variants.append(trimmed)   // 原样（小写 + 连字符）
+        let parts = trimmed.split { $0 == "." || $0 == " " }.map(String.init)
+        if parts.count >= 2, let studio = parts.first,
+           studio.range(of: #"^[A-Za-z]{3,}$"#, options: .regularExpression) != nil {
+            let nums = parts.filter { $0.allSatisfy(\.isNumber) && ($0.count == 2 || $0.count == 4) }
+            if nums.count >= 3 {
+                variants.append("\(studio).\(nums[0]).\(nums[1]).\(nums[2])")
+            }
+            variants.append(studio)
+        }
+        variants.append(trimmed)
         if upper != trimmed {
-            variants.append(upper) // 大写 + 连字符
+            variants.append(upper)
         }
         let spaced = trimmed.replacingOccurrences(of: ".", with: " ")
         if spaced != trimmed { variants.append(spaced) }
-        if let r = trimmed.range(of: #"^[A-Za-z]+"#, options: .regularExpression) {
-            let prefix = String(trimmed[r])
-            if prefix.count >= 3 { variants.append(prefix) }
-        }
         return variants.uniqued
+    }
+
+    /// 欧美文件名常被截短，不能要求整串番号都出现在文件名里。
+    private func nameMatches(_ filename: String, keyword: String) -> Bool {
+        let name = normalizedKey(filename)
+        let key = normalizedKey(keyword)
+        if key.isEmpty || name.isEmpty { return false }
+        if name.contains(key) { return true }
+        guard keyword.contains(".") || keyword.contains(" ") else { return false }
+        let tokens = matchTokens(keyword)
+        let studio = tokens.first { ($0.first?.isLetter == true) && $0.count >= 3 }
+        let date = westernDateToken(tokens)
+        if let studio, name.contains(studio) {
+            if let date, name.contains(date) { return true }
+            let rest = tokens.filter { $0 != studio && $0.count >= 4 }
+            return rest.filter { name.contains($0) }.count >= 2
+        }
+        return false
+    }
+
+    private func matchTokens(_ raw: String) -> [String] {
+        raw.lowercased()
+            .replacingOccurrences(of: #"\.(mp4|mkv|avi|mov|wmv|flv|ts|m2ts|webm|m4v)$"#, with: "", options: .regularExpression)
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
+            .filter { $0.count >= 2 }
+    }
+
+    private func westernDateToken(_ tokens: [String]) -> String? {
+        var nums: [String] = []
+        for t in tokens where t.allSatisfy(\.isNumber) && (t.count == 2 || t.count == 4) {
+            nums.append(t.count == 4 ? String(t.suffix(2)) : t)
+            if nums.count >= 3 { return nums[0] + nums[1] + nums[2] }
+        }
+        return tokens.first { $0.count == 6 && $0.allSatisfy(\.isNumber) }
     }
 
     private func normalizedKey(_ raw: String?) -> String {

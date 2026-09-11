@@ -53,7 +53,7 @@ struct RankingsView: View {
 
     private var rankingBody: some View {
         VStack(spacing: 0) {
-            UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab)
+            UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                 .padding(.top, 4)
 
             if tab == .playback {
