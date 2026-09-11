@@ -213,14 +213,17 @@ struct SeriesMoviesView: View {
 struct SeriesNumberMoviesView: View {
     let number: String
     let title: String
+    var type: String = "0"
     @StateObject private var vm: MovieListViewModel
 
-    init(number: String, title: String) {
+    init(number: String, title: String, type: String = "0") {
         self.number = number
         self.title = title
+        self.type = type
+        let catalog = type.isEmpty ? "0" : type
         _vm = StateObject(wrappedValue: MovieListViewModel { page, sort in
             try await JavDBSDK.shared.moviesByTag(
-                filterBy: "0:c:\(number):", type: "0", page: page, limit: 21,
+                filterBy: "\(catalog):c:\(number):", type: catalog, page: page, limit: 21,
                 sortBy: sort.sortBy, orderBy: sort.orderBy)
         })
     }

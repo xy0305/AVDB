@@ -235,14 +235,37 @@ struct MovieDetailView: View {
     private func movieInfoCard(_ movie: Movie) -> some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 20) {
-                detailInfoLine("番号：", movie.displayNumber, underline: true)
+                detailLinkLine("番号：", movie.displayNumber) {
+                    SeriesNumberMoviesView(
+                        number: movie.codePrefix,
+                        title: movie.displayNumber,
+                        type: movie.catalogType
+                    )
+                }
                 if let date = movie.releaseDate { detailInfoLine("发行日期：", date) }
                 if let duration = movie.duration { detailInfoLine("长度：", "\(duration) 分钟") }
                 if let director = movie.directorName, !director.isEmpty {
-                    detailInfoLine("导演：", director, underline: true)
+                    if let id = movie.directorID, !id.isEmpty {
+                        detailLinkLine("导演：", director) {
+                            DirectorMoviesView(directorID: id, title: director, type: movie.catalogType)
+                        }
+                    } else {
+                        detailInfoLine("导演：", director, underline: true)
+                    }
                 }
                 if let maker = movie.makerName, !maker.isEmpty {
-                    detailInfoLine("制作商：", maker, underline: true)
+                    if let id = movie.makerID, !id.isEmpty {
+                        detailLinkLine("制作商：", maker) {
+                            MakerMoviesView(makerID: id, title: maker, type: movie.catalogType)
+                        }
+                    } else {
+                        detailInfoLine("制作商：", maker, underline: true)
+                    }
+                }
+                if let series = movie.seriesName, !series.isEmpty, let id = movie.seriesID, !id.isEmpty {
+                    detailLinkLine("系列：", series) {
+                        SeriesMoviesView(seriesID: id, title: series, type: movie.catalogType)
+                    }
                 }
                 let count = movie.reviewsCount ?? movie.commentsCount ?? 0
                 detailInfoLine("评分：", count > 0 ? "共\(count)人评分" : movie.scoreText)
@@ -273,7 +296,19 @@ struct MovieDetailView: View {
             Text(value).underline(underline)
         }
         .font(.system(size: 18, weight: .regular))
-        .textSelection(.enabled)
+    }
+
+    private func detailLinkLine<D: View>(_ label: String, _ value: String, @ViewBuilder destination: () -> D) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Text(label)
+            NavigationLink(destination: destination()) {
+                Text(value)
+                    .underline()
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+        }
+        .font(.system(size: 18, weight: .regular))
     }
 
     private func heroAction(_ systemName: String, title: String, action: @escaping () -> Void) -> some View {
@@ -367,7 +402,7 @@ struct MovieDetailView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(tags) { tag in
                     NavigationLink {
-                        TagMoviesView(tag: tag, catalogType: vm.movie?.type ?? "0")
+                        TagMoviesView(tag: tag, catalogType: vm.movie?.catalogType ?? "0")
                     } label: {
                         Text(tag.name ?? "")
                             .font(.caption)
@@ -377,7 +412,7 @@ struct MovieDetailView: View {
                             .liquidGlass(interactive: false)
                             .contentShape(Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderless)
                 }
             }
         }
@@ -412,7 +447,7 @@ struct MovieDetailView: View {
                         .frame(width: 70)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderless)
                 }
             }
             .padding(.horizontal)

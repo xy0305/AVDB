@@ -63,6 +63,21 @@ public struct Movie: Decodable, Identifiable, Hashable {
     // 派生字段
     public var displayTitle: String { title ?? number ?? "未知影片" }
     public var displayNumber: String { number ?? id }
+
+    /// 官方番号前缀：`filter_by={type}:c:{prefix}:`（IPX-123 → IPX，Tushy.2026.08.16 → Tushy）
+    public var codePrefix: String {
+        if let letter = numberLetter, !letter.isEmpty { return letter }
+        let n = displayNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let r = n.range(of: #"^[A-Za-z]+"#, options: .regularExpression) {
+            return String(n[r])
+        }
+        return n
+    }
+
+    public var catalogType: String {
+        let t = type ?? "0"
+        return t.isEmpty ? "0" : t
+    }
     public var scoreText: String {
         guard let s = score, s > 0 else { return "N/A" }
         return String(format: "%.2f", s)
@@ -111,6 +126,20 @@ public struct Movie: Decodable, Identifiable, Hashable {
         case relativeMovies = "relative_movies"
         case actorMovies = "actor_movies"
         case review
+        case maker, director, publisher, series
+    }
+
+    private struct NamedRef: Decodable {
+        let id: String?
+        let name: String?
+
+        enum CodingKeys: String, CodingKey { case id, name }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = JSONFlex.string(c, .id)
+            name = try? c.decode(String.self, forKey: .name)
+        }
     }
 
     public init(from decoder: Decoder) throws {
@@ -139,14 +168,38 @@ public struct Movie: Decodable, Identifiable, Hashable {
         category = JSONFlex.string(c, .category)
         actors = try? c.decode([Actor].self, forKey: .actors)
         actorNames = try? c.decode([String].self, forKey: .actorNames)
-        makerID = JSONFlex.string(c, .makerID)
-        makerName = try? c.decode(String.self, forKey: .makerName)
-        directorID = JSONFlex.string(c, .directorID)
-        directorName = try? c.decode(String.self, forKey: .directorName)
-        publisherID = JSONFlex.string(c, .publisherID)
-        publisherName = try? c.decode(String.self, forKey: .publisherName)
-        seriesID = JSONFlex.string(c, .seriesID)
-        seriesName = try? c.decode(String.self, forKey: .seriesName)
+        var makerID = JSONFlex.string(c, .makerID)
+        var makerName = try? c.decode(String.self, forKey: .makerName)
+        var directorID = JSONFlex.string(c, .directorID)
+        var directorName = try? c.decode(String.self, forKey: .directorName)
+        var publisherID = JSONFlex.string(c, .publisherID)
+        var publisherName = try? c.decode(String.self, forKey: .publisherName)
+        var seriesID = JSONFlex.string(c, .seriesID)
+        var seriesName = try? c.decode(String.self, forKey: .seriesName)
+        if let ref = try? c.decode(NamedRef.self, forKey: .maker) {
+            if makerID == nil || makerID?.isEmpty == true { makerID = ref.id }
+            if makerName == nil || makerName?.isEmpty == true { makerName = ref.name }
+        }
+        if let ref = try? c.decode(NamedRef.self, forKey: .director) {
+            if directorID == nil || directorID?.isEmpty == true { directorID = ref.id }
+            if directorName == nil || directorName?.isEmpty == true { directorName = ref.name }
+        }
+        if let ref = try? c.decode(NamedRef.self, forKey: .publisher) {
+            if publisherID == nil || publisherID?.isEmpty == true { publisherID = ref.id }
+            if publisherName == nil || publisherName?.isEmpty == true { publisherName = ref.name }
+        }
+        if let ref = try? c.decode(NamedRef.self, forKey: .series) {
+            if seriesID == nil || seriesID?.isEmpty == true { seriesID = ref.id }
+            if seriesName == nil || seriesName?.isEmpty == true { seriesName = ref.name }
+        }
+        self.makerID = makerID
+        self.makerName = makerName
+        self.directorID = directorID
+        self.directorName = directorName
+        self.publisherID = publisherID
+        self.publisherName = publisherName
+        self.seriesID = seriesID
+        self.seriesName = seriesName
         fileSize = JSONFlex.int(c, .fileSize)
         reviewsCount = JSONFlex.int(c, .reviewsCount)
         commentsCount = JSONFlex.int(c, .commentsCount)
