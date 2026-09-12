@@ -136,6 +136,10 @@ struct ListDetailView: View {
         }
         .task {
             isFollowing = FollowingTagsStore.shared.tags.contains { $0.name == "list" && $0.value == listID }
+            // 读本地缓存的收藏状态
+            if let cached = UserDefaults.standard.object(forKey: "avdb.collected.list.\(listID)") as? Bool {
+                isCollected = cached
+            }
             if vm.movies.isEmpty { await vm.loadMore() }
         }
         .refreshable { await vm.refresh() }
@@ -169,7 +173,10 @@ struct ListDetailView: View {
         defer { isCollecting = false }
         do {
             let success = try await JavDBSDK.shared.toggleListCollection(listID, collect: !isCollected)
-            if success { isCollected.toggle() }
+            if success {
+                isCollected.toggle()
+                UserDefaults.standard.set(isCollected, forKey: "avdb.collected.list.\(listID)")
+            }
         } catch {
             print("收藏清单失败: \(error)")
         }

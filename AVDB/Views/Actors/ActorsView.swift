@@ -569,7 +569,9 @@ final class ActorDetailViewModel: ObservableObject {
             actor = payload.actor
             filterTags = payload.filterTags ?? []
             tags = payload.tags ?? []
-            hasCollected = payload.hasCollected ?? false
+            // 优先读本地缓存，没有再用服务端状态
+            let cachedCollected = UserDefaults.standard.object(forKey: "avdb.collected.actor.\(actorID)") as? Bool
+            hasCollected = cachedCollected ?? payload.hasCollected ?? false
             hasFollowed = UserDefaults.standard.bool(forKey: "avdb.followed.actor.\(actorID)")
         }
         page = 1
@@ -647,6 +649,7 @@ final class ActorDetailViewModel: ObservableObject {
         do {
             _ = try await JavDBSDK.shared.collectActor(actorID, collect: next)
             hasCollected = next
+            UserDefaults.standard.set(next, forKey: "avdb.collected.actor.\(actorID)")
         } catch {
             collectHint = error.localizedDescription
         }
