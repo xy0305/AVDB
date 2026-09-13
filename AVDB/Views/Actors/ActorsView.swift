@@ -78,7 +78,12 @@ struct ActorsView: View {
                 }
             }
             .navigationDestination(isPresented: $showSearch) { SearchView() }
-            .task { await vm.loadRecommend() }
+            .task {
+                // 从演员详情返回时 .task 会再次触发；不要重写数组，否则 ScrollView 回到顶部。
+                if !vm.hasLoadedRecommend {
+                    await vm.loadRecommend()
+                }
+            }
             .onChange(of: tab) { _, new in
                 Task { await vm.switchTab(new) }
             }
@@ -186,18 +191,21 @@ final class ActorsHomeViewModel: ObservableObject {
     @Published var list: [Actor] = []
     @Published var isLoading = false
     @Published var newUpdateLabel = ""
+    private(set) var hasLoadedRecommend = false
     private var page = 1
     private var hasMore = true
     private var currentTab: ActorTab = .recommend
     private let sdk = JavDBSDK.shared
 
     func loadRecommend() async {
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
-        let data = try? await sdk.recommendActors()
-        newActors = data?.newActors ?? []
-        monthlyActors = data?.monthlyActors ?? []
-        recommendActors = data?.recommendActors ?? []
+        guard let data = try? await sdk.recommendActors() else { return }
+        newActors = data.newActors
+        monthlyActors = data.monthlyActors
+        recommendActors = data.recommendActors
+        hasLoadedRecommend = true
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_Hant")
         f.dateFormat = "M月d日更新"
