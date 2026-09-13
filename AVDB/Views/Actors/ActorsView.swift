@@ -50,9 +50,6 @@ struct ActorsView: View {
     @State private var tab: ActorTab = .recommend
     @StateObject private var vm = ActorsHomeViewModel()
     @State private var showSearch = false
-    /// SwiftUI 返回时偶尔会重建 ScrollView；记录点入的演员，返回后主动恢复。
-    @State private var restoreActorAnchor: String?
-    @State private var restoreActorGeneration = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var columns: [GridItem] {
@@ -81,12 +78,7 @@ struct ActorsView: View {
                 }
             }
             .navigationDestination(isPresented: $showSearch) { SearchView() }
-            .task {
-                // 从演员详情返回时 .task 会再次触发；不要重写数组，否则 ScrollView 回到顶部。
-                if !vm.hasLoadedRecommend {
-                    await vm.loadRecommend()
-                }
-            }
+            .task { await vm.loadRecommend() }
             .onChange(of: tab) { _, new in
                 Task { await vm.switchTab(new) }
             }
@@ -104,24 +96,19 @@ struct ActorsView: View {
     }
 
     private var recommendContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    actorBlock(key: "new", title: "新人", trailing: vm.newUpdateLabel, actors: vm.newActors)
-                    actorBlock(key: "monthly", title: "月排名", trailing: "全部 >", actors: vm.monthlyActors)
-                    if !vm.recommendActors.isEmpty {
-                        actorBlock(key: "recommend", title: "推薦", trailing: nil, actors: vm.recommendActors)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                actorBlock(title: "新人", trailing: vm.newUpdateLabel, actors: vm.newActors)
+                actorBlock(title: "月排名", trailing: "全部 >", actors: vm.monthlyActors)
+                if !vm.recommendActors.isEmpty {
+                    actorBlock(title: "推薦", trailing: nil, actors: vm.recommendActors)
                 }
-                .padding(.vertical, 12)
             }
-            .onChange(of: restoreActorGeneration) { _, _ in
-                restoreScrollPosition(proxy)
-            }
+            .padding(.vertical, 12)
         }
     }
 
-    private func actorBlock(key: String, title: String, trailing: String?, actors: [Actor]) -> some View {
+    private func actorBlock(title: String, trailing: String?, actors: [Actor]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(title)
@@ -137,18 +124,12 @@ struct ActorsView: View {
 
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(actors) { actor in
-                    let anchor = "\(key):\(actor.id)"
                     NavigationLink {
                         ActorDetailView(actorID: actor.id)
-                            .onDisappear { restoreActorGeneration += 1 }
                     } label: {
                         actorCell(actor)
                     }
                     .buttonStyle(.plain)
-                    .id(anchor)
-                    .simultaneousGesture(TapGesture().onEnded {
-                        restoreActorAnchor = anchor
-                    })
                 }
             }
             .padding(.horizontal, AdaptiveLayout.gridPadding)
@@ -156,48 +137,29 @@ struct ActorsView: View {
     }
 
     private var listContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                if vm.isLoading && vm.list.isEmpty {
-                    EmptyStateView(text: "載入演員…")
-                } else {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(vm.list) { actor in
-                            let anchor = "list:\(tab.rawValue):\(actor.id)"
-                            NavigationLink {
-                                ActorDetailView(actorID: actor.id)
-                                    .onDisappear { restoreActorGeneration += 1 }
-                            } label: {
-                                actorCell(actor)
-                            }
-                            .buttonStyle(.plain)
-                            .id(anchor)
-                            .simultaneousGesture(TapGesture().onEnded {
-                                restoreActorAnchor = anchor
-                            })
-                            .onAppear {
-                                if actor.id == vm.list.last?.id {
-                                    Task { await vm.loadMore() }
-                                }
+        ScrollView {
+            if vm.isLoading && vm.list.isEmpty {
+                EmptyStateView(text: "載入演員…")
+            } else {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(vm.list) { actor in
+                        NavigationLink {
+                            ActorDetailView(actorID: actor.id)
+                        } label: {
+                            actorCell(actor)
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear {
+                            if actor.id == vm.list.last?.id {
+                                Task { await vm.loadMore() }
                             }
                         }
                     }
-                    .padding(.horizontal, AdaptiveLayout.gridPadding)
-                    .padding(.vertical, 12)
-                    if vm.isLoading { ProgressView().padding() }
                 }
+                .padding(.horizontal, AdaptiveLayout.gridPadding)
+                .padding(.vertical, 12)
+                if vm.isLoading { ProgressView().padding() }
             }
-            .onChange(of: restoreActorGeneration) { _, _ in
-                restoreScrollPosition(proxy)
-            }
-        }
-    }
-
-    private func restoreScrollPosition(_ proxy: ScrollViewProxy) {
-        guard let anchor = restoreActorAnchor else { return }
-        Task { @MainActor in
-            await Task.yield()
-            proxy.scrollTo(anchor, anchor: .center)
         }
     }
 
@@ -224,21 +186,18 @@ final class ActorsHomeViewModel: ObservableObject {
     @Published var list: [Actor] = []
     @Published var isLoading = false
     @Published var newUpdateLabel = ""
-    private(set) var hasLoadedRecommend = false
     private var page = 1
     private var hasMore = true
     private var currentTab: ActorTab = .recommend
     private let sdk = JavDBSDK.shared
 
     func loadRecommend() async {
-        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
-        guard let data = try? await sdk.recommendActors() else { return }
-        newActors = data.newActors ?? []
-        monthlyActors = data.monthlyActors ?? []
-        recommendActors = data.recommendActors ?? []
-        hasLoadedRecommend = true
+        let data = try? await sdk.recommendActors()
+        newActors = data?.newActors ?? []
+        monthlyActors = data?.monthlyActors ?? []
+        recommendActors = data?.recommendActors ?? []
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_Hant")
         f.dateFormat = "M月d日更新"
