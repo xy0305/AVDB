@@ -202,9 +202,9 @@ final class ActorsHomeViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         guard let data = try? await sdk.recommendActors() else { return }
-        newActors = data.newActors
-        monthlyActors = data.monthlyActors
-        recommendActors = data.recommendActors
+        newActors = data.newActors ?? []
+        monthlyActors = data.monthlyActors ?? []
+        recommendActors = data.recommendActors ?? []
         hasLoadedRecommend = true
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_Hant")
