@@ -562,6 +562,8 @@ final class ActorDetailViewModel: ObservableObject {
     }
 
     func load() async {
+        // 从作品详情返回时 SwiftUI 会重跑 .task；已有数据就不要清空重拉，否则滚动会回到顶部。
+        guard actor == nil else { return }
         isLoading = true
         isLoadingMovies = true
         defer { isLoading = false }
