@@ -29,20 +29,33 @@ struct MyListsView: View {
         List(vm.lists) { list in
             if let movieID {
                 Button {
+                    GlassHaptic.tap()
                     Task { await toggle(list, movieID: movieID) }
                 } label: {
-                    HStack {
-                        Label(list.displayName, systemImage: list.hasMovie == true ? "bookmark.fill" : "bookmark")
+                    HStack(spacing: 12) {
+                        Image(systemName: list.hasMovie == true ? "bookmark.fill" : "bookmark")
+                            .foregroundStyle(list.hasMovie == true ? Color.accentColor : Color.secondary)
+                            .frame(width: 34, height: 34)
+                            .liquidGlassCircle(tint: list.hasMovie == true ? Color.accentColor.opacity(0.25) : nil)
+                        Text(list.displayName)
                         Spacer()
                         if list.hasMovie == true {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.secondary)
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color.accentColor)
+                                .symbolEffect(.bounce, value: list.hasMovie)
                         }
                     }
                 }
+                .pressableGlass(scale: 0.98)
             } else {
                 NavigationLink { ListDetailView(listID: list.id, title: list.displayName) } label: {
-                    Label(list.displayName, systemImage: "bookmark")
+                    HStack(spacing: 12) {
+                        Image(systemName: "bookmark")
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 34, height: 34)
+                            .liquidGlassCircle(tint: Color.accentColor.opacity(0.18))
+                        Text(list.displayName)
+                    }
                 }
             }
         }

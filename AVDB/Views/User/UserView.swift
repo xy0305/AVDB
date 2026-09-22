@@ -176,11 +176,16 @@ struct UserView: View {
                         Pan115SettingsView()
                     } label: {
                         HStack {
-                            Text("115 离线")
+                            Label("115 离线", systemImage: "icloud.and.arrow.down")
                             Spacer()
-                            Text(pan115.isConfigured ? "已配置" : "未配置")
-                                .font(.caption)
-                                .foregroundColor(pan115.isConfigured ? .green : .secondary)
+                            GlassChip(
+                                text: pan115.isConfigured ? "已配置" : "未配置",
+                                tint: pan115.isConfigured ? .green : .gray,
+                                font: .caption2,
+                                foreground: pan115.isConfigured ? .green : .secondary,
+                                compact: true,
+                                tintStrength: pan115.isConfigured ? 0.16 : 0.08
+                            )
                         }
                     }
                 }

@@ -345,10 +345,16 @@ struct CategoryFilterSheet: View {
                     tags: [Tag.allChip] + (group.tags ?? []),
                     selected: current.isEmpty ? "all" : current
                 ) { id in
+                    GlassHaptic.tap()
                     vm.pick(groupID: cid, tagID: id == "all" ? nil : id)
                 }
             }
         }
+        .padding(12)
+        .glassSurface(
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous),
+            elevation: 0.35
+        )
     }
 }
 

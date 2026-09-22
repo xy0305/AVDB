@@ -437,6 +437,7 @@ struct KSChromePlayer: View {
             Text(formatTime(isSeeking ? seekValue : currentTime))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                 .frame(width: 48, alignment: .leading)
             Slider(
                 value: Binding(
@@ -463,33 +464,50 @@ struct KSChromePlayer: View {
             Text(formatTime(duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                 .frame(width: 48, alignment: .trailing)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .glassSurface(
+            in: Capsule(),
+            tint: .black,
+            tintStrength: 0.18,
+            elevation: 0.4
+        )
     }
 
     private func glassButton(_ system: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
             Image(systemName: system)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
                 .frame(width: 40, height: 40)
                 .liquidGlass()
         }
-        .buttonStyle(.plain)
+        .pressableGlass(scale: 0.9)
         .contentShape(Circle())
     }
 
     private func capsuleButton(_ system: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
             Image(systemName: system)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
                 .frame(width: 30, height: 30)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
                 .liquidGlass()
         }
-        .buttonStyle(.plain)
+        .pressableGlass(scale: 0.9)
     }
 
     private func applyFillMode() {

@@ -13,25 +13,59 @@ struct ListsView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(vm.lists) { list in
+                ForEach(Array(vm.lists.enumerated()), id: \.element.id) { idx, list in
                     NavigationLink {
                         ListDetailView(listID: list.id, title: list.displayName)
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(list.displayName)
-                                .font(.subheadline)
-                            HStack(spacing: 8) {
-                                if let count = list.movieCount {
-                                    Text("\(count) 部影片")
+                        HStack(spacing: 12) {
+                            Image(systemName: "list.bullet.rectangle.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 36, height: 36)
+                                .background {
+                                    Circle().fill(.ultraThinMaterial)
+                                    Circle().fill(Color.accentColor.opacity(0.16))
+                                    Circle().fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.35), .clear],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
                                 }
-                                if let c = list.collectionsCount {
-                                    Text("\(c) 收藏")
+                                .overlay {
+                                    Circle().strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
+                                }
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(list.displayName)
+                                    .font(.subheadline.weight(.semibold))
+                                HStack(spacing: 6) {
+                                    if let count = list.movieCount {
+                                        GlassChip(
+                                            text: "\(count) 部",
+                                            tint: .blue,
+                                            font: .caption2,
+                                            foreground: .secondary,
+                                            compact: true,
+                                            tintStrength: 0.10
+                                        )
+                                    }
+                                    if let c = list.collectionsCount {
+                                        GlassChip(
+                                            text: "\(c) 收藏",
+                                            tint: .pink,
+                                            font: .caption2,
+                                            foreground: .secondary,
+                                            compact: true,
+                                            tintStrength: 0.10
+                                        )
+                                    }
                                 }
                             }
-                            .font(.caption)
-                            .foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 4)
                     }
+                    .staggerAppear(index: idx % 10)
                     .onAppear {
                         if list.id == vm.lists.last?.id {
                             Task { await vm.load() }
@@ -117,18 +151,24 @@ struct ListDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
                     Button {
+                        GlassHaptic.tap()
                         Task { await toggleFollow() }
                     } label: {
                         Image(systemName: isFollowing ? "eye.fill" : "eye")
                             .foregroundColor(isFollowing ? .blue : .primary)
+                            .symbolEffect(.bounce, value: isFollowing)
                     }
+                    .pressableGlass(scale: 0.9)
                     .disabled(isFollowingOp)
                     Button {
+                        GlassHaptic.tap()
                         Task { await toggleCollect() }
                     } label: {
                         Image(systemName: isCollected ? "heart.fill" : "heart")
                             .foregroundColor(isCollected ? .red : .primary)
+                            .symbolEffect(.bounce, value: isCollected)
                     }
+                    .pressableGlass(scale: 0.9)
                     .disabled(isCollecting)
                     MovieSortToolbar(vm: vm, sortOptions: CatalogSort.listSortOptions)
                 }

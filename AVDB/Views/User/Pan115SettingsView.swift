@@ -39,8 +39,15 @@ struct Pan115SettingsView: View {
             }
 
             Section {
-                Button("保存") { save() }
                 Button {
+                    GlassHaptic.tap()
+                    save()
+                } label: {
+                    Text("保存").frame(maxWidth: .infinity)
+                }
+                .pressableGlass(scale: 0.97)
+                Button {
+                    GlassHaptic.tap()
                     Task { await testPush() }
                 } label: {
                     if testing {
@@ -49,6 +56,7 @@ struct Pan115SettingsView: View {
                         Text("测试连接").frame(maxWidth: .infinity)
                     }
                 }
+                .pressableGlass(scale: 0.97)
                 .disabled(testing)
             }
 

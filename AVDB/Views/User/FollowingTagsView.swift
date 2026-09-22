@@ -16,37 +16,44 @@ struct FollowingTagsView: View {
             if store.tags.isEmpty && store.isLoading {
                 ProgressView()
             } else if store.tags.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "eye.slash")
-                        .font(.system(size: 48))
-                        .foregroundColor(.secondary)
-                    Text("暫無關注")
-                        .font(.headline)
-                    Text("在演員 / 類別 / 清單頁可以加入關注")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    if let err = store.errorMessage {
-                        Text(err).font(.caption).foregroundColor(.red)
-                    }
+                GlassEmptyView(
+                    icon: "eye.slash",
+                    title: "暫無關注",
+                    subtitle: "在演員 / 類別 / 清單頁可以加入關注"
+                )
+                if let err = store.errorMessage {
+                    Text(err).font(.caption).foregroundColor(.red)
                 }
             } else {
                 List {
-                    ForEach(store.tags) { tag in
+                    ForEach(Array(store.tags.enumerated()), id: \.element.id) { idx, tag in
                         NavigationLink {
                             FollowingTagDestination(tag: tag)
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(tag.displayName)
-                                    .font(.body)
-                                if let typeText = tag.typeText {
-                                    Text(typeText)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                            HStack(spacing: 12) {
+                                Image(systemName: "eye.fill")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 34, height: 34)
+                                    .liquidGlassCircle(tint: Color.accentColor.opacity(0.2))
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(tag.displayName)
+                                        .font(.body.weight(.medium))
+                                    if let typeText = tag.typeText {
+                                        GlassChip(
+                                            text: typeText,
+                                            tint: .blue,
+                                            font: .caption2,
+                                            foreground: .secondary,
+                                            compact: true,
+                                            tintStrength: 0.10
+                                        )
+                                    }
                                 }
                             }
+                            .padding(.vertical, 3)
                         }
+                        .staggerAppear(index: idx % 10)
                     }
                     .onDelete { indexSet in
                         Task { await deleteTagsRemote(at: indexSet) }

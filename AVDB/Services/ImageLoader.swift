@@ -361,8 +361,9 @@ public struct MovieCoverCard: View {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                     .frame(width: width, height: width * 1.4)
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .contentShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .glassMediaFrame(cornerRadius: 10)
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 if let score = movie.score, score > 0 {
                     GlassChip(
@@ -387,5 +388,6 @@ public struct MovieCoverCard: View {
                 .lineLimit(2)
         }
         .frame(width: width)
+        .glassPressFeedback()
     }
 }
