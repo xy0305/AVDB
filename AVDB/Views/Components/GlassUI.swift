@@ -204,18 +204,19 @@ struct LiquidGlassEffect: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            if let tint {
-                content.glassEffect(
-                    interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
-                    in: Capsule()
-                )
-            } else {
-                content.glassEffect(
-                    interactive ? .regular.interactive() : .regular,
-                    in: Capsule()
-                )
+            Group {
+                if let tint {
+                    content.glassEffect(
+                        interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                        in: Capsule()
+                    )
+                } else {
+                    content.glassEffect(
+                        interactive ? .regular.interactive() : .regular,
+                        in: Capsule()
+                    )
+                }
             }
-            // 系统玻璃外再压一道极薄棱光，补「厚度」
             .overlay {
                 Capsule().strokeBorder(
                     LinearGradient(
@@ -243,16 +244,18 @@ struct LiquidGlassRectEffect: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(iOS 26.0, *) {
-            if let tint {
-                content.glassEffect(
-                    interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
-                    in: shape
-                )
-            } else {
-                content.glassEffect(
-                    interactive ? .regular.interactive() : .regular,
-                    in: shape
-                )
+            Group {
+                if let tint {
+                    content.glassEffect(
+                        interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                        in: shape
+                    )
+                } else {
+                    content.glassEffect(
+                        interactive ? .regular.interactive() : .regular,
+                        in: shape
+                    )
+                }
             }
             .overlay {
                 GlassRim(shape: shape)
@@ -271,16 +274,18 @@ struct LiquidGlassCircleEffect: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            if let tint {
-                content.glassEffect(
-                    interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
-                    in: Circle()
-                )
-            } else {
-                content.glassEffect(
-                    interactive ? .regular.interactive() : .regular,
-                    in: Circle()
-                )
+            Group {
+                if let tint {
+                    content.glassEffect(
+                        interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                        in: Circle()
+                    )
+                } else {
+                    content.glassEffect(
+                        interactive ? .regular.interactive() : .regular,
+                        in: Circle()
+                    )
+                }
             }
             .overlay {
                 GlassRim(shape: Circle())
