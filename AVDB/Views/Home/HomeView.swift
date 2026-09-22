@@ -79,6 +79,7 @@ struct HomeView: View {
     /// 首页顶部搜索框（整条可点，避免 Spacer 吃掉右半边点击）
     private var searchBar: some View {
         Button {
+            GlassHaptic.tap()
             goSearch = true
         } label: {
             HStack(spacing: 12) {
@@ -99,10 +100,11 @@ struct HomeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .liquidGlassRect(cornerRadius: 14, interactive: false)
         }
-        .buttonStyle(.plain)
+        .pressableGlass(scale: 0.98)
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.horizontal, AdaptiveLayout.horizontalPadding)
         .padding(.top, 8)
+        .staggerAppear(index: 0)
     }
 
     private var shortcutRow: some View {
@@ -110,13 +112,21 @@ struct HomeView: View {
             LiquidGlassContainer(spacing: AdaptiveLayout.isPad ? 16 : 12) {
                 HStack(spacing: AdaptiveLayout.isPad ? 16 : 12) {
                     shortcut("看熱播", "play.rectangle.fill", Color.red) { goHot = true }
+                        .staggerAppear(index: 0)
                     shortcut("AV資訊", "newspaper.fill", Color.orange) { goArticles = true }
+                        .staggerAppear(index: 1)
                     shortcut("看短評", "text.bubble.fill", Color.purple) { goReviews = true }
+                        .staggerAppear(index: 2)
                     shortcut("找磁鏈", "link.circle.fill", Color.green) { goMagnets = true }
+                        .staggerAppear(index: 3)
                     shortcut("系列", "square.stack.3d.up.fill", Color.blue) { goSeries = true }
+                        .staggerAppear(index: 4)
                     shortcut("片商", "building.2.fill", Color.teal) { goMakers = true }
+                        .staggerAppear(index: 5)
                     shortcut("導演", "person.3.fill", Color.indigo) { goDirectors = true }
+                        .staggerAppear(index: 6)
                     shortcut("TOP250", "crown.fill", Color.yellow) { goRankings = true }
+                        .staggerAppear(index: 7)
                 }
             }
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
@@ -124,38 +134,46 @@ struct HomeView: View {
     }
 
     private func shortcut(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
             VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(color)
-                    .frame(width: 56, height: 56)
-                    .liquidGlassCircle(tint: color.opacity(0.28))
+                ZStack {
+                    SoftPulseRing(color: color.opacity(0.7))
+                        .frame(width: 68, height: 68)
+                    Image(systemName: icon)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(color)
+                        .symbolEffect(.bounce, value: title)
+                        .frame(width: 56, height: 56)
+                        .liquidGlassCircle(tint: color.opacity(0.28))
+                }
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.primary)
             }
             .frame(width: 72)
         }
-        .buttonStyle(.plain)
+        .pressableGlass(scale: 0.92)
     }
 
     private var recommendSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.yellow.gradient)
-                    Text("佳片推薦")
-                        .font(.system(size: 17, weight: .bold))
-                }
+            HStack(spacing: 8) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.yellow.gradient)
+                    .frame(width: 28, height: 28)
+                    .background(Color.yellow.opacity(0.16), in: Circle())
+                Text("佳片推薦")
+                    .font(.system(size: 17, weight: .bold))
                 Text(vm.periodLabel)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(.blue, in: Capsule())
+                    .background(Color.accentColor.opacity(0.12), in: Capsule())
                 Spacer()
                 NavigationLink {
                     PastRecommendView()
@@ -167,81 +185,129 @@ struct HomeView: View {
                             .font(.system(size: 12, weight: .semibold))
                     }
                     .foregroundStyle(.blue)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
                 }
+                .pressableGlass(scale: 0.94)
             }
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+            .staggerAppear(index: 1)
 
             if vm.recommended.isEmpty {
                 EmptyStateView(text: "載入推薦…")
                     .padding(.horizontal, AdaptiveLayout.horizontalPadding)
             } else {
                 RecommendCarousel(movies: vm.recommended)
+                    .staggerAppear(index: 2)
             }
         }
     }
 
     private var latestSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeaderBar(title: "最新上架") { goLatest = true }
+            SectionHeaderBar(title: "最新上架", trailing: "全部") { goLatest = true }
+                .staggerAppear(index: 3)
             if vm.latest.isEmpty {
                 EmptyStateView(text: "載入最新…")
             } else {
                 MoviePosterGrid(movies: Array(vm.latest.prefix(9)))
             }
-            Button {
-                Task { await vm.shuffleLatest() }
-            } label: {
-                Text("換一組")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            }
+            shufflePill { Task { await vm.shuffleLatest() } }
+                .staggerAppear(index: 4)
         }
     }
 
+    private func shufflePill(action: @escaping () -> Void) -> some View {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("換一組")
+                    .font(.subheadline.weight(.medium))
+            }
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .contentShape(Capsule())
+            .liquidGlass(interactive: false)
+        }
+        .pressableGlass(scale: 0.97)
+        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+    }
+
     private var top250Banner: some View {
-        Button { goRankings = true } label: {
+        Button {
+            GlassHaptic.tap()
+            goRankings = true
+        } label: {
             ZStack {
                 JavDBImage(url: vm.latest.first?.coverURL, contentMode: .fill)
-                    .frame(height: AdaptiveLayout.isPad ? 120 : 90)
+                    .frame(height: AdaptiveLayout.isPad ? 132 : 104)
                     .clipped()
-                    .overlay(Color.black.opacity(0.35))
-                Text("TOP250")
-                    .font(.largeTitle.weight(.heavy))
-                    .foregroundStyle(.white)
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.55),
+                        Color.blue.opacity(0.25),
+                        Color.black.opacity(0.45)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                HStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("TOP250")
+                            .font(.largeTitle.weight(.heavy))
+                            .foregroundStyle(.white)
+                        Text("本季口碑榜 · 每日更新")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right.circle.fill")
+                        .font(.system(size: 32, weight: .light))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
+                        .liquidGlassCircle()
+                }
+                .padding(.horizontal, 20)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .glassSpecular(cornerRadius: 16)
+            .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
             .padding(.horizontal, AdaptiveLayout.gridPadding)
         }
-        .buttonStyle(.plain)
+        .pressableGlass(scale: 0.98)
+        .staggerAppear(index: 5)
     }
 
     private var magnetSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeaderBar(title: "近期磁鏈更新") { goMagnets = true }
+            SectionHeaderBar(title: "近期磁鏈更新", trailing: "全部") { goMagnets = true }
+                .staggerAppear(index: 6)
             if vm.magnets.isEmpty {
                 EmptyStateView(text: "載入磁鏈…")
             } else {
                 MoviePosterGrid(movies: Array(vm.magnets.prefix(9)))
             }
-            Button {
-                Task { await vm.shuffleMagnets() }
-            } label: {
-                Text("換一組")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            }
+            shufflePill { Task { await vm.shuffleMagnets() } }
+                .staggerAppear(index: 7)
         }
     }
 
     private var followingSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(spacing: 8) {
+                Image(systemName: "eye.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 28, height: 28)
+                    .background(Color.accentColor.opacity(0.12), in: Circle())
                 Text("我的關注")
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .bold))
                 Spacer()
                 Menu {
                     ForEach([CatalogSort.releaseDesc, CatalogSort.updateDesc]) { item in
@@ -262,6 +328,9 @@ struct HomeView: View {
                     }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
                 }
                 NavigationLink {
                     FollowingTagsView()
@@ -272,6 +341,9 @@ struct HomeView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
                 }
             }
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
@@ -287,7 +359,10 @@ struct HomeView: View {
                     HStack(spacing: 8) {
                         ForEach(vm.followTags) { tag in
                             Button {
-                                Task { await vm.selectFollowTag(tag) }
+                                GlassHaptic.tap()
+                                withAnimation(GlassMotion.select) {
+                                    Task { await vm.selectFollowTag(tag) }
+                                }
                             } label: {
                                 Text(tag.displayName)
                                     .font(.caption.weight(vm.selectedFollowTag?.id == tag.id ? .semibold : .regular))
@@ -301,7 +376,7 @@ struct HomeView: View {
                                     }
                                     .liquidGlass(interactive: false)
                             }
-                            .buttonStyle(.plain)
+                            .pressableGlass(scale: 0.94)
                         }
                     }
                     .padding(.horizontal, AdaptiveLayout.horizontalPadding)
@@ -504,14 +579,35 @@ private struct RecommendCarousel: View {
 
 private struct RecommendBannerCard: View {
     let movie: Movie
+    @State private var pressed = false
 
     var body: some View {
-        JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+        ZStack(alignment: .bottomLeading) {
+            JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.38)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+            HStack(spacing: 10) {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(.white.opacity(0.95))
+                    .frame(width: 50, height: 50)
+                    .liquidGlassCircle()
+                Spacer()
+            }
+            .padding(14)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .glassSpecular(cornerRadius: 16)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(pressed ? 0.06 : 0.16), radius: pressed ? 3 : 12, y: pressed ? 1 : 6)
+        .scaleEffect(pressed ? 0.98 : 1)
+        .animation(GlassMotion.press, value: pressed)
+        .onLongPressGesture(minimumDuration: 0.01, pressing: { p in pressed = p }, perform: {})
     }
 }
 

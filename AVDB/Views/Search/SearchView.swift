@@ -139,14 +139,27 @@ struct SearchView: View {
                 HStack(spacing: 0) {
                     ForEach(SearchCategory.allCases) { cat in
                         Button {
-                            category = cat
+                            GlassHaptic.tap()
+                            withAnimation(GlassMotion.select) {
+                                category = cat
+                            }
                         } label: {
                             VStack(spacing: 8) {
                                 Text(cat.title)
                                     .font(.subheadline.weight(category == cat ? .semibold : .regular))
                                     .foregroundStyle(category == cat ? Color.accentColor : Color.primary)
-                                Rectangle()
-                                    .fill(category == cat ? Color.accentColor : Color.clear)
+                                Capsule(style: .continuous)
+                                    .fill(
+                                        category == cat
+                                            ? AnyShapeStyle(
+                                                LinearGradient(
+                                                    colors: [Color.accentColor, Color.accentColor.opacity(0.55)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            : AnyShapeStyle(Color.clear)
+                                    )
                                     .frame(height: 2)
                             }
                             .padding(.horizontal, 12)
@@ -187,7 +200,10 @@ struct SearchView: View {
                     ForEach(items) { item in
                         let selected = selection.wrappedValue == item
                         Button {
-                            selection.wrappedValue = item
+                            GlassHaptic.tap()
+                            withAnimation(GlassMotion.select) {
+                                selection.wrappedValue = item
+                            }
                         } label: {
                             Text(title(item))
                                 .font(.subheadline.weight(selected ? .semibold : .regular))
@@ -201,7 +217,7 @@ struct SearchView: View {
                                 }
                                 .liquidGlass(interactive: false)
                         }
-                        .buttonStyle(.plain)
+                        .pressableGlass(scale: 0.94)
                     }
                 }
             }
@@ -262,8 +278,9 @@ private struct SearchIdleView: View {
             Text(title)
                 .font(.system(size: 18, weight: .bold))
             FlowLayout(spacing: 8) {
-                ForEach(words, id: \.self) { word in
+                ForEach(Array(words.enumerated()), id: \.element) { idx, word in
                     Button {
+                        GlassHaptic.tap()
                         onPick(word)
                     } label: {
                         Text(word)
@@ -271,9 +288,10 @@ private struct SearchIdleView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .liquidGlassRect(cornerRadius: 8, interactive: false)
+                            .liquidGlassRect(cornerRadius: 12, interactive: false)
                     }
-                    .buttonStyle(.plain)
+                    .pressableGlass(scale: 0.94)
+                    .staggerAppear(index: idx)
                 }
             }
         }

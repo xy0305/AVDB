@@ -59,6 +59,7 @@ struct ContentView: View {
                 .tag(AppTab.me)
         }
         .tint(JAVDBPalette.accent)
+        .animation(GlassMotion.soft, value: selectedTab)
         .modifier(LiquidGlassTabBarModifier())
     }
 }

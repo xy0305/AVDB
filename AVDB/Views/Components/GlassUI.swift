@@ -2,12 +2,14 @@
 //  GlassUI.swift
 //  AVDB
 //
-//  iOS 26 系统 Liquid Glass。
+//  iOS 26 系统 Liquid Glass + 液态玻璃动效层。
 //  编译需 Xcode 26 SDK；运行时 iOS 26 走 .glassEffect / .buttonStyle(.glass)，
 //  iOS 17–25 回退 .ultraThinMaterial。
+//  在材质之外补：漂浮氛围光斑、按压回弹、错落入场、高光描边、微交互。
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - 系统玻璃修饰符
 
@@ -34,8 +36,9 @@ struct LiquidGlassEffect: ViewModifier {
             content
                 .background(.ultraThinMaterial, in: Capsule())
                 .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                    Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 0.6)
                 }
+                .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
         }
     }
 }
@@ -65,8 +68,17 @@ struct LiquidGlassRectEffect: ViewModifier {
             content
                 .background(.ultraThinMaterial, in: shape)
                 .overlay {
-                    shape.strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+                    shape
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.42), .white.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.8
+                        )
                 }
+                .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
         }
     }
 }
@@ -94,8 +106,17 @@ struct LiquidGlassCircleEffect: ViewModifier {
             content
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay {
-                    Circle().strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.45), .white.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.8
+                        )
                 }
+                .shadow(color: .black.opacity(0.10), radius: 12, y: 5)
         }
     }
 }
@@ -122,7 +143,7 @@ struct LiquidGlassContainer<Content: View>: View {
     }
 }
 
-// MARK: - View 扩展
+// MARK: - View 扩展（玻璃）
 
 extension View {
     /// 悬浮胶囊控件：系统 Liquid Glass
@@ -211,22 +232,224 @@ private struct LiquidGlassChromeModifier: ViewModifier {
 
 // MARK: - 全局氛围背景（内容区，不是控件玻璃）
 
+/// 页面底层：冷色渐变 + 缓慢漂浮的柔光斑，形成液态玻璃的「有厚度」感。
 struct LiquidGlassBackground: View {
+    @State private var drift = false
+
     var body: some View {
         ZStack {
             Color(.systemBackground)
+
             LinearGradient(
                 colors: [
-                    Color.blue.opacity(0.10),
-                    Color.cyan.opacity(0.05),
+                    Color.blue.opacity(0.14),
+                    Color.cyan.opacity(0.08),
+                    Color.purple.opacity(0.05),
                     Color.clear
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+
+            // 漂浮光斑：慢速位移 + 缩放，模拟液态折射
+            blob(
+                color: Color.blue.opacity(0.22),
+                size: AdaptiveLayout.isPad ? 280 : 200,
+                x: -0.18, y: -0.22,
+                phase: drift ? 1 : 0
+            )
+            blob(
+                color: Color.cyan.opacity(0.16),
+                size: AdaptiveLayout.isPad ? 240 : 170,
+                x: 0.72, y: -0.05,
+                phase: drift ? 1 : 0
+            )
+            blob(
+                color: Color.purple.opacity(0.12),
+                size: AdaptiveLayout.isPad ? 260 : 190,
+                x: 0.55, y: 0.68,
+                phase: drift ? 1 : 0
+            )
+
+            LinearGradient(
+                colors: [.white.opacity(0.18), .clear, .black.opacity(0.04)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(
+                .easeInOut(duration: 10)
+                .repeatForever(autoreverses: true)
+            ) {
+                drift.toggle()
+            }
+        }
+    }
+
+    private func blob(color: Color, size: CGFloat, x: CGFloat, y: CGFloat, phase: CGFloat) -> some View {
+        GeometryReader { geo in
+            Circle()
+                .fill(color)
+                .frame(width: size, height: size)
+                .blur(radius: 40)
+                .scaleEffect(phase == 1 ? 1.12 : 0.92)
+                .offset(
+                    x: geo.size.width * x + (phase == 1 ? 18 : -12),
+                    y: geo.size.height * y + (phase == 1 ? 22 : -10)
+                )
+        }
+    }
+}
+
+// MARK: - 动效 / 微交互
+
+enum GlassMotion {
+    static let press = Animation.spring(response: 0.22, dampingFraction: 0.72)
+    static let soft = Animation.spring(response: 0.38, dampingFraction: 0.86)
+    static let enter = Animation.spring(response: 0.48, dampingFraction: 0.84)
+    static let select = Animation.spring(response: 0.3, dampingFraction: 0.78)
+}
+
+/// 按压缩放 + 轻微变暗，让玻璃控件有「可捏」手感。
+struct PressableGlassStyle: ButtonStyle {
+    var scale: CGFloat = 0.96
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scale : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(GlassMotion.press, value: configuration.isPressed)
+    }
+}
+
+extension View {
+    func pressableGlass(scale: CGFloat = 0.96) -> some View {
+        buttonStyle(PressableGlassStyle(scale: scale))
+    }
+
+    /// 卡片按压反馈（非 Button 也可用）。
+    func glassPressFeedback() -> some View {
+        modifier(GlassPressFeedback())
+    }
+
+    /// 错落入场：轻微上浮 + 缩放淡入。
+    func staggerAppear(index: Int = 0) -> some View {
+        modifier(StaggerAppearModifier(index: index))
+    }
+
+    /// 高光描边：左上高光、右下暗边，模拟玻璃折射。
+    func glassSpecular(cornerRadius: CGFloat = 14) -> some View {
+        overlay {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.55),
+                            .white.opacity(0.08),
+                            .black.opacity(0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.7
+                )
+        }
+    }
+}
+
+private struct GlassPressFeedback: ViewModifier {
+    @State private var pressed = false
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(pressed ? 0.97 : 1)
+            .animation(GlassMotion.press, value: pressed)
+            .onLongPressGesture(minimumDuration: 0.01, pressing: { pressing in
+                pressed = pressing
+            }, perform: {})
+    }
+}
+
+private struct StaggerAppearModifier: ViewModifier {
+    let index: Int
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 16)
+            .scaleEffect(shown ? 1 : 0.94)
+            .onAppear {
+                let delay = Double(min(index, 14)) * 0.045
+                withAnimation(GlassMotion.enter.delay(delay)) {
+                    shown = true
+                }
+            }
+    }
+}
+
+/// 柔光呼吸环（头像 / 播放钮）。
+struct SoftPulseRing: View {
+    var color: Color = .blue
+    @State private var pulse = false
+
+    var body: some View {
+        Circle()
+            .strokeBorder(color.opacity(0.45), lineWidth: 1.5)
+            .scaleEffect(pulse ? 1.12 : 0.96)
+            .opacity(pulse ? 0.2 : 0.55)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
+                    pulse = true
+                }
+            }
+            .allowsHitTesting(false)
+    }
+}
+
+/// 骨架屏微光扫过。
+struct ShimmerView: View {
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = max(geo.size.width, 1)
+            LinearGradient(
+                colors: [
+                    Color(.systemGray5),
+                    Color(.systemGray4),
+                    Color(.systemGray5)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .overlay {
+                LinearGradient(
+                    colors: [.clear, .white.opacity(0.45), .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: w * 0.55)
+                .offset(x: phase * w * 1.4)
+            }
+        }
+        .clipped()
+        .onAppear {
+            withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) {
+                phase = 1.2
+            }
+        }
+    }
+}
+
+/// 轻触反馈（按钮态切换时）。
+enum GlassHaptic {
+    static func tap() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+    static func success() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }
 
@@ -243,7 +466,10 @@ struct GlassButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            GlassHaptic.tap()
+            action()
+        }) {
             HStack(spacing: 6) {
                 if let icon {
                     Image(systemName: icon)
@@ -255,6 +481,42 @@ struct GlassButton: View {
         }
         .avdbGlassButton(prominent: style == .primary || style == .destructive)
         .tint(style == .destructive ? .red : .accentColor)
+        .pressableGlass()
+    }
+}
+
+/// 详情页操作胶囊：想看 / 看过 / 存入清单。
+struct GlassActionPill: View {
+    let title: String
+    let icon: String
+    var isSelected: Bool = false
+    var tint: Color = .blue
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .symbolEffect(.bounce, value: isSelected)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background {
+                if isSelected {
+                    Capsule(style: .continuous).fill(tint)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .pressableGlass(scale: 0.94)
+        .liquidGlass(tint: isSelected ? tint.opacity(0.35) : nil, interactive: false)
     }
 }
 
@@ -266,19 +528,22 @@ struct LiquidFilterChip: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
             Text(title)
                 .font(.caption.weight(isSelected ? .semibold : .medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .foregroundStyle(isSelected ? .white : .primary)
+                .background {
+                    if isSelected {
+                        Capsule(style: .continuous).fill(Color.accentColor)
+                    }
+                }
         }
-        .buttonStyle(.plain)
-        .background {
-            if isSelected {
-                Capsule(style: .continuous).fill(Color.accentColor)
-            }
-        }
+        .pressableGlass(scale: 0.94)
         .liquidGlass(interactive: false)
     }
 }
@@ -302,7 +567,8 @@ struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
 
     private func segmentButton(_ option: T) -> some View {
         Button {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+            GlassHaptic.tap()
+            withAnimation(GlassMotion.select) {
                 selection = option
             }
         } label: {
@@ -320,6 +586,71 @@ struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
                 }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - 区块标题（玻璃徽章 + 点缀）
+
+struct GlassSectionHeader: View {
+    let title: String
+    var icon: String? = nil
+    var badge: String? = nil
+    var trailingTitle: String? = "全部"
+    var action: (() -> Void)? = nil
+
+    init(
+        title: String,
+        icon: String? = nil,
+        badge: String? = nil,
+        trailingTitle: String? = "全部",
+        action: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.icon = icon
+        self.badge = badge
+        self.trailingTitle = trailingTitle
+        self.action = action
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 28, height: 28)
+                    .background(Color.accentColor.opacity(0.12), in: Circle())
+            }
+            Text(title)
+                .font(.system(size: 17, weight: .bold))
+            if let badge {
+                Text(badge)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+            }
+            Spacer()
+            if let trailingTitle {
+                Button {
+                    GlassHaptic.tap()
+                    action?()
+                } label: {
+                    HStack(spacing: 2) {
+                        Text(trailingTitle)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
+                }
+                .pressableGlass(scale: 0.94)
+            }
+        }
     }
 }
 
@@ -374,6 +705,10 @@ struct GlassEmptyView: View {
             Image(systemName: icon)
                 .font(.system(size: 64, weight: .thin))
                 .foregroundStyle(.secondary)
+                .overlay(alignment: .center) {
+                    SoftPulseRing(color: .blue.opacity(0.5))
+                        .frame(width: 88, height: 88)
+                }
 
             Text(title)
                 .font(.system(size: 20, weight: .semibold))
@@ -392,6 +727,7 @@ struct GlassEmptyView: View {
             }
         }
         .padding(40)
+        .staggerAppear(index: 0)
     }
 }
 
@@ -510,14 +846,17 @@ struct GlassNavigationBar: View {
     var body: some View {
         HStack {
             if let leftAction = leftButton {
-                Button(action: leftAction) {
+                Button {
+                    GlassHaptic.tap()
+                    leftAction()
+                } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
                         .liquidGlass()
                 }
-                .buttonStyle(.plain)
+                .pressableGlass(scale: 0.9)
             }
 
             Spacer()
@@ -528,14 +867,17 @@ struct GlassNavigationBar: View {
             Spacer()
 
             if let rightAction = rightButton {
-                Button(action: rightAction) {
+                Button {
+                    GlassHaptic.tap()
+                    rightAction()
+                } label: {
                     Image(systemName: rightIcon)
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
                         .liquidGlass()
                 }
-                .buttonStyle(.plain)
+                .pressableGlass(scale: 0.9)
             } else {
                 Color.clear.frame(width: 44, height: 44)
             }

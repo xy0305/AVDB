@@ -19,23 +19,55 @@ struct UserView: View {
                     // 已登录
                     Section {
                         HStack(spacing: 16) {
-                            JavDBImage(url: user.avatarURL)
-                                .frame(width: 60, height: 60)
-                                .clipShape(Circle())
-                            VStack(alignment: .leading, spacing: 4) {
+                            ZStack {
+                                SoftPulseRing(color: user.isVip == true ? .orange : .blue)
+                                    .frame(width: 76, height: 76)
+                                JavDBImage(url: user.avatarURL)
+                                    .frame(width: 64, height: 64)
+                                    .clipShape(Circle())
+                                    .overlay {
+                                        Circle().strokeBorder(
+                                            LinearGradient(
+                                                colors: [.white.opacity(0.7), .white.opacity(0.15)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                    }
+                                    .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                            }
+                            VStack(alignment: .leading, spacing: 6) {
                                 Text(user.displayName)
                                     .font(.headline)
-                                if user.isVip == true {
-                                    Text("VIP 会员")
-                                        .font(.caption)
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(.orange, in: Capsule())
+                                HStack(spacing: 8) {
+                                    if user.isVip == true {
+                                        Text("VIP 会员")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(
+                                                LinearGradient(
+                                                    colors: [.orange, .orange.opacity(0.75)],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                in: Capsule()
+                                            )
+                                    }
+                                    if let n = user.wantWatchCount {
+                                        Text("想看 \(n)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(.ultraThinMaterial, in: Capsule())
+                                    }
                                 }
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 8)
                     }
 
                     Section("我的") {
@@ -115,13 +147,30 @@ struct UserView: View {
                     // 未登录
                     Section {
                         Button {
+                            GlassHaptic.tap()
                             showLogin = true
                         } label: {
-                            HStack {
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("登录 / 注册")
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    SoftPulseRing(color: .blue)
+                                        .frame(width: 56, height: 56)
+                                    Image(systemName: "person.crop.circle.badge.plus")
+                                        .font(.system(size: 28, weight: .light))
+                                        .foregroundStyle(Color.accentColor)
+                                        .frame(width: 48, height: 48)
+                                        .liquidGlassCircle(tint: Color.accentColor.opacity(0.2))
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("登录 / 注册")
+                                        .font(.headline)
+                                    Text("同步关注、收藏与观看记录")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            .padding(.vertical, 6)
                         }
+                        .pressableGlass(scale: 0.98)
                     }
                 }
 

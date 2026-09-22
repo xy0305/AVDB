@@ -273,6 +273,7 @@ public struct JavDBImage: View {
 
     @State private var image: UIImage?
     @State private var loading = false
+    @State private var appeared = false
 
     public init(
         url: String?,
@@ -306,6 +307,8 @@ public struct JavDBImage: View {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: contentMode)
+                        .opacity(appeared ? 1 : 0)
+                        .scaleEffect(appeared ? 1 : 1.03)
                 } else {
                     placeholder
                 }
@@ -315,12 +318,16 @@ public struct JavDBImage: View {
             // task(id:) 在候选 URL 改变时会取消旧任务；不能用 loading 拦截，
             // 否则 Tenhow poster 稍晚解析完成时会继续显示先加载到的横版 thumb。
             loading = true
+            appeared = false
             image = nil
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
                 if let img = await ImageLoader.shared.load(candidate) {
                     guard !Task.isCancelled else { return }
                     image = img
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        appeared = true
+                    }
                     break
                 }
             }
@@ -330,9 +337,10 @@ public struct JavDBImage: View {
 
     private var placeholder: some View {
         ZStack {
-            Color(.systemGray6)
+            ShimmerView()
             Image(systemName: "film")
-                .foregroundColor(.gray)
+                .font(.system(size: 22, weight: .light))
+                .foregroundColor(.gray.opacity(0.7))
         }
     }
 }

@@ -123,13 +123,14 @@ struct ActorsView: View {
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
 
             LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(actors) { actor in
+                ForEach(Array(actors.enumerated()), id: \.element.id) { idx, actor in
                     NavigationLink {
                         ActorDetailView(actorID: actor.id)
                     } label: {
                         actorCell(actor)
                     }
                     .buttonStyle(.plain)
+                    .staggerAppear(index: idx % 12)
                 }
             }
             .padding(.horizontal, AdaptiveLayout.gridPadding)
@@ -168,6 +169,18 @@ struct ActorsView: View {
             ClippedAspectFill(aspectRatio: 1) {
                 JavDBImage(url: actor.avatarURL ?? actor.coverURL)
             }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.45), .white.opacity(0.05), .black.opacity(0.06)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.8
+                    )
+            }
+            .shadow(color: .black.opacity(0.1), radius: 6, y: 3)
             Text(actor.name ?? "")
                 .font(.system(size: 13))
                 .foregroundColor(.primary)
@@ -175,6 +188,7 @@ struct ActorsView: View {
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
+        .glassPressFeedback()
     }
 }
 

@@ -75,12 +75,13 @@ enum RankPeriod: String, CaseIterable, Identifiable {
     }
 }
 
-/// 官方下划线 Tab（全部 / 有碼 / 無碼 …）
+/// 官方下划线 Tab（全部 / 有碼 / 無碼 …）——滑动指示条带弹簧过渡
 struct UnderlineTabBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
     /// 排行等少量标签应铺满且不可拖；类别/演员字母多时才横向滚动。
     var scrolls: Bool = true
+    @Namespace private var underlineNS
 
     var body: some View {
         VStack(spacing: 0) {
@@ -94,7 +95,9 @@ struct UnderlineTabBar<Tab: Hashable>: View {
                     .padding(.horizontal, 4)
                     .tabSwipe(tabs: tabs.map(\.0), selection: $selection)
             }
-            Divider()
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 1)
         }
     }
 
@@ -102,7 +105,8 @@ struct UnderlineTabBar<Tab: Hashable>: View {
         HStack(spacing: 0) {
             ForEach(tabs, id: \.0) { tab, title in
                 Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                    GlassHaptic.tap()
+                    withAnimation(GlassMotion.select) {
                         selection = tab
                     }
                 } label: {
@@ -113,9 +117,22 @@ struct UnderlineTabBar<Tab: Hashable>: View {
                             .minimumScaleFactor(flexible ? 0.7 : 1)
                             .foregroundStyle(selection == tab ? Color.accentColor : Color.primary)
                             .frame(maxWidth: flexible ? .infinity : nil)
-                        Rectangle()
-                            .fill(selection == tab ? Color.accentColor : Color.clear)
-                            .frame(height: 2)
+                        ZStack {
+                            if selection == tab {
+                                Capsule(style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.accentColor, Color.accentColor.opacity(0.55)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .matchedGeometryEffect(id: "tab-underline", in: underlineNS)
+                            } else {
+                                Color.clear.frame(height: 2)
+                            }
+                        }
+                        .frame(height: 2)
                     }
                     .padding(.horizontal, flexible ? 2 : 14)
                     .contentShape(Rectangle())
@@ -144,12 +161,14 @@ struct CapsuleChipBar<Tab: Hashable>: View {
 private struct SegmentedControlBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
+    @Namespace private var chipNS
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(tabs, id: \.0) { tab, title in
                 Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                    GlassHaptic.tap()
+                    withAnimation(GlassMotion.select) {
                         selection = tab
                     }
                 } label: {
@@ -163,6 +182,7 @@ private struct SegmentedControlBar<Tab: Hashable>: View {
                             if selection == tab {
                                 Capsule(style: .continuous)
                                     .fill(Color.accentColor)
+                                    .matchedGeometryEffect(id: "chip-seg", in: chipNS)
                             }
                         }
                 }
@@ -221,12 +241,14 @@ struct SegmentedTabBar<Tab: Hashable>: View {
 struct SegmentChipBar<Tab: Hashable>: View {
     let tabs: [(Tab, String)]
     @Binding var selection: Tab
+    @Namespace private var chipNS
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(tabs, id: \.0) { tab, title in
                 Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                    GlassHaptic.tap()
+                    withAnimation(GlassMotion.select) {
                         selection = tab
                     }
                 } label: {
@@ -239,6 +261,7 @@ struct SegmentChipBar<Tab: Hashable>: View {
                             if selection == tab {
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .fill(Color.accentColor)
+                                    .matchedGeometryEffect(id: "chip-seg", in: chipNS)
                             }
                         }
                 }
@@ -297,24 +320,47 @@ struct ClippedAspectFill<Content: View>: View {
     }
 }
 
-/// 三列海报卡 —— 内容，不用玻璃，干净的圆角图片 + 文字
+/// 三列海报卡 —— 内容干净，封面带高光边、角标玻璃化、按压回弹
 struct MoviePosterCard: View {
     let movie: Movie
     var rank: Int? = nil
+    @State private var pressed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ClippedAspectFill(aspectRatio: 0.72) {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+                    .overlay {
+                        LinearGradient(
+                            colors: [.white.opacity(0.18), .clear, .black.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
                     .overlay(alignment: .topLeading) {
                         if let rank {
                             Text("\(rank)")
                                 .font(.caption.bold())
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
+                                .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
-                                .background(rank <= 3 ? Color.orange : Color.black.opacity(0.65))
-                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .background(
+                                    rank <= 3
+                                        ? AnyShapeStyle(
+                                            LinearGradient(
+                                                colors: [Color.orange, Color.orange.opacity(0.75)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        : AnyShapeStyle(.ultraThinMaterial)
+                                )
+                                .foregroundStyle(rank <= 3 ? Color.white : Color.primary)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
+                                }
                                 .padding(6)
                         }
                     }
@@ -330,11 +376,29 @@ struct MoviePosterCard: View {
                                         ? JAVDBPalette.cnsubOrange
                                         : JAVDBPalette.playRed
                                 )
-                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .strokeBorder(.white.opacity(0.28), lineWidth: 0.5)
+                                }
                                 .padding(5)
                         }
                     }
             }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.4), .white.opacity(0.05), .black.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.7
+                    )
+            }
+            .shadow(color: .black.opacity(pressed ? 0.04 : 0.12), radius: pressed ? 2 : 8, y: pressed ? 1 : 4)
+            .scaleEffect(pressed ? 0.96 : 1)
+            .animation(GlassMotion.press, value: pressed)
 
             Text(movie.displayTitle)
                 .font(.subheadline)
@@ -364,12 +428,19 @@ struct MoviePosterCard: View {
                 }
                 if movie.isNewMagnet {
                     Text("新種")
-                        .font(.caption2)
-                        .foregroundColor(JAVDBPalette.magnetGreen)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(JAVDBPalette.magnetGreen)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(JAVDBPalette.magnetGreen.opacity(0.14), in: Capsule())
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onLongPressGesture(minimumDuration: 0.01, pressing: { pressing in
+            pressed = pressing
+        }, perform: {})
     }
 }
 
@@ -400,6 +471,7 @@ struct MoviePosterGrid: View {
                 .buttonStyle(.plain)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
+                .staggerAppear(index: idx % 12)
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)
@@ -417,23 +489,11 @@ struct SectionHeaderBar: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
-        HStack {
-            Text(title)
-                .font(.headline)
-            Spacer()
-            if let trailing {
-                Button(action: { action?() }) {
-                    HStack(spacing: 2) {
-                        Text(trailing)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
+        GlassSectionHeader(
+            title: title,
+            trailingTitle: trailing,
+            action: action
+        )
         .padding(.horizontal, AdaptiveLayout.horizontalPadding)
     }
 }
@@ -442,7 +502,11 @@ struct EmptyStateView: View {
     let text: String
     var body: some View {
         VStack(spacing: 10) {
-            ProgressView()
+            ZStack {
+                SoftPulseRing(color: .blue.opacity(0.45))
+                    .frame(width: 56, height: 56)
+                ProgressView()
+            }
             Text(text).font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

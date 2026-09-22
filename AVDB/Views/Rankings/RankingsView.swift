@@ -178,6 +178,8 @@ struct RankingsView: View {
                         top250Row(rank: vm.startRank + idx, movie: movie)
                     }
                     .buttonStyle(.plain)
+                    .glassPressFeedback()
+                    .staggerAppear(index: idx % 10)
                     .onAppear {
                         if movie.id == vm.displayed.last?.id {
                             Task { await vm.loadMore() }
@@ -192,13 +194,20 @@ struct RankingsView: View {
             .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .bottom, spacing: 8) {
-            Button { showTopFilter = true } label: {
-                Text("篩選")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+            Button {
+                GlassHaptic.tap()
+                showTopFilter = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                    Text("篩選")
+                        .font(.headline)
+                }
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
             }
+            .pressableGlass(scale: 0.97)
             .liquidGlass(interactive: false)
             .padding(.horizontal, 20)
             .padding(.bottom, AdaptiveLayout.isPad ? 4 : 6)
@@ -214,16 +223,32 @@ struct RankingsView: View {
                     JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                         .frame(width: coverW, height: coverH)
                         .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .glassSpecular(cornerRadius: 12)
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     Text("\(rank)")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 7)
+                        .foregroundColor(rank <= 3 ? .white : .primary)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(rank <= 3 ? Color.orange : Color.black.opacity(0.6))
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .padding(6)
+                        .background(
+                            rank <= 3
+                                ? AnyShapeStyle(
+                                    LinearGradient(
+                                        colors: [Color.orange, Color.orange.opacity(0.8)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                : AnyShapeStyle(.ultraThinMaterial)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
+                        }
+                        .padding(8)
                     if let badge = movie.playBadge {
                         Text(badge)
                             .font(.system(size: 10, weight: .semibold))
@@ -231,7 +256,7 @@ struct RankingsView: View {
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(badge.contains("中字") ? JAVDBPalette.cnsubOrange : JAVDBPalette.playRed)
-                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             .padding(6)
                     }
@@ -297,13 +322,17 @@ private struct RankingPreviewCarousel: View {
                     ForEach(imageURLs.indices, id: \.self) { index in
                         Circle()
                             .fill(index == selection ? Color.accentColor : .white.opacity(0.72))
-                            .frame(width: 6, height: 6)
+                            .frame(width: index == selection ? 7 : 5, height: index == selection ? 7 : 5)
+                            .animation(GlassMotion.select, value: selection)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
                 .background(.ultraThinMaterial, in: Capsule())
-                .padding(.bottom, 8)
+                .overlay {
+                    Capsule().strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                }
+                .padding(.bottom, 10)
                 .allowsHitTesting(false)
             }
         }

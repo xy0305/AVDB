@@ -180,14 +180,21 @@ struct MovieDetailView: View {
                 .aspectRatio(1.47, contentMode: .fit)
                 .clipped()
 
-                Button { play115 = true } label: {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.96))
-                        .frame(width: 56, height: 56)
-                        .liquidGlassCircle()
+                Button {
+                    GlassHaptic.tap()
+                    play115 = true
+                } label: {
+                    ZStack {
+                        SoftPulseRing(color: .white.opacity(0.9))
+                            .frame(width: 72, height: 72)
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.96))
+                            .frame(width: 56, height: 56)
+                            .liquidGlassCircle()
+                    }
                 }
-                .buttonStyle(.plain)
+                .pressableGlass(scale: 0.9)
                 .padding(12)
             }
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -204,26 +211,38 @@ struct MovieDetailView: View {
             movieInfoCard(movie)
 
             HStack(spacing: 10) {
-                Button {
+                GlassActionPill(
+                    title: vm.reviewStatus == "want_watch" ? "已想看" : "想看",
+                    icon: vm.reviewStatus == "want_watch" ? "heart.fill" : "heart",
+                    isSelected: vm.reviewStatus == "want_watch",
+                    tint: .pink
+                ) {
                     Task { await vm.setReviewStatus("want_watch") }
-                } label: {
-                    Label(vm.reviewStatus == "want_watch" ? "已想看" : "想看",
-                          systemImage: vm.reviewStatus == "want_watch" ? "heart.fill" : "heart")
                 }
-                .buttonStyle(.borderedProminent)
-                Button {
+                GlassActionPill(
+                    title: vm.reviewStatus == "watched" ? "已看過" : "看過",
+                    icon: vm.reviewStatus == "watched" ? "checkmark.circle.fill" : "checkmark.circle",
+                    isSelected: vm.reviewStatus == "watched",
+                    tint: .green
+                ) {
                     Task { await vm.setReviewStatus("watched") }
-                } label: {
-                    Label(vm.reviewStatus == "watched" ? "已看過" : "看過",
-                          systemImage: vm.reviewStatus == "watched" ? "checkmark.circle.fill" : "checkmark.circle")
                 }
-                .buttonStyle(.borderedProminent)
                 NavigationLink {
                     MyListsView(movieID: movie.id)
                 } label: {
-                    Label("存入清單", systemImage: "bookmark")
+                    HStack(spacing: 6) {
+                        Image(systemName: "bookmark")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("存入清單")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .contentShape(Capsule())
+                    .liquidGlass(interactive: false)
                 }
-                .buttonStyle(.borderedProminent)
+                .pressableGlass(scale: 0.94)
             }
             .font(.caption)
             .padding(.bottom, 4)
@@ -287,7 +306,9 @@ struct MovieDetailView: View {
             }
         }
         .foregroundStyle(.white)
-        .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.ultraThinMaterial.opacity(0.55), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .glassSpecular(cornerRadius: 16)
     }
 
     private func detailInfoLine(_ label: String, _ value: String, underline: Bool = false) -> some View {
@@ -398,9 +419,9 @@ struct MovieDetailView: View {
 
     private func tagsSection(_ tags: [Tag]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("标签").font(.headline)
+            GlassSectionHeader(title: "标签", icon: "tag.fill", trailingTitle: nil)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 8)], alignment: .leading, spacing: 8) {
-                ForEach(tags) { tag in
+                ForEach(Array(tags.enumerated()), id: \.element.id) { idx, tag in
                     NavigationLink {
                         TagMoviesView(tag: tag, catalogType: vm.movie?.catalogType ?? "0")
                     } label: {
@@ -412,7 +433,8 @@ struct MovieDetailView: View {
                             .liquidGlass(interactive: false)
                             .contentShape(Capsule())
                     }
-                    .buttonStyle(.borderless)
+                    .pressableGlass(scale: 0.94)
+                    .staggerAppear(index: idx)
                 }
             }
         }
@@ -421,7 +443,7 @@ struct MovieDetailView: View {
 
     private func actorsSection(_ actors: [Actor]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("演员").font(.headline)
+            GlassSectionHeader(title: "演员", icon: "person.2.fill", trailingTitle: nil)
                 .padding(.horizontal)
 
             // 静态自适应网格，避免横向 ScrollView 让头像被手指拖动。
@@ -456,23 +478,30 @@ struct MovieDetailView: View {
 
     private func summarySection(_ summary: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("简介").font(.headline)
+            GlassSectionHeader(title: "简介", icon: "text.alignleft", trailingTitle: nil)
             Text(summary)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .glassSpecular(cornerRadius: 14)
         }
         .padding(.horizontal)
     }
 
     private func previewImagesSection(_ images: [PreviewImage]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("剧照").font(.headline)
+            GlassSectionHeader(title: "剧照", icon: "photo.on.rectangle", trailingTitle: nil)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(images) { img in
+                    ForEach(Array(images.enumerated()), id: \.element.id) { idx, img in
                         JavDBImage(url: img.largeURL ?? img.thumbURL)
                             .frame(width: 260, height: 160)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .glassSpecular(cornerRadius: 14)
+                            .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                            .staggerAppear(index: idx)
                     }
                 }
                 .padding(.horizontal)
@@ -518,30 +547,43 @@ struct MovieDetailView: View {
 
     private func trailerSection(_ url: URL) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("预告片").font(.headline)
+            GlassSectionHeader(title: "预告片", icon: "play.rectangle.fill", trailingTitle: nil)
             Button {
+                GlassHaptic.tap()
                 showTrailer = true
             } label: {
                 ZStack {
                     JavDBImage(url: vm.movie?.coverURL ?? vm.movie?.thumbURL, contentMode: .fill)
                         .frame(height: 180)
                         .clipped()
-                        .overlay(Color.black.opacity(0.35))
+                    LinearGradient(
+                        colors: [.black.opacity(0.15), .black.opacity(0.45)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                     Image(systemName: "play.circle.fill")
-                        .font(.system(size: 48))
+                        .font(.system(size: 48, weight: .light))
                         .foregroundStyle(.white)
+                        .frame(width: 64, height: 64)
+                        .liquidGlassCircle()
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .glassSpecular(cornerRadius: 16)
+                .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
             }
-            .buttonStyle(.plain)
+            .pressableGlass(scale: 0.98)
         }
         .padding(.horizontal)
     }
 
     private func magnetsSection(_ movie: Movie) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("磁力链接 (\(movie.magnetsCount ?? 0))")
-                .font(.headline)
+            GlassSectionHeader(
+                title: "磁力链接",
+                icon: "link",
+                badge: "\(movie.magnetsCount ?? 0)",
+                trailingTitle: nil
+            )
             if vm.magnets.isEmpty && vm.loadingMagnets {
                 ProgressView()
             } else {
@@ -588,7 +630,7 @@ struct MovieDetailView: View {
 
     private func relatedSection(_ movies: [Movie]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("相似推荐").font(.headline)
+            GlassSectionHeader(title: "相似推荐", icon: "sparkles", trailingTitle: nil)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(movies) { movie in
@@ -607,7 +649,7 @@ struct MovieDetailView: View {
 
     private func actorMoviesSection(_ movies: [Movie]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Ta 还出演过").font(.headline)
+            GlassSectionHeader(title: "Ta 还出演过", icon: "person.crop.rectangle.stack", trailingTitle: nil)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(movies) { movie in
@@ -626,8 +668,7 @@ struct MovieDetailView: View {
 
     private var relatedListsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("相关片单")
-                .font(.headline)
+            GlassSectionHeader(title: "相关片单", icon: "list.bullet.rectangle", trailingTitle: nil)
             if vm.relatedLists.isEmpty {
                 if vm.loadingLists {
                     ProgressView().frame(maxWidth: .infinity)
@@ -826,12 +867,18 @@ struct MagnetRow: View {
             .buttonStyle(.plain)
             .disabled(pushing)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
         .contentShape(Rectangle())
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassSpecular(cornerRadius: 12)
+        .glassPressFeedback()
         .onTapGesture {
+            GlassHaptic.tap()
             Task { await pushTo115() }
         }
         .onLongPressGesture {
+            GlassHaptic.success()
             copyMagnet()
             toast = "已复制"
         }
@@ -1054,7 +1101,8 @@ struct ReviewRow: View {
             }
         }
         .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassSpecular(cornerRadius: 12)
     }
 
     private func copyText(_ text: String) {

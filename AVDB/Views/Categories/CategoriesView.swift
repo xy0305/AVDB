@@ -67,11 +67,23 @@ struct CategoriesView: View {
     private var filterBar: some View {
         VStack(spacing: 0) {
             HStack {
-                Button { showFilter = true } label: {
-                    Text("篩選")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
+                Button {
+                    GlassHaptic.tap()
+                    showFilter = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("篩選")
+                            .font(.headline)
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .contentShape(Capsule())
+                    .liquidGlass(interactive: false)
                 }
+                .pressableGlass(scale: 0.95)
                 Spacer()
                 Menu {
                     ForEach(CatalogSort.allCases) { sort in
@@ -92,11 +104,15 @@ struct CategoriesView: View {
                     }
                     .font(.subheadline)
                     .foregroundStyle(.tint)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .contentShape(Capsule())
+                    .liquidGlass(interactive: false)
                 }
             }
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
             .padding(.vertical, 10)
-            .background(.bar)
+            .background(.ultraThinMaterial)
         }
         .frame(maxWidth: .infinity)
     }
