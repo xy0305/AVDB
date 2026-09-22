@@ -224,41 +224,28 @@ struct RankingsView: View {
                         .frame(width: coverW, height: coverH)
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .glassSpecular(cornerRadius: 12)
-                        .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                        .glassMediaFrame(cornerRadius: 12)
                         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    Text("\(rank)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(rank <= 3 ? .white : .primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            rank <= 3
-                                ? AnyShapeStyle(
-                                    LinearGradient(
-                                        colors: [Color.orange, Color.orange.opacity(0.8)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                : AnyShapeStyle(.ultraThinMaterial)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
-                        }
-                        .padding(8)
+                    GlassChip(
+                        text: "\(rank)",
+                        tint: rank <= 3 ? .orange : .blue,
+                        font: .system(size: 13, weight: .bold),
+                        foreground: rank <= 3 ? .white : .primary,
+                        compact: true,
+                        tintStrength: rank <= 3 ? 0.68 : 0.12
+                    )
+                    .padding(8)
                     if let badge = movie.playBadge {
-                        Text(badge)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(badge.contains("中字") ? JAVDBPalette.cnsubOrange : JAVDBPalette.playRed)
-                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                            .padding(6)
+                        GlassChip(
+                            text: badge,
+                            tint: badge.contains("中字") ? JAVDBPalette.cnsubOrange : JAVDBPalette.playRed,
+                            font: .system(size: 10, weight: .semibold),
+                            foreground: .white,
+                            compact: true,
+                            tintStrength: 0.66
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .padding(6)
                     }
                 }
                 RankingPreviewCarousel(movie: movie)

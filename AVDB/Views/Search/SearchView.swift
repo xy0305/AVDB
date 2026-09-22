@@ -210,12 +210,8 @@ struct SearchView: View {
                                 .foregroundStyle(selected ? Color.white : Color.primary)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background {
-                                    if selected {
-                                        Capsule(style: .continuous).fill(Color.accentColor)
-                                    }
-                                }
-                                .liquidGlass(interactive: false)
+                                .shadow(color: selected ? .black.opacity(0.18) : .clear, radius: 1, y: 0.5)
+                                .liquidGlass(tint: selected ? Color.accentColor.opacity(0.7) : nil, interactive: false)
                         }
                         .pressableGlass(scale: 0.94)
                     }
@@ -288,7 +284,7 @@ private struct SearchIdleView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .liquidGlassRect(cornerRadius: 12, interactive: false)
+                            .glassSurface(in: Capsule(), elevation: 0.35)
                     }
                     .pressableGlass(scale: 0.94)
                     .staggerAppear(index: idx)

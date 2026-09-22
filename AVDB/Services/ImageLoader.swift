@@ -365,14 +365,15 @@ public struct MovieCoverCard: View {
                     .contentShape(RoundedRectangle(cornerRadius: 6))
 
                 if let score = movie.score, score > 0 {
-                    Text(String(format: "%.1f", score))
-                        .font(.caption2.bold())
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.orange)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .padding(4)
+                    GlassChip(
+                        text: String(format: "%.1f", score),
+                        tint: .orange,
+                        font: .caption2.bold(),
+                        foreground: .white,
+                        compact: true,
+                        tintStrength: 0.68
+                    )
+                    .padding(4)
                 }
             }
 

@@ -42,27 +42,24 @@ struct UserView: View {
                                     .font(.headline)
                                 HStack(spacing: 8) {
                                     if user.isVip == true {
-                                        Text("VIP 会员")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.white)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(
-                                                LinearGradient(
-                                                    colors: [.orange, .orange.opacity(0.75)],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                ),
-                                                in: Capsule()
-                                            )
+                                        GlassChip(
+                                            text: "VIP 会员",
+                                            tint: .orange,
+                                            font: .caption.weight(.semibold),
+                                            foreground: .white,
+                                            compact: false,
+                                            tintStrength: 0.68
+                                        )
                                     }
                                     if let n = user.wantWatchCount {
-                                        Text("想看 \(n)")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(.ultraThinMaterial, in: Capsule())
+                                        GlassChip(
+                                            text: "想看 \(n)",
+                                            tint: .blue,
+                                            font: .caption2,
+                                            foreground: .secondary,
+                                            compact: true,
+                                            tintStrength: 0.10
+                                        )
                                     }
                                 }
                             }

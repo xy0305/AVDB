@@ -165,15 +165,38 @@ struct HomeView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.yellow.gradient)
                     .frame(width: 28, height: 28)
-                    .background(Color.yellow.opacity(0.16), in: Circle())
+                    .background {
+                        Circle().fill(.ultraThinMaterial)
+                        Circle().fill(Color.yellow.opacity(0.22))
+                        Circle().fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.35), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    }
+                    .overlay {
+                        Circle().strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.55), .white.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.6
+                        )
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
                 Text("佳片推薦")
                     .font(.system(size: 17, weight: .bold))
-                Text(vm.periodLabel)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                GlassChip(
+                    text: vm.periodLabel,
+                    tint: Color.accentColor,
+                    font: .system(size: 11, weight: .semibold),
+                    foreground: Color.accentColor,
+                    compact: true,
+                    tintStrength: 0.14
+                )
                 Spacer()
                 NavigationLink {
                     PastRecommendView()
@@ -250,34 +273,43 @@ struct HomeView: View {
                     .clipped()
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.55),
-                        Color.blue.opacity(0.25),
-                        Color.black.opacity(0.45)
+                        Color.black.opacity(0.18),
+                        Color.black.opacity(0.08),
+                        Color.black.opacity(0.28)
                     ],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("TOP250")
                             .font(.largeTitle.weight(.heavy))
                             .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
                         Text("本季口碑榜 · 每日更新")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.85))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassSurface(
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous),
+                        tint: .blue,
+                        tintStrength: 0.18,
+                        elevation: 0.6
+                    )
                     Spacer()
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.white.opacity(0.95))
                         .frame(width: 44, height: 44)
                         .liquidGlassCircle()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .glassSpecular(cornerRadius: 16)
-            .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
+            .glassMediaFrame(cornerRadius: 16)
             .padding(.horizontal, AdaptiveLayout.gridPadding)
         }
         .pressableGlass(scale: 0.98)
@@ -305,7 +337,28 @@ struct HomeView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 28, height: 28)
-                    .background(Color.accentColor.opacity(0.12), in: Circle())
+                    .background {
+                        Circle().fill(.ultraThinMaterial)
+                        Circle().fill(Color.accentColor.opacity(0.16))
+                        Circle().fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.35), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    }
+                    .overlay {
+                        Circle().strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.55), .white.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.6
+                        )
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
                 Text("我的關注")
                     .font(.system(size: 17, weight: .bold))
                 Spacer()
@@ -369,12 +422,13 @@ struct HomeView: View {
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
                                     .foregroundStyle(vm.selectedFollowTag?.id == tag.id ? Color.white : Color.primary)
-                                    .background {
-                                        if vm.selectedFollowTag?.id == tag.id {
-                                            Capsule(style: .continuous).fill(Color.accentColor)
-                                        }
-                                    }
-                                    .liquidGlass(interactive: false)
+                                    .shadow(color: vm.selectedFollowTag?.id == tag.id ? .black.opacity(0.16) : .clear, radius: 1, y: 0.5)
+                                    .liquidGlass(
+                                        tint: vm.selectedFollowTag?.id == tag.id
+                                            ? Color.accentColor.opacity(0.7)
+                                            : nil,
+                                        interactive: false
+                                    )
                             }
                             .pressableGlass(scale: 0.94)
                         }
@@ -602,7 +656,7 @@ private struct RecommendBannerCard: View {
             .padding(14)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .glassSpecular(cornerRadius: 16)
+        .glassMediaFrame(cornerRadius: 16)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(pressed ? 0.06 : 0.16), radius: pressed ? 3 : 12, y: pressed ? 1 : 6)
         .scaleEffect(pressed ? 0.98 : 1)

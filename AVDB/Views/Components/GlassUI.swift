@@ -11,6 +11,189 @@
 import SwiftUI
 import UIKit
 
+// MARK: - 真玻璃体（多层：模糊底 + 染色透光 + 厚度边 + 内高光 + 双层投影）
+
+/// 玻璃体底层：材质模糊 + 染色透光 + 斜向柔光。避免纯色贴皮。
+struct GlassBody<S: InsettableShape>: View {
+    let shape: S
+    var tint: Color? = nil
+    /// 染色强度：0 清玻璃，0.35+ 彩色玻璃
+    var tintStrength: Double = 0.18
+    /// 是否盖一层冷白柔光（默认有，像玻璃表层）
+    var sheen: Bool = true
+
+    var body: some View {
+        ZStack {
+            shape.fill(.ultraThinMaterial)
+
+            // 染色透光：不是实色块，是薄色釉
+            if let tint {
+                shape.fill(tint.opacity(tintStrength))
+                shape.fill(
+                    LinearGradient(
+                        colors: [
+                            tint.opacity(tintStrength * 1.35),
+                            tint.opacity(tintStrength * 0.45),
+                            tint.opacity(tintStrength * 0.15)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            }
+
+            if sheen {
+                // 表层斜向反光：左上亮、右下略暗，形成弧面
+                shape.fill(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(tint == nil ? 0.34 : 0.22),
+                            .white.opacity(0.08),
+                            .clear,
+                            .black.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            }
+        }
+    }
+}
+
+/// 玻璃厚度边 + 内阴影：让边缘像切过光的玻璃棱，而不是描边贴纸。
+struct GlassRim<S: InsettableShape>: View {
+    let shape: S
+    var lineWidth: CGFloat = 1
+
+    var body: some View {
+        ZStack {
+            // 外棱高光（左上白）
+            shape.strokeBorder(
+                AngularGradient(
+                    colors: [
+                        .white.opacity(0.72),
+                        .white.opacity(0.18),
+                        .black.opacity(0.08),
+                        .white.opacity(0.28),
+                        .white.opacity(0.72)
+                    ],
+                    center: .topLeading
+                ),
+                lineWidth: lineWidth
+            )
+            // 内侧厚度阴影（右下略压）
+            shape
+                .inset(by: lineWidth * 0.85)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.10)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: lineWidth * 0.7
+                )
+            // 顶部内高光条
+            shape
+                .inset(by: lineWidth * 1.6)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.35), .clear],
+                        startPoint: .top,
+                        endPoint: .center
+                    ),
+                    lineWidth: lineWidth * 0.55
+                )
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// 完整玻璃层（背景体 + 厚度边 + 落地影）。给内容套上后不再是「贴图」。
+struct GlassSurface<S: InsettableShape>: ViewModifier {
+    let shape: S
+    var tint: Color? = nil
+    var tintStrength: Double = 0.18
+    var elevation: CGFloat = 1
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                GlassBody(shape: shape, tint: tint, tintStrength: tintStrength)
+            }
+            .overlay {
+                GlassRim(shape: shape)
+            }
+            // 贴地短影 + 环境大影：有厚度、离开纸面
+            .shadow(color: .black.opacity(0.07 * elevation), radius: 2 * elevation, y: 1 * elevation)
+            .shadow(color: .black.opacity(0.10 * elevation), radius: 14 * elevation, y: 7 * elevation)
+    }
+}
+
+extension View {
+    /// 给任意内容套上真玻璃体。
+    func glassSurface<S: InsettableShape>(
+        in shape: S,
+        tint: Color? = nil,
+        tintStrength: Double = 0.18,
+        elevation: CGFloat = 1
+    ) -> some View {
+        modifier(GlassSurface(shape: shape, tint: tint, tintStrength: tintStrength, elevation: elevation))
+    }
+}
+
+/// 图片上的玻璃角标/芯片：染色玻璃，不是实色贴纸。
+struct GlassChip: View {
+    let text: String
+    var tint: Color = .blue
+    var font: Font = .caption2.weight(.semibold)
+    var foreground: Color = .white
+    var compact: Bool = true
+    /// 色釉浓度：深色字用 0.12–0.2，白字用 0.55–0.7
+    var tintStrength: Double = 0.62
+
+    var body: some View {
+        Text(text)
+            .font(font)
+            .foregroundStyle(foreground)
+            .shadow(color: .black.opacity(tintStrength >= 0.5 ? 0.28 : 0.08), radius: 1, y: 0.5)
+            .padding(.horizontal, compact ? 7 : 10)
+            .padding(.vertical, compact ? 3.5 : 5)
+            .background {
+                Capsule(style: .continuous).fill(.ultraThinMaterial)
+                Capsule(style: .continuous).fill(tint.opacity(tintStrength))
+                Capsule(style: .continuous).fill(
+                    LinearGradient(
+                        colors: [
+                            tint.opacity(min(tintStrength + 0.12, 0.85)),
+                            tint.opacity(tintStrength * 0.45)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                Capsule(style: .continuous).fill(
+                    LinearGradient(
+                        colors: [.white.opacity(0.28), .clear, .black.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            }
+            .overlay {
+                Capsule(style: .continuous).strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.55), .white.opacity(0.08), .black.opacity(0.10)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.6
+                )
+            }
+            .shadow(color: .black.opacity(0.16), radius: 4, y: 2)
+    }
+}
+
 // MARK: - 系统玻璃修饰符
 
 /// 胶囊形系统 Liquid Glass（悬浮控件）。
@@ -32,13 +215,20 @@ struct LiquidGlassEffect: ViewModifier {
                     in: Capsule()
                 )
             }
+            // 系统玻璃外再压一道极薄棱光，补「厚度」
+            .overlay {
+                Capsule().strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.35), .clear, .black.opacity(0.06)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.55
+                )
+                .allowsHitTesting(false)
+            }
         } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 0.6)
-                }
-                .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+            content.glassSurface(in: Capsule(), tint: tint, tintStrength: tint == nil ? 0 : 0.16)
         }
     }
 }
@@ -64,21 +254,11 @@ struct LiquidGlassRectEffect: ViewModifier {
                     in: shape
                 )
             }
+            .overlay {
+                GlassRim(shape: shape)
+            }
         } else {
-            content
-                .background(.ultraThinMaterial, in: shape)
-                .overlay {
-                    shape
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [.white.opacity(0.42), .white.opacity(0.08)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.8
-                        )
-                }
-                .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+            content.glassSurface(in: shape, tint: tint, tintStrength: tint == nil ? 0 : 0.16)
         }
     }
 }
@@ -102,21 +282,11 @@ struct LiquidGlassCircleEffect: ViewModifier {
                     in: Circle()
                 )
             }
+            .overlay {
+                GlassRim(shape: Circle())
+            }
         } else {
-            content
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay {
-                    Circle()
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [.white.opacity(0.45), .white.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.8
-                        )
-                }
-                .shadow(color: .black.opacity(0.10), radius: 12, y: 5)
+            content.glassSurface(in: Circle(), tint: tint, tintStrength: tint == nil ? 0 : 0.16)
         }
     }
 }
@@ -339,23 +509,36 @@ extension View {
         modifier(StaggerAppearModifier(index: index))
     }
 
-    /// 高光描边：左上高光、右下暗边，模拟玻璃折射。
+    /// 玻璃厚度棱 + 内高光（替换旧的单层描边）。
     func glassSpecular(cornerRadius: CGFloat = 14) -> some View {
         overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(0.55),
-                            .white.opacity(0.08),
-                            .black.opacity(0.06)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.7
-                )
+            GlassRim(shape: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
+    }
+
+    /// 图片内容框：轻玻璃棱 + 内暗角，避免「贴图浮在页面上」。
+    func glassMediaFrame(cornerRadius: CGFloat = 12) -> some View {
+        self
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        .white.opacity(0.14),
+                        .clear,
+                        .black.opacity(0.10)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .allowsHitTesting(false)
+            }
+            .overlay {
+                GlassRim(
+                    shape: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+                    lineWidth: 0.9
+                )
+            }
+            .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
     }
 }
 
@@ -485,7 +668,7 @@ struct GlassButton: View {
     }
 }
 
-/// 详情页操作胶囊：想看 / 看过 / 存入清单。
+/// 详情页操作胶囊：选中态是染色玻璃，不是实色贴片。
 struct GlassActionPill: View {
     let title: String
     let icon: String
@@ -505,18 +688,14 @@ struct GlassActionPill: View {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .foregroundStyle(isSelected ? tint : Color.primary)
+            .shadow(color: .black.opacity(0.12), radius: 1, y: 0.5)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background {
-                if isSelected {
-                    Capsule(style: .continuous).fill(tint)
-                }
-            }
             .contentShape(Capsule())
         }
         .pressableGlass(scale: 0.94)
-        .liquidGlass(tint: isSelected ? tint.opacity(0.35) : nil, interactive: false)
+        .liquidGlass(tint: isSelected ? tint.opacity(0.55) : nil, interactive: false)
     }
 }
 
@@ -536,15 +715,11 @@ struct LiquidFilterChip: View {
                 .font(.caption.weight(isSelected ? .semibold : .medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .foregroundStyle(isSelected ? .white : .primary)
-                .background {
-                    if isSelected {
-                        Capsule(style: .continuous).fill(Color.accentColor)
-                    }
-                }
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .shadow(color: isSelected ? .black.opacity(0.18) : .clear, radius: 1, y: 0.5)
         }
         .pressableGlass(scale: 0.94)
-        .liquidGlass(interactive: false)
+        .liquidGlass(tint: isSelected ? Color.accentColor.opacity(0.7) : nil, interactive: false)
     }
 }
 
@@ -574,14 +749,34 @@ struct GlassSegmentedPicker<T: Hashable & CaseIterable>: View {
         } label: {
             Text(title(option))
                 .font(.system(size: 14, weight: selection == option ? .semibold : .regular))
-                .foregroundStyle(selection == option ? .white : .primary)
+                .foregroundStyle(selection == option ? Color.white : Color.primary)
+                .shadow(color: selection == option ? .black.opacity(0.16) : .clear, radius: 1, y: 0.5)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background {
                     if selection == option {
-                        Capsule(style: .continuous)
-                            .fill(Color.accentColor)
-                            .matchedGeometryEffect(id: "segment", in: namespace)
+                        ZStack {
+                            Capsule(style: .continuous).fill(.ultraThinMaterial)
+                            Capsule(style: .continuous).fill(Color.accentColor.opacity(0.72))
+                            Capsule(style: .continuous).fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.28), .clear, .black.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        }
+                        .matchedGeometryEffect(id: "segment", in: namespace)
+                        .overlay {
+                            Capsule(style: .continuous).strokeBorder(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.5), .clear, .black.opacity(0.1)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.6
+                            )
+                        }
                     }
                 }
         }
@@ -619,17 +814,40 @@ struct GlassSectionHeader: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 28, height: 28)
-                    .background(Color.accentColor.opacity(0.12), in: Circle())
+                    .background {
+                        Circle().fill(.ultraThinMaterial)
+                        Circle().fill(Color.accentColor.opacity(0.16))
+                        Circle().fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.35), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    }
+                    .overlay {
+                        Circle().strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.55), .white.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.6
+                        )
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
             }
             Text(title)
                 .font(.system(size: 17, weight: .bold))
             if let badge {
-                Text(badge)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                GlassChip(
+                    text: badge,
+                    tint: Color.accentColor,
+                    font: .system(size: 11, weight: .semibold),
+                    foreground: Color.accentColor,
+                    compact: true,
+                    tintStrength: 0.14
+                )
             }
             Spacer()
             if let trailingTitle {
@@ -646,7 +864,7 @@ struct GlassSectionHeader: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .glassSurface(in: Capsule(), tintStrength: 0, elevation: 0.5)
                 }
                 .pressableGlass(scale: 0.94)
             }
@@ -829,11 +1047,13 @@ struct GlassTag: View {
     }
 
     var body: some View {
-        Text(text)
-            .font(size.font)
-            .foregroundStyle(.white)
-            .padding(size.padding)
-            .background(color, in: Capsule())
+        GlassChip(
+            text: text,
+            tint: color,
+            font: size.font,
+            foreground: .white,
+            compact: size == .small
+        )
     }
 }
 

@@ -197,8 +197,8 @@ struct MovieDetailView: View {
                 .pressableGlass(scale: 0.9)
                 .padding(12)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .shadow(color: .black.opacity(0.18), radius: 8, y: 5)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .glassMediaFrame(cornerRadius: 14)
             .task(id: movie.id) {
                 let names = movie.actors?.compactMap(\.name) ?? movie.actorNames ?? []
                 tenhowCoverURL = await TenhowCoverResolver.shared.coverURL(
@@ -299,16 +299,36 @@ struct MovieDetailView: View {
                     Text(String(format: "%.1f", score)).font(.system(size: 28, weight: .bold))
                 }
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
                 .frame(width: 72, height: 86)
-                .background(Color.orange.opacity(0.9))
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous))
+                .background {
+                    let shape = UnevenRoundedRectangle(
+                        bottomLeadingRadius: 18,
+                        bottomTrailingRadius: 18,
+                        style: .continuous
+                    )
+                    GlassBody(shape: shape, tint: .orange, tintStrength: 0.58)
+                }
+                .overlay {
+                    GlassRim(
+                        shape: UnevenRoundedRectangle(
+                            bottomLeadingRadius: 18,
+                            bottomTrailingRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                }
+                .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
                 .padding(.trailing, 18)
             }
         }
         .foregroundStyle(.white)
-        .background(.ultraThinMaterial.opacity(0.55), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .glassSpecular(cornerRadius: 16)
+        .glassSurface(
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous),
+            tint: .black,
+            tintStrength: 0.18,
+            elevation: 0.8
+        )
     }
 
     private func detailInfoLine(_ label: String, _ value: String, underline: Bool = false) -> some View {
@@ -430,7 +450,7 @@ struct MovieDetailView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .liquidGlass(interactive: false)
+                            .glassSurface(in: Capsule(), elevation: 0.35)
                             .contentShape(Capsule())
                     }
                     .pressableGlass(scale: 0.94)
@@ -484,8 +504,7 @@ struct MovieDetailView: View {
                 .foregroundColor(.secondary)
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .glassSpecular(cornerRadius: 14)
+                .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.4)
         }
         .padding(.horizontal)
     }
@@ -499,8 +518,7 @@ struct MovieDetailView: View {
                         JavDBImage(url: img.largeURL ?? img.thumbURL)
                             .frame(width: 260, height: 160)
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .glassSpecular(cornerRadius: 14)
-                            .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                            .glassMediaFrame(cornerRadius: 14)
                             .staggerAppear(index: idx)
                     }
                 }
@@ -568,8 +586,7 @@ struct MovieDetailView: View {
                         .liquidGlassCircle()
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .glassSpecular(cornerRadius: 16)
-                .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
+                .glassMediaFrame(cornerRadius: 16)
             }
             .pressableGlass(scale: 0.98)
         }
@@ -870,8 +887,7 @@ struct MagnetRow: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
         .contentShape(Rectangle())
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .glassSpecular(cornerRadius: 12)
+        .glassSurface(in: RoundedRectangle(cornerRadius: 12, style: .continuous), elevation: 0.45)
         .glassPressFeedback()
         .onTapGesture {
             GlassHaptic.tap()
@@ -1101,8 +1117,7 @@ struct ReviewRow: View {
             }
         }
         .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .glassSpecular(cornerRadius: 12)
+        .glassSurface(in: RoundedRectangle(cornerRadius: 12, style: .continuous), elevation: 0.5)
     }
 
     private func copyText(_ text: String) {

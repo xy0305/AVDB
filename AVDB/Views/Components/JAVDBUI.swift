@@ -178,11 +178,31 @@ private struct SegmentedControlBar<Tab: Hashable>: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 7)
                         .foregroundStyle(selection == tab ? Color.white : Color.secondary)
+                        .shadow(color: selection == tab ? .black.opacity(0.16) : .clear, radius: 1, y: 0.5)
                         .background {
                             if selection == tab {
-                                Capsule(style: .continuous)
-                                    .fill(Color.accentColor)
-                                    .matchedGeometryEffect(id: "chip-seg", in: chipNS)
+                                ZStack {
+                                    Capsule(style: .continuous).fill(.ultraThinMaterial)
+                                    Capsule(style: .continuous).fill(Color.accentColor.opacity(0.72))
+                                    Capsule(style: .continuous).fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.28), .clear, .black.opacity(0.08)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                }
+                                .matchedGeometryEffect(id: "chip-seg", in: chipNS)
+                                .overlay {
+                                    Capsule(style: .continuous).strokeBorder(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.5), .clear, .black.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 0.55
+                                    )
+                                }
                             }
                         }
                 }
@@ -257,11 +277,31 @@ struct SegmentChipBar<Tab: Hashable>: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                         .foregroundStyle(selection == tab ? Color.white : Color.primary)
+                        .shadow(color: selection == tab ? .black.opacity(0.16) : .clear, radius: 1, y: 0.5)
                         .background {
                             if selection == tab {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.accentColor)
-                                    .matchedGeometryEffect(id: "chip-seg", in: chipNS)
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.ultraThinMaterial)
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.accentColor.opacity(0.72))
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.28), .clear, .black.opacity(0.08)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                }
+                                .matchedGeometryEffect(id: "chip-seg", in: chipNS)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.5), .clear, .black.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 0.55
+                                    )
+                                }
                             }
                         }
                 }
@@ -339,64 +379,32 @@ struct MoviePosterCard: View {
                     }
                     .overlay(alignment: .topLeading) {
                         if let rank {
-                            Text("\(rank)")
-                                .font(.caption.bold())
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(
-                                    rank <= 3
-                                        ? AnyShapeStyle(
-                                            LinearGradient(
-                                                colors: [Color.orange, Color.orange.opacity(0.75)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        : AnyShapeStyle(.ultraThinMaterial)
-                                )
-                                .foregroundStyle(rank <= 3 ? Color.white : Color.primary)
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
-                                }
-                                .padding(6)
+                            GlassChip(
+                                text: "\(rank)",
+                                tint: rank <= 3 ? .orange : .blue,
+                                font: .caption.bold(),
+                                foreground: rank <= 3 ? .white : .primary,
+                                compact: true,
+                                tintStrength: rank <= 3 ? 0.68 : 0.12
+                            )
+                            .padding(6)
                         }
                     }
                     .overlay(alignment: .bottomTrailing) {
                         if let badge = movie.playBadge {
-                            Text(badge)
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(
-                                    badge.contains("中字")
-                                        ? JAVDBPalette.cnsubOrange
-                                        : JAVDBPalette.playRed
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                        .strokeBorder(.white.opacity(0.28), lineWidth: 0.5)
-                                }
-                                .padding(5)
+                            GlassChip(
+                                text: badge,
+                                tint: badge.contains("中字") ? JAVDBPalette.cnsubOrange : JAVDBPalette.playRed,
+                                font: .caption2.weight(.semibold),
+                                foreground: .white,
+                                compact: true,
+                                tintStrength: 0.66
+                            )
+                            .padding(5)
                         }
                     }
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [.white.opacity(0.4), .white.opacity(0.05), .black.opacity(0.08)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.7
-                    )
-            }
-            .shadow(color: .black.opacity(pressed ? 0.04 : 0.12), radius: pressed ? 2 : 8, y: pressed ? 1 : 4)
+            .glassMediaFrame(cornerRadius: 8)
             .scaleEffect(pressed ? 0.96 : 1)
             .animation(GlassMotion.press, value: pressed)
 
@@ -427,12 +435,14 @@ struct MoviePosterCard: View {
                         .foregroundColor(movie.hasCnsub == true ? JAVDBPalette.cnsubOrange : JAVDBPalette.magnetGreen)
                 }
                 if movie.isNewMagnet {
-                    Text("新種")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(JAVDBPalette.magnetGreen)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(JAVDBPalette.magnetGreen.opacity(0.14), in: Capsule())
+                    GlassChip(
+                        text: "新種",
+                        tint: JAVDBPalette.magnetGreen,
+                        font: .caption2.weight(.semibold),
+                        foreground: JAVDBPalette.magnetGreen,
+                        compact: true,
+                        tintStrength: 0.14
+                    )
                 }
             }
         }
