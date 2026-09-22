@@ -349,20 +349,23 @@ private struct ActorRankingGridContent: View {
                                 ClippedAspectFill(aspectRatio: 1) {
                                     JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                                 }
-                                Text("\(idx + 1)")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(idx < 3 ? Color.orange : Color.black.opacity(0.6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                    .padding(6)
+                                .glassMediaFrame(cornerRadius: 8)
+                                GlassChip(
+                                    text: "\(idx + 1)",
+                                    tint: idx < 3 ? .orange : .blue,
+                                    font: .system(size: 12, weight: .bold),
+                                    foreground: idx < 3 ? .white : .primary,
+                                    compact: true,
+                                    tintStrength: idx < 3 ? 0.68 : 0.12
+                                )
+                                .padding(6)
                             }
                             Text(actor.displayName)
                                 .font(.system(size: 13))
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
                         }
+                        .glassPressFeedback()
                     }
                     .buttonStyle(.plain)
                     .onAppear {
@@ -536,33 +539,50 @@ struct Top250FilterSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 18) {
                     Text("篩選")
                         .font(.title2.bold())
 
-                    chipRow(types.map { ($0.0, $0.1) }, selected: vm.year.isEmpty ? vm.catalog : "") { id in
-                        vm.catalog = id
-                        vm.year = ""
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("類型").font(.subheadline.weight(.semibold))
+                        chipRow(types.map { ($0.0, $0.1) }, selected: vm.year.isEmpty ? vm.catalog : "") { id in
+                            GlassHaptic.tap()
+                            vm.catalog = id
+                            vm.year = ""
+                        }
                     }
+                    .padding(12)
+                    .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.35)
 
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
-                        ForEach(years, id: \.self) { y in
-                            chip(y, on: vm.year == y) {
-                                if vm.year == y {
-                                    vm.year = ""
-                                } else {
-                                    vm.year = y
-                                    vm.catalog = "all"
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("年份").font(.subheadline.weight(.semibold))
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+                            ForEach(years, id: \.self) { y in
+                                chip(y, on: vm.year == y) {
+                                    GlassHaptic.tap()
+                                    if vm.year == y {
+                                        vm.year = ""
+                                    } else {
+                                        vm.year = y
+                                        vm.catalog = "all"
+                                    }
                                 }
                             }
                         }
                     }
+                    .padding(12)
+                    .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.35)
 
-                    Text("起始排名:")
-                        .font(.headline)
-                    chipRow(ranks.map { ("\($0)", "\($0)") }, selected: "\(vm.startRank)") {
-                        vm.startRank = Int($0) ?? 1
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("起始排名")
+                            .font(.subheadline.weight(.semibold))
+                        chipRow(ranks.map { ("\($0)", "\($0)") }, selected: "\(vm.startRank)") {
+                            GlassHaptic.tap()
+                            vm.startRank = Int($0) ?? 1
+                        }
                     }
+                    .padding(12)
+                    .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.35)
 
                     Toggle(isOn: $vm.hideWatched) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -574,8 +594,11 @@ struct Top250FilterSheet: View {
                         }
                     }
                     .tint(JAVDBPalette.accent)
+                    .padding(12)
+                    .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.35)
                 }
                 .padding(16)
+                .staggerAppear(index: 0)
             }
             .background {
                 LiquidGlassBackground()
@@ -603,16 +626,41 @@ struct Top250FilterSheet: View {
     }
 
     private func chip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
             Text(title)
                 .font(.system(size: 14, weight: on ? .semibold : .medium))
                 .foregroundColor(on ? .white : .primary)
+                .shadow(color: on ? .black.opacity(0.18) : .clear, radius: 1, y: 0.5)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(on ? JAVDBPalette.chipSelected : Color(.systemGray5))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background {
+                    if on {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.ultraThinMaterial)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(JAVDBPalette.chipSelected.opacity(0.75))
+                            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.28), .clear, .black.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        }
+                    } else {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                    }
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(.white.opacity(on ? 0.4 : 0.2), lineWidth: 0.5)
+                }
         }
-        .buttonStyle(.plain)
+        .pressableGlass(scale: 0.95)
     }
 }
 

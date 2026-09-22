@@ -117,6 +117,7 @@ struct MovieSortToolbar: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
+                .foregroundStyle(.primary)
         }
         .accessibilityLabel("排序")
     }

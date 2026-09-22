@@ -713,7 +713,10 @@ struct MovieDetailView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(12)
-                        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .glassSurface(
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous),
+                            elevation: 0.35
+                        )
                     }
                     .buttonStyle(.plain)
                     .onAppear {
@@ -981,14 +984,25 @@ struct ReviewRow: View {
         VStack(alignment: .leading, spacing: 10) {
             // 用户信息行
             HStack(spacing: 8) {
-                Circle()
-                    .fill(.blue.gradient.opacity(0.2))
+                Text((review.userName ?? "匿名").prefix(1))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.blue)
                     .frame(width: 32, height: 32)
-                    .overlay {
-                        Text((review.userName ?? "匿名").prefix(1))
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.blue)
+                    .background {
+                        Circle().fill(.ultraThinMaterial)
+                        Circle().fill(Color.blue.opacity(0.16))
+                        Circle().fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.35), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     }
+                    .overlay {
+                        Circle().strokeBorder(.white.opacity(0.4), lineWidth: 0.5)
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 3, y: 1.5)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(review.userName ?? "匿名")
@@ -1014,7 +1028,12 @@ struct ReviewRow: View {
                     .foregroundStyle(.orange.gradient)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(.orange.opacity(0.12), in: Capsule())
+                    .glassSurface(
+                        in: Capsule(),
+                        tint: .orange,
+                        tintStrength: 0.16,
+                        elevation: 0.3
+                    )
                 }
             }
 
@@ -1197,7 +1216,7 @@ struct FlowTags: View {
                         .font(.caption2.monospaced())
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color(.systemGray5), in: Capsule())
+                        .glassSurface(in: Capsule(), elevation: 0.3)
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.primary)
@@ -1248,6 +1267,16 @@ struct DraggableReviewsPanel: View {
         }
         .frame(height: panelHeight, alignment: .top)
         .frame(maxWidth: .infinity)
+        .glassSurface(
+            in: UnevenRoundedRectangle(
+                topLeadingRadius: 22,
+                topTrailingRadius: 22,
+                style: .continuous
+            ),
+            tint: .white,
+            tintStrength: 0.08,
+            elevation: 0.8
+        )
         .background {
             UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
                 .fill(.ultraThinMaterial)
