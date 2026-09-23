@@ -273,7 +273,6 @@ public struct JavDBImage: View {
 
     @State private var image: UIImage?
     @State private var loading = false
-    @State private var appeared = false
 
     public init(
         url: String?,
@@ -303,12 +302,10 @@ public struct JavDBImage: View {
         // 把 LazyVGrid 格子撑爆（.clipped() 只裁绘制、不改布局）。
         Color.clear
             .overlay {
-                if let image = image {
+                if let image {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: contentMode)
-                        .opacity(appeared ? 1 : 0)
-                        .scaleEffect(appeared ? 1 : 1.03)
                 } else {
                     placeholder
                 }
@@ -318,16 +315,13 @@ public struct JavDBImage: View {
             // task(id:) 在候选 URL 改变时会取消旧任务；不能用 loading 拦截，
             // 否则 Tenhow poster 稍晚解析完成时会继续显示先加载到的横版 thumb。
             loading = true
-            appeared = false
             image = nil
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
                 if let img = await ImageLoader.shared.load(candidate) {
                     guard !Task.isCancelled else { return }
+                    // 直接显示，不做 scale/长淡入，避免滚动时封面抖动
                     image = img
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        appeared = true
-                    }
                     break
                 }
             }
@@ -337,7 +331,7 @@ public struct JavDBImage: View {
 
     private var placeholder: some View {
         ZStack {
-            ShimmerView()
+            Color(.systemGray6)
             Image(systemName: "film")
                 .font(.system(size: 22, weight: .light))
                 .foregroundColor(.gray.opacity(0.7))

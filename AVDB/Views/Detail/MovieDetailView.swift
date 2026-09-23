@@ -43,7 +43,6 @@ struct MovieDetailView: View {
         }
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        .clipped()
         .background {
             Group {
                 if let movie = vm.movie {
@@ -73,7 +72,7 @@ struct MovieDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(AdaptiveLayout.isPad ? .visible : .hidden, for: .tabBar)
-        // 详情页固定不左右拖：关闭系统侧滑返回，只保留左上角返回
+        .nativeSwipeBackEnabled()
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task {
             await vm.load()
@@ -1252,6 +1251,11 @@ struct DraggableReviewsPanel: View {
         }
     }
 
+    /// 展开中：高度略高于收起就显示列表，拖动过程内容跟着长高，避免「松手才蹦出来」
+    private var isContentVisible: Bool {
+        panelHeight > collapsedHeight + 6 || panelState != .collapsed
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerSection
@@ -1260,48 +1264,45 @@ struct DraggableReviewsPanel: View {
                 .gesture(handleDrag)
                 .onTapGesture { toggleFromHeader() }
 
-            if panelState != .collapsed {
+            if isContentVisible {
                 sortSection
                 reviewsList
             }
         }
         .frame(height: panelHeight, alignment: .top)
         .frame(maxWidth: .infinity)
-        .glassSurface(
-            in: UnevenRoundedRectangle(
-                topLeadingRadius: 22,
-                topTrailingRadius: 22,
-                style: .continuous
-            ),
-            tint: .white,
-            tintStrength: 0.08,
-            elevation: 0.8
-        )
         .background {
-            UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous)
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
                 .fill(.ultraThinMaterial)
+                .overlay {
+                    UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
+                        .strokeBorder(.white.opacity(0.28), lineWidth: 0.6)
+                }
         }
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
-        .contentShape(UnevenRoundedRectangle(topLeadingRadius: 32, topTrailingRadius: 32, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 16, y: -4)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
+        .contentShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 10, y: -2)
         .safeAreaPadding(.bottom)
-        .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.12), value: panelState)
     }
 
     private var handleDrag: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .global)
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
-                // 只响应纵向拖动，避免和左右侧滑/横向手势抢
                 let dx = abs(value.translation.width)
                 let dy = abs(value.translation.height)
-                if dx > dy { return }
+                guard dy >= dx else { return }
                 if dragStartHeight == nil { dragStartHeight = panelHeight }
                 let next = (dragStartHeight ?? panelHeight) - value.translation.height
-                panelHeight = min(maximumHeight, max(collapsedHeight, next))
+                // 拖动过程直接改高度，不套动画，保证跟手
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    panelHeight = min(maximumHeight, max(collapsedHeight, next))
+                }
             }
             .onEnded { value in
                 defer { dragStartHeight = nil }
-                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                guard abs(value.translation.height) >= abs(value.translation.width) else { return }
                 let start = dragStartHeight ?? panelHeight
                 let predicted = start - value.predictedEndTranslation.height
                 let velocityY = value.predictedEndTranslation.height - value.translation.height
@@ -1311,8 +1312,10 @@ struct DraggableReviewsPanel: View {
 
     private func toggleFromHeader() {
         let next: PanelState = panelState == .collapsed ? .medium : .collapsed
-        panelState = next
-        panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.88)) {
+            panelState = next
+            panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+        }
     }
 
     private func snap(to predicted: CGFloat, velocityY: CGFloat) {
@@ -1329,8 +1332,10 @@ struct DraggableReviewsPanel: View {
         } else {
             next = .expanded
         }
-        panelState = next
-        panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.88)) {
+            panelState = next
+            panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+        }
     }
 
     private var headerSection: some View {
@@ -1395,7 +1400,7 @@ struct DraggableReviewsPanel: View {
                 ForEach(vm.reviews, id: \.stableReviewID) { review in
                     ReviewRow(review: review, movieID: movieID)
                         .padding(14)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .onAppear {
                             if review.stableReviewID == vm.reviews.last?.stableReviewID {
                                 Task { await vm.loadMore(movieID: movieID) }
@@ -1409,8 +1414,8 @@ struct DraggableReviewsPanel: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
         }
+        .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .background(Color(.systemGroupedBackground))
         .refreshable {
             await vm.load(movieID: movieID, force: true)
         }

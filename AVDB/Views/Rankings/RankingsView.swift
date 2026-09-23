@@ -178,7 +178,6 @@ struct RankingsView: View {
                         top250Row(rank: vm.startRank + idx, movie: movie)
                     }
                     .buttonStyle(.plain)
-                    .staggerAppear(index: idx % 10)
                     .onAppear {
                         if movie.id == vm.displayed.last?.id {
                             Task { await vm.loadMore() }
