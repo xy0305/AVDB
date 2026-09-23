@@ -559,12 +559,12 @@ private struct StaggerAppearModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 16)
-            .scaleEffect(shown ? 1 : 0.94)
-            .allowsHitTesting(shown)
+            .offset(y: shown ? 0 : 8)
+            .scaleEffect(shown ? 1 : 0.97)
             .onAppear {
-                let delay = Double(min(index, 14)) * 0.045
-                withAnimation(GlassMotion.enter.delay(delay)) {
+                // 滚动时必须很快：短延迟 + 短时长，避免网格逐张慢慢弹出
+                let delay = Double(min(index, 5)) * 0.015
+                withAnimation(.easeOut(duration: 0.18).delay(delay)) {
                     shown = true
                 }
             }
