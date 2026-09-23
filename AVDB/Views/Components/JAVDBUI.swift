@@ -360,11 +360,11 @@ struct ClippedAspectFill<Content: View>: View {
     }
 }
 
-/// 三列海报卡 —— 内容干净，封面带高光边、角标玻璃化、按压回弹
+/// 三列海报卡 —— 内容干净，封面带高光边、角标玻璃化。
+/// 不要在这里加手势：外层是 NavigationLink，手势会吃掉点击。
 struct MoviePosterCard: View {
     let movie: Movie
     var rank: Int? = nil
-    @State private var pressed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -376,6 +376,7 @@ struct MoviePosterCard: View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
+                        .allowsHitTesting(false)
                     }
                     .overlay(alignment: .topLeading) {
                         if let rank {
@@ -388,6 +389,7 @@ struct MoviePosterCard: View {
                                 tintStrength: rank <= 3 ? 0.68 : 0.12
                             )
                             .padding(6)
+                            .allowsHitTesting(false)
                         }
                     }
                     .overlay(alignment: .bottomTrailing) {
@@ -401,12 +403,11 @@ struct MoviePosterCard: View {
                                 tintStrength: 0.66
                             )
                             .padding(5)
+                            .allowsHitTesting(false)
                         }
                     }
             }
             .glassMediaFrame(cornerRadius: 8)
-            .scaleEffect(pressed ? 0.96 : 1)
-            .animation(GlassMotion.press, value: pressed)
 
             Text(movie.displayTitle)
                 .font(.subheadline)
@@ -443,14 +444,12 @@ struct MoviePosterCard: View {
                         compact: true,
                         tintStrength: 0.14
                     )
+                    .allowsHitTesting(false)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onLongPressGesture(minimumDuration: 0.01, pressing: { pressing in
-            pressed = pressing
-        }, perform: {})
     }
 }
 
@@ -481,6 +480,7 @@ struct MoviePosterGrid: View {
                 .buttonStyle(.plain)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
+                .pressableGlass(scale: 0.97)
                 .staggerAppear(index: idx % 12)
                 .onAppear {
                     if movie.id == movies.last?.id {

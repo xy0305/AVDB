@@ -574,6 +574,7 @@ private struct RecommendCarousel: View {
                                     .frame(width: cardWidth, height: geo.size.height)
                             }
                             .buttonStyle(.plain)
+                            .pressableGlass(scale: 0.98)
                             .id(movie.id)
                         }
                     }
@@ -633,7 +634,6 @@ private struct RecommendCarousel: View {
 
 private struct RecommendBannerCard: View {
     let movie: Movie
-    @State private var pressed = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -645,23 +645,22 @@ private struct RecommendBannerCard: View {
                 startPoint: .center,
                 endPoint: .bottom
             )
+            .allowsHitTesting(false)
             HStack(spacing: 10) {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 34, weight: .light))
                     .foregroundStyle(.white.opacity(0.95))
                     .frame(width: 50, height: 50)
                     .liquidGlassCircle()
+                    .allowsHitTesting(false)
                 Spacer()
             }
             .padding(14)
+            .allowsHitTesting(false)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .glassMediaFrame(cornerRadius: 16)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(pressed ? 0.06 : 0.16), radius: pressed ? 3 : 12, y: pressed ? 1 : 6)
-        .scaleEffect(pressed ? 0.98 : 1)
-        .animation(GlassMotion.press, value: pressed)
-        .onLongPressGesture(minimumDuration: 0.01, pressing: { p in pressed = p }, perform: {})
     }
 }
 

@@ -191,6 +191,8 @@ struct GlassChip: View {
                 )
             }
             .shadow(color: .black.opacity(0.16), radius: 4, y: 2)
+            // 装饰角标不吃点击，避免挡住海报 NavigationLink
+            .allowsHitTesting(false)
     }
 }
 
@@ -504,9 +506,11 @@ extension View {
         buttonStyle(PressableGlassStyle(scale: scale))
     }
 
-    /// 卡片按压反馈（非 Button 也可用）。
+    /// 卡片按压反馈：只做视觉缩放，不附加手势。
+    /// 重要：绝不能在 NavigationLink 标签上加 onLongPressGesture，
+    /// 否则会吃掉点击，封面无法进详情。
     func glassPressFeedback() -> some View {
-        modifier(GlassPressFeedback())
+        self
     }
 
     /// 错落入场：轻微上浮 + 缩放淡入。
@@ -521,7 +525,7 @@ extension View {
         }
     }
 
-    /// 图片内容框：轻玻璃棱 + 内暗角，避免「贴图浮在页面上」。
+    /// 图片内容框：轻玻璃棱 + 内暗角。装饰层全部不吃点击。
     func glassMediaFrame(cornerRadius: CGFloat = 12) -> some View {
         self
             .overlay {
@@ -541,21 +545,10 @@ extension View {
                     shape: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
                     lineWidth: 0.9
                 )
+                .allowsHitTesting(false)
             }
             .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
             .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-    }
-}
-
-private struct GlassPressFeedback: ViewModifier {
-    @State private var pressed = false
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(pressed ? 0.97 : 1)
-            .animation(GlassMotion.press, value: pressed)
-            .onLongPressGesture(minimumDuration: 0.01, pressing: { pressing in
-                pressed = pressing
-            }, perform: {})
     }
 }
 
@@ -568,6 +561,7 @@ private struct StaggerAppearModifier: ViewModifier {
             .opacity(shown ? 1 : 0)
             .offset(y: shown ? 0 : 16)
             .scaleEffect(shown ? 1 : 0.94)
+            .allowsHitTesting(shown)
             .onAppear {
                 let delay = Double(min(index, 14)) * 0.045
                 withAnimation(GlassMotion.enter.delay(delay)) {

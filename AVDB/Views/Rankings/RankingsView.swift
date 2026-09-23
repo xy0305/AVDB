@@ -178,7 +178,7 @@ struct RankingsView: View {
                         top250Row(rank: vm.startRank + idx, movie: movie)
                     }
                     .buttonStyle(.plain)
-                    .glassPressFeedback()
+                    .pressableGlass(scale: 0.98)
                     .staggerAppear(index: idx % 10)
                     .onAppear {
                         if movie.id == vm.displayed.last?.id {
@@ -365,9 +365,9 @@ private struct ActorRankingGridContent: View {
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
                         }
-                        .glassPressFeedback()
                     }
                     .buttonStyle(.plain)
+                    .pressableGlass(scale: 0.97)
                     .onAppear {
                         if actor.id == vm.actors.last?.id {
                             Task { await vm.loadMore() }

@@ -388,6 +388,6 @@ public struct MovieCoverCard: View {
                 .lineLimit(2)
         }
         .frame(width: width)
-        .glassPressFeedback()
+        .contentShape(Rectangle())
     }
 }

@@ -188,7 +188,6 @@ struct ActorsView: View {
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
-        .glassPressFeedback()
     }
 }
 
