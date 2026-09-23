@@ -574,7 +574,6 @@ private struct RecommendCarousel: View {
                                     .frame(width: cardWidth, height: geo.size.height)
                             }
                             .buttonStyle(.plain)
-                            .pressableGlass(scale: 0.98)
                             .id(movie.id)
                         }
                     }

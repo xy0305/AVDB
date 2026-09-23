@@ -42,6 +42,8 @@ struct MovieDetailView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .clipped()
         .background {
             Group {
                 if let movie = vm.movie {
@@ -71,7 +73,7 @@ struct MovieDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(AdaptiveLayout.isPad ? .visible : .hidden, for: .tabBar)
-        .nativeSwipeBackEnabled()
+        // 详情页固定不左右拖：关闭系统侧滑返回，只保留左上角返回
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task {
             await vm.load()
@@ -454,8 +456,7 @@ struct MovieDetailView: View {
                             .contentShape(Capsule())
                     }
                     .pressableGlass(scale: 0.94)
-                    .staggerAppear(index: idx)
-                }
+                    }
             }
         }
         .padding(.horizontal)
@@ -519,7 +520,6 @@ struct MovieDetailView: View {
                             .frame(width: 260, height: 160)
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .glassMediaFrame(cornerRadius: 14)
-                            .staggerAppear(index: idx)
                     }
                 }
                 .padding(.horizontal)
@@ -1289,15 +1289,20 @@ struct DraggableReviewsPanel: View {
     }
 
     private var handleDrag: some Gesture {
-        DragGesture(minimumDistance: 4, coordinateSpace: .global)
+        DragGesture(minimumDistance: 10, coordinateSpace: .global)
             .onChanged { value in
+                // 只响应纵向拖动，避免和左右侧滑/横向手势抢
+                let dx = abs(value.translation.width)
+                let dy = abs(value.translation.height)
+                if dx > dy { return }
                 if dragStartHeight == nil { dragStartHeight = panelHeight }
                 let next = (dragStartHeight ?? panelHeight) - value.translation.height
                 panelHeight = min(maximumHeight, max(collapsedHeight, next))
             }
             .onEnded { value in
+                defer { dragStartHeight = nil }
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
                 let start = dragStartHeight ?? panelHeight
-                dragStartHeight = nil
                 let predicted = start - value.predictedEndTranslation.height
                 let velocityY = value.predictedEndTranslation.height - value.translation.height
                 snap(to: predicted, velocityY: velocityY)

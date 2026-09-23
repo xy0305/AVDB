@@ -490,14 +490,14 @@ enum GlassMotion {
     static let select = Animation.spring(response: 0.3, dampingFraction: 0.78)
 }
 
-/// 按压缩放 + 轻微变暗，让玻璃控件有「可捏」手感。
+/// 按压反馈：只用透明度，不用 scale。
+/// scale 会和 Navigation push 转场叠在一起，导致详情页「晃动」。
 struct PressableGlassStyle: ButtonStyle {
     var scale: CGFloat = 0.96
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? scale : 1)
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(GlassMotion.press, value: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -559,12 +559,10 @@ private struct StaggerAppearModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 8)
-            .scaleEffect(shown ? 1 : 0.97)
             .onAppear {
-                // 滚动时必须很快：短延迟 + 短时长，避免网格逐张慢慢弹出
-                let delay = Double(min(index, 5)) * 0.015
-                withAnimation(.easeOut(duration: 0.18).delay(delay)) {
+                // 只做极短淡入，不用位移/缩放，避免转场和滚动时晃
+                let delay = Double(min(index, 4)) * 0.01
+                withAnimation(.easeOut(duration: 0.12).delay(delay)) {
                     shown = true
                 }
             }

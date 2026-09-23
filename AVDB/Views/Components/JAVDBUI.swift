@@ -480,7 +480,7 @@ struct MoviePosterGrid: View {
                 .buttonStyle(.plain)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .pressableGlass(scale: 0.97)
+                // 不要对 NavigationLink 用 scale 手势：推入详情时会和转场叠成晃动
                 .staggerAppear(index: idx % 12)
                 .onAppear {
                     if movie.id == movies.last?.id {
