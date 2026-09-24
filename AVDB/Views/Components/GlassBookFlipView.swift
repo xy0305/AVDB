@@ -29,7 +29,8 @@ struct MovieBookFlipView: View {
 
     private var currentIndex: Int {
         guard !movies.isEmpty else { return 0 }
-        return min(max(0, Int(progress.rounded())), movies.count - 1)
+        let rounded = Int(progress.rounded())
+        return min(max(0, rounded), movies.count - 1)
     }
 
     private var current: Movie? {
@@ -40,12 +41,9 @@ struct MovieBookFlipView: View {
         VStack(spacing: 14) {
             ZStack {
                 ambientGlow
-
-                ForEach(visibleMovies) { movie in
-                    if let i = movies.firstIndex(where: { $0.id == movie.id }) {
-                        coverCard(movie, at: i)
-                            .zIndex(zIndex(for: i))
-                    }
+                ForEach(visibleRange, id: \.self) { i in
+                    coverCard(movies[i], at: i)
+                        .zIndex(zIndex(for: i))
                 }
             }
             .frame(height: cardH + 48)
@@ -70,10 +68,8 @@ struct MovieBookFlipView: View {
         }
     }
 
-    private var visibleMovies: [Movie] {
-        movies.enumerated().compactMap { i, movie in
-            abs(CGFloat(i) - progress) <= 3.6 ? movie : nil
-        }
+    private var visibleRange: [Int] {
+        movies.indices.filter { abs(CGFloat($0) - progress) <= 3.6 }
     }
 
     private func slot(for i: Int) -> CGFloat {
@@ -81,7 +77,7 @@ struct MovieBookFlipView: View {
     }
 
     private func zIndex(for i: Int) -> Double {
-        20 - abs(slot(for: i))
+        20.0 - abs(Double(slot(for: i)))
     }
 
     private var ambientGlow: some View {
@@ -107,11 +103,14 @@ struct MovieBookFlipView: View {
     private func coverCard(_ movie: Movie, at i: Int) -> some View {
         let x = slot(for: i)
         let absX = abs(x)
-        let turn = Double(x.clamped(to: -2.4 ... 2.4))
-        let angle = -turn * 58
-        let scale = 1 - min(absX, 2.2) * 0.11
-        let opacity = max(0.18, 1 - absX * 0.18)
-        let lift = max(0, 12 - absX * 16)
+        let turn = min(max(x, -2.4), 2.4)
+        let angle = Double(-turn * 58)
+        let scale: CGFloat = 1 - min(absX, 2.2) * 0.11
+        let opacity: CGFloat = max(0.18, 1 - absX * 0.18)
+        let lift: CGFloat = max(0, 12 - absX * 16)
+        let shadowAlpha: Double = 0.10 + Double(max(0 as CGFloat, 0.26 - absX * 0.16))
+        let shadowRadius: CGFloat = 8 + max(0 as CGFloat, 16 - absX * 8)
+        let shadowY: CGFloat = 6 + max(0 as CGFloat, 8 - absX * 4)
 
         return NavigationLink {
             MovieDetailView(movieID: movie.id)
@@ -128,41 +127,42 @@ struct MovieBookFlipView: View {
         )
         .offset(x: x * spacing, y: -lift)
         .opacity(opacity)
-        .shadow(
-            color: .black.opacity(0.10 + max(0, 0.26 - absX * 0.16)),
-            radius: 8 + max(0, 16 - absX * 8),
-            y: 6 + max(0, 8 - absX * 4)
-        )
+        .shadow(color: .black.opacity(shadowAlpha), radius: shadowRadius, y: shadowY)
         .allowsHitTesting(absX < 0.62)
     }
 
+    @ViewBuilder
     private func poster(_ movie: Movie, tilt: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
-        let facing = tilt.clamped(to: -1 ... 1)
-        return ZStack {
+        let facing = min(max(tilt, -1), 1)
+        let sheen = Double(0.28 - abs(facing) * 0.08)
+        let glassOpacity = Double(0.16 + (1 - min(abs(tilt), 1)) * 0.10)
+        let edgeShade = Double(0.22 * abs(facing))
+        let sheenX0 = CGFloat(0.12) - facing * 0.35
+        let sheenX1 = CGFloat(0.88) - facing * 0.25
+        ZStack {
             Color(white: 0.10)
 
             JavDBImage(url: movie.thumbURL ?? movie.coverURL)
                 .frame(width: cardW, height: cardH)
                 .clipped()
 
-            // 玻璃釉：随侧转把高光推到朝向镜头的那条棱
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.28 - abs(facing) * 0.08),
+                    Color.white.opacity(sheen),
                     Color.white.opacity(0.04),
                     Color.clear,
                     Color.cyan.opacity(0.08)
                 ],
-                startPoint: UnitPoint(x: 0.12 - facing * 0.35, y: 0),
-                endPoint: UnitPoint(x: 0.88 - facing * 0.25, y: 1)
+                startPoint: UnitPoint(x: sheenX0, y: 0),
+                endPoint: UnitPoint(x: sheenX1, y: 1)
             )
             .blendMode(.softLight)
             .allowsHitTesting(false)
 
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.22 * abs(facing)),
+                    Color.black.opacity(edgeShade),
                     Color.clear,
                     Color.black.opacity(0.10)
                 ],
@@ -171,12 +171,7 @@ struct MovieBookFlipView: View {
             )
             .allowsHitTesting(false)
 
-            if #available(iOS 26.0, *) {
-                Color.clear
-                    .glassEffect(.regular, in: shape)
-                    .opacity(0.16 + (1 - min(abs(tilt), 1)) * 0.10)
-                    .allowsHitTesting(false)
-            }
+            glassOverlay(shape: shape, opacity: CGFloat(glassOpacity))
 
             if let badge = movie.playBadge {
                 GlassChip(
@@ -191,6 +186,16 @@ struct MovieBookFlipView: View {
         .clipShape(shape)
         .overlay { GlassRim(shape: shape, lineWidth: 1.15) }
         .contentShape(shape)
+    }
+
+    @ViewBuilder
+    private func glassOverlay(shape: RoundedRectangle, opacity: CGFloat) -> some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(.regular, in: shape)
+                .opacity(opacity)
+                .allowsHitTesting(false)
+        }
     }
 
     private var caption: some View {
@@ -251,13 +256,14 @@ struct MovieBookFlipView: View {
                 gestureStart = nil
                 let predicted = value.translation.width + value.predictedEndTranslation.width * 0.38
                 let raw = start - predicted / max(spacing, 1)
-                let target = rubberBand(raw).rounded().clamped(to: 0 ... maxIndex)
+                let snapped = min(max(rubberBand(raw).rounded(), 0), maxIndex)
                 withAnimation(.interpolatingSpring(stiffness: 180, damping: 24)) {
-                    progress = target
+                    progress = snapped
                 }
-                if Int(target) != lastHapticIndex {
+                let snappedIndex = Int(snapped)
+                if snappedIndex != lastHapticIndex {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    lastHapticIndex = Int(target)
+                    lastHapticIndex = snappedIndex
                 }
             }
     }
@@ -275,11 +281,5 @@ struct MovieBookFlipView: View {
             UISelectionFeedbackGenerator().selectionChanged()
             lastHapticIndex = idx
         }
-    }
-}
-
-private extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        min(max(self, range.lowerBound), range.upperBound)
     }
 }
