@@ -264,85 +264,49 @@ struct ActorDetailView: View {
 
     @EnvironmentObject private var appState: AppState
     @State private var showLogin = false
+    @State private var openedMovieID: String?
     @State private var filterPanelHeight: CGFloat = 0
     @GestureState private var filterDrag: CGFloat = 0
 
     var body: some View {
-        ScrollView {
+        Group {
             if let actor = vm.actor {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top, spacing: 16) {
-                        JavDBImage(url: actor.avatarURL ?? actor.coverURL)
-                            .frame(width: 100, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(actor.displayName)
-                                .font(.title3.bold())
-                            if let other = actor.otherName, !other.isEmpty, other != actor.displayName {
-                                Text(other).font(.caption).foregroundColor(.secondary)
-                            }
-                            if let birthday = actor.birthday, !birthday.isEmpty {
-                                Label(birthday, systemImage: "birthday.cake")
-                                    .font(.caption).foregroundColor(.secondary)
-                            }
-                            HStack(spacing: 12) {
-                                if let age = actor.age { info("\(age)歲") }
-                                if let height = actor.height { info("\(height)cm") }
-                                if let cup = actor.cup { info(cup) }
-                                if let count = actor.videosCount { info("\(count) 部") }
-                            }
-                            if let twitter = actor.twitterID, !twitter.isEmpty {
-                                info("@" + twitter)
-                            }
-                            HStack(spacing: 18) {
-                                actorActionButton(
-                                    icon: vm.hasFollowed ? "eye.fill" : "eye",
-                                    title: vm.hasFollowed ? "已关注" : "关注",
-                                    active: vm.hasFollowed
-                                ) {
-                                    if appState.isLoggedIn { Task { await vm.toggleFollow() } }
-                                    else { showLogin = true }
-                                }
-                                actorActionButton(
-                                    icon: vm.hasCollected ? "heart.fill" : "heart",
-                                    title: vm.hasCollected ? "已收藏" : "收藏",
-                                    active: vm.hasCollected
-                                ) {
-                                    if appState.isLoggedIn { Task { await vm.toggleCollect() } }
-                                    else { showLogin = true }
-                                }
-                            }
-                            .disabled(vm.isCollecting)
-                            if let hint = vm.collectHint {
-                                Text(hint)
-                                    .font(.caption2)
-                                    .foregroundStyle(.red)
-                            }
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-
+                VStack(alignment: .leading, spacing: 10) {
+                    actorHeader(actor)
                     if vm.movies.isEmpty {
                         if vm.isLoadingMovies {
-                            ProgressView().frame(maxWidth: .infinity).padding(.top, 24)
+                            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
                             Text("暫無作品")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                                 .padding(.horizontal)
                         }
                     } else {
-                        MoviePosterGrid(movies: vm.movies, onAppearLast: { _ in
-                            Task { await vm.loadMore() }
-                        })
+                        MovieBookFlipView(
+                            movies: vm.movies,
+                            onSelect: { openedMovieID = $0.id },
+                            onNearEnd: { Task { await vm.loadMore() } }
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             } else if vm.isLoading {
-                ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background { LiquidGlassBackground() }
         .nestedMovieListChrome()
+        .navigationDestination(isPresented: Binding(
+            get: { openedMovieID != nil },
+            set: { if !$0 { openedMovieID = nil } }
+        )) {
+            if let id = openedMovieID {
+                MovieDetailView(movieID: id)
+            }
+        }
         .navigationTitle(vm.actor.map { "演員 - \($0.displayName)" } ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
@@ -500,6 +464,61 @@ struct ActorDetailView: View {
             }
             .padding(.horizontal, 16)
         }
+    }
+
+    private func actorHeader(_ actor: Actor) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                .frame(width: 88, height: 88)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(actor.displayName)
+                    .font(.title3.bold())
+                if let other = actor.otherName, !other.isEmpty, other != actor.displayName {
+                    Text(other).font(.caption).foregroundColor(.secondary)
+                }
+                if let birthday = actor.birthday, !birthday.isEmpty {
+                    Label(birthday, systemImage: "birthday.cake")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+                HStack(spacing: 12) {
+                    if let age = actor.age { info("\(age)歲") }
+                    if let height = actor.height { info("\(height)cm") }
+                    if let cup = actor.cup { info(cup) }
+                    if let count = actor.videosCount { info("\(count) 部") }
+                }
+                if let twitter = actor.twitterID, !twitter.isEmpty {
+                    info("@" + twitter)
+                }
+                HStack(spacing: 18) {
+                    actorActionButton(
+                        icon: vm.hasFollowed ? "eye.fill" : "eye",
+                        title: vm.hasFollowed ? "已关注" : "关注",
+                        active: vm.hasFollowed
+                    ) {
+                        if appState.isLoggedIn { Task { await vm.toggleFollow() } }
+                        else { showLogin = true }
+                    }
+                    actorActionButton(
+                        icon: vm.hasCollected ? "heart.fill" : "heart",
+                        title: vm.hasCollected ? "已收藏" : "收藏",
+                        active: vm.hasCollected
+                    ) {
+                        if appState.isLoggedIn { Task { await vm.toggleCollect() } }
+                        else { showLogin = true }
+                    }
+                }
+                .disabled(vm.isCollecting)
+                if let hint = vm.collectHint {
+                    Text(hint)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.top, 6)
     }
 
     private func actorActionButton(icon: String, title: String, active: Bool, action: @escaping () -> Void) -> some View {
