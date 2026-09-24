@@ -10,13 +10,20 @@ import UIKit
 
 struct MovieBookFlipView: View {
     let movies: [Movie]
-    var onSelect: ((Movie) -> Void)? = nil
     var onNearEnd: (() -> Void)? = nil
 
     @State private var index = 0
     @State private var dragX: CGFloat = 0
-    @State private var pageWidth: CGFloat = 280
     @State private var isSettling = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var pageWidth: CGFloat {
+        sizeClass == .regular ? 360 : 248
+    }
+
+    private var pageHeight: CGFloat {
+        pageWidth / 0.72
+    }
 
     private var safeIndex: Int {
         guard !movies.isEmpty else { return 0 }
@@ -42,20 +49,12 @@ struct MovieBookFlipView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            GeometryReader { geo in
-                let height = geo.size.height
-                let width = min(geo.size.width * 0.82, height * 0.70)
-                bookStage(pageSize: CGSize(width: width, height: width / 0.72))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onAppear { pageWidth = width }
-                    .onChange(of: width) { _, w in pageWidth = w }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+            bookStage
+                .frame(height: pageHeight + 36)
             caption
             pageIndicator
         }
-        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             if movies.count < 8 { onNearEnd?() }
         }
@@ -65,30 +64,29 @@ struct MovieBookFlipView: View {
         }
     }
 
-    private func bookStage(pageSize: CGSize) -> some View {
-        ZStack {
-            bookBlock(pageSize: pageSize)
+    private var bookStage: some View {
+        let size = CGSize(width: pageWidth, height: pageHeight)
+        return ZStack {
+            bookBlock(pageSize: size)
 
             if let under = revealedPage {
-                bookPage(under, size: pageSize, shine: 0.08)
+                bookPage(under, size: size, shine: 0.08)
                     .scaleEffect(0.985)
                     .offset(x: 5)
+                    .allowsHitTesting(false)
                     .zIndex(1)
             }
 
             if let movie = current {
-                flippingPage(movie, size: pageSize)
+                flippingPage(movie, size: size)
                     .zIndex(abs(flip) > 0.5 ? 0.5 : 3)
             }
         }
-        .frame(width: pageSize.width, height: pageSize.height)
-        .rotation3DEffect(.degrees(7), axis: (x: 1, y: 0, z: 0), perspective: 0.85)
+        .frame(width: size.width, height: size.height)
+        .rotation3DEffect(.degrees(6), axis: (x: 1, y: 0, z: 0), perspective: 0.85)
+        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .highPriorityGesture(flipGesture)
-        .onTapGesture {
-            guard !isSettling, abs(dragX) < 8, let movie = current else { return }
-            onSelect?(movie)
-        }
     }
 
     private var revealedPage: Movie? {
@@ -126,6 +124,7 @@ struct MovieBookFlipView: View {
             .allowsHitTesting(false)
         }
         .shadow(color: .black.opacity(0.30), radius: 26, y: 18)
+        .allowsHitTesting(false)
         .zIndex(0)
     }
 
@@ -136,13 +135,21 @@ struct MovieBookFlipView: View {
         let ySign: Double = goingNext ? -1 : 1
         let showFront = angle < 90
 
-        return ZStack {
-            bookPage(movie, size: size, shine: Double(-flip) * 0.28)
-                .opacity(showFront ? 1 : 0)
-            glassVerso(movie, size: size)
-                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                .opacity(showFront ? 0 : 1)
+        return NavigationLink {
+            MovieDetailView(movieID: movie.id)
+        } label: {
+            ZStack {
+                bookPage(movie, size: size, shine: Double(-flip) * 0.28)
+                    .opacity(showFront ? 1 : 0)
+                glassVerso(movie, size: size)
+                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                    .opacity(showFront ? 0 : 1)
+            }
         }
+        .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture().onEnded {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        })
         .rotation3DEffect(
             .degrees(ySign * angle),
             axis: (x: 0, y: 1, z: 0),
@@ -181,6 +188,7 @@ struct MovieBookFlipView: View {
                 endPoint: UnitPoint(x: 0.85, y: 1)
             )
             .blendMode(.softLight)
+            .allowsHitTesting(false)
 
             LinearGradient(
                 colors: [
@@ -191,6 +199,7 @@ struct MovieBookFlipView: View {
                 startPoint: .leading,
                 endPoint: .trailing
             )
+            .allowsHitTesting(false)
 
             if let badge = movie.playBadge {
                 Text(badge)
@@ -206,6 +215,7 @@ struct MovieBookFlipView: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .padding(10)
+                    .allowsHitTesting(false)
             }
         }
         .clipShape(shape)
@@ -222,16 +232,10 @@ struct MovieBookFlipView: View {
                 ),
                 lineWidth: 1.1
             )
-        }
-        .overlay {
-            if #available(iOS 26.0, *) {
-                Color.clear
-                    .glassEffect(.regular, in: shape)
-                    .opacity(0.16)
-                    .allowsHitTesting(false)
-            }
+            .allowsHitTesting(false)
         }
         .frame(width: size.width, height: size.height)
+        .contentShape(shape)
     }
 
     private func glassVerso(_ movie: Movie, size: CGSize) -> some View {
@@ -266,6 +270,7 @@ struct MovieBookFlipView: View {
         }
         .clipShape(shape)
         .liquidGlassRect(cornerRadius: 16, interactive: false)
+        .allowsHitTesting(false)
     }
 
     private var caption: some View {
@@ -303,7 +308,7 @@ struct MovieBookFlipView: View {
     }
 
     private var flipGesture: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+        DragGesture(minimumDistance: 16, coordinateSpace: .local)
             .onChanged { value in
                 guard !isSettling else { return }
                 // 左侧边缘留给系统侧滑返回。

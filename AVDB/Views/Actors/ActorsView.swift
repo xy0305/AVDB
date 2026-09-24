@@ -264,7 +264,6 @@ struct ActorDetailView: View {
 
     @EnvironmentObject private var appState: AppState
     @State private var showLogin = false
-    @State private var openedMovieID: String?
     @State private var filterPanelHeight: CGFloat = 0
     @GestureState private var filterDrag: CGFloat = 0
 
@@ -286,7 +285,6 @@ struct ActorDetailView: View {
                     } else {
                         MovieBookFlipView(
                             movies: vm.movies,
-                            onSelect: { openedMovieID = $0.id },
                             onNearEnd: { Task { await vm.loadMore() } }
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -294,19 +292,19 @@ struct ActorDetailView: View {
                 }
             } else if vm.isLoading {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 12) {
+                    Text("載入失敗")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("重試") { Task { await vm.load() } }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { LiquidGlassBackground() }
         .nestedMovieListChrome()
-        .navigationDestination(isPresented: Binding(
-            get: { openedMovieID != nil },
-            set: { if !$0 { openedMovieID = nil } }
-        )) {
-            if let id = openedMovieID {
-                MovieDetailView(movieID: id)
-            }
-        }
         .navigationTitle(vm.actor.map { "演員 - \($0.displayName)" } ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
