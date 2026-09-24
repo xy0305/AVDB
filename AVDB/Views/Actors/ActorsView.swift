@@ -264,8 +264,11 @@ struct ActorDetailView: View {
 
     @EnvironmentObject private var appState: AppState
     @State private var showLogin = false
+    @AppStorage("avdb.actor.browseMode") private var browseMode = "grid"
     @State private var filterPanelHeight: CGFloat = 0
     @GestureState private var filterDrag: CGFloat = 0
+
+    private var isBookMode: Bool { browseMode == "book" }
 
     var body: some View {
         Group {
@@ -282,12 +285,19 @@ struct ActorDetailView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                                 .padding(.horizontal)
                         }
-                    } else {
+                    } else if isBookMode {
                         MovieBookFlipView(
                             movies: vm.movies,
                             onNearEnd: { Task { await vm.loadMore() } }
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            MoviePosterGrid(movies: vm.movies, onAppearLast: { _ in
+                                Task { await vm.loadMore() }
+                            })
+                            .padding(.bottom, 12)
+                        }
                     }
                 }
             } else if vm.isLoading {
@@ -307,6 +317,18 @@ struct ActorDetailView: View {
         .nestedMovieListChrome()
         .navigationTitle(vm.actor.map { "演員 - \($0.displayName)" } ?? "演員")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        browseMode = isBookMode ? "grid" : "book"
+                    }
+                } label: {
+                    Image(systemName: isBookMode ? "square.grid.2x2" : "book")
+                }
+                .accessibilityLabel(isBookMode ? "切換網格" : "切換書頁")
+            }
+        }
         .overlay {
             if filterPanelHeight > 0.5 {
                 Color.black.opacity(min(0.28, filterPanelHeight / 900))
