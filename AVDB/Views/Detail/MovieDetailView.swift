@@ -14,6 +14,7 @@ struct MovieDetailView: View {
     @State private var play115 = false
     @State private var showTrailer = false
     @State private var tenhowCoverURL: String?
+    @State private var reviewPanelHeight: CGFloat = 76
     @StateObject private var reviewsVM = ReviewsListViewModel()
     @State private var showSearch = false
     @Environment(\.dismiss) private var dismiss
@@ -57,17 +58,16 @@ struct MovieDetailView: View {
             detailChrome
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // 只占收起高度，展开时 UIKit 底板盖在详情上，不再改 SwiftUI 布局。
-            Color.clear.frame(height: 76)
-        }
-        .overlay {
             if let movie = vm.movie {
-                ReviewsSheetHost(
+                DraggableReviewsPanel(
                     movieID: movie.id,
+                    // 官方 App 的“短评”数量对应 comments_count；reviews_count 是评分人数。
                     total: movie.commentsCount ?? 0,
-                    vm: reviewsVM
+                    panelHeight: $reviewPanelHeight,
+                    vm: reviewsVM,
+                    availableHeight: max(280, UIScreen.main.bounds.height)
                 )
-                .ignoresSafeArea()
+                .frame(height: reviewPanelHeight, alignment: .top)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -1224,21 +1224,118 @@ struct FlowTags: View {
     }
 }
 
-/// 评论面板内容：高度由 UIKit 底板裁剪，SwiftUI 不再跟手改 frame。
-struct ReviewsPanelContent: View {
+/// 评论面板：把手拖动改高度，列表用系统 ScrollView，互不抢手势。
+struct DraggableReviewsPanel: View {
     let movieID: String
     let total: Int
+    @Binding var panelHeight: CGFloat
     @ObservedObject var vm: ReviewsListViewModel
-    var isExpanded: Bool = false
+    let availableHeight: CGFloat
+
+    private let collapsedHeight: CGFloat = 76
+    private var maximumHeight: CGFloat { max(300, availableHeight - 8) }
+    private var mediumHeight: CGFloat { collapsedHeight + (maximumHeight - collapsedHeight) * 0.55 }
+
+    @State private var panelState: PanelState = .collapsed
+    @State private var dragStartHeight: CGFloat?
+
+    enum PanelState {
+        case collapsed, medium, expanded
+
+        func height(collapsed: CGFloat, medium: CGFloat, max: CGFloat) -> CGFloat {
+            switch self {
+            case .collapsed: return collapsed
+            case .medium: return medium
+            case .expanded: return max
+            }
+        }
+    }
+
+    /// 展开中：高度略高于收起就显示列表，拖动过程内容跟着长高，避免「松手才蹦出来」
+    private var isContentVisible: Bool {
+        panelHeight > collapsedHeight + 6 || panelState != .collapsed
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             headerSection
-                .frame(height: 76)
-            sortSection
-            reviewsList
+                .frame(height: collapsedHeight)
+                .contentShape(Rectangle())
+                .gesture(handleDrag)
+                .onTapGesture { toggleFromHeader() }
+
+            if isContentVisible {
+                sortSection
+                reviewsList
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(height: panelHeight, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
+                        .strokeBorder(.white.opacity(0.28), lineWidth: 0.6)
+                }
+        }
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
+        .contentShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 10, y: -2)
+        .safeAreaPadding(.bottom)
+    }
+
+    private var handleDrag: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
+            .onChanged { value in
+                let dx = abs(value.translation.width)
+                let dy = abs(value.translation.height)
+                guard dy >= dx else { return }
+                if dragStartHeight == nil { dragStartHeight = panelHeight }
+                let next = (dragStartHeight ?? panelHeight) - value.translation.height
+                // 拖动过程直接改高度，不套动画，保证跟手
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    panelHeight = min(maximumHeight, max(collapsedHeight, next))
+                }
+            }
+            .onEnded { value in
+                defer { dragStartHeight = nil }
+                guard abs(value.translation.height) >= abs(value.translation.width) else { return }
+                let start = dragStartHeight ?? panelHeight
+                let predicted = start - value.predictedEndTranslation.height
+                let velocityY = value.predictedEndTranslation.height - value.translation.height
+                snap(to: predicted, velocityY: velocityY)
+            }
+    }
+
+    private func toggleFromHeader() {
+        let next: PanelState = panelState == .collapsed ? .medium : .collapsed
+        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.88)) {
+            panelState = next
+            panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+        }
+    }
+
+    private func snap(to predicted: CGFloat, velocityY: CGFloat) {
+        let span = max(1, maximumHeight - collapsedHeight)
+        let next: PanelState
+        if velocityY < -900 {
+            next = .expanded
+        } else if velocityY > 900 {
+            next = .collapsed
+        } else if predicted < collapsedHeight + span * 0.28 {
+            next = .collapsed
+        } else if predicted < collapsedHeight + span * 0.72 {
+            next = .medium
+        } else {
+            next = .expanded
+        }
+        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.88)) {
+            panelState = next
+            panelHeight = next.height(collapsed: collapsedHeight, medium: mediumHeight, max: maximumHeight)
+        }
     }
 
     private var headerSection: some View {
@@ -1263,7 +1360,7 @@ struct ReviewsPanelContent: View {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .rotationEffect(.degrees(panelState == .collapsed ? 0 : 180))
             }
             .padding(.horizontal, 22)
         }
@@ -1303,7 +1400,7 @@ struct ReviewsPanelContent: View {
                 ForEach(vm.reviews, id: \.stableReviewID) { review in
                     ReviewRow(review: review, movieID: movieID)
                         .padding(14)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .onAppear {
                             if review.stableReviewID == vm.reviews.last?.stableReviewID {
                                 Task { await vm.loadMore(movieID: movieID) }
