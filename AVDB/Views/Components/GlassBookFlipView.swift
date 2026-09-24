@@ -2,7 +2,7 @@
 //  GlassBookFlipView.swift
 //  AVDB
 //
-//  摊开的立体书：左右两页同时展示，沿书脊翻页。
+//  摊开的立体精装书：硬壳、书脊、页边厚度，左右页同时展示。
 //
 
 import SwiftUI
@@ -15,7 +15,10 @@ struct MovieBookFlipView: View {
     @State private var spread = 0
     @State private var dragX: CGFloat = 0
     @State private var isSettling = false
-    @State private var pageWidth: CGFloat = 160
+    @State private var pageWidth: CGFloat = 150
+
+    private let coverInset: CGFloat = 11
+    private let restFold: Double = 11
 
     private var spreadCount: Int {
         max(1, Int(ceil(Double(movies.count) / 2.0)))
@@ -50,7 +53,7 @@ struct MovieBookFlipView: View {
     var body: some View {
         GeometryReader { geo in
             let metrics = bookMetrics(in: geo.size)
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 openBook(pageW: metrics.pageW, pageH: metrics.pageH, spine: metrics.spine)
                 captions(pageW: metrics.pageW, spine: metrics.spine)
                 indicator
@@ -69,39 +72,51 @@ struct MovieBookFlipView: View {
     }
 
     private func bookMetrics(in size: CGSize) -> (pageW: CGFloat, pageH: CGFloat, spine: CGFloat) {
-        let spine: CGFloat = 10
+        let spine: CGFloat = 16
         let fallbackW = UIScreen.main.bounds.width
-        let width = max(size.width, fallbackW) - 16
+        let width = max(size.width, fallbackW) - 20
         let height = size.height > 8 ? size.height : 420
-        var pageW = (width - spine) / 2
+        var pageW = (width - spine - coverInset * 2) / 2
         var pageH = pageW / 0.72
-        let maxH = max(height - 78, 220)
+        let maxH = max(height - 86, 210)
         if pageH > maxH {
             pageH = maxH
             pageW = pageH * 0.72
         }
-        return (pageW, pageH, spine)
+        return (max(pageW, 96), max(pageH, 140), spine)
     }
 
     private func openBook(pageW: CGFloat, pageH: CGFloat, spine: CGFloat) -> some View {
         let bookW = pageW * 2 + spine
+        let coverW = bookW + coverInset * 2
+        let coverH = pageH + coverInset * 2
         let goingNext = progress < 0
-        let angle = Double(progress) * 180
+        let leafAngle = Double(progress) * 180
 
         return ZStack {
-            bookBoard(width: bookW + 18, height: pageH + 18)
+            tableShadow(width: coverW)
+                .offset(y: coverH * 0.46)
+
+            hardcover(width: coverW, height: coverH, spine: spine)
+
+            pageStack(height: pageH, onLeft: true)
+                .offset(x: -(pageW + spine / 2) + 3)
+            pageStack(height: pageH, onLeft: false)
+                .offset(x: pageW + spine / 2 - 3)
 
             HStack(spacing: 0) {
                 spreadPage(
-                    goingNext || progress == 0 ? leftMovie : prevLeft,
+                    goingNext || abs(progress) < 0.002 ? leftMovie : prevLeft,
                     size: CGSize(width: pageW, height: pageH),
-                    side: .left
+                    side: .left,
+                    fold: restFold
                 )
-                spineView(height: pageH, width: spine)
+                spineBlock(height: pageH, width: spine)
                 spreadPage(
                     goingNext ? (nextRight ?? rightMovie) : rightMovie,
                     size: CGSize(width: pageW, height: pageH),
-                    side: .right
+                    side: .right,
+                    fold: restFold
                 )
             }
             .frame(width: bookW, height: pageH)
@@ -112,7 +127,7 @@ struct MovieBookFlipView: View {
                         back: nextLeft,
                         size: CGSize(width: pageW, height: pageH),
                         side: .right,
-                        angle: angle
+                        angle: leafAngle
                     )
                 }
             }
@@ -123,70 +138,163 @@ struct MovieBookFlipView: View {
                         back: prevRight,
                         size: CGSize(width: pageW, height: pageH),
                         side: .left,
-                        angle: angle
+                        angle: leafAngle
                     )
                 }
             }
-            .rotation3DEffect(.degrees(7), axis: (x: 1, y: 0, z: 0), perspective: 0.9)
         }
-        .frame(width: bookW + 18, height: pageH + 22)
+        .rotation3DEffect(.degrees(14), axis: (x: 1, y: 0, z: 0), perspective: 0.72)
+        .frame(width: coverW, height: coverH + 18)
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .highPriorityGesture(flipGesture)
     }
 
-    private func bookBoard(width: CGFloat, height: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(.ultraThinMaterial)
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(
+    private func tableShadow(width: CGFloat) -> some View {
+        Ellipse()
+            .fill(Color.black.opacity(0.28))
+            .frame(width: width * 0.86, height: 22)
+            .blur(radius: 10)
+            .allowsHitTesting(false)
+    }
+
+    private func hardcover(width: CGFloat, height: CGFloat, spine: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        return ZStack {
+            shape
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.18, green: 0.20, blue: 0.24),
+                            Color(red: 0.28, green: 0.31, blue: 0.36),
+                            Color(red: 0.16, green: 0.17, blue: 0.21)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    if #available(iOS 26.0, *) {
+                        Color.clear.glassEffect(.regular, in: shape)
+                            .opacity(0.55)
+                    } else {
+                        shape.fill(.ultraThinMaterial.opacity(0.35))
+                    }
+                }
+                .overlay {
+                    shape.strokeBorder(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.55),
+                                Color.white.opacity(0.42),
                                 Color.white.opacity(0.08),
-                                Color.white.opacity(0.28)
+                                Color.white.opacity(0.22)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 0.8
+                        lineWidth: 1.2
                     )
-            }
-            .frame(width: width, height: height)
-            .shadow(color: .black.opacity(0.22), radius: 18, y: 10)
-            .allowsHitTesting(false)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.6)
+                        .padding(5)
+                }
+                .overlay {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.10),
+                                    Color.black.opacity(0.35),
+                                    Color.white.opacity(0.08)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: spine + 6)
+                }
+
+            // 封面厚度：底部和外侧一圈暗边
+            shape
+                .stroke(Color.black.opacity(0.45), lineWidth: 3)
+                .offset(y: 3)
+                .opacity(0.55)
+                .blendMode(.multiply)
+        }
+        .frame(width: width, height: height)
+        .shadow(color: .black.opacity(0.38), radius: 22, y: 16)
+        .allowsHitTesting(false)
     }
 
-    private func spineView(height: CGFloat, width: CGFloat) -> some View {
+    private func pageStack(height: CGFloat, onLeft: Bool) -> some View {
+        HStack(spacing: 0.8) {
+            ForEach(0..<7, id: \.self) { i in
+                let shade = 0.96 - Double(i) * 0.05
+                Capsule()
+                    .fill(Color(white: shade))
+                    .frame(width: 1.4, height: height - CGFloat(i) * 3)
+                    .overlay {
+                        Capsule().strokeBorder(Color.black.opacity(0.08), lineWidth: 0.3)
+                    }
+            }
+        }
+        .rotation3DEffect(
+            .degrees(onLeft ? 18 : -18),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.6
+        )
+        .allowsHitTesting(false)
+    }
+
+    private func spineBlock(height: CGFloat, width: CGFloat) -> some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.35),
-                    Color.white.opacity(0.45),
-                    Color.black.opacity(0.22)
+                    Color(red: 0.12, green: 0.13, blue: 0.16),
+                    Color(red: 0.38, green: 0.40, blue: 0.45),
+                    Color(red: 0.14, green: 0.15, blue: 0.18)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
             )
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.18),
+                    Color.black.opacity(0.35),
                     Color.clear,
-                    Color.black.opacity(0.12)
+                    Color.black.opacity(0.28)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
+            // 书脊高光
+            Capsule()
+                .fill(Color.white.opacity(0.28))
+                .frame(width: 2.2)
+                .blur(radius: 0.4)
+            VStack(spacing: 7) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                        .frame(width: width * 0.55, height: 2)
+                }
+            }
+            .padding(.vertical, 16)
         }
         .frame(width: width, height: height)
+        .overlay {
+            Rectangle()
+                .strokeBorder(Color.black.opacity(0.35), lineWidth: 0.6)
+        }
         .allowsHitTesting(false)
     }
 
     private enum PageSide { case left, right }
 
-    private func spreadPage(_ movie: Movie?, size: CGSize, side: PageSide) -> some View {
+    private func spreadPage(_ movie: Movie?, size: CGSize, side: PageSide, fold: Double) -> some View {
         let shape = pageShape(side)
+        let yAngle: Double = side == .left ? fold : -fold
         return Group {
             if let movie {
                 NavigationLink {
@@ -201,9 +309,24 @@ struct MovieBookFlipView: View {
         }
         .clipShape(shape)
         .overlay {
-            shape.strokeBorder(Color.white.opacity(0.35), lineWidth: 0.6)
+            shape.strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
         }
-        .shadow(color: .black.opacity(0.16), radius: 6, y: 3)
+        .overlay(alignment: side == .left ? .trailing : .leading) {
+            LinearGradient(
+                colors: [Color.black.opacity(0.38), Color.black.opacity(0.08), Color.clear],
+                startPoint: side == .left ? .trailing : .leading,
+                endPoint: side == .left ? .leading : .trailing
+            )
+            .frame(width: size.width * 0.22)
+            .allowsHitTesting(false)
+        }
+        .rotation3DEffect(
+            .degrees(yAngle),
+            axis: (x: 0, y: 1, z: 0),
+            anchor: side == .left ? .trailing : .leading,
+            perspective: 0.65
+        )
+        .shadow(color: .black.opacity(0.22), radius: 8, y: 4)
     }
 
     private func flippingLeaf(
@@ -215,6 +338,7 @@ struct MovieBookFlipView: View {
     ) -> some View {
         let showFront = abs(angle) < 90
         let shape = pageShape(side)
+        let rest = side == .right ? -restFold : restFold
         return ZStack {
             Group {
                 if let front {
@@ -240,9 +364,9 @@ struct MovieBookFlipView: View {
         .overlay {
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.02 + abs(angle / 180) * 0.22),
+                    Color.black.opacity(0.04 + abs(angle / 180) * 0.28),
                     Color.clear,
-                    Color.white.opacity(0.12)
+                    Color.white.opacity(0.16)
                 ],
                 startPoint: side == .right ? .leading : .trailing,
                 endPoint: side == .right ? .trailing : .leading
@@ -250,16 +374,16 @@ struct MovieBookFlipView: View {
             .allowsHitTesting(false)
         }
         .rotation3DEffect(
-            .degrees(angle),
+            .degrees(rest + angle),
             axis: (x: 0, y: 1, z: 0),
             anchor: side == .right ? .leading : .trailing,
-            perspective: 0.62
+            perspective: 0.58
         )
         .shadow(
-            color: .black.opacity(0.18 + abs(angle / 180) * 0.25),
-            radius: 10 + abs(angle / 18),
-            x: side == .right ? 8 : -8,
-            y: 6
+            color: .black.opacity(0.22 + abs(angle / 180) * 0.28),
+            radius: 12 + abs(angle / 16),
+            x: side == .right ? 10 : -10,
+            y: 8
         )
         .allowsHitTesting(false)
     }
@@ -267,32 +391,37 @@ struct MovieBookFlipView: View {
     private func pageShape(_ side: PageSide) -> UnevenRoundedRectangle {
         if side == .left {
             return UnevenRoundedRectangle(
-                topLeadingRadius: 12,
-                bottomLeadingRadius: 12,
-                bottomTrailingRadius: 2,
-                topTrailingRadius: 2,
+                topLeadingRadius: 3,
+                bottomLeadingRadius: 3,
+                bottomTrailingRadius: 1,
+                topTrailingRadius: 1,
                 style: .continuous
             )
         }
         return UnevenRoundedRectangle(
-            topLeadingRadius: 2,
-            bottomLeadingRadius: 2,
-            bottomTrailingRadius: 12,
-            topTrailingRadius: 12,
+            topLeadingRadius: 1,
+            bottomLeadingRadius: 1,
+            bottomTrailingRadius: 3,
+            topTrailingRadius: 3,
             style: .continuous
         )
     }
 
     private func cover(_ movie: Movie, size: CGSize, side: PageSide) -> some View {
         ZStack {
-            JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+            Color(white: 0.93)
+            JavDBImage(url: movie.thumbURL ?? movie.coverURL)
                 .frame(width: size.width, height: size.height)
                 .clipped()
 
             LinearGradient(
-                colors: gutterColors(side),
-                startPoint: side == .left ? .trailing : .leading,
-                endPoint: side == .left ? .leading : .trailing
+                colors: [
+                    Color.white.opacity(0.16),
+                    Color.clear,
+                    Color.black.opacity(0.10)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
             .allowsHitTesting(false)
 
@@ -317,30 +446,23 @@ struct MovieBookFlipView: View {
         .contentShape(Rectangle())
     }
 
-    private func gutterColors(_ side: PageSide) -> [Color] {
-        [
-            Color.black.opacity(0.28),
-            Color.black.opacity(0.06),
-            Color.clear
-        ]
-    }
-
     private func paperBlank(size: CGSize, side: PageSide) -> some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.72),
-                    Color(white: 0.93),
-                    Color(white: 0.88)
+                    Color(red: 0.97, green: 0.95, blue: 0.90),
+                    Color(red: 0.93, green: 0.90, blue: 0.84)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            LinearGradient(
-                colors: gutterColors(side),
-                startPoint: side == .left ? .trailing : .leading,
-                endPoint: side == .left ? .leading : .trailing
-            )
+            ForEach(0..<8, id: \.self) { i in
+                Rectangle()
+                    .fill(Color.black.opacity(0.04))
+                    .frame(height: 1)
+                    .padding(.horizontal, 14)
+                    .offset(y: CGFloat(i - 4) * 16)
+            }
         }
         .frame(width: size.width, height: size.height)
     }
