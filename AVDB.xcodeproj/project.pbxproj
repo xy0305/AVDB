@@ -31,6 +31,7 @@
 		B00BB00CDE000D10DE000002 /* DownloadLinkDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */; };
 		GLASSUI0000000000000001 /* GlassUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = GLASSUI0000000000000002 /* GlassUI.swift */; };
 		BOOKFLIP0000000000000001 /* GlassBookFlipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BOOKFLIP0000000000000002 /* GlassBookFlipView.swift */; };
+		REVIEWSHEET00000000000001 /* ReviewsSheetHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = REVIEWSHEET00000000000002 /* ReviewsSheetHost.swift */; };
 		A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */; };
 		A115C11E7A7B115C11E7A003 /* JSONFlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A103 /* JSONFlex.swift */; };
 		A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */; };
@@ -69,6 +70,7 @@
 		B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadLinkDetector.swift; sourceTree = "<group>"; };
 		GLASSUI0000000000000002 /* GlassUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassUI.swift; sourceTree = "<group>"; };
 		BOOKFLIP0000000000000002 /* GlassBookFlipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassBookFlipView.swift; sourceTree = "<group>"; };
+		REVIEWSHEET00000000000002 /* ReviewsSheetHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewsSheetHost.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115SettingsView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A103 /* JSONFlex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONFlex.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A104 /* JAVDBUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVDBUI.swift; sourceTree = "<group>"; };
@@ -188,6 +190,7 @@
 			isa = PBXGroup;
 			children = (
 				14321A82C49C1554A3104999 /* MovieDetailView.swift */,
+				REVIEWSHEET00000000000002 /* ReviewsSheetHost.swift */,
 			);
 			name = Detail;
 			 path = "Detail";
@@ -376,6 +379,7 @@
 				A115C11E7A7B115C11E7A004 /* JAVDBUI.swift in Sources */,
 				GLASSUI0000000000000001 /* GlassUI.swift in Sources */,
 				BOOKFLIP0000000000000001 /* GlassBookFlipView.swift in Sources */,
+				REVIEWSHEET00000000000001 /* ReviewsSheetHost.swift in Sources */,
 				A115C11E7A7B115C11E7A005 /* RankingsView.swift in Sources */,
 				A115C11E7A7B115C11E7A006 /* CategoriesView.swift in Sources */,
 				A115C11E7A7B115C11E7A007 /* Pan115PlayerView.swift in Sources */,
@@ -441,7 +445,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 109;
+				CURRENT_PROJECT_VERSION = 110;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -464,7 +468,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 109;
+				CURRENT_PROJECT_VERSION = 110;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
