@@ -2,7 +2,7 @@
 //  GlassBookFlipView.swift
 //  AVDB
 //
-//  摊开的立体精装书：硬壳、书脊、页边厚度，左右页同时展示。
+//  Cover Flow：中间封面正向最大，两侧立体侧转。
 //
 
 import SwiftUI
@@ -12,416 +12,116 @@ struct MovieBookFlipView: View {
     let movies: [Movie]
     var onNearEnd: (() -> Void)? = nil
 
-    @State private var spread = 0
+    @State private var index = 0
     @State private var dragX: CGFloat = 0
     @State private var isSettling = false
-    @State private var pageWidth: CGFloat = 150
 
-    private let coverInset: CGFloat = 11
-    private let restFold: Double = 11
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var spreadCount: Int {
-        max(1, Int(ceil(Double(movies.count) / 2.0)))
+    private var cardW: CGFloat { sizeClass == .regular ? 240 : 168 }
+    private var cardH: CGFloat { cardW / 0.72 }
+    private var spacing: CGFloat { cardW * 0.58 }
+
+    private var safeIndex: Int {
+        guard !movies.isEmpty else { return 0 }
+        return min(max(0, index), movies.count - 1)
     }
 
-    private var safeSpread: Int {
-        min(max(0, spread), max(0, spreadCount - 1))
+    private var current: Movie? {
+        movies.indices.contains(safeIndex) ? movies[safeIndex] : nil
     }
 
-    private func movie(at index: Int) -> Movie? {
-        movies.indices.contains(index) ? movies[index] : nil
-    }
-
-    private var leftMovie: Movie? { movie(at: safeSpread * 2) }
-    private var rightMovie: Movie? { movie(at: safeSpread * 2 + 1) }
-    private var nextLeft: Movie? { movie(at: (safeSpread + 1) * 2) }
-    private var nextRight: Movie? { movie(at: (safeSpread + 1) * 2 + 1) }
-    private var prevLeft: Movie? { movie(at: (safeSpread - 1) * 2) }
-    private var prevRight: Movie? { movie(at: (safeSpread - 1) * 2 + 1) }
-
-    private var canGoNext: Bool { safeSpread + 1 < spreadCount }
-    private var canGoPrev: Bool { safeSpread > 0 }
-
-    /// -1…1，负值翻下一跨页。
-    private var progress: CGFloat {
-        let raw = dragX / max(pageWidth, 1)
-        if raw < 0, !canGoNext { return raw * 0.16 }
-        if raw > 0, !canGoPrev { return raw * 0.16 }
-        return raw.clamped(to: -1 ... 1)
+    /// 跟手偏移，单位：张。右滑为正。
+    private var dragOffset: CGFloat {
+        dragX / max(spacing, 1)
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let metrics = bookMetrics(in: geo.size)
-            VStack(spacing: 8) {
-                openBook(pageW: metrics.pageW, pageH: metrics.pageH, spine: metrics.spine)
-                captions(pageW: metrics.pageW, spine: metrics.spine)
-                indicator
+        VStack(spacing: 12) {
+            ZStack {
+                ForEach(visibleRange, id: \.self) { i in
+                    coverCard(movies[i], at: i)
+                        .zIndex(zIndex(for: i))
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .onAppear { pageWidth = metrics.pageW }
-            .onChange(of: metrics.pageW) { _, w in pageWidth = w }
+            .frame(height: cardH + 36)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .highPriorityGesture(drag)
+
+            caption
+            indicator
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             if movies.count < 8 { onNearEnd?() }
         }
         .onChange(of: movies.first?.id) { _, _ in
-            spread = 0
+            index = 0
             dragX = 0
         }
     }
 
-    private func bookMetrics(in size: CGSize) -> (pageW: CGFloat, pageH: CGFloat, spine: CGFloat) {
-        let spine: CGFloat = 16
-        let fallbackW = UIScreen.main.bounds.width
-        let width = max(size.width, fallbackW) - 20
-        let height = size.height > 8 ? size.height : 420
-        var pageW = (width - spine - coverInset * 2) / 2
-        var pageH = pageW / 0.72
-        let maxH = max(height - 86, 210)
-        if pageH > maxH {
-            pageH = maxH
-            pageW = pageH * 0.72
-        }
-        return (max(pageW, 96), max(pageH, 140), spine)
+    private var visibleRange: [Int] {
+        let center = safeIndex
+        return movies.indices.filter { abs($0 - center) <= 3 }
     }
 
-    private func openBook(pageW: CGFloat, pageH: CGFloat, spine: CGFloat) -> some View {
-        let bookW = pageW * 2 + spine
-        let coverW = bookW + coverInset * 2
-        let coverH = pageH + coverInset * 2
-        let goingNext = progress < 0
-        let leafAngle = Double(progress) * 180
-
-        return ZStack {
-            tableShadow(width: coverW)
-                .offset(y: coverH * 0.46)
-
-            hardcover(width: coverW, height: coverH, spine: spine)
-
-            pageStack(height: pageH, onLeft: true)
-                .offset(x: -(pageW + spine / 2) + 3)
-            pageStack(height: pageH, onLeft: false)
-                .offset(x: pageW + spine / 2 - 3)
-
-            HStack(spacing: 0) {
-                spreadPage(
-                    goingNext || abs(progress) < 0.002 ? leftMovie : prevLeft,
-                    size: CGSize(width: pageW, height: pageH),
-                    side: .left,
-                    fold: restFold
-                )
-                spineBlock(height: pageH, width: spine)
-                spreadPage(
-                    goingNext ? (nextRight ?? rightMovie) : rightMovie,
-                    size: CGSize(width: pageW, height: pageH),
-                    side: .right,
-                    fold: restFold
-                )
-            }
-            .frame(width: bookW, height: pageH)
-            .overlay(alignment: .trailing) {
-                if progress < -0.002 {
-                    flippingLeaf(
-                        front: rightMovie,
-                        back: nextLeft,
-                        size: CGSize(width: pageW, height: pageH),
-                        side: .right,
-                        angle: leafAngle
-                    )
-                }
-            }
-            .overlay(alignment: .leading) {
-                if progress > 0.002 {
-                    flippingLeaf(
-                        front: leftMovie,
-                        back: prevRight,
-                        size: CGSize(width: pageW, height: pageH),
-                        side: .left,
-                        angle: leafAngle
-                    )
-                }
-            }
-        }
-        .rotation3DEffect(.degrees(14), axis: (x: 1, y: 0, z: 0), perspective: 0.72)
-        .frame(width: coverW, height: coverH + 18)
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-        .highPriorityGesture(flipGesture)
+    private func offset(for i: Int) -> CGFloat {
+        CGFloat(i - safeIndex) + dragOffset
     }
 
-    private func tableShadow(width: CGFloat) -> some View {
-        Ellipse()
-            .fill(Color.black.opacity(0.28))
-            .frame(width: width * 0.86, height: 22)
-            .blur(radius: 10)
-            .allowsHitTesting(false)
+    private func zIndex(for i: Int) -> Double {
+        10 - abs(offset(for: i))
     }
 
-    private func hardcover(width: CGFloat, height: CGFloat, spine: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        return ZStack {
-            shape
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.18, green: 0.20, blue: 0.24),
-                            Color(red: 0.28, green: 0.31, blue: 0.36),
-                            Color(red: 0.16, green: 0.17, blue: 0.21)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay {
-                    if #available(iOS 26.0, *) {
-                        Color.clear.glassEffect(.regular, in: shape)
-                            .opacity(0.55)
-                    } else {
-                        shape.fill(.ultraThinMaterial.opacity(0.35))
-                    }
-                }
-                .overlay {
-                    shape.strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.42),
-                                Color.white.opacity(0.08),
-                                Color.white.opacity(0.22)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.2
-                    )
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.6)
-                        .padding(5)
-                }
-                .overlay {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.10),
-                                    Color.black.opacity(0.35),
-                                    Color.white.opacity(0.08)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: spine + 6)
-                }
+    private func coverCard(_ movie: Movie, at i: Int) -> some View {
+        let x = offset(for: i)
+        let absX = abs(x)
+        let angle = Double(x.clamped(to: -3 ... 3)) * -52
+        let scale = max(0.72, 1 - absX * 0.12)
+        let opacity = max(0.28, 1 - absX * 0.22)
+        let lift = absX < 0.15 ? 8.0 : 0.0
 
-            // 封面厚度：底部和外侧一圈暗边
-            shape
-                .stroke(Color.black.opacity(0.45), lineWidth: 3)
-                .offset(y: 3)
-                .opacity(0.55)
-                .blendMode(.multiply)
+        return NavigationLink {
+            MovieDetailView(movieID: movie.id)
+        } label: {
+            poster(movie)
         }
-        .frame(width: width, height: height)
-        .shadow(color: .black.opacity(0.38), radius: 22, y: 16)
-        .allowsHitTesting(false)
-    }
-
-    private func pageStack(height: CGFloat, onLeft: Bool) -> some View {
-        HStack(spacing: 0.8) {
-            ForEach(0..<7, id: \.self) { i in
-                let shade = 0.96 - Double(i) * 0.05
-                Capsule()
-                    .fill(Color(white: shade))
-                    .frame(width: 1.4, height: height - CGFloat(i) * 3)
-                    .overlay {
-                        Capsule().strokeBorder(Color.black.opacity(0.08), lineWidth: 0.3)
-                    }
-            }
-        }
+        .buttonStyle(.plain)
+        .frame(width: cardW, height: cardH)
+        .scaleEffect(scale)
         .rotation3DEffect(
-            .degrees(onLeft ? 18 : -18),
+            .degrees(angle),
             axis: (x: 0, y: 1, z: 0),
-            perspective: 0.6
+            perspective: 0.55
         )
-        .allowsHitTesting(false)
-    }
-
-    private func spineBlock(height: CGFloat, width: CGFloat) -> some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.12, green: 0.13, blue: 0.16),
-                    Color(red: 0.38, green: 0.40, blue: 0.45),
-                    Color(red: 0.14, green: 0.15, blue: 0.18)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.35),
-                    Color.clear,
-                    Color.black.opacity(0.28)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            // 书脊高光
-            Capsule()
-                .fill(Color.white.opacity(0.28))
-                .frame(width: 2.2)
-                .blur(radius: 0.4)
-            VStack(spacing: 7) {
-                ForEach(0..<5, id: \.self) { _ in
-                    Capsule()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: width * 0.55, height: 2)
-                }
-            }
-            .padding(.vertical, 16)
-        }
-        .frame(width: width, height: height)
-        .overlay {
-            Rectangle()
-                .strokeBorder(Color.black.opacity(0.35), lineWidth: 0.6)
-        }
-        .allowsHitTesting(false)
-    }
-
-    private enum PageSide { case left, right }
-
-    private func spreadPage(_ movie: Movie?, size: CGSize, side: PageSide, fold: Double) -> some View {
-        let shape = pageShape(side)
-        let yAngle: Double = side == .left ? fold : -fold
-        return Group {
-            if let movie {
-                NavigationLink {
-                    MovieDetailView(movieID: movie.id)
-                } label: {
-                    cover(movie, size: size, side: side)
-                }
-                .buttonStyle(.plain)
-            } else {
-                paperBlank(size: size, side: side)
-            }
-        }
-        .clipShape(shape)
-        .overlay {
-            shape.strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
-        }
-        .overlay(alignment: side == .left ? .trailing : .leading) {
-            LinearGradient(
-                colors: [Color.black.opacity(0.38), Color.black.opacity(0.08), Color.clear],
-                startPoint: side == .left ? .trailing : .leading,
-                endPoint: side == .left ? .leading : .trailing
-            )
-            .frame(width: size.width * 0.22)
-            .allowsHitTesting(false)
-        }
-        .rotation3DEffect(
-            .degrees(yAngle),
-            axis: (x: 0, y: 1, z: 0),
-            anchor: side == .left ? .trailing : .leading,
-            perspective: 0.65
-        )
-        .shadow(color: .black.opacity(0.22), radius: 8, y: 4)
-    }
-
-    private func flippingLeaf(
-        front: Movie?,
-        back: Movie?,
-        size: CGSize,
-        side: PageSide,
-        angle: Double
-    ) -> some View {
-        let showFront = abs(angle) < 90
-        let shape = pageShape(side)
-        let rest = side == .right ? -restFold : restFold
-        return ZStack {
-            Group {
-                if let front {
-                    cover(front, size: size, side: side)
-                } else {
-                    paperBlank(size: size, side: side)
-                }
-            }
-            .opacity(showFront ? 1 : 0)
-
-            Group {
-                if let back {
-                    cover(back, size: size, side: side == .left ? .right : .left)
-                } else {
-                    paperBlank(size: size, side: side == .left ? .right : .left)
-                }
-            }
-            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-            .opacity(showFront ? 0 : 1)
-        }
-        .frame(width: size.width, height: size.height)
-        .clipShape(shape)
-        .overlay {
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.04 + abs(angle / 180) * 0.28),
-                    Color.clear,
-                    Color.white.opacity(0.16)
-                ],
-                startPoint: side == .right ? .leading : .trailing,
-                endPoint: side == .right ? .trailing : .leading
-            )
-            .allowsHitTesting(false)
-        }
-        .rotation3DEffect(
-            .degrees(rest + angle),
-            axis: (x: 0, y: 1, z: 0),
-            anchor: side == .right ? .leading : .trailing,
-            perspective: 0.58
-        )
+        .offset(x: x * spacing, y: -lift)
+        .opacity(opacity)
         .shadow(
-            color: .black.opacity(0.22 + abs(angle / 180) * 0.28),
-            radius: 12 + abs(angle / 16),
-            x: side == .right ? 10 : -10,
-            y: 8
+            color: .black.opacity(absX < 0.4 ? 0.28 : 0.12),
+            radius: absX < 0.4 ? 18 : 8,
+            y: absX < 0.4 ? 10 : 4
         )
-        .allowsHitTesting(false)
+        .allowsHitTesting(absX < 0.55)
     }
 
-    private func pageShape(_ side: PageSide) -> UnevenRoundedRectangle {
-        if side == .left {
-            return UnevenRoundedRectangle(
-                topLeadingRadius: 3,
-                bottomLeadingRadius: 3,
-                bottomTrailingRadius: 1,
-                topTrailingRadius: 1,
-                style: .continuous
-            )
-        }
-        return UnevenRoundedRectangle(
-            topLeadingRadius: 1,
-            bottomLeadingRadius: 1,
-            bottomTrailingRadius: 3,
-            topTrailingRadius: 3,
-            style: .continuous
-        )
-    }
-
-    private func cover(_ movie: Movie, size: CGSize, side: PageSide) -> some View {
-        ZStack {
-            Color(white: 0.93)
+    private func poster(_ movie: Movie) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        return ZStack {
+            Color(white: 0.12)
             JavDBImage(url: movie.thumbURL ?? movie.coverURL)
-                .frame(width: size.width, height: size.height)
+                .frame(width: cardW, height: cardH)
                 .clipped()
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.16),
+                    Color.white.opacity(0.18),
                     Color.clear,
-                    Color.black.opacity(0.10)
+                    Color.black.opacity(0.18)
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
             .allowsHitTesting(false)
 
@@ -429,8 +129,8 @@ struct MovieBookFlipView: View {
                 Text(badge)
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
                     .background(
                         badge.contains("中字")
                             ? JAVDBPalette.cnsubOrange
@@ -438,67 +138,53 @@ struct MovieBookFlipView: View {
                         in: Capsule()
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(6)
+                    .padding(8)
                     .allowsHitTesting(false)
             }
         }
-        .frame(width: size.width, height: size.height)
-        .contentShape(Rectangle())
-    }
-
-    private func paperBlank(size: CGSize, side: PageSide) -> some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.97, green: 0.95, blue: 0.90),
-                    Color(red: 0.93, green: 0.90, blue: 0.84)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+        .clipShape(shape)
+        .overlay {
+            shape.strokeBorder(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.45),
+                        Color.white.opacity(0.08)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.8
             )
-            ForEach(0..<8, id: \.self) { i in
-                Rectangle()
-                    .fill(Color.black.opacity(0.04))
-                    .frame(height: 1)
-                    .padding(.horizontal, 14)
-                    .offset(y: CGFloat(i - 4) * 16)
-            }
         }
-        .frame(width: size.width, height: size.height)
+        .contentShape(shape)
     }
 
-    private func captions(pageW: CGFloat, spine: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: spine) {
-            caption(for: leftMovie)
-                .frame(width: pageW)
-            caption(for: rightMovie)
-                .frame(width: pageW)
-        }
-        .padding(.horizontal, 8)
-    }
-
-    private func caption(for movie: Movie?) -> some View {
-        VStack(spacing: 2) {
-            if let movie {
+    private var caption: some View {
+        VStack(spacing: 3) {
+            if let movie = current {
                 Text(movie.displayTitle)
-                    .font(.caption.weight(.medium))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                Text(movie.displayNumber)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tint)
+                HStack(spacing: 8) {
+                    Text(movie.displayNumber)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tint)
+                    if let date = movie.releaseDate, !date.isEmpty {
+                        Text(date)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .padding(.horizontal, 6)
-        .liquidGlassRect(cornerRadius: 12, interactive: false)
+        .padding(.horizontal, 20)
+        .animation(.easeOut(duration: 0.18), value: current?.id)
     }
 
     private var indicator: some View {
-        let start = movies.isEmpty ? 0 : safeSpread * 2 + 1
-        let end = min(movies.count, safeSpread * 2 + 2)
-        return Text(movies.isEmpty ? "0 / 0" : "\(start)–\(end) / \(movies.count)")
+        Text(movies.isEmpty ? "0 / 0" : "\(safeIndex + 1) / \(movies.count)")
             .font(.caption.weight(.medium))
             .monospacedDigit()
             .padding(.horizontal, 12)
@@ -506,47 +192,47 @@ struct MovieBookFlipView: View {
             .liquidGlass(interactive: false)
     }
 
-    private var flipGesture: some Gesture {
-        DragGesture(minimumDistance: 16, coordinateSpace: .global)
+    private var drag: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
             .onChanged { value in
                 guard !isSettling else { return }
-                if value.startLocation.x < 18 { return }
+                if value.startLocation.x < 16 { return }
                 let dx = value.translation.width
                 let dy = value.translation.height
-                guard abs(dx) > abs(dy) * 0.55 else { return }
-                dragX = dx
+                guard abs(dx) > abs(dy) * 0.4 else { return }
+                var next = dx
+                if index <= 0, dx > 0 { next = dx * 0.22 }
+                if index >= movies.count - 1, dx < 0 { next = dx * 0.22 }
+                dragX = next
             }
             .onEnded { value in
                 guard !isSettling else { return }
-                settle(translation: value.translation.width, velocity: value.predictedEndTranslation.width)
+                settle(translation: value.translation.width, predicted: value.predictedEndTranslation.width)
             }
     }
 
-    private func settle(translation: CGFloat, velocity: CGFloat) {
-        let predicted = translation + velocity * 0.28
-        let goNext = (progress < -0.18 || predicted < -70) && canGoNext
-        let goPrev = (progress > 0.18 || predicted > 70) && canGoPrev
-        let target: CGFloat
-        if goNext { target = -pageWidth }
-        else if goPrev { target = pageWidth }
-        else { target = 0 }
+    private func settle(translation: CGFloat, predicted: CGFloat) {
+        let projected = (translation + predicted * 0.35) / max(spacing, 1)
+        let delta = -Int(projected.rounded())
+        let from = index
+        let target = min(max(0, from + delta), max(0, movies.count - 1))
+        let remain = CGFloat(from - target) * spacing
 
         isSettling = true
-        withAnimation(.interpolatingSpring(stiffness: 170, damping: 22)) {
-            dragX = target
+        withAnimation(.interpolatingSpring(stiffness: 210, damping: 26)) {
+            dragX = remain
         } completion: {
             var t = Transaction()
             t.disablesAnimations = true
             withTransaction(t) {
-                if goNext { spread = min(spread + 1, spreadCount - 1) }
-                if goPrev { spread = max(spread - 1, 0) }
+                index = target
                 dragX = 0
                 isSettling = false
             }
-            if goNext || goPrev {
+            if target != from {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
-            if safeSpread >= spreadCount - 2 {
+            if target >= movies.count - 4 {
                 onNearEnd?()
             }
         }
