@@ -196,13 +196,7 @@ struct MovieDetailView: View {
                 .pressableGlass(scale: 0.9)
                 .padding(12)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(.white.opacity(0.22), lineWidth: 0.6)
-                    .allowsHitTesting(false)
-            }
-            .shadow(color: .black.opacity(0.18), radius: 16, y: 8)
+            .liquidCover(cornerRadius: 16)
             .task(id: movie.id) {
                 let names = movie.actors?.compactMap(\.name) ?? movie.actorNames ?? []
                 tenhowCoverURL = await TenhowCoverResolver.shared.coverURL(
@@ -373,8 +367,7 @@ struct MovieDetailView: View {
         HStack(alignment: .top, spacing: 12) {
             JavDBImage(url: movie.coverURL ?? movie.thumbURL, fallbackURL: movie.hdCoverURL)
                 .frame(width: 120, height: 168)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .shadow(radius: 3)
+                .liquidCover(cornerRadius: 10)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(movie.displayNumber)
@@ -520,8 +513,7 @@ struct MovieDetailView: View {
                     ForEach(Array(images.enumerated()), id: \.element.id) { idx, img in
                         JavDBImage(url: img.largeURL ?? img.thumbURL)
                             .frame(width: 260, height: 160)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .glassMediaFrame(cornerRadius: 14)
+                            .liquidCover(cornerRadius: 14)
                     }
                 }
                 .padding(.horizontal)
@@ -587,8 +579,7 @@ struct MovieDetailView: View {
                         .frame(width: 64, height: 64)
                         .liquidGlassCircle()
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .glassMediaFrame(cornerRadius: 16)
+                .liquidCover(cornerRadius: 16)
             }
             .pressableGlass(scale: 0.98)
         }

@@ -221,8 +221,7 @@ struct RankingsView: View {
                     JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                         .frame(width: coverW, height: coverH)
                         .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .glassMediaFrame(cornerRadius: 12)
+                        .liquidCover(cornerRadius: 12)
                         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     GlassChip(
                         text: "\(rank)",
@@ -249,7 +248,7 @@ struct RankingsView: View {
                 RankingPreviewCarousel(movie: movie)
                     .frame(maxWidth: .infinity)
                     .frame(height: coverH)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .liquidCover(cornerRadius: 8)
             }
             Text(movie.displayTitle)
                 .font(.system(size: 15))
@@ -347,7 +346,7 @@ private struct ActorRankingGridContent: View {
                                 ClippedAspectFill(aspectRatio: 1) {
                                     JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                                 }
-                                .glassMediaFrame(cornerRadius: 8)
+                                .liquidCover(cornerRadius: 8)
                                 GlassChip(
                                     text: "\(idx + 1)",
                                     tint: idx < 3 ? .orange : .blue,

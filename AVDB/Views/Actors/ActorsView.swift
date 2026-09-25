@@ -169,18 +169,7 @@ struct ActorsView: View {
             ClippedAspectFill(aspectRatio: 1) {
                 JavDBImage(url: actor.avatarURL ?? actor.coverURL)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [.white.opacity(0.45), .white.opacity(0.05), .black.opacity(0.06)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.8
-                    )
-            }
-            .shadow(color: .black.opacity(0.1), radius: 6, y: 3)
+            .liquidCover(cornerRadius: 12)
             Text(actor.name ?? "")
                 .font(.system(size: 13))
                 .foregroundColor(.primary)
@@ -497,7 +486,7 @@ struct ActorDetailView: View {
         HStack(alignment: .top, spacing: 16) {
             JavDBImage(url: actor.avatarURL ?? actor.coverURL)
                 .frame(width: 88, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .liquidCover(cornerRadius: 12)
             VStack(alignment: .leading, spacing: 6) {
                 Text(actor.displayName)
                     .font(.title3.bold())

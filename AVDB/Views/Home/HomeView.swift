@@ -309,7 +309,7 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .glassMediaFrame(cornerRadius: 16)
+            .liquidCover(cornerRadius: 16)
             .padding(.horizontal, AdaptiveLayout.gridPadding)
         }
         .pressableGlass(scale: 0.98)
@@ -658,7 +658,7 @@ private struct RecommendBannerCard: View {
             .allowsHitTesting(false)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .glassMediaFrame(cornerRadius: 16)
+        .liquidCover(cornerRadius: 16)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

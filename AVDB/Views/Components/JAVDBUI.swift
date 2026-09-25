@@ -407,7 +407,7 @@ struct MoviePosterCard: View {
                         }
                     }
             }
-            .glassMediaFrame(cornerRadius: 8)
+            .liquidCover(cornerRadius: 12)
 
             Text(movie.displayTitle)
                 .font(.subheadline)

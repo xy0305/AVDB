@@ -505,6 +505,42 @@ extension View {
             .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
             .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
     }
+
+    /// 封面液态玻璃：系统玻璃罩在封面上，不吃点击。
+    /// iOS 26 用 .glassEffect；更早系统用材质罩 + 高光棱。
+    func liquidCover(cornerRadius: CGFloat = 12) -> some View {
+        modifier(LiquidCoverModifier(cornerRadius: cornerRadius))
+    }
+}
+
+private struct LiquidCoverModifier: ViewModifier {
+    var cornerRadius: CGFloat = 12
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .clipShape(shape)
+            .overlay {
+                Group {
+                    if #available(iOS 26.0, *) {
+                        shape.fill(.clear).glassEffect(.regular, in: shape)
+                    } else {
+                        shape.fill(.ultraThinMaterial).opacity(0.28)
+                        shape.fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.28), .clear, .black.opacity(0.06)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+            .overlay { GlassRim(shape: shape, lineWidth: 0.8) }
+            .shadow(color: .black.opacity(0.10), radius: 10, y: 5)
+            .overlay { shape.fill(.clear).allowsHitTesting(false) }
+    }
 }
 
 private struct StaggerAppearModifier: ViewModifier {
