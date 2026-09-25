@@ -230,7 +230,7 @@ struct SegmentedTabBar<Tab: Hashable>: View {
             HStack(spacing: 0) {
                 ForEach(tabs, id: \.0) { tab, title in
                     Button {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                        withAnimation(GlassMotion.select) {
                             selection = tab
                         }
                     } label: {
@@ -330,7 +330,7 @@ private struct TabSwipeModifier<Tab: Hashable>: ViewModifier {
                     guard let idx = tabs.firstIndex(of: selection) else { return }
                     let next = dx < 0 ? idx + 1 : idx - 1
                     guard tabs.indices.contains(next) else { return }
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                    withAnimation(GlassMotion.select) {
                         selection = tabs[next]
                     }
                 }
@@ -372,9 +372,9 @@ struct MoviePosterCard: View {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL)
                     .overlay {
                         LinearGradient(
-                            colors: [.white.opacity(0.18), .clear, .black.opacity(0.08)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            colors: [.white.opacity(0.10), .clear],
+                            startPoint: .top,
+                            endPoint: .center
                         )
                         .allowsHitTesting(false)
                     }
@@ -510,14 +510,12 @@ struct EmptyStateView: View {
     let text: String
     var body: some View {
         VStack(spacing: 10) {
-            ZStack {
-                SoftPulseRing(color: .blue.opacity(0.45))
-                    .frame(width: 56, height: 56)
-                ProgressView()
-            }
-            Text(text).font(.caption).foregroundStyle(.secondary)
+            ProgressView()
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .padding(.vertical, 28)
     }
 }

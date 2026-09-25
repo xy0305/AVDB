@@ -156,7 +156,6 @@ struct ListDetailView: View {
                     } label: {
                         Image(systemName: isFollowing ? "eye.fill" : "eye")
                             .foregroundColor(isFollowing ? .blue : .primary)
-                            .symbolEffect(.bounce, value: isFollowing)
                     }
                     .pressableGlass(scale: 0.9)
                     .disabled(isFollowingOp)
@@ -166,7 +165,6 @@ struct ListDetailView: View {
                     } label: {
                         Image(systemName: isCollected ? "heart.fill" : "heart")
                             .foregroundColor(isCollected ? .red : .primary)
-                            .symbolEffect(.bounce, value: isCollected)
                     }
                     .pressableGlass(scale: 0.9)
                     .disabled(isCollecting)

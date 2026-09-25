@@ -155,7 +155,7 @@ struct MovieDetailView: View {
             .padding(.bottom, 40)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.systemBackground))
-            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34))
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
         }
         .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
         .frame(maxWidth: .infinity)
@@ -185,21 +185,22 @@ struct MovieDetailView: View {
                     GlassHaptic.tap()
                     play115 = true
                 } label: {
-                    ZStack {
-                        SoftPulseRing(color: .white.opacity(0.9))
-                            .frame(width: 72, height: 72)
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.96))
-                            .frame(width: 56, height: 56)
-                            .liquidGlassCircle()
-                    }
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .frame(width: 56, height: 56)
+                        .liquidGlassCircle()
                 }
                 .pressableGlass(scale: 0.9)
                 .padding(12)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .glassMediaFrame(cornerRadius: 14)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.white.opacity(0.22), lineWidth: 0.6)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 16, y: 8)
             .task(id: movie.id) {
                 let names = movie.actors?.compactMap(\.name) ?? movie.actorNames ?? []
                 tenhowCoverURL = await TenhowCoverResolver.shared.coverURL(

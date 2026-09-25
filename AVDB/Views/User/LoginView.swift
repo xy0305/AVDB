@@ -29,7 +29,8 @@ struct LoginView: View {
                 VStack(spacing: 18) {
                     VStack(spacing: 10) {
                         ZStack {
-                            SoftPulseRing(color: .blue)
+                            Circle()
+                                .strokeBorder(Color.accentColor.opacity(0.22), lineWidth: 1)
                                 .frame(width: 88, height: 88)
                             Image(systemName: "person.crop.circle.fill.badge.checkmark")
                                 .font(.system(size: 42, weight: .light))

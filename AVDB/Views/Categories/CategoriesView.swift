@@ -34,6 +34,7 @@ struct CategoriesView: View {
                         if vm.isLoading { ProgressView().padding() }
                     }
                 }
+                .animation(GlassMotion.page, value: catalog)
 
                 filterBar
             }

@@ -42,7 +42,7 @@ struct MyListsView: View {
                         if list.hasMovie == true {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(Color.accentColor)
-                                .symbolEffect(.bounce, value: list.hasMovie)
+                                .contentTransition(.symbolEffect(.replace))
                         }
                     }
                 }

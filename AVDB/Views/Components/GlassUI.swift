@@ -409,85 +409,40 @@ private struct LiquidGlassChromeModifier: ViewModifier {
 
 // MARK: - 全局氛围背景（内容区，不是控件玻璃）
 
-/// 页面底层：冷色渐变 + 缓慢漂浮的柔光斑，形成液态玻璃的「有厚度」感。
+/// 页面底层：静态冷色渐变。不放常驻漂浮光斑，避免整页持续重绘。
 struct LiquidGlassBackground: View {
-    @State private var drift = false
-
     var body: some View {
         ZStack {
             Color(.systemBackground)
-
             LinearGradient(
                 colors: [
-                    Color.blue.opacity(0.14),
-                    Color.cyan.opacity(0.08),
-                    Color.purple.opacity(0.05),
+                    Color.blue.opacity(0.10),
+                    Color.cyan.opacity(0.045),
+                    Color.purple.opacity(0.03),
                     Color.clear
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-
-            // 漂浮光斑：慢速位移 + 缩放，模拟液态折射
-            blob(
-                color: Color.blue.opacity(0.22),
-                size: AdaptiveLayout.isPad ? 280 : 200,
-                x: -0.18, y: -0.22,
-                phase: drift ? 1 : 0
-            )
-            blob(
-                color: Color.cyan.opacity(0.16),
-                size: AdaptiveLayout.isPad ? 240 : 170,
-                x: 0.72, y: -0.05,
-                phase: drift ? 1 : 0
-            )
-            blob(
-                color: Color.purple.opacity(0.12),
-                size: AdaptiveLayout.isPad ? 260 : 190,
-                x: 0.55, y: 0.68,
-                phase: drift ? 1 : 0
-            )
-
             LinearGradient(
-                colors: [.white.opacity(0.18), .clear, .black.opacity(0.04)],
+                colors: [.white.opacity(0.12), .clear],
                 startPoint: .top,
-                endPoint: .bottom
+                endPoint: .center
             )
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
-        .onAppear {
-            withAnimation(
-                .easeInOut(duration: 10)
-                .repeatForever(autoreverses: true)
-            ) {
-                drift.toggle()
-            }
-        }
-    }
-
-    private func blob(color: Color, size: CGFloat, x: CGFloat, y: CGFloat, phase: CGFloat) -> some View {
-        GeometryReader { geo in
-            Circle()
-                .fill(color)
-                .frame(width: size, height: size)
-                .blur(radius: 40)
-                .scaleEffect(phase == 1 ? 1.12 : 0.92)
-                .offset(
-                    x: geo.size.width * x + (phase == 1 ? 18 : -12),
-                    y: geo.size.height * y + (phase == 1 ? 22 : -10)
-                )
-        }
     }
 }
 
 // MARK: - 动效 / 微交互
 
 enum GlassMotion {
-    static let press = Animation.spring(response: 0.22, dampingFraction: 0.72)
-    static let soft = Animation.spring(response: 0.38, dampingFraction: 0.86)
-    static let enter = Animation.spring(response: 0.48, dampingFraction: 0.84)
-    static let select = Animation.spring(response: 0.3, dampingFraction: 0.78)
+    static let press = Animation.spring(response: 0.22, dampingFraction: 0.86)
+    static let soft = Animation.spring(response: 0.32, dampingFraction: 0.9)
+    static let enter = Animation.spring(response: 0.36, dampingFraction: 0.88)
+    static let select = Animation.spring(response: 0.26, dampingFraction: 0.86)
+    static let page = Animation.easeInOut(duration: 0.28)
 }
 
 /// 按压反馈：只用透明度，不用 scale。
@@ -553,37 +508,18 @@ extension View {
 }
 
 private struct StaggerAppearModifier: ViewModifier {
-    let index: Int
-    @State private var shown = false
-
     func body(content: Content) -> some View {
         content
-            .opacity(shown ? 1 : 0)
-            .onAppear {
-                // 只做极短淡入，不用位移/缩放，避免转场和滚动时晃
-                let delay = Double(min(index, 4)) * 0.01
-                withAnimation(.easeOut(duration: 0.12).delay(delay)) {
-                    shown = true
-                }
-            }
     }
 }
 
 /// 柔光呼吸环（头像 / 播放钮）。
 struct SoftPulseRing: View {
     var color: Color = .blue
-    @State private var pulse = false
 
     var body: some View {
         Circle()
-            .strokeBorder(color.opacity(0.45), lineWidth: 1.5)
-            .scaleEffect(pulse ? 1.12 : 0.96)
-            .opacity(pulse ? 0.2 : 0.55)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
-            }
+            .strokeBorder(color.opacity(0.28), lineWidth: 1)
             .allowsHitTesting(false)
     }
 }
@@ -616,7 +552,7 @@ struct ShimmerView: View {
         }
         .clipped()
         .onAppear {
-            withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) {
+            withAnimation(.easeOut(duration: 0.9)) {
                 phase = 1.2
             }
         }
@@ -681,7 +617,7 @@ struct GlassActionPill: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .symbolEffect(.bounce, value: isSelected)
+                    .contentTransition(.symbolEffect(.replace))
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
             }
@@ -920,10 +856,6 @@ struct GlassEmptyView: View {
             Image(systemName: icon)
                 .font(.system(size: 64, weight: .thin))
                 .foregroundStyle(.secondary)
-                .overlay(alignment: .center) {
-                    SoftPulseRing(color: .blue.opacity(0.5))
-                        .frame(width: 88, height: 88)
-                }
 
             Text(title)
                 .font(.system(size: 20, weight: .semibold))

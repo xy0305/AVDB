@@ -63,6 +63,7 @@ struct ActorsView: View {
                 UnderlineTabBar(tabs: ActorTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                     .padding(.top, 4)
                 content
+                    .animation(GlassMotion.page, value: tab)
             }
             .background {
                 LiquidGlassBackground()

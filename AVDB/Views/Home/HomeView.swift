@@ -140,14 +140,14 @@ struct HomeView: View {
         } label: {
             VStack(spacing: 8) {
                 ZStack {
-                    SoftPulseRing(color: color.opacity(0.7))
+                    Circle()
+                        .strokeBorder(color.opacity(0.28), lineWidth: 1)
                         .frame(width: 68, height: 68)
                     Image(systemName: icon)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(color)
-                        .symbolEffect(.bounce, value: title)
                         .frame(width: 56, height: 56)
-                        .liquidGlassCircle(tint: color.opacity(0.28))
+                        .liquidGlassCircle(tint: color.opacity(0.22))
                 }
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
@@ -601,7 +601,7 @@ private struct RecommendCarousel: View {
                 let ids = movies.map(\.id)
                 let current = currentID ?? ids[0]
                 guard let i = ids.firstIndex(of: current) else { return }
-                withAnimation(.easeInOut(duration: 0.45)) {
+                withAnimation(GlassMotion.page) {
                     currentID = ids[(i + 1) % ids.count]
                 }
             }

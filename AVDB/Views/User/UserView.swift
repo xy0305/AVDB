@@ -20,7 +20,8 @@ struct UserView: View {
                     Section {
                         HStack(spacing: 16) {
                             ZStack {
-                                SoftPulseRing(color: user.isVip == true ? .orange : .blue)
+                                Circle()
+                                    .strokeBorder(Color.accentColor.opacity(0.22), lineWidth: 1)
                                     .frame(width: 76, height: 76)
                                 JavDBImage(url: user.avatarURL)
                                     .frame(width: 64, height: 64)
@@ -149,7 +150,8 @@ struct UserView: View {
                         } label: {
                             HStack(spacing: 12) {
                                 ZStack {
-                                    SoftPulseRing(color: .blue)
+                                    Circle()
+                                        .strokeBorder(Color.accentColor.opacity(0.22), lineWidth: 1)
                                         .frame(width: 56, height: 56)
                                     Image(systemName: "person.crop.circle.badge.plus")
                                         .font(.system(size: 28, weight: .light))
