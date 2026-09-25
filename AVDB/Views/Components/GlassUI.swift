@@ -508,6 +508,8 @@ extension View {
 }
 
 private struct StaggerAppearModifier: ViewModifier {
+    let index: Int
+
     func body(content: Content) -> some View {
         content
     }
