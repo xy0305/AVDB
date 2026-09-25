@@ -21,7 +21,7 @@ struct Pan115PlayerView: View {
             if let url = vm.playURL, vm.errorMessage == nil, !vm.isLoading {
                 KSChromePlayer(
                     url: url,
-                    title: movie.displayNumber,
+                    title: vm.fileName.isEmpty ? movie.displayNumber : vm.fileName,
                     subtitle: vm.qualityLabel,
                     headers: vm.headers
                 )

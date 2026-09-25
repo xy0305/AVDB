@@ -168,7 +168,23 @@ struct KSChromePlayer: View {
         KSOptions.isAutoPlay = true
         o.videoAdaptable = fillMode != .stretch
         o.canStartPictureInPictureAutomaticallyFromInline = false
+        // 杜比视界 / 全景声只有系统 AVPlayer 能点亮设备标志。
+        // 系统解不了时 KSPlayer 会回退 FFmpeg，画面仍可播，只是标志不亮。
+        if preferSystemDolby {
+            o.firstPlayerType = KSAVPlayer.self
+            o.secondPlayerType = KSMEPlayer.self
+        }
         return o
+    }
+
+    /// 只有文件名带杜比标记才优先系统播放器，避免普通片被切走。
+    private var preferSystemDolby: Bool {
+        let text = (title + " " + subtitle).lowercased()
+        return text.contains("dolby")
+            || text.contains("dovi")
+            || text.contains("atmos")
+            || text.contains("hdr10")
+            || text.contains("vision")
     }
 
     var body: some View {
