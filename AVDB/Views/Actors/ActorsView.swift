@@ -362,7 +362,7 @@ struct ActorDetailView: View {
         min(UIScreen.main.bounds.height * 0.72, 640)
     }
     private var currentFilterHeight: CGFloat {
-        min(expandedFilterHeight, max(collapsedFilterHeight, collapsedFilterHeight + filterPanelHeight + filterDrag))
+        min(expandedFilterHeight, max(collapsedFilterHeight, collapsedFilterHeight + filterPanelHeight))
     }
     private var isFilterExpanded: Bool {
         currentFilterHeight > collapsedFilterHeight + 80
