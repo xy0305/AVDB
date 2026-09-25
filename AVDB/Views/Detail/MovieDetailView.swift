@@ -1236,7 +1236,18 @@ struct DraggableReviewsPanel: View {
     let availableHeight: CGFloat
 
     private let collapsedHeight: CGFloat = 76
-    private var maximumHeight: CGFloat { max(300, availableHeight - 8) }
+    private var maximumHeight: CGFloat {
+        let top = max(59, safeTop + 12)
+        return max(300, availableHeight - top)
+    }
+
+    private var safeTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }?
+            .safeAreaInsets.top ?? 59
+    }
     private var mediumHeight: CGFloat { collapsedHeight + (maximumHeight - collapsedHeight) * 0.55 }
 
     @State private var panelState: PanelState = .collapsed
