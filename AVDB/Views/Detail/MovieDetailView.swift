@@ -1241,6 +1241,7 @@ struct DraggableReviewsPanel: View {
 
     @State private var panelState: PanelState = .collapsed
     @State private var dragStartHeight: CGFloat?
+    @State private var listAtTop = true
 
     enum PanelState {
         case collapsed, medium, expanded
@@ -1264,7 +1265,7 @@ struct DraggableReviewsPanel: View {
             headerSection
                 .frame(height: collapsedHeight)
                 .contentShape(Rectangle())
-                .gesture(handleDrag)
+                .highPriorityGesture(handleDrag)
                 .onTapGesture { toggleFromHeader() }
 
             if isContentVisible {
@@ -1286,6 +1287,34 @@ struct DraggableReviewsPanel: View {
         .contentShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 10, y: -2)
         .safeAreaPadding(.bottom)
+    }
+
+    /// 列表在顶部时下拉收起面板，避免评论区把下拉全部吃掉。
+    private var collapseDrag: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .onChanged { value in
+                guard listAtTop, panelState != .collapsed, value.translation.height > 0 else { return }
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                if dragStartHeight == nil { dragStartHeight = panelHeight }
+                let next = (dragStartHeight ?? panelHeight) - value.translation.height
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    panelHeight = min(maximumHeight, max(collapsedHeight, next))
+                }
+            }
+            .onEnded { value in
+                guard listAtTop, value.translation.height > 18,
+                      abs(value.translation.height) > abs(value.translation.width) else {
+                    dragStartHeight = nil
+                    return
+                }
+                let start = dragStartHeight ?? panelHeight
+                dragStartHeight = nil
+                let predicted = start - value.predictedEndTranslation.height
+                let velocityY = value.predictedEndTranslation.height - value.translation.height
+                snap(to: predicted, velocityY: max(velocityY, value.translation.height > 48 ? 1000 : 0))
+            }
     }
 
     private var handleDrag: some Gesture {
@@ -1394,6 +1423,10 @@ struct DraggableReviewsPanel: View {
 
     private var reviewsList: some View {
         ScrollView {
+            Color.clear
+                .frame(height: 1)
+                .onAppear { listAtTop = true }
+                .onDisappear { listAtTop = false }
             LazyVStack(spacing: 12) {
                 if vm.reviews.isEmpty && !vm.isLoading {
                     Text("暂无评论")
@@ -1419,9 +1452,7 @@ struct DraggableReviewsPanel: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .refreshable {
-            await vm.load(movieID: movieID, force: true)
-        }
+        .simultaneousGesture(collapseDrag)
     }
 }
 
