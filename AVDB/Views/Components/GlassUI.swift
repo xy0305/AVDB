@@ -521,25 +521,11 @@ private struct LiquidCoverModifier: ViewModifier {
         content
             .clipShape(shape)
             .overlay {
-                Group {
-                    if #available(iOS 26.0, *) {
-                        shape.fill(.clear).glassEffect(.regular, in: shape)
-                    } else {
-                        shape.fill(.ultraThinMaterial).opacity(0.28)
-                        shape.fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.28), .clear, .black.opacity(0.06)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    }
-                }
-                .allowsHitTesting(false)
+                // 只留棱上的高光，不盖材质。整张 glassEffect 会把封面糊成白块。
+                GlassRim(shape: shape, lineWidth: 0.9)
+                    .allowsHitTesting(false)
             }
-            .overlay { GlassRim(shape: shape, lineWidth: 0.8) }
-            .shadow(color: .black.opacity(0.10), radius: 10, y: 5)
-            .overlay { shape.fill(.clear).allowsHitTesting(false) }
+            .shadow(color: .black.opacity(0.10), radius: 8, y: 4)
     }
 }
 
