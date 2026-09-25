@@ -84,12 +84,28 @@ struct Pan115PlayerView: View {
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
         .confirmationDialog("选择集数", isPresented: $showEpisodes) {
             ForEach(Array(vm.episodes.enumerated()), id: \.element.fileID) { index, file in
-                Button("第 \(index + 1) 集") {
+                Button(episodeTitle(index: index, name: file.name)) {
                     Task { await vm.selectEpisode(index) }
                 }
             }
             Button("取消", role: .cancel) {}
         }
+    }
+
+    /// 4K、文件名含 -c（中文）、restored（破解）标在集数后面。
+    private func episodeTitle(index: Int, name: String) -> String {
+        let lower = name.lowercased()
+        var marks: [String] = []
+        if lower.contains("4k") || lower.contains("2160") { marks.append("4K") }
+        if lower.range(of: #"(^|[^a-z0-9])-c([^a-z0-9]|$)"#, options: .regularExpression) != nil
+            || lower.contains("-c.")
+            || lower.contains("中字")
+            || lower.contains("中文") {
+            marks.append("-c")
+        }
+        if lower.contains("restored") { marks.append("restored") }
+        let base = "第 \(index + 1) 集"
+        return marks.isEmpty ? base : base + "  " + marks.joined(separator: " ")
     }
 }
 
