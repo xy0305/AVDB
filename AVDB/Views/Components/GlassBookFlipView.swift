@@ -96,7 +96,6 @@ struct MovieBookFlipView: View {
             )
             .frame(width: cardW * 1.8, height: 36)
             .offset(y: cardH * 0.48)
-            .blur(radius: 12)
             .allowsHitTesting(false)
     }
 
@@ -227,7 +226,6 @@ struct MovieBookFlipView: View {
             elevation: 0.8
         )
         .padding(.horizontal, 28)
-        .animation(.easeOut(duration: 0.16), value: current?.id)
     }
 
     private var indicator: some View {

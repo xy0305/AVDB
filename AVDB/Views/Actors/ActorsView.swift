@@ -63,7 +63,6 @@ struct ActorsView: View {
                 UnderlineTabBar(tabs: ActorTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                     .padding(.top, 4)
                 content
-                    .animation(GlassMotion.page, value: tab)
             }
             .background {
                 LiquidGlassBackground()
@@ -267,7 +266,7 @@ struct ActorDetailView: View {
     @State private var showLogin = false
     @AppStorage("avdb.actor.browseMode") private var browseMode = "grid"
     @State private var filterPanelHeight: CGFloat = 0
-    @GestureState private var filterDrag: CGFloat = 0
+    @State private var filterDragStart: CGFloat?
 
     private var isBookMode: Bool { browseMode == "book" }
 
@@ -409,18 +408,25 @@ struct ActorDetailView: View {
                     .fill(.ultraThinMaterial)
             }
         }
-        .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86), value: filterPanelHeight)
     }
 
     private var filterPanelDrag: some Gesture {
-        DragGesture(minimumDistance: 2, coordinateSpace: .global)
-            .updating($filterDrag) { value, state, _ in
-                state = -value.translation.height
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
+            .onChanged { value in
+                if filterDragStart == nil { filterDragStart = filterPanelHeight }
+                let next = (filterDragStart ?? filterPanelHeight) - value.translation.height
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    filterPanelHeight = min(expandedFilterHeight - collapsedFilterHeight, max(0, next))
+                }
             }
             .onEnded { value in
-                let projected = filterPanelHeight - value.translation.height - value.predictedEndTranslation.height * 0.35
+                defer { filterDragStart = nil }
+                let start = filterDragStart ?? filterPanelHeight
+                let projected = start - value.predictedEndTranslation.height
                 let mid = (expandedFilterHeight - collapsedFilterHeight) * 0.45
-                withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.86)) {
+                withAnimation(GlassMotion.soft) {
                     filterPanelHeight = projected > mid ? (expandedFilterHeight - collapsedFilterHeight) : 0
                 }
             }

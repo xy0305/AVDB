@@ -58,10 +58,12 @@ struct MovieDetailView: View {
             detailChrome
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: 76)
+        }
+        .overlay(alignment: .bottom) {
             if let movie = vm.movie {
                 DraggableReviewsPanel(
                     movieID: movie.id,
-                    // 官方 App 的“短评”数量对应 comments_count；reviews_count 是评分人数。
                     total: movie.commentsCount ?? 0,
                     panelHeight: $reviewPanelHeight,
                     vm: reviewsVM,
@@ -116,19 +118,19 @@ struct MovieDetailView: View {
     }
 
     private func detailBackground(_ movie: Movie) -> some View {
+        // 进详情时不要对整屏封面做实时 blur，否则 push 转场会掉帧。
         ZStack {
-            JavDBImage(
-                url: movie.coverURL,
-                fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
-                secondFallbackURL: movie.hdBackdropURL,
-                contentMode: .fill
-            )
-            .scaleEffect(1.35)
-            .blur(radius: 42)
-            .opacity(0.58)
-            Color(red: 0.43, green: 0.13, blue: 0.15).opacity(0.68)
+            Color(red: 0.28, green: 0.10, blue: 0.12)
             LinearGradient(
-                colors: [.white.opacity(0.20), .clear, .black.opacity(0.12)],
+                colors: [
+                    Color(red: 0.55, green: 0.16, blue: 0.18).opacity(0.85),
+                    Color(red: 0.22, green: 0.08, blue: 0.10)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            LinearGradient(
+                colors: [.white.opacity(0.16), .clear, .black.opacity(0.18)],
                 startPoint: .top,
                 endPoint: .bottom
             )

@@ -83,8 +83,6 @@ struct RankingsView: View {
             }
 
             content
-                .animation(GlassMotion.page, value: tab)
-                .animation(GlassMotion.page, value: period)
         }
         .background {
             LiquidGlassBackground()
