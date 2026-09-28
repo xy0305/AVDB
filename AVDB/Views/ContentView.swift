@@ -39,26 +39,52 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             HomeView()
-                .tabItem { Label(AppTab.home.title, systemImage: AppTab.home.icon) }
+                .tabItem {
+                    Label(
+                        AppTab.home.title,
+                        systemImage: selectedTab == .home ? "house.fill" : AppTab.home.icon
+                    )
+                }
                 .tag(AppTab.home)
 
             RankingsView()
-                .tabItem { Label(AppTab.rankings.title, systemImage: AppTab.rankings.icon) }
+                .tabItem {
+                    Label(
+                        AppTab.rankings.title,
+                        systemImage: selectedTab == .rankings ? "trophy.fill" : AppTab.rankings.icon
+                    )
+                }
                 .tag(AppTab.rankings)
 
             CategoriesView()
-                .tabItem { Label(AppTab.categories.title, systemImage: AppTab.categories.icon) }
+                .tabItem {
+                    Label(
+                        AppTab.categories.title,
+                        systemImage: selectedTab == .categories ? "square.grid.2x2.fill" : AppTab.categories.icon
+                    )
+                }
                 .tag(AppTab.categories)
 
             ActorsView()
-                .tabItem { Label(AppTab.actors.title, systemImage: AppTab.actors.icon) }
+                .tabItem {
+                    Label(
+                        AppTab.actors.title,
+                        systemImage: selectedTab == .actors ? "person.2.fill" : AppTab.actors.icon
+                    )
+                }
                 .tag(AppTab.actors)
 
             UserView()
-                .tabItem { Label(AppTab.me.title, systemImage: AppTab.me.icon) }
+                .tabItem {
+                    Label(
+                        AppTab.me.title,
+                        systemImage: selectedTab == .me ? "person.crop.circle.fill" : AppTab.me.icon
+                    )
+                }
                 .tag(AppTab.me)
         }
         .tint(JAVDBPalette.accent)
+        .sensoryFeedback(.selection, trigger: selectedTab)
         .modifier(LiquidGlassTabBarModifier())
     }
 }

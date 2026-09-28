@@ -1,36 +1,36 @@
 name: Build IPA
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "AVDB/**"
+      - "AVDB.xcodeproj/**"
+      - ".github/workflows/build-ipa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ipa:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
+    name: Build Release IPA
+    runs-on: macos-26
+    timeout-minutes: 30
 
-      - name: Select Xcode 26 (iOS 26 SDK / Liquid Glass)
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
         run: |
-          set -euo pipefail
-          XCODE=""
-          for p in \
-            /Applications/Xcode_26.3.app \
-            /Applications/Xcode_26.2.app \
-            /Applications/Xcode_26.1.1.app \
-            /Applications/Xcode_26.0.1.app \
-            /Applications/Xcode_26.app; do
-            if [ -d "$p" ]; then XCODE="$p"; break; fi
-          done
-          if [ -z "$XCODE" ]; then
-            echo "Xcode 26 not found. Installed:"
-            ls /Applications | grep -i xcode || true
-            exit 1
-          fi
-          echo "Using $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
+          xcodebuild -showsdks
 
       - name: Build unsigned (iphoneos)
         run: |
@@ -41,35 +41,44 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath "$PWD/DerivedData" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
-            build
+            clean build \
+            | tee "$RUNNER_TEMP/xcodebuild.log"
 
       - name: Package IPA
         run: |
           set -euo pipefail
-          APP=$(find DerivedData/Build/Products -path '*/Release-iphoneos/*.app' | head -1)
-          echo "APP=$APP"
-          test -n "$APP" && test -d "$APP"
-          rm -rf Payload
-          mkdir Payload
-          cp -R "$APP" Payload/
-          find Payload -name '*.xcent' -delete || true
-          find Payload -name 'embedded.mobileprovision' -delete || true
-          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Payload/AVDB.app/Info.plist)
-          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Payload/AVDB.app/Info.plist)
-          NAME="AVDB-unsigned-${VERSION}-${BUILD}.ipa"
-          zip -qry "$NAME" Payload
-          ls -lh "$NAME"
-          echo "IPA_NAME=$NAME" >> "$GITHUB_ENV"
+          app_path="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/AVDB.app"
+          test -d "$app_path"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          ditto "$app_path" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
+          find "$RUNNER_TEMP/ipa/Payload" -name '*.xcent' -delete
+          find "$RUNNER_TEMP/ipa/Payload" -name 'embedded.mobileprovision' -delete
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Info.plist")
+          build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Info.plist")
+          ipa_name="AVDB-unsigned-${version}-${build}.ipa"
+          cd "$RUNNER_TEMP/ipa"
+          zip -qry "$GITHUB_WORKSPACE/$ipa_name" Payload
+          echo "IPA_NAME=$ipa_name" >> "$GITHUB_ENV"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: AVDB-unsigned-ipa
+          name: AVDB-unsigned-${{ github.run_number }}
           path: AVDB-unsigned-*.ipa
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log-${{ github.run_number }}
+          path: ${{ runner.temp }}/xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7

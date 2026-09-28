@@ -480,6 +480,7 @@ struct MoviePosterGrid: View {
                 .buttonStyle(.plain)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
+                .staggerAppear(index: min(idx, 8))
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)

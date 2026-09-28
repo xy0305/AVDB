@@ -409,8 +409,11 @@ private struct LiquidGlassChromeModifier: ViewModifier {
 
 // MARK: - 全局氛围背景（内容区，不是控件玻璃）
 
-/// 页面底层：静态冷色渐变。不放常驻漂浮光斑，避免整页持续重绘。
+/// 页面底层：冷色氛围光在进入时轻柔归位，不做常驻重绘。
 struct LiquidGlassBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isSettled = false
+
     var body: some View {
         ZStack {
             Color(.systemBackground)
@@ -429,9 +432,44 @@ struct LiquidGlassBackground: View {
                 startPoint: .top,
                 endPoint: .center
             )
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.blue.opacity(0.17), Color.blue.opacity(0)],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 170
+                    )
+                )
+                .frame(width: 340, height: 340)
+                .blur(radius: 12)
+                .offset(x: isSettled ? 125 : 95, y: isSettled ? -265 : -235)
+
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.purple.opacity(0.10), Color.cyan.opacity(0.02), Color.clear],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 190
+                    )
+                )
+                .frame(width: 380, height: 380)
+                .blur(radius: 18)
+                .offset(x: isSettled ? -140 : -105, y: isSettled ? 310 : 275)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
+        .onAppear {
+            if reduceMotion {
+                isSettled = true
+            } else {
+                withAnimation(.easeOut(duration: 1.4)) {
+                    isSettled = true
+                }
+            }
+        }
     }
 }
 
@@ -445,14 +483,18 @@ enum GlassMotion {
     static let page = Animation.easeInOut(duration: 0.28)
 }
 
-/// 按压反馈：只用透明度，不用 scale。
-/// scale 会和 Navigation push 转场叠在一起，导致详情页「晃动」。
+/// 按压反馈：轻微压缩、降低透明度并收短阴影，模拟玻璃控件的下沉感。
 struct PressableGlassStyle: ButtonStyle {
     var scale: CGFloat = 0.96
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .opacity(configuration.isPressed ? 0.88 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? scale : 1))
+            .opacity(configuration.isPressed ? 0.86 : 1)
+            .brightness(configuration.isPressed ? -0.025 : 0)
+            .animation(reduceMotion ? nil : GlassMotion.press, value: configuration.isPressed)
     }
 }
 
@@ -531,25 +573,52 @@ private struct LiquidCoverModifier: ViewModifier {
 
 private struct StaggerAppearModifier: ViewModifier {
     let index: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isVisible = false
 
     func body(content: Content) -> some View {
         content
+            .opacity(isVisible ? 1 : 0)
+            .offset(y: isVisible || reduceMotion ? 0 : 12)
+            .scaleEffect(isVisible || reduceMotion ? 1 : 0.985)
+            .onAppear {
+                guard !isVisible else { return }
+                if reduceMotion {
+                    isVisible = true
+                } else {
+                    let delay = Double(min(max(index, 0), 10)) * 0.035
+                    withAnimation(GlassMotion.enter.delay(delay)) {
+                        isVisible = true
+                    }
+                }
+            }
     }
 }
 
 /// 柔光呼吸环（头像 / 播放钮）。
 struct SoftPulseRing: View {
     var color: Color = .blue
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPulsing = false
 
     var body: some View {
         Circle()
             .strokeBorder(color.opacity(0.28), lineWidth: 1)
+            .scaleEffect(reduceMotion ? 1 : (isPulsing ? 1.12 : 0.96))
+            .opacity(reduceMotion ? 1 : (isPulsing ? 0.15 : 0.75))
             .allowsHitTesting(false)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                    isPulsing = true
+                }
+            }
     }
 }
 
 /// 骨架屏微光扫过。
 struct ShimmerView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: CGFloat = -1
 
     var body: some View {
@@ -576,7 +645,11 @@ struct ShimmerView: View {
         }
         .clipped()
         .onAppear {
-            withAnimation(.easeOut(duration: 0.9)) {
+            withAnimation(
+                reduceMotion
+                    ? .easeOut(duration: 0.01)
+                    : .linear(duration: 1.35).repeatForever(autoreverses: false)
+            ) {
                 phase = 1.2
             }
         }
