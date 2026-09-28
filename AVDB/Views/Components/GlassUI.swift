@@ -443,7 +443,6 @@ struct LiquidGlassBackground: View {
                     )
                 )
                 .frame(width: 340, height: 340)
-                .blur(radius: 12)
                 .offset(x: isSettled ? 125 : 95, y: isSettled ? -265 : -235)
 
             Circle()
@@ -456,7 +455,6 @@ struct LiquidGlassBackground: View {
                     )
                 )
                 .frame(width: 380, height: 380)
-                .blur(radius: 18)
                 .offset(x: isSettled ? -140 : -105, y: isSettled ? 310 : 275)
         }
         .ignoresSafeArea()
@@ -511,8 +509,8 @@ extension View {
     }
 
     /// 错落入场：轻微上浮 + 缩放淡入。
-    func staggerAppear(index: Int = 0) -> some View {
-        modifier(StaggerAppearModifier(index: index))
+    func staggerAppear(index: Int = 0, enabled: Bool = true) -> some View {
+        modifier(StaggerAppearModifier(index: index, enabled: enabled))
     }
 
     /// 玻璃厚度棱 + 内高光（替换旧的单层描边）。
@@ -573,15 +571,17 @@ private struct LiquidCoverModifier: ViewModifier {
 
 private struct StaggerAppearModifier: ViewModifier {
     let index: Int
+    let enabled: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isVisible = false
 
     func body(content: Content) -> some View {
         content
-            .opacity(isVisible ? 1 : 0)
-            .offset(y: isVisible || reduceMotion ? 0 : 12)
-            .scaleEffect(isVisible || reduceMotion ? 1 : 0.985)
+            .opacity(enabled ? (isVisible ? 1 : 0) : 1)
+            .offset(y: !enabled || isVisible || reduceMotion ? 0 : 12)
+            .scaleEffect(!enabled || isVisible || reduceMotion ? 1 : 0.985)
             .onAppear {
+                guard enabled else { return }
                 guard !isVisible else { return }
                 if reduceMotion {
                     isVisible = true

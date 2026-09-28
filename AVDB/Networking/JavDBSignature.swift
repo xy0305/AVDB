@@ -61,11 +61,16 @@ public enum JavDBSignature {
     public static func decryptImage(_ enc: Data) -> Data {
         guard !enc.isEmpty, enc.count > 1 else { return Data() }
         let key = enc[enc.startIndex]
-        var out = Data(capacity: enc.count - 1)
-        for i in 1..<enc.count {
-            out.append(enc[enc.startIndex + i] ^ key)
+        return Data(unsafeUninitializedCapacity: enc.count - 1) { output, initializedCount in
+            enc.withUnsafeBytes { rawInput in
+                let input = rawInput.bindMemory(to: UInt8.self)
+                let destination = output.bindMemory(to: UInt8.self)
+                for index in 1..<input.count {
+                    destination[index - 1] = input[index] ^ key
+                }
+                initializedCount = input.count - 1
+            }
         }
-        return out
     }
 }
 

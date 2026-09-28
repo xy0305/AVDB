@@ -278,11 +278,12 @@ private struct RankingPreviewCarousel: View {
     @State private var selection = 0
 
     private var imageURLs: [String] {
-        var urls = (movie.previewImages ?? []).compactMap { $0.largeURL ?? $0.thumbURL }
+        // 列表优先缩略图，避免每一行的轮播同时解码多张大图。
+        var urls = (movie.previewImages ?? []).compactMap { $0.thumbURL ?? $0.largeURL }
         if urls.isEmpty, let backdrop = movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL {
             urls = [backdrop]
         }
-        return Array(urls.prefix(8))
+        return Array(urls.prefix(5))
     }
 
     var body: some View {

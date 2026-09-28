@@ -16,6 +16,8 @@ struct MovieBookFlipView: View {
     @State private var progress: CGFloat = 0
     @State private var gestureStart: CGFloat?
     @State private var lastHapticIndex: Int = 0
+    @State private var selectionFeedback = UISelectionFeedbackGenerator()
+    @State private var impactFeedback = UIImpactFeedbackGenerator(style: .light)
 
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -57,6 +59,8 @@ struct MovieBookFlipView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             lastHapticIndex = currentIndex
+            selectionFeedback.prepare()
+            impactFeedback.prepare()
             if movies.count < 8 { onNearEnd?() }
         }
         .onChange(of: movies.first?.id) { _, _ in
@@ -69,7 +73,10 @@ struct MovieBookFlipView: View {
     }
 
     private var visibleRange: [Int] {
-        movies.indices.filter { abs(CGFloat($0) - progress) <= 3.6 }
+        guard !movies.isEmpty else { return [] }
+        let lower = max(0, Int(floor(progress)) - 4)
+        let upper = min(movies.count - 1, Int(ceil(progress)) + 4)
+        return Array(lower...upper)
     }
 
     private func slot(for i: Int) -> CGFloat {
@@ -260,7 +267,8 @@ struct MovieBookFlipView: View {
                 }
                 let snappedIndex = Int(snapped)
                 if snappedIndex != lastHapticIndex {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    impactFeedback.impactOccurred()
+                    impactFeedback.prepare()
                     lastHapticIndex = snappedIndex
                 }
             }
@@ -276,7 +284,8 @@ struct MovieBookFlipView: View {
     private func hapticIfNeeded() {
         let idx = currentIndex
         if idx != lastHapticIndex {
-            UISelectionFeedbackGenerator().selectionChanged()
+            selectionFeedback.selectionChanged()
+            selectionFeedback.prepare()
             lastHapticIndex = idx
         }
     }

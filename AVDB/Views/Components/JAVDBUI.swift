@@ -392,6 +392,28 @@ struct MoviePosterCard: View {
                             .allowsHitTesting(false)
                         }
                     }
+                    .overlay(alignment: .topTrailing) {
+                        if let score = movie.score, score > 0 {
+                            HStack(spacing: 3) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.yellow)
+                                Text(String(format: "%.1f", score))
+                                    .font(.caption2.weight(.bold))
+                                    .monospacedDigit()
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(.black.opacity(0.52), in: Capsule(style: .continuous))
+                            .overlay {
+                                Capsule(style: .continuous)
+                                    .strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
+                            }
+                            .padding(6)
+                            .allowsHitTesting(false)
+                        }
+                    }
                     .overlay(alignment: .bottomTrailing) {
                         if let badge = movie.playBadge {
                             GlassChip(
@@ -480,7 +502,7 @@ struct MoviePosterGrid: View {
                 .buttonStyle(.plain)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .staggerAppear(index: min(idx, 8))
+                .staggerAppear(index: idx, enabled: idx < columnCount * 2)
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)
@@ -510,11 +532,19 @@ struct SectionHeaderBar: View {
 struct EmptyStateView: View {
     let text: String
     var body: some View {
-        VStack(spacing: 10) {
+        HStack(spacing: 10) {
             ProgressView()
+                .controlSize(.small)
             Text(text)
-                .font(.caption)
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(Color.primary.opacity(0.035), in: Capsule(style: .continuous))
+        .overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.5)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import ImageIO
 import SwiftUI
 
 /// 图片加载错误
@@ -180,17 +181,18 @@ extension String {
     }
 }
 
-/// 图片加载器（单例，带内存 + 磁盘缓存）
-@MainActor
-public final class ImageLoader: ObservableObject {
+/// 图片加载器（单例）：后台解密/降采样、请求合并、按内存压力自动淘汰。
+public actor ImageLoader {
     public static let shared = ImageLoader()
 
-    @Published private var cache: [String: UIImage] = [:]
-
-    private let cacheLimit = 300
+    private let cache = NSCache<NSString, UIImage>()
+    private var inFlight: [String: Task<UIImage?, Never>] = [:]
     private let userAgent = "Mozilla/5.0 (Linux; Android 13; javdb)"
 
-    private init() {}
+    private init() {
+        cache.countLimit = 240
+        cache.totalCostLimit = 192 * 1024 * 1024
+    }
 
     /// 获取图片（自动判断是否需要解密）
     public func load(_ urlString: String?) async -> UIImage? {
@@ -200,25 +202,47 @@ public final class ImageLoader: ObservableObject {
         }
 
         // 命中缓存
-        if let img = cache[urlString] {
+        let cacheKey = urlString as NSString
+        if let img = cache.object(forKey: cacheKey) {
             return img
         }
 
+        // 多个可见卡片请求同一 URL 时复用同一个任务，避免重复下载和解密。
+        if let task = inFlight[urlString] {
+            return await task.value
+        }
+
+        let task = Task.detached(priority: .utility) { [userAgent] in
+            await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent)
+        }
+        inFlight[urlString] = task
+        let image = await task.value
+        inFlight[urlString] = nil
+
+        if let image {
+            let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 1
+            cache.setObject(image, forKey: cacheKey, cost: cost)
+        }
+        return image
+    }
+
+    private static func isExternalCover(_ urlString: String) -> Bool {
+        urlString.contains("pics.dmm.co.jp") || urlString.contains("image.mgstage.com")
+    }
+
+    /// 判断是否为 App 专用加密 CDN（tp.spfcas.com）
+    private static func isEncryptedCDN(_ urlString: String) -> Bool {
+        return urlString.contains(JavDBConstants.imageCDNHost)
+    }
+
+    private static func fetchImage(url: URL, urlString: String, userAgent: String) async -> UIImage? {
         do {
-            let image: UIImage
-            if isEncryptedCDN(urlString) {
-                let encrypted = try await download(url)
-                let decrypted = JavDBSignature.decryptImage(encrypted)
-                guard let img = UIImage(data: decrypted) else {
-                    throw ImageLoaderError.decryptFailed
-                }
-                image = img
-            } else {
-                let data = try await download(url)
-                guard let img = UIImage(data: data) else {
-                    throw ImageLoaderError.invalidData
-                }
-                image = img
+            let downloaded = try await download(url, userAgent: userAgent)
+            let imageData = isEncryptedCDN(urlString)
+                ? JavDBSignature.decryptImage(downloaded)
+                : downloaded
+            guard let image = downsample(imageData, maxPixelSize: 2048) else {
+                throw ImageLoaderError.invalidData
             }
 
             // DMM/MGS 某些地址会返回通用 NOW 占位图：ps 为 147x200，
@@ -229,28 +253,17 @@ public final class ImageLoader: ObservableObject {
                     && image.size.height > image.size.width
                 if tooSmall || portraitBackdrop { throw ImageLoaderError.invalidData }
             }
-            cache[urlString] = image
-            if cache.count > cacheLimit {
-                cache.removeAll()
-            }
             return image
         } catch {
             return nil
         }
     }
 
-    private func isExternalCover(_ urlString: String) -> Bool {
-        urlString.contains("pics.dmm.co.jp") || urlString.contains("image.mgstage.com")
-    }
-
-    /// 判断是否为 App 专用加密 CDN（tp.spfcas.com）
-    private func isEncryptedCDN(_ urlString: String) -> Bool {
-        return urlString.contains(JavDBConstants.imageCDNHost)
-    }
-
-    private func download(_ url: URL) async throws -> Data {
+    private static func download(_ url: URL, userAgent: String) async throws -> Data {
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.cachePolicy = .returnCacheDataElseLoad
+        request.timeoutInterval = 20
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw ImageLoaderError.downloadFailed
@@ -258,9 +271,27 @@ public final class ImageLoader: ObservableObject {
         return data
     }
 
+    /// 提前解码并限制纹理尺寸，避免原始大图在滚动期间触发主线程解码和内存峰值。
+    private static func downsample(_ data: Data, maxPixelSize: Int) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
+            return nil
+        }
+        let options = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ] as CFDictionary
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
     /// 清空缓存
     public func clearCache() {
-        cache.removeAll()
+        cache.removeAllObjects()
     }
 }
 
@@ -272,7 +303,6 @@ public struct JavDBImage: View {
     let contentMode: ContentMode
 
     @State private var image: UIImage?
-    @State private var loading = false
 
     public init(
         url: String?,
@@ -314,7 +344,6 @@ public struct JavDBImage: View {
             .task(id: imageURLs.joined(separator: "|")) {
             // task(id:) 在候选 URL 改变时会取消旧任务；不能用 loading 拦截，
             // 否则 Tenhow poster 稍晚解析完成时会继续显示先加载到的横版 thumb。
-            loading = true
             image = nil
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
@@ -325,17 +354,24 @@ public struct JavDBImage: View {
                     break
                 }
             }
-            loading = false
         }
     }
 
     private var placeholder: some View {
         ZStack {
-            Color(.systemGray6)
-            Image(systemName: "film")
-                .font(.system(size: 22, weight: .light))
-                .foregroundColor(.gray.opacity(0.7))
+            LinearGradient(
+                colors: [Color(.systemGray6), Color(.systemGray5).opacity(0.7)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Circle()
+                .fill(.white.opacity(0.42))
+                .frame(width: 48, height: 48)
+            Image(systemName: "film.stack")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.secondary)
         }
+        .accessibilityHidden(true)
     }
 }
 
