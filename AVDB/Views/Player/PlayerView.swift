@@ -356,54 +356,63 @@ struct KSChromePlayer: View {
             UIScreen.main.brightness = value
         case .volume:
             SystemVolume.set(Float(value))
-        case nil:
+        case .seek, nil:
             break
         }
     }
 
+    @ViewBuilder
     private func overlayHUD(_ kind: OverlayKind) -> some View {
         if kind == .seek {
-            VStack(spacing: 8) {
-                Text(formatTime(seekValue))
-                    .font(.title3.monospacedDigit().weight(.semibold))
-                Text(formatTime(duration))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.7))
-                Capsule()
-                    .fill(Color.white.opacity(0.25))
-                    .frame(width: 160, height: 4)
-                    .overlay(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white)
-                            .frame(width: 160 * min(1, seekValue / max(duration, 0.1)))
-                    }
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            seekHUD
         } else {
-            VStack(spacing: 10) {
-                Image(systemName: kind == .brightness
-                      ? (overlayValue > 0.5 ? "sun.max.fill" : "sun.min.fill")
-                      : (overlayValue > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill"))
-                    .font(.system(size: 22, weight: .semibold))
-                Capsule()
-                    .fill(Color.white.opacity(0.25))
-                    .frame(width: 6, height: 90)
-                    .overlay(alignment: .bottom) {
-                        Capsule()
-                            .fill(Color.white)
-                            .frame(height: 90 * overlayValue)
-                    }
-                    .clipShape(Capsule())
-                Text("\(Int(overlayValue * 100))%")
-                    .font(.caption.monospacedDigit())
-            }
-            .foregroundStyle(.white)
-            .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            levelHUD(kind)
         }
+    }
+
+    private var seekHUD: some View {
+        VStack(spacing: 8) {
+            Text(formatTime(seekValue))
+                .font(.title3.monospacedDigit().weight(.semibold))
+            Text(formatTime(duration))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.7))
+            Capsule()
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 160, height: 4)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: 160 * min(1, seekValue / max(duration, 0.1)))
+                }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func levelHUD(_ kind: OverlayKind) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: kind == .brightness
+                  ? (overlayValue > 0.5 ? "sun.max.fill" : "sun.min.fill")
+                  : (overlayValue > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill"))
+                .font(.system(size: 22, weight: .semibold))
+            Capsule()
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 6, height: 90)
+                .overlay(alignment: .bottom) {
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(height: 90 * overlayValue)
+                }
+                .clipShape(Capsule())
+            Text("\(Int(overlayValue * 100))%")
+                .font(.caption.monospacedDigit())
+        }
+        .foregroundStyle(.white)
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var infoBar: some View {
