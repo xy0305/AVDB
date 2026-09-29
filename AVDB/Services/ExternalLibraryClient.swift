@@ -1,14 +1,14 @@
 import Foundation
 
 public struct ExternalLink: Decodable, Identifiable, Hashable {
-    let id: Int
-    let title: String?
-    let downloadURL: String
-    let sizeMB: Double?
-    let seeders: Int?
-    let chinese: Bool?
-    let uncensored: Bool?
-    let uhd: Bool?
+    public let id: Int
+    public let title: String?
+    public let downloadURL: String
+    public let sizeMB: Double?
+    public let seeders: Int?
+    public let chinese: Bool?
+    public let uncensored: Bool?
+    public let uhd: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, title
