@@ -776,7 +776,6 @@ final class MovieDetailViewModel: ObservableObject {
             magnets = m
         }
         await mergeExternalLinks()
-        await mergeExternalLinks()
     }
 
     private func mergeExternalLinks() async {
@@ -791,6 +790,8 @@ final class MovieDetailViewModel: ObservableObject {
         guard !extra.isEmpty else { return }
         magnets.append(contentsOf: extra)
     }
+
+    func loadReviews() async {
         guard !movieID.isEmpty, reviews.isEmpty else { return }
         if let r = try? await sdk.movieReviews(movieID) {
             reviews = r
