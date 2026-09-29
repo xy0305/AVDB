@@ -142,7 +142,7 @@ private struct OfflineCandidate {
         let is4K = text.contains("4k") || text.contains("2160")
         let isChinese = text.contains("-c") || text.contains("中字") || text.contains("中文") || text.contains("字幕")
         let isCracked = text.contains("破解") || text.contains("无码破解") || text.contains("uncensored") || text.contains("restored")
-        return (is4K ? 1 : 0, isChinese ? 1 : 0, sizeMB, seeders, isCracked ? 1 : 0)
+        return (is4K ? 1 : 0, isChinese ? 1 : 0, sizeMB, isCracked ? 1 : 0, seeders)
     }
 }
 
