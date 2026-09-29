@@ -109,6 +109,43 @@ struct Pan115PlayerView: View {
     }
 }
 
+private struct OfflineCandidate {
+    let url: String
+    let name: String
+    let sizeMB: Double
+    let seeders: Int
+
+    init?(magnet: Magnet) {
+        guard let url = magnet.magnetURL, !url.isEmpty else { return nil }
+        self.url = url
+        name = magnet.displayName
+        sizeMB = Double(magnet.size ?? 0) / 1_000_000
+        seeders = 0
+    }
+
+    init(link: ExternalLink) {
+        url = link.downloadURL
+        name = link.title ?? link.downloadURL
+        sizeMB = link.sizeMB ?? 0
+        seeders = link.seeders ?? 0
+    }
+
+    init(url: String, name: String, sizeMB: Double, seeders: Int) {
+        self.url = url
+        self.name = name
+        self.sizeMB = sizeMB
+        self.seeders = seeders
+    }
+
+    var rank: (Int, Int, Double, Int, Int) {
+        let text = (name + " " + url).lowercased()
+        let is4K = text.contains("4k") || text.contains("2160")
+        let isChinese = text.contains("-c") || text.contains("中字") || text.contains("中文") || text.contains("字幕")
+        let isCracked = text.contains("破解") || text.contains("无码破解") || text.contains("uncensored") || text.contains("restored")
+        return (is4K ? 1 : 0, isChinese ? 1 : 0, sizeMB, seeders, isCracked ? 1 : 0)
+    }
+}
+
 @MainActor
 final class Pan115PlayerViewModel: ObservableObject {
     @Published var isLoading = false
@@ -154,13 +191,17 @@ final class Pan115PlayerViewModel: ObservableObject {
             }
 
             if magnet.isEmpty {
+                status = "网盘没有文件，正在从磁力库选择…"
+            }
+            let chosen = await chooseOfflineLink(movie: movie, fallback: magnet)
+            guard !chosen.isEmpty else {
                 throw Pan115Error.fileNotFound
             }
 
             status = "正在推送到 115 离线…"
             let result = try await Pan115Client.shared.addOfflineTask(
-                url: magnet, cookie: cookie, folderCID: cid)
-            Pan115PlaybackCache.save(movieID: movie.id, magnet: magnet)
+                url: chosen, cookie: cookie, folderCID: cid)
+            Pan115PlaybackCache.save(movieID: movie.id, magnet: chosen)
             switch result {
             case .failed(let msg):
                 throw Pan115Error.api(msg)
@@ -196,6 +237,21 @@ final class Pan115PlayerViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func chooseOfflineLink(movie: Movie, fallback: String) async -> String {
+        var candidates: [OfflineCandidate] = []
+        if let magnets = try? await JavDBSDK.shared.movieMagnets(movie.id) {
+            candidates.append(contentsOf: magnets.compactMap(OfflineCandidate.init))
+        }
+        let external = await ExternalLibraryClient.shared.links(for: movie.displayNumber)
+        candidates.append(contentsOf: external.map(OfflineCandidate.init))
+        if !fallback.isEmpty {
+            candidates.append(OfflineCandidate(url: fallback, name: fallback, sizeMB: 0, seeders: 0))
+        }
+        var seen = Set<String>()
+        candidates = candidates.filter { seen.insert($0.url).inserted }
+        return candidates.sorted { $0.rank > $1.rank }.first?.url ?? ""
     }
 
     private func waitUntilPlayable(
