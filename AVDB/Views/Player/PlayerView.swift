@@ -222,17 +222,18 @@ struct KSChromePlayer: View {
             Color.black
             KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
                 .onAppear { applyFillMode() }
-            // KSVideoPlayer 内部是 UIViewRepresentable，会优先吃掉 SwiftUI 父层拖动。
-            // 在播放器上方放独立透明命中层，确保左右半屏手势稳定收到事件。
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) { location in
-                    skip(by: location.x < width * 0.5 ? -10 : 10)
+            PlayerGestureLayer(
+                onDoubleTap: { x, width in
+                    skip(by: x < width * 0.5 ? -10 : 10)
+                },
+                onSingleTap: { toggleChrome() },
+                onDragChanged: { value, size in
+                    handlePlayerDrag(value, size: size, ended: false)
+                },
+                onDragEnded: { value, size in
+                    handlePlayerDrag(value, size: size, ended: true)
                 }
-                .onTapGesture { toggleChrome() }
-                .highPriorityGesture(sideDrag(width: width, height: height))
-                .padding(.top, 72)
-                .padding(.bottom, 92)
+            )
             if !hasStarted {
                 ProgressView()
                     .tint(.white)
@@ -256,62 +257,60 @@ struct KSChromePlayer: View {
         .contentShape(Rectangle())
     }
 
-    private func sideDrag(width: CGFloat, height: CGFloat) -> some Gesture {
-        // 左右边缘上下滑调亮度/音量；中间横向滑动跟手调进度。
+    private func handlePlayerDrag(_ value: PlayerDragValue, size: CGSize, ended: Bool) {
+        let width = size.width
+        let height = size.height
+        let dx = value.translation.width
+        let dy = value.translation.height
         let travel = max(140, height * 0.42)
-        let scrubWidth = max(180, width * 0.72)
-        return DragGesture(minimumDistance: 8)
-            .onChanged { value in
-                let dx = value.translation.width
-                let dy = value.translation.height
-                let inCenter = value.startLocation.x > width * 0.28 && value.startLocation.x < width * 0.72
-                if !verticalDrag && !horizontalDrag && overlay == nil {
-                    if inCenter && abs(dx) > abs(dy) && abs(dx) > 8 {
-                        horizontalDrag = true
-                        isSeeking = true
-                        scrubStart = currentTime
-                        seekValue = currentTime
-                        overlay = .seek
-                        hideTask?.cancel()
-                    } else if abs(dy) > abs(dx) && abs(dy) > 8 {
-                        verticalDrag = true
-                        hideTask?.cancel()
-                        if value.startLocation.x < width * 0.5 {
-                            overlay = .brightness
-                            dragStart = UIScreen.main.brightness
-                        } else {
-                            overlay = .volume
-                            dragStart = Double(SystemVolume.current)
-                        }
-                        overlayValue = dragStart
-                    } else {
-                        return
-                    }
-                }
-                if horizontalDrag {
-                    let span = max(duration, 1)
-                    let delta = Double(dx / scrubWidth) * min(span, 180)
-                    let next = min(span, max(0, scrubStart + delta))
-                    seekValue = next
-                    overlayValue = next
-                    return
-                }
-                guard verticalDrag, overlay == .brightness || overlay == .volume else { return }
-                let next = min(1, max(0, dragStart - dy / travel))
-                overlayValue = next
-                applyOverlay(next)
+        let scrubWidth = max(160, width * 0.55)
+        if ended {
+            if horizontalDrag {
+                seek(to: seekValue)
+                currentTime = seekValue
+                isSeeking = false
             }
-            .onEnded { _ in
-                if horizontalDrag {
-                    seek(to: seekValue)
-                    currentTime = seekValue
-                    isSeeking = false
+            verticalDrag = false
+            horizontalDrag = false
+            overlay = nil
+            if showChrome { scheduleHide() }
+            return
+        }
+        if !verticalDrag && !horizontalDrag && overlay == nil {
+            if abs(dx) > abs(dy) + 6 {
+                horizontalDrag = true
+                isSeeking = true
+                scrubStart = currentTime
+                seekValue = currentTime
+                overlay = .seek
+                hideTask?.cancel()
+            } else if abs(dy) > abs(dx) + 6 {
+                verticalDrag = true
+                hideTask?.cancel()
+                if value.start.x < width * 0.5 {
+                    overlay = .brightness
+                    dragStart = UIScreen.main.brightness
+                } else {
+                    overlay = .volume
+                    dragStart = Double(SystemVolume.current)
                 }
-                verticalDrag = false
-                horizontalDrag = false
-                overlay = nil
-                if showChrome { scheduleHide() }
+                overlayValue = dragStart
+            } else {
+                return
             }
+        }
+        if horizontalDrag {
+            let span = max(duration, 1)
+            let delta = Double(dx / scrubWidth) * span
+            let next = min(span, max(0, scrubStart + delta))
+            seekValue = next
+            overlayValue = next
+            return
+        }
+        guard verticalDrag, overlay == .brightness || overlay == .volume else { return }
+        let next = min(1, max(0, dragStart - dy / travel))
+        overlayValue = next
+        applyOverlay(next)
     }
 
     private func skip(by seconds: Double) {
@@ -783,4 +782,78 @@ enum SystemVolume {
             slider?.sendActions(for: .valueChanged)
         }
     }
+}
+
+struct PlayerDragValue {
+    var start: CGPoint
+    var translation: CGSize
+}
+
+struct PlayerGestureLayer: UIViewRepresentable {
+    var onDoubleTap: (CGFloat, CGFloat) -> Void
+    var onSingleTap: () -> Void
+    var onDragChanged: (PlayerDragValue, CGSize) -> Void
+    var onDragEnded: (PlayerDragValue, CGSize) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
+        pan.maximumNumberOfTouches = 1
+        pan.delegate = context.coordinator
+        let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.singleTap(_:)))
+        singleTap.require(toFail: doubleTap)
+        view.addGestureRecognizer(pan)
+        view.addGestureRecognizer(doubleTap)
+        view.addGestureRecognizer(singleTap)
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.parent = self
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: PlayerGestureLayer
+        var dragStart = CGPoint.zero
+        init(parent: PlayerGestureLayer) { self.parent = parent }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            false
+        }
+
+        @objc func pan(_ gesture: UIPanGestureRecognizer) {
+            guard let view = gesture.view else { return }
+            if gesture.state == .began {
+                dragStart = gesture.location(in: view)
+            }
+            let value = PlayerDragValue(
+                start: dragStart,
+                translation: gesture.translation(in: view).size
+            )
+            if gesture.state == .changed || gesture.state == .began {
+                parent.onDragChanged(value, view.bounds.size)
+            } else if gesture.state == .ended || gesture.state == .cancelled {
+                parent.onDragEnded(value, view.bounds.size)
+            }
+        }
+
+        @objc func doubleTap(_ gesture: UITapGestureRecognizer) {
+            guard let view = gesture.view else { return }
+            let point = gesture.location(in: view)
+            parent.onDoubleTap(point.x, view.bounds.width)
+        }
+
+        @objc func singleTap(_ gesture: UITapGestureRecognizer) {
+            parent.onSingleTap()
+        }
+    }
+}
+
+private extension CGPoint {
+    var size: CGSize { CGSize(width: x, height: y) }
 }
