@@ -42,7 +42,7 @@ struct MovieDetailView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .scrollDisabled(true, axes: .horizontal)
+        .modifier(HorizontalScrollLock())
         .background {
             Group {
                 if let movie = vm.movie {
@@ -1554,6 +1554,28 @@ struct TrailerPlayerView: View {
             .onDisappear {
                 // 播放器随视图销毁自动释放
             }
+    }
+}
+
+/// iOS 18 才能按轴向关闭滚动。低版本关掉整页回弹，避免详情页被左右拖动。
+private struct HorizontalScrollLock: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.scrollDisabled(true, axes: .horizontal)
+        } else {
+            content.scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        }
+    }
+}
+
+/// iOS 18 才能按轴向关闭滚动。低版本关掉整页回弹，避免详情页被左右拖动。
+private struct HorizontalScrollLock: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.scrollDisabled(true, axes: .horizontal)
+        } else {
+            content.scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        }
     }
 }
 
