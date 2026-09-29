@@ -1557,25 +1557,10 @@ struct TrailerPlayerView: View {
     }
 }
 
-/// iOS 18 才能按轴向关闭滚动。低版本关掉整页回弹，避免详情页被左右拖动。
+/// 固定详情页，避免整页被左右拖动。用 frame 约束，不依赖轴向滚动 API。
 private struct HorizontalScrollLock: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.scrollDisabled(true, axes: .horizontal)
-        } else {
-            content.scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        }
-    }
-}
-
-/// iOS 18 才能按轴向关闭滚动。低版本关掉整页回弹，避免详情页被左右拖动。
-private struct HorizontalScrollLock: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.scrollDisabled(true, axes: .horizontal)
-        } else {
-            content.scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        }
+        content.frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

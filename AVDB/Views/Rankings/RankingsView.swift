@@ -288,14 +288,6 @@ private struct RankingPreviewCarousel: View {
 
     private var imageURLs: [String] { slides.isEmpty ? fallbackURLs : slides }
 
-    @State private var loadedURLs: [String] = []
-
-    private var slides: [String] { loadedURLs.isEmpty ? imageURLs : loadedURLs }
-
-    @State private var loadedURLs: [String] = []
-
-    private var slides: [String] { loadedURLs.isEmpty ? imageURLs : loadedURLs }
-
     var body: some View {
         ZStack(alignment: .bottom) {
             if imageURLs.isEmpty {
