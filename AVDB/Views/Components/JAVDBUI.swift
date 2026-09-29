@@ -429,7 +429,8 @@ struct MoviePosterCard: View {
                         }
                     }
             }
-            .liquidCover(cornerRadius: 12)
+            .compositingGroup()
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             Text(movie.displayTitle)
                 .font(.subheadline)
@@ -502,7 +503,6 @@ struct MoviePosterGrid: View {
                 .buttonStyle(.plain)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .staggerAppear(index: idx, enabled: idx < columnCount * 2)
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)

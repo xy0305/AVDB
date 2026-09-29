@@ -338,22 +338,20 @@ public struct JavDBImage: View {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: contentMode)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     placeholder
                 }
             }
             .clipped()
             .task(id: imageURLs.joined(separator: "|")) {
-            // task(id:) 在候选 URL 改变时会取消旧任务；不能用 loading 拦截，
-            // 否则 Tenhow poster 稍晚解析完成时会继续显示先加载到的横版 thumb。
-            image = nil
+            // 不先清空 image。LazyVGrid 滚动时 task 会被取消，先清空会让中间封面变空白。
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
                 if let img = await ImageLoader.shared.load(candidate, maxPixelSize: maxPixelSize) {
                     guard !Task.isCancelled else { return }
-                    // 直接显示，不做 scale/长淡入，避免滚动时封面抖动
                     image = img
-                    break
+                    return
                 }
             }
         }
