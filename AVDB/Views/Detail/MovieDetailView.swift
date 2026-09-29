@@ -1244,6 +1244,7 @@ struct DraggableReviewsPanel: View {
     @State private var panelState: PanelState = .collapsed
     @State private var dragStartHeight: CGFloat?
     @State private var listAtTop = true
+    @State private var collapseArmed = false
 
     enum PanelState {
         case collapsed, medium, expanded
@@ -1291,16 +1292,20 @@ struct DraggableReviewsPanel: View {
         .safeAreaPadding(.bottom)
     }
 
-    /// 只在列表已经到顶、并且明确下拉时收起。上翻评论不触发。
+    /// 只有按下时列表就在顶部，才允许下拉收起。中途滑到顶不能抢这次手势。
     private var collapseDrag: some Gesture {
-        DragGesture(minimumDistance: 28, coordinateSpace: .global)
+        DragGesture(minimumDistance: 24, coordinateSpace: .global)
             .onChanged { value in
-                guard listAtTop, panelState != .collapsed else { return }
-                guard value.translation.height > 36, value.translation.height > abs(value.translation.width) * 1.8 else {
+                guard panelState != .collapsed else { return }
+                if dragStartHeight == nil {
+                    collapseArmed = listAtTop
+                    dragStartHeight = panelHeight
+                }
+                guard collapseArmed else { return }
+                guard value.translation.height > 48, value.translation.height > abs(value.translation.width) * 2 else {
                     return
                 }
-                if dragStartHeight == nil { dragStartHeight = panelHeight }
-                let pulled = value.translation.height - 36
+                let pulled = value.translation.height - 48
                 let next = (dragStartHeight ?? panelHeight) - pulled
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
@@ -1309,14 +1314,16 @@ struct DraggableReviewsPanel: View {
                 }
             }
             .onEnded { value in
-                let wasDragging = dragStartHeight != nil
+                let armed = collapseArmed
+                let start = dragStartHeight
+                collapseArmed = false
                 dragStartHeight = nil
-                guard wasDragging, listAtTop, value.translation.height > 90,
-                      value.translation.height > abs(value.translation.width) * 1.8 else {
-                    if wasDragging { snap(to: panelHeight, velocityY: 0) }
+                guard armed, let start, value.translation.height > 120,
+                      value.translation.height > abs(value.translation.width) * 2 else {
                     return
                 }
-                snap(to: collapsedHeight, velocityY: 1200)
+                let predicted = start - (value.translation.height - 48)
+                snap(to: predicted, velocityY: 0)
             }
     }
 
@@ -1428,8 +1435,14 @@ struct DraggableReviewsPanel: View {
         ScrollView {
             Color.clear
                 .frame(height: 1)
-                .onAppear { listAtTop = true }
-                .onDisappear { listAtTop = false }
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: ReviewListOffsetKey.self,
+                            value: proxy.frame(in: .named("reviewsList")).minY
+                        )
+                    }
+                }
             LazyVStack(spacing: 12) {
                 if vm.reviews.isEmpty && !vm.isLoading {
                     Text("暂无评论")
@@ -1453,6 +1466,10 @@ struct DraggableReviewsPanel: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
         }
+        .coordinateSpace(name: "reviewsList")
+        .onPreferenceChange(ReviewListOffsetKey.self) { offset in
+            listAtTop = offset >= -1
+        }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .simultaneousGesture(collapseDrag)
@@ -1460,6 +1477,13 @@ struct DraggableReviewsPanel: View {
 }
 
 /// 影评独立列表，可滚动翻页
+private struct ReviewListOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct ReviewsListView: View {
     let movieID: String
     var total: Int = 0
