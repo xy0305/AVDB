@@ -42,7 +42,7 @@ struct MovieDetailView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .scrollDisabled(true, axes: .horizontal)
         .background {
             Group {
                 if let movie = vm.movie {
@@ -1584,7 +1584,7 @@ struct NativeSwipeBackEnabler: UIViewControllerRepresentable {
                       navigationController.viewControllers.count > 1,
                       let gesture = navigationController.interactivePopGestureRecognizer else { return }
                 gesture.delegate = nil
-                gesture.isEnabled = true
+                gesture.isEnabled = false
             }
         }
     }

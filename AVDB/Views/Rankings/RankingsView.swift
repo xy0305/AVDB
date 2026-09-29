@@ -276,14 +276,25 @@ struct RankingsView: View {
 private struct RankingPreviewCarousel: View {
     let movie: Movie
     @State private var selection = 0
+    @State private var slides: [String] = []
 
-    private var imageURLs: [String] {
+    private var fallbackURLs: [String] {
         var urls = (movie.previewImages ?? []).compactMap { $0.largeURL ?? $0.thumbURL }
         if urls.isEmpty, let backdrop = movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL {
             urls = [backdrop]
         }
         return Array(urls.prefix(8))
     }
+
+    private var imageURLs: [String] { slides.isEmpty ? fallbackURLs : slides }
+
+    @State private var loadedURLs: [String] = []
+
+    private var slides: [String] { loadedURLs.isEmpty ? imageURLs : loadedURLs }
+
+    @State private var loadedURLs: [String] = []
+
+    private var slides: [String] { loadedURLs.isEmpty ? imageURLs : loadedURLs }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -321,6 +332,20 @@ private struct RankingPreviewCarousel: View {
             }
         }
         .contentShape(Rectangle())
+        .task(id: movie.id) { await loadSlides() }
+    }
+
+    private func loadSlides() async {
+        let current = fallbackURLs
+        if slides.isEmpty { slides = current }
+        guard current.count < 8 else { return }
+        guard let detail = try? await JavDBSDK.shared.movieDetail(movie.id, fromRankings: true) else { return }
+        var urls = (detail.previewImages ?? []).compactMap { $0.largeURL ?? $0.thumbURL }
+        if urls.isEmpty { urls = current }
+        let next = Array(urls.prefix(8))
+        guard next.count > slides.count else { return }
+        slides = next
+        if selection >= next.count { selection = 0 }
     }
 }
 
