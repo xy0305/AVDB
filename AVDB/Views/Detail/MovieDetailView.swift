@@ -1523,19 +1523,20 @@ struct TrailerPlayerView: View {
     }
 }
 
-/// 固定详情页，避免整页被左右拖动。用 frame 约束，不依赖轴向滚动 API。
+/// 固定详情页，避免整页被左右拖动。
 private struct HorizontalScrollLock: ViewModifier {
     func body(content: Content) -> some View {
-        content.frame(maxWidth: .infinity, alignment: .leading)
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped()
     }
 }
 
-/// 页面级安全桥接：只恢复当前 UINavigationController 已有的系统边缘返回手势。
-/// 不交换方法、不继承或扩展系统类；获取失败时静默退出，不影响启动。
+/// 关掉当前导航的交互式返回，避免详情页跟着左右滑。
 struct NativeSwipeBackEnabler: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> Controller { Controller() }
     func updateUIViewController(_ uiViewController: Controller, context: Context) {
-        uiViewController.enableWhenAvailable()
+        uiViewController.lockWhenAvailable()
     }
 
     final class Controller: UIViewController {
@@ -1548,16 +1549,17 @@ struct NativeSwipeBackEnabler: UIViewControllerRepresentable {
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            enableWhenAvailable()
+            lockWhenAvailable()
         }
 
-        func enableWhenAvailable() {
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+        }
+
+        func lockWhenAvailable() {
             DispatchQueue.main.async { [weak self] in
-                guard let navigationController = self?.navigationController,
-                      navigationController.viewControllers.count > 1,
-                      let gesture = navigationController.interactivePopGestureRecognizer else { return }
-                gesture.delegate = nil
-                gesture.isEnabled = false
+                self?.navigationController?.interactivePopGestureRecognizer?.isEnabled = false
             }
         }
     }
