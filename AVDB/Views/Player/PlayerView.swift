@@ -151,13 +151,20 @@ struct KSChromePlayer: View {
     @State private var overlayValue: Double = 0
     @State private var dragStart: Double = 0
     @State private var verticalDrag = false
+    @State private var horizontalDrag = false
+    @State private var scrubStart: Double = 0
+    @State private var skipHUD: SkipHUD?
     @State private var fillMode: FillMode = .fit
 
-    private enum OverlayKind { case brightness, volume }
+    private enum OverlayKind { case brightness, volume, seek }
     private enum FillMode: String, CaseIterable {
         case fit = "适应屏幕"
         case fill = "填满屏幕"
         case stretch = "拉伸填满"
+    }
+    private struct SkipHUD: Equatable {
+        var forward: Bool
+        var seconds: Int
     }
 
     private var playerOptions: KSOptions {
@@ -219,6 +226,9 @@ struct KSChromePlayer: View {
             // 在播放器上方放独立透明命中层，确保左右半屏手势稳定收到事件。
             Color.clear
                 .contentShape(Rectangle())
+                .onTapGesture(count: 2) { location in
+                    skip(by: location.x < width * 0.5 ? -10 : 10)
+                }
                 .onTapGesture { toggleChrome() }
                 .highPriorityGesture(sideDrag(width: width, height: height))
                 .padding(.top, 72)
@@ -232,6 +242,10 @@ struct KSChromePlayer: View {
                 overlayHUD(overlay)
                     .allowsHitTesting(false)
             }
+            if let skipHUD {
+                skipOverlay(skipHUD)
+                    .allowsHitTesting(false)
+            }
             if showChrome {
                 chromeOverlay
             }
@@ -243,35 +257,97 @@ struct KSChromePlayer: View {
     }
 
     private func sideDrag(width: CGFloat, height: CGFloat) -> some Gesture {
-        // 半屏上下滑走完 0→1；右侧从画面中线起就算音量，避免贴边才生效。
+        // 左右边缘上下滑调亮度/音量；中间横向滑动跟手调进度。
         let travel = max(140, height * 0.42)
-        return DragGesture(minimumDistance: 4)
+        let scrubWidth = max(180, width * 0.72)
+        return DragGesture(minimumDistance: 8)
             .onChanged { value in
-                let dx = abs(value.translation.width)
-                let dy = abs(value.translation.height)
-                if !verticalDrag && overlay == nil {
-                    guard dy > dx, dy > 6 else { return }
-                    verticalDrag = true
-                    hideTask?.cancel()
-                    if value.startLocation.x < width * 0.5 {
-                        overlay = .brightness
-                        dragStart = UIScreen.main.brightness
+                let dx = value.translation.width
+                let dy = value.translation.height
+                let inCenter = value.startLocation.x > width * 0.28 && value.startLocation.x < width * 0.72
+                if !verticalDrag && !horizontalDrag && overlay == nil {
+                    if inCenter && abs(dx) > abs(dy) && abs(dx) > 8 {
+                        horizontalDrag = true
+                        isSeeking = true
+                        scrubStart = currentTime
+                        seekValue = currentTime
+                        overlay = .seek
+                        hideTask?.cancel()
+                    } else if abs(dy) > abs(dx) && abs(dy) > 8 {
+                        verticalDrag = true
+                        hideTask?.cancel()
+                        if value.startLocation.x < width * 0.5 {
+                            overlay = .brightness
+                            dragStart = UIScreen.main.brightness
+                        } else {
+                            overlay = .volume
+                            dragStart = Double(SystemVolume.current)
+                        }
+                        overlayValue = dragStart
                     } else {
-                        overlay = .volume
-                        dragStart = Double(SystemVolume.current)
+                        return
                     }
-                    overlayValue = dragStart
                 }
-                guard verticalDrag, overlay != nil else { return }
-                let next = min(1, max(0, dragStart - value.translation.height / travel))
+                if horizontalDrag {
+                    let span = max(duration, 1)
+                    let delta = Double(dx / scrubWidth) * min(span, 180)
+                    let next = min(span, max(0, scrubStart + delta))
+                    seekValue = next
+                    overlayValue = next
+                    return
+                }
+                guard verticalDrag, overlay == .brightness || overlay == .volume else { return }
+                let next = min(1, max(0, dragStart - dy / travel))
                 overlayValue = next
                 applyOverlay(next)
             }
             .onEnded { _ in
+                if horizontalDrag {
+                    seek(to: seekValue)
+                    currentTime = seekValue
+                    isSeeking = false
+                }
                 verticalDrag = false
+                horizontalDrag = false
                 overlay = nil
                 if showChrome { scheduleHide() }
             }
+    }
+
+    private func skip(by seconds: Double) {
+        let next = min(max(duration, 0), max(0, currentTime + seconds))
+        seek(to: next)
+        currentTime = next
+        let forward = seconds > 0
+        if skipHUD?.forward == forward {
+            skipHUD?.seconds += Int(abs(seconds))
+        } else {
+            skipHUD = SkipHUD(forward: forward, seconds: Int(abs(seconds)))
+        }
+        hideTask?.cancel()
+        Task {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            skipHUD = nil
+            if showChrome { scheduleHide() }
+        }
+    }
+
+    private func skipOverlay(_ hud: SkipHUD) -> some View {
+        HStack {
+            if hud.forward { Spacer() }
+            VStack(spacing: 6) {
+                Image(systemName: hud.forward ? "goforward.10" : "gobackward.10")
+                    .font(.system(size: 28, weight: .semibold))
+                Text("\(hud.seconds) 秒")
+                    .font(.caption.monospacedDigit().weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(16)
+            .background(.black.opacity(0.45), in: Circle())
+            .padding(.horizontal, 28)
+            if !hud.forward { Spacer() }
+        }
     }
 
     private func applyOverlay(_ value: Double) {
@@ -286,26 +362,48 @@ struct KSChromePlayer: View {
     }
 
     private func overlayHUD(_ kind: OverlayKind) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: kind == .brightness
-                  ? (overlayValue > 0.5 ? "sun.max.fill" : "sun.min.fill")
-                  : (overlayValue > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill"))
-                .font(.system(size: 22, weight: .semibold))
-            Capsule()
-                .fill(Color.white.opacity(0.25))
-                .frame(width: 6, height: 90)
-                .overlay(alignment: .bottom) {
-                    Capsule()
-                        .fill(Color.white)
-                        .frame(height: 90 * overlayValue)
-                }
-                .clipShape(Capsule())
-            Text("\(Int(overlayValue * 100))%")
-                .font(.caption.monospacedDigit())
+        if kind == .seek {
+            VStack(spacing: 8) {
+                Text(formatTime(seekValue))
+                    .font(.title3.monospacedDigit().weight(.semibold))
+                Text(formatTime(duration))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.7))
+                Capsule()
+                    .fill(Color.white.opacity(0.25))
+                    .frame(width: 160, height: 4)
+                    .overlay(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white)
+                            .frame(width: 160 * min(1, seekValue / max(duration, 0.1)))
+                    }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else {
+            VStack(spacing: 10) {
+                Image(systemName: kind == .brightness
+                      ? (overlayValue > 0.5 ? "sun.max.fill" : "sun.min.fill")
+                      : (overlayValue > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill"))
+                    .font(.system(size: 22, weight: .semibold))
+                Capsule()
+                    .fill(Color.white.opacity(0.25))
+                    .frame(width: 6, height: 90)
+                    .overlay(alignment: .bottom) {
+                        Capsule()
+                            .fill(Color.white)
+                            .frame(height: 90 * overlayValue)
+                    }
+                    .clipShape(Capsule())
+                Text("\(Int(overlayValue * 100))%")
+                    .font(.caption.monospacedDigit())
+            }
+            .foregroundStyle(.white)
+            .padding(16)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .foregroundStyle(.white)
-        .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var infoBar: some View {
