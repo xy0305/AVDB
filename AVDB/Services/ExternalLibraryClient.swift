@@ -1,6 +1,6 @@
 import Foundation
 
-struct ExternalLink: Decodable, Identifiable, Hashable {
+public struct ExternalLink: Decodable, Identifiable, Hashable {
     let id: Int
     let title: String?
     let downloadURL: String

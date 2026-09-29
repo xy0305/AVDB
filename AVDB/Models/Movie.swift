@@ -529,7 +529,7 @@ public struct Magnet: Decodable, Identifiable, Hashable {
         let raw = link.downloadURL
         let lower = raw.lowercased()
         if lower.hasPrefix("magnet:"), let hashStart = raw.range(of: "btih:", options: .caseInsensitive) {
-            let rest = raw[hashStart.upperBound]
+            let rest = raw[hashStart.upperBound...]
             hash = String(rest.prefix { $0.isHexDigit })
             pikpakURL = nil
         } else {
