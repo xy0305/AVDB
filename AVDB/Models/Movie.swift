@@ -524,15 +524,41 @@ public struct Magnet: Decodable, Identifiable, Hashable {
         pikpakURL = try? c.decode(String.self, forKey: .pikpakURL)
     }
 
-    public var displayName: String { name ?? "磁力链接" }
+    public init(link: ExternalLink) {
+        name = link.title
+        let raw = link.downloadURL
+        let lower = raw.lowercased()
+        if lower.hasPrefix("magnet:"), let hashStart = raw.range(of: "btih:", options: .caseInsensitive) {
+            let rest = raw[hashStart.upperBound]
+            hash = String(rest.prefix { $0.isHexDigit })
+            pikpakURL = nil
+        } else {
+            hash = nil
+            pikpakURL = raw
+        }
+        size = link.sizeMB.map { Int64($0 * 1_000_000) }
+        cnsub = link.chinese
+        hd = link.uhd
+        filesCount = nil
+        createdAt = nil
+    }
 
-    public var stableID: String { hash ?? name ?? displayName }
+    public var displayName: String { name ?? (isED2K ? "ed2k 链接" : "磁力链接") }
+
+    public var stableID: String { hash ?? pikpakURL ?? name ?? displayName }
+
+    public var isED2K: Bool {
+        pikpakURL?.lowercased().hasPrefix("ed2k:") == true
+    }
 
     public var magnetURL: String? {
+        if let pikpakURL, pikpakURL.lowercased().hasPrefix("ed2k:") || pikpakURL.lowercased().hasPrefix("magnet:") {
+            return pikpakURL
+        }
         if let hash, !hash.isEmpty {
             return "magnet:?xt=urn:btih:\(hash)"
         }
-        return nil
+        return pikpakURL
     }
 
     public var sizeText: String? {

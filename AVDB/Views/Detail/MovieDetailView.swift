@@ -785,7 +785,7 @@ final class MovieDetailViewModel: ObservableObject {
         let existing = Set(magnets.compactMap(\.magnetURL))
         let extra = links.compactMap { link -> Magnet? in
             guard !existing.contains(link.downloadURL) else { return nil }
-            return Magnet(external: link)
+            return Magnet(link: link)
         }
         guard !extra.isEmpty else { return }
         magnets.append(contentsOf: extra)
