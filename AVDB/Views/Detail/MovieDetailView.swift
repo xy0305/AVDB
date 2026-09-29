@@ -775,9 +775,22 @@ final class MovieDetailViewModel: ObservableObject {
         if let m = try? await sdk.movieMagnets(movieID) {
             magnets = m
         }
+        await mergeExternalLinks()
+        await mergeExternalLinks()
     }
 
-    func loadReviews() async {
+    private func mergeExternalLinks() async {
+        let number = movie?.displayNumber ?? movie?.number ?? ""
+        let links = await ExternalLibraryClient.shared.links(for: number)
+        guard !links.isEmpty else { return }
+        let existing = Set(magnets.compactMap(\.magnetURL))
+        let extra = links.compactMap { link -> Magnet? in
+            guard !existing.contains(link.downloadURL) else { return nil }
+            return Magnet(external: link)
+        }
+        guard !extra.isEmpty else { return }
+        magnets.append(contentsOf: extra)
+    }
         guard !movieID.isEmpty, reviews.isEmpty else { return }
         if let r = try? await sdk.movieReviews(movieID) {
             reviews = r
@@ -913,8 +926,6 @@ struct MagnetRow: View {
         pushing = true
         defer { pushing = false }
         do {
-            let folderSnapshot = await Pan115Client.shared.folderSnapshot(
-                cid: settings.folderCID, cookie: settings.cookie)
             let result = try await Pan115Client.shared.addOfflineTask(
                 url: url,
                 cookie: settings.cookie,
@@ -924,29 +935,8 @@ struct MagnetRow: View {
                 Pan115PlaybackCache.save(movieID: movieID, magnet: url)
             }
             toast = result.message
-            // 推送成功后，等待离线完成并清理 <115MB 的小文件
-            await autoCleanSmallFiles(existingFolderIDs: folderSnapshot)
         } catch {
             toast = error.localizedDescription
-        }
-    }
-
-    /// 推送成功后，等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
-    private func autoCleanSmallFiles(existingFolderIDs: Set<String>) async {
-        let settings = Pan115Settings.shared
-        let keyword = movieNumber.isEmpty ? magnet.displayName : movieNumber
-        do {
-            let deleted = try await Pan115Client.shared.waitAndCleanSmallFiles(
-                keyword: keyword,
-                cookie: settings.cookie,
-                folderCID: settings.folderCID,
-                existingFolderIDs: existingFolderIDs
-            )
-            if deleted > 0 {
-                toast = "已清理 \(deleted) 个小于 115MB 的小文件"
-            }
-        } catch {
-            toast = "自动清理失败：\(error.localizedDescription)"
         }
     }
 }
@@ -1152,8 +1142,6 @@ struct ReviewRow: View {
         linkStates[key] = .pushing
         defer { linkStates[key] = nil }
         do {
-            let folderSnapshot = await Pan115Client.shared.folderSnapshot(
-                cid: settings.folderCID, cookie: settings.cookie)
             let result = try await Pan115Client.shared.addOfflineTask(
                 url: link.rawValue,
                 cookie: settings.cookie,
@@ -1163,28 +1151,8 @@ struct ReviewRow: View {
                 Pan115PlaybackCache.save(movieID: movieID, magnet: link.rawValue)
             }
             toast = result.message
-            // 推送成功后，等待离线完成并清理 <115MB 的小文件
-            await autoCleanSmallFiles(link: link, existingFolderIDs: folderSnapshot)
         } catch {
             toast = error.localizedDescription
-        }
-    }
-
-    /// 推送成功后，等待离线完成，进入离线产物文件夹删除 <115MB 的小文件。
-    private func autoCleanSmallFiles(link: DownloadLinkKind, existingFolderIDs: Set<String>) async {
-        let settings = Pan115Settings.shared
-        do {
-            let deleted = try await Pan115Client.shared.waitAndCleanSmallFiles(
-                keyword: link.rawValue,
-                cookie: settings.cookie,
-                folderCID: settings.folderCID,
-                existingFolderIDs: existingFolderIDs
-            )
-            if deleted > 0 {
-                toast = "已清理 \(deleted) 个小于 115MB 的小文件"
-            }
-        } catch {
-            toast = "自动清理失败：\(error.localizedDescription)"
         }
     }
 

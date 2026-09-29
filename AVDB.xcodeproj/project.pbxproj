@@ -27,6 +27,8 @@
 		D93E29B791E253E75F820628 /* UserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E30F604E876D29C296F9649 /* UserView.swift */; };
 		FOLLOWTAG001E253E75F82001 /* FollowingTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLOWTAG001E253E75F82002 /* FollowingTagsView.swift */; };
 		A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A101 /* Pan115Client.swift */; };
+		EXTLIB000000000000000001 /* ExternalLibraryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = EXTLIB000000000000000002 /* ExternalLibraryClient.swift */; };
+		EXTLIB000000000000000003 /* ExternalLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EXTLIB000000000000000004 /* ExternalLibraryView.swift */; };
 		FOLLTAGS0000000000000001 /* FollowingTagsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLTAGS0000000000000002 /* FollowingTagsStore.swift */; };
 		B00BB00CDE000D10DE000002 /* DownloadLinkDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */; };
 		GLASSUI0000000000000001 /* GlassUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = GLASSUI0000000000000002 /* GlassUI.swift */; };
@@ -65,6 +67,8 @@
 		FOLLOWTAG001E253E75F82002 /* FollowingTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowingTagsView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A110 /* UserCollectionsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserCollectionsViews.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A101 /* Pan115Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115Client.swift; sourceTree = "<group>"; };
+		EXTLIB000000000000000002 /* ExternalLibraryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLibraryClient.swift; sourceTree = "<group>"; };
+		EXTLIB000000000000000004 /* ExternalLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLibraryView.swift; sourceTree = "<group>"; };
 		FOLLTAGS0000000000000002 /* FollowingTagsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowingTagsStore.swift; sourceTree = "<group>"; };
 		B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadLinkDetector.swift; sourceTree = "<group>"; };
 		GLASSUI0000000000000002 /* GlassUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassUI.swift; sourceTree = "<group>"; };
@@ -140,6 +144,7 @@
 				7231C462DD413E8C76270418 /* JavDBSDK.swift */,
 				5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */,
 				A115C11E7A7B115C11E7A101 /* Pan115Client.swift */,
+				EXTLIB000000000000000002 /* ExternalLibraryClient.swift */,
 				FOLLTAGS0000000000000002 /* FollowingTagsStore.swift */,
 				B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */,
 			);
@@ -218,6 +223,7 @@
 				DA8A6DDD7AACE6897F060AED /* LoginView.swift */,
 				0E30F604E876D29C296F9649 /* UserView.swift */,
 				FOLLOWTAG001E253E75F82002 /* FollowingTagsView.swift */,
+				EXTLIB000000000000000004 /* ExternalLibraryView.swift */,
 				A115C11E7A7B115C11E7A110 /* UserCollectionsViews.swift */,
 				A115C11E7A7B115C11E7A102 /* Pan115SettingsView.swift */,
 			);
@@ -369,6 +375,8 @@
 				FOLLOWTAG001E253E75F82001 /* FollowingTagsView.swift in Sources */,
 				A115C11E7A7B115C11E7A111 /* UserCollectionsViews.swift in Sources */,
 				A115C11E7A7B115C11E7A001 /* Pan115Client.swift in Sources */,
+				EXTLIB000000000000000001 /* ExternalLibraryClient.swift in Sources */,
+				EXTLIB000000000000000003 /* ExternalLibraryView.swift in Sources */,
 				FOLLTAGS0000000000000001 /* FollowingTagsStore.swift in Sources */,
 				B00BB00CDE000D10DE000002 /* DownloadLinkDetector.swift in Sources */,
 				A115C11E7A7B115C11E7A002 /* Pan115SettingsView.swift in Sources */,
@@ -441,7 +449,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 133;
+				CURRENT_PROJECT_VERSION = 134;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -464,7 +472,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 133;
+				CURRENT_PROJECT_VERSION = 134;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
