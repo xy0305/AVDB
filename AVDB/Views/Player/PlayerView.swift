@@ -222,6 +222,9 @@ struct KSChromePlayer: View {
             Color.black
             KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
                 .onAppear { applyFillMode() }
+            if showChrome {
+                chromeOverlay
+            }
             PlayerGestureLayer(
                 onDoubleTap: { x, width in
                     skip(by: x < width * 0.5 ? -10 : 10)
@@ -790,28 +793,37 @@ struct PlayerDragValue {
 }
 
 struct PlayerGestureLayer: UIViewRepresentable {
+    final class GestureView: UIView {
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            guard bounds.contains(point) else { return false }
+            if point.y < 72 || point.y > bounds.height - 108 { return false }
+            return true
+        }
+    }
     var onDoubleTap: (CGFloat, CGFloat) -> Void
     var onSingleTap: () -> Void
     var onDragChanged: (PlayerDragValue, CGSize) -> Void
     var onDragEnded: (PlayerDragValue, CGSize) -> Void
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
+    func makeUIView(context: Context) -> GestureView {
+        let view = GestureView()
         view.backgroundColor = .clear
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
         pan.maximumNumberOfTouches = 1
         pan.delegate = context.coordinator
         let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
+        doubleTap.delegate = context.coordinator
         let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.singleTap(_:)))
         singleTap.require(toFail: doubleTap)
+        singleTap.delegate = context.coordinator
         view.addGestureRecognizer(pan)
         view.addGestureRecognizer(doubleTap)
         view.addGestureRecognizer(singleTap)
         return view
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
+    func updateUIView(_ uiView: GestureView, context: Context) {
         context.coordinator.parent = self
     }
 
@@ -822,8 +834,13 @@ struct PlayerGestureLayer: UIViewRepresentable {
         var dragStart = CGPoint.zero
         init(parent: PlayerGestureLayer) { self.parent = parent }
 
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-            false
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            guard let view = gestureRecognizer.view else { return true }
+            let point = touch.location(in: view)
+            let height = view.bounds.height
+            let width = view.bounds.width
+            if point.y < 72 || point.y > height - 108 { return false }
+            return true
         }
 
         @objc func pan(_ gesture: UIPanGestureRecognizer) {
