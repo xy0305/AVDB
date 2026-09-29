@@ -195,29 +195,28 @@ public actor ImageLoader {
     }
 
     /// 获取图片（自动判断是否需要解密）
-    public func load(_ urlString: String?) async -> UIImage? {
+    public func load(_ urlString: String?, maxPixelSize: Int = 2048) async -> UIImage? {
         guard let urlString = urlString, !urlString.isEmpty,
               let url = URL(string: urlString) else {
             return nil
         }
-
-        // 命中缓存
-        let cacheKey = urlString as NSString
+        let pixelSize = max(320, maxPixelSize)
+        let cacheKey = "\(urlString)#\(pixelSize)" as NSString
         if let img = cache.object(forKey: cacheKey) {
             return img
         }
 
-        // 多个可见卡片请求同一 URL 时复用同一个任务，避免重复下载和解密。
-        if let task = inFlight[urlString] {
+        let flightKey = "\(urlString)#\(pixelSize)"
+        if let task = inFlight[flightKey] {
             return await task.value
         }
 
         let task = Task.detached(priority: .utility) { [userAgent] in
-            await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent)
+            await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent, maxPixelSize: pixelSize)
         }
-        inFlight[urlString] = task
+        inFlight[flightKey] = task
         let image = await task.value
-        inFlight[urlString] = nil
+        inFlight[flightKey] = nil
 
         if let image {
             let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 1
@@ -235,13 +234,13 @@ public actor ImageLoader {
         return urlString.contains(JavDBConstants.imageCDNHost)
     }
 
-    private static func fetchImage(url: URL, urlString: String, userAgent: String) async -> UIImage? {
+    private static func fetchImage(url: URL, urlString: String, userAgent: String, maxPixelSize: Int) async -> UIImage? {
         do {
             let downloaded = try await download(url, userAgent: userAgent)
             let imageData = isEncryptedCDN(urlString)
                 ? JavDBSignature.decryptImage(downloaded)
                 : downloaded
-            guard let image = downsample(imageData, maxPixelSize: 2048) else {
+            guard let image = downsample(imageData, maxPixelSize: maxPixelSize) else {
                 throw ImageLoaderError.invalidData
             }
 
@@ -301,6 +300,7 @@ public struct JavDBImage: View {
     var fallbackURL: String? = nil
     var secondFallbackURL: String? = nil
     let contentMode: ContentMode
+    let maxPixelSize: Int
 
     @State private var image: UIImage?
 
@@ -308,12 +308,14 @@ public struct JavDBImage: View {
         url: String?,
         fallbackURL: String? = nil,
         secondFallbackURL: String? = nil,
-        contentMode: ContentMode = .fill
+        contentMode: ContentMode = .fill,
+        maxPixelSize: Int = 2048
     ) {
         self.url = url
         self.fallbackURL = fallbackURL
         self.secondFallbackURL = secondFallbackURL
         self.contentMode = contentMode
+        self.maxPixelSize = maxPixelSize
     }
 
     private var imageURLs: [String] {
@@ -347,7 +349,7 @@ public struct JavDBImage: View {
             image = nil
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
-                if let img = await ImageLoader.shared.load(candidate) {
+                if let img = await ImageLoader.shared.load(candidate, maxPixelSize: maxPixelSize) {
                     guard !Task.isCancelled else { return }
                     // 直接显示，不做 scale/长淡入，避免滚动时封面抖动
                     image = img

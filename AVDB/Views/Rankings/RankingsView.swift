@@ -278,12 +278,11 @@ private struct RankingPreviewCarousel: View {
     @State private var selection = 0
 
     private var imageURLs: [String] {
-        // 列表优先缩略图，避免每一行的轮播同时解码多张大图。
-        var urls = (movie.previewImages ?? []).compactMap { $0.thumbURL ?? $0.largeURL }
+        var urls = (movie.previewImages ?? []).compactMap { $0.largeURL ?? $0.thumbURL }
         if urls.isEmpty, let backdrop = movie.hdBackdropURL ?? movie.coverURL ?? movie.thumbURL {
             urls = [backdrop]
         }
-        return Array(urls.prefix(5))
+        return Array(urls.prefix(8))
     }
 
     var body: some View {
@@ -293,7 +292,7 @@ private struct RankingPreviewCarousel: View {
             } else {
                 TabView(selection: $selection) {
                     ForEach(Array(imageURLs.enumerated()), id: \.offset) { index, url in
-                        JavDBImage(url: url, contentMode: .fill)
+                        JavDBImage(url: url, contentMode: .fill, maxPixelSize: 1600)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
                             .tag(index)
