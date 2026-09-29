@@ -388,7 +388,7 @@ public struct MovieCoverCard: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .bottomTrailing) {
-                JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+                JavDBImage(url: movie.coverURL ?? movie.thumbURL, maxPixelSize: 480)
                     .frame(width: width, height: width * 1.4)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

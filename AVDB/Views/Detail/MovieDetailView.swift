@@ -146,12 +146,22 @@ struct MovieDetailView: View {
                 if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
                 if let actors = movie.actors, !actors.isEmpty { actorsSection(actors) }
                 if let summary = movie.summary, !summary.isEmpty { summarySection(summary) }
-                if let trailer = movie.previewVideoURL, let url = URL(string: trailer) { trailerSection(url) }
-                if let images = movie.previewImages, !images.isEmpty { previewImagesSection(images) }
-                if (movie.magnetsCount ?? 0) > 0 { magnetsSection(movie) }
-                if !vm.actorMovies.isEmpty { actorMoviesSection(vm.actorMovies) }
-                if !vm.relatedMovies.isEmpty { relatedSection(vm.relatedMovies) }
-                relatedListsSection
+                if let trailer = movie.previewVideoURL, let url = URL(string: trailer) {
+                    deferredSection { trailerSection(url) }
+                }
+                if let images = movie.previewImages, !images.isEmpty {
+                    deferredSection { previewImagesSection(images) }
+                }
+                if (movie.magnetsCount ?? 0) > 0 {
+                    deferredSection { magnetsSection(movie) }
+                }
+                if !vm.actorMovies.isEmpty {
+                    deferredSection { actorMoviesSection(vm.actorMovies) }
+                }
+                if !vm.relatedMovies.isEmpty {
+                    deferredSection { relatedSection(vm.relatedMovies) }
+                }
+                deferredSection { relatedListsSection }
             }
             .padding(.top, 26)
             .padding(.bottom, 40)
@@ -325,8 +335,13 @@ struct MovieDetailView: View {
             in: RoundedRectangle(cornerRadius: 16, style: .continuous),
             tint: .black,
             tintStrength: 0.18,
-            elevation: 0.8
+            elevation: 0.8,
+            scrolling: true
         )
+    }
+
+    private func deferredSection<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+        DeferredDetailSection(content: content)
     }
 
     private func detailInfoLine(_ label: String, _ value: String, underline: Bool = false) -> some View {
@@ -447,7 +462,7 @@ struct MovieDetailView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .glassSurface(in: Capsule(), elevation: 0.35)
+                            .glassSurface(in: Capsule(), elevation: 0.35, scrolling: true)
                             .contentShape(Capsule())
                     }
                     .pressableGlass(scale: 0.94)
@@ -500,7 +515,7 @@ struct MovieDetailView: View {
                 .foregroundColor(.secondary)
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.4)
+                .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.4, scrolling: true)
         }
         .padding(.horizontal)
     }
@@ -511,7 +526,7 @@ struct MovieDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(Array(images.enumerated()), id: \.element.id) { idx, img in
-                        JavDBImage(url: img.largeURL ?? img.thumbURL)
+                        JavDBImage(url: img.largeURL ?? img.thumbURL, maxPixelSize: 720)
                             .frame(width: 260, height: 160)
                             .liquidCover(cornerRadius: 14)
                     }
@@ -708,7 +723,8 @@ struct MovieDetailView: View {
                         .padding(12)
                         .glassSurface(
                             in: RoundedRectangle(cornerRadius: 12, style: .continuous),
-                            elevation: 0.35
+                            elevation: 0.35,
+                            scrolling: true
                         )
                     }
                     .buttonStyle(.plain)
@@ -897,7 +913,7 @@ struct MagnetRow: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
         .contentShape(Rectangle())
-        .glassSurface(in: RoundedRectangle(cornerRadius: 12, style: .continuous), elevation: 0.45)
+        .glassSurface(in: RoundedRectangle(cornerRadius: 12, style: .continuous), elevation: 0.45, scrolling: true)
         .glassPressFeedback()
         .onTapGesture {
             GlassHaptic.tap()
@@ -973,7 +989,7 @@ struct ReviewRow: View {
                     .foregroundStyle(.blue)
                     .frame(width: 32, height: 32)
                     .background {
-                        Circle().fill(.ultraThinMaterial)
+                        Circle().fill(Color(.secondarySystemBackground))
                         Circle().fill(Color.blue.opacity(0.16))
                         Circle().fill(
                             LinearGradient(
@@ -1245,14 +1261,7 @@ struct DraggableReviewsPanel: View {
         }
         .frame(height: panelHeight, alignment: .top)
         .frame(maxWidth: .infinity)
-        .background {
-            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
-                        .strokeBorder(.white.opacity(0.28), lineWidth: 0.6)
-                }
-        }
+        .background(Color(.systemBackground))
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
         .contentShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 10, y: -2)
@@ -1374,7 +1383,7 @@ struct DraggableReviewsPanel: View {
                 ForEach(vm.reviews, id: \.stableReviewID) { review in
                     ReviewRow(review: review, movieID: movieID)
                         .padding(14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .onAppear {
                             if review.stableReviewID == vm.reviews.last?.stableReviewID {
                                 Task { await vm.loadMore(movieID: movieID) }
@@ -1489,6 +1498,23 @@ struct TrailerPlayerView: View {
             .onDisappear {
                 // 播放器随视图销毁自动释放
             }
+    }
+}
+
+/// 滑到附近才创建重区块，避免打开详情时一次绘制全部玻璃和图片。
+private struct DeferredDetailSection<Content: View>: View {
+    let content: () -> Content
+    @State private var isVisible = false
+
+    var body: some View {
+        Group {
+            if isVisible {
+                content()
+            } else {
+                Color.clear.frame(height: 180)
+            }
+        }
+        .onAppear { isVisible = true }
     }
 }
 

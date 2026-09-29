@@ -115,18 +115,27 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
     var tint: Color? = nil
     var tintStrength: Double = 0.18
     var elevation: CGFloat = 1
+    /// 滚动内容用静态填充。实时材质和多层阴影会在每次位移时重采样。
+    var scrolling: Bool = false
 
     func body(content: Content) -> some View {
         content
             .background {
-                GlassBody(shape: shape, tint: tint, tintStrength: tintStrength)
+                if scrolling {
+                    shape.fill(Color(.secondarySystemBackground).opacity(0.94))
+                } else {
+                    GlassBody(shape: shape, tint: tint, tintStrength: tintStrength)
+                }
             }
             .overlay {
-                GlassRim(shape: shape)
+                shape.strokeBorder(.white.opacity(scrolling ? 0.18 : 0), lineWidth: scrolling ? 0.5 : 0)
+                if !scrolling {
+                    GlassRim(shape: shape)
+                }
             }
-            // 贴地短影 + 环境大影：有厚度、离开纸面
-            .shadow(color: .black.opacity(0.07 * elevation), radius: 2 * elevation, y: 1 * elevation)
-            .shadow(color: .black.opacity(0.10 * elevation), radius: 14 * elevation, y: 7 * elevation)
+            // 贴地短影 + 环境大影：有厚度、离开纸面。滚动中不投影。
+            .shadow(color: .black.opacity(scrolling ? 0 : 0.07 * elevation), radius: 2 * elevation, y: 1 * elevation)
+            .shadow(color: .black.opacity(scrolling ? 0 : 0.10 * elevation), radius: 14 * elevation, y: 7 * elevation)
     }
 }
 
@@ -136,9 +145,16 @@ extension View {
         in shape: S,
         tint: Color? = nil,
         tintStrength: Double = 0.18,
-        elevation: CGFloat = 1
+        elevation: CGFloat = 1,
+        scrolling: Bool = false
     ) -> some View {
-        modifier(GlassSurface(shape: shape, tint: tint, tintStrength: tintStrength, elevation: elevation))
+        modifier(GlassSurface(
+            shape: shape,
+            tint: tint,
+            tintStrength: tintStrength,
+            elevation: elevation,
+            scrolling: scrolling
+        ))
     }
 }
 
@@ -565,7 +581,7 @@ private struct LiquidCoverModifier: ViewModifier {
                 GlassRim(shape: shape, lineWidth: 0.9)
                     .allowsHitTesting(false)
             }
-            .shadow(color: .black.opacity(0.10), radius: 8, y: 4)
+            .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
     }
 }
 
