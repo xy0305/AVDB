@@ -120,11 +120,11 @@ struct MovieDetailView: View {
     private func detailBackground(_ movie: Movie) -> some View {
         // 进详情时不要对整屏封面做实时 blur，否则 push 转场会掉帧。
         ZStack {
-            Color(red: 0.28, green: 0.10, blue: 0.12)
+            Color(red: 0.12, green: 0.12, blue: 0.14)
             LinearGradient(
                 colors: [
-                    Color(red: 0.55, green: 0.16, blue: 0.18).opacity(0.85),
-                    Color(red: 0.22, green: 0.08, blue: 0.10)
+                    Color(red: 0.24, green: 0.22, blue: 0.25).opacity(0.85),
+                    Color(red: 0.10, green: 0.10, blue: 0.12)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -330,11 +330,11 @@ struct MovieDetailView: View {
                 .padding(.trailing, 18)
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color(red: 0.16, green: 0.12, blue: 0.13))
         .glassSurface(
             in: RoundedRectangle(cornerRadius: 16, style: .continuous),
-            tint: .black,
-            tintStrength: 0.18,
+            tint: Color(red: 0.98, green: 0.96, blue: 0.95),
+            tintStrength: 0.96,
             elevation: 0.8,
             scrolling: true
         )

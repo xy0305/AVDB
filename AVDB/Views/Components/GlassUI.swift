@@ -122,7 +122,7 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
         content
             .background {
                 if scrolling {
-                    shape.fill(Color(.secondarySystemBackground).opacity(0.94))
+                    shape.fill((tint ?? Color(.secondarySystemBackground)).opacity(max(0.94, tintStrength)))
                 } else {
                     GlassBody(shape: shape, tint: tint, tintStrength: tintStrength)
                 }
