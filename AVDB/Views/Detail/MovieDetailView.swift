@@ -1243,8 +1243,6 @@ struct DraggableReviewsPanel: View {
 
     @State private var panelState: PanelState = .collapsed
     @State private var dragStartHeight: CGFloat?
-    @State private var listAtTop = true
-    @State private var collapseArmed = false
 
     enum PanelState {
         case collapsed, medium, expanded
@@ -1290,41 +1288,6 @@ struct DraggableReviewsPanel: View {
         .contentShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 10, y: -2)
         .safeAreaPadding(.bottom)
-    }
-
-    /// 只有按下时列表就在顶部，才允许下拉收起。中途滑到顶不能抢这次手势。
-    private var collapseDrag: some Gesture {
-        DragGesture(minimumDistance: 24, coordinateSpace: .global)
-            .onChanged { value in
-                guard panelState != .collapsed else { return }
-                if dragStartHeight == nil {
-                    collapseArmed = listAtTop
-                    dragStartHeight = panelHeight
-                }
-                guard collapseArmed else { return }
-                guard value.translation.height > 48, value.translation.height > abs(value.translation.width) * 2 else {
-                    return
-                }
-                let pulled = value.translation.height - 48
-                let next = (dragStartHeight ?? panelHeight) - pulled
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    panelHeight = min(maximumHeight, max(collapsedHeight, next))
-                }
-            }
-            .onEnded { value in
-                let armed = collapseArmed
-                let start = dragStartHeight
-                collapseArmed = false
-                dragStartHeight = nil
-                guard armed, let start, value.translation.height > 120,
-                      value.translation.height > abs(value.translation.width) * 2 else {
-                    return
-                }
-                let predicted = start - (value.translation.height - 48)
-                snap(to: predicted, velocityY: 0)
-            }
     }
 
     private var handleDrag: some Gesture {
@@ -1433,16 +1396,6 @@ struct DraggableReviewsPanel: View {
 
     private var reviewsList: some View {
         ScrollView {
-            Color.clear
-                .frame(height: 1)
-                .background {
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: ReviewListOffsetKey.self,
-                            value: proxy.frame(in: .named("reviewsList")).minY
-                        )
-                    }
-                }
             LazyVStack(spacing: 12) {
                 if vm.reviews.isEmpty && !vm.isLoading {
                     Text("暂无评论")
@@ -1466,24 +1419,12 @@ struct DraggableReviewsPanel: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
         }
-        .coordinateSpace(name: "reviewsList")
-        .onPreferenceChange(ReviewListOffsetKey.self) { offset in
-            listAtTop = offset >= -1
-        }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .simultaneousGesture(collapseDrag)
     }
 }
 
 /// 影评独立列表，可滚动翻页
-private struct ReviewListOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 struct ReviewsListView: View {
     let movieID: String
     var total: Int = 0
