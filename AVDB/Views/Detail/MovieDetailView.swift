@@ -1291,14 +1291,17 @@ struct DraggableReviewsPanel: View {
         .safeAreaPadding(.bottom)
     }
 
-    /// 列表在顶部时下拉收起面板，避免评论区把下拉全部吃掉。
+    /// 只在列表已经到顶、并且明确下拉时收起。上翻评论不触发。
     private var collapseDrag: some Gesture {
-        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+        DragGesture(minimumDistance: 28, coordinateSpace: .global)
             .onChanged { value in
-                guard listAtTop, panelState != .collapsed, value.translation.height > 0 else { return }
-                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                guard listAtTop, panelState != .collapsed else { return }
+                guard value.translation.height > 36, value.translation.height > abs(value.translation.width) * 1.8 else {
+                    return
+                }
                 if dragStartHeight == nil { dragStartHeight = panelHeight }
-                let next = (dragStartHeight ?? panelHeight) - value.translation.height
+                let pulled = value.translation.height - 36
+                let next = (dragStartHeight ?? panelHeight) - pulled
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
@@ -1306,16 +1309,14 @@ struct DraggableReviewsPanel: View {
                 }
             }
             .onEnded { value in
-                guard listAtTop, value.translation.height > 18,
-                      abs(value.translation.height) > abs(value.translation.width) else {
-                    dragStartHeight = nil
+                let wasDragging = dragStartHeight != nil
+                dragStartHeight = nil
+                guard wasDragging, listAtTop, value.translation.height > 90,
+                      value.translation.height > abs(value.translation.width) * 1.8 else {
+                    if wasDragging { snap(to: panelHeight, velocityY: 0) }
                     return
                 }
-                let start = dragStartHeight ?? panelHeight
-                dragStartHeight = nil
-                let predicted = start - value.predictedEndTranslation.height
-                let velocityY = value.predictedEndTranslation.height - value.translation.height
-                snap(to: predicted, velocityY: max(velocityY, value.translation.height > 48 ? 1000 : 0))
+                snap(to: collapsedHeight, velocityY: 1200)
             }
     }
 
