@@ -157,16 +157,23 @@ struct HomeView: View {
             action()
         } label: {
             VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .strokeBorder(color.opacity(0.28), lineWidth: 1)
-                        .frame(width: 68, height: 68)
-                    Image(systemName: icon)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(color)
-                        .frame(width: 56, height: 56)
-                        .liquidGlassCircle(tint: color.opacity(0.22))
-                }
+                Image(systemName: icon)
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 58, height: 58)
+                    .background(
+                        LinearGradient(
+                            colors: [color.opacity(0.95), color.opacity(0.68)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(.white.opacity(0.28), lineWidth: 0.7)
+                    }
+                    .shadow(color: color.opacity(0.24), radius: 7, y: 3)
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.primary)
