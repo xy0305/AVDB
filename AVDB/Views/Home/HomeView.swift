@@ -19,6 +19,7 @@ struct HomeView: View {
     @State private var goSeries = false
     @State private var goMakers = false
     @State private var goDirectors = false
+    @State private var goDailyDraw = false
 
     var body: some View {
         NavigationStack {
@@ -73,6 +74,9 @@ struct HomeView: View {
             .navigationDestination(isPresented: $goDirectors) {
                 DirectorsView()
             }
+            .navigationDestination(isPresented: $goDailyDraw) {
+                DailyDrawView()
+            }
         }
     }
 
@@ -111,6 +115,8 @@ struct HomeView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LiquidGlassContainer(spacing: AdaptiveLayout.isPad ? 16 : 12) {
                 HStack(spacing: AdaptiveLayout.isPad ? 16 : 12) {
+                    shortcut("每日抽簽", "sparkles", Color.pink) { goDailyDraw = true }
+                        .staggerAppear(index: 0)
                     shortcut("看熱播", "play.rectangle.fill", Color.red) { goHot = true }
                         .staggerAppear(index: 0)
                     shortcut("AV資訊", "newspaper.fill", Color.orange) { goArticles = true }
