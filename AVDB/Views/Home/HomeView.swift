@@ -22,7 +22,6 @@ struct HomeView: View {
     @State private var goDailyDraw = false
     @State private var goWatchLater = false
     @State private var goUpdates = false
-    @State private var goQueue = false
     @State private var goChallenge = false
 
     var body: some View {
@@ -83,7 +82,6 @@ struct HomeView: View {
             }
             .navigationDestination(isPresented: $goWatchLater) { WatchLaterView() }
             .navigationDestination(isPresented: $goUpdates) { UpdateNoticesView() }
-            .navigationDestination(isPresented: $goQueue) { DownloadQueueView() }
             .navigationDestination(isPresented: $goChallenge) { TripleDrawView() }
         }
     }
@@ -125,7 +123,6 @@ struct HomeView: View {
                 HStack(spacing: AdaptiveLayout.isPad ? 16 : 12) {
                     shortcut("稍後再看", "clock.fill", Color.orange) { goWatchLater = true }
                     shortcut("新作提醒", "bell.fill", Color.red) { goUpdates = true }
-                    shortcut("下載隊列", "arrow.down.circle.fill", Color.blue) { goQueue = true }
                     shortcut("三連挑戰", "rectangle.stack.fill", Color.purple) { goChallenge = true }
                     shortcut("每日抽簽", "sparkles", Color.pink) { goDailyDraw = true }
                         .staggerAppear(index: 0)

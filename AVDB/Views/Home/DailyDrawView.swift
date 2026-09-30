@@ -12,6 +12,7 @@ struct DailyDrawView: View {
     @State private var rotation = 0.0
     @State private var isSpinning = false
     @State private var selectedMovie: Movie?
+    @State private var showCover = false
     @State private var showResult = false
 
     var body: some View {
@@ -104,28 +105,18 @@ struct DailyDrawView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-            VStack(spacing: 10) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 34, weight: .semibold))
-                Text("AVDB")
-                    .font(.system(size: 28, weight: .black))
-            }
-            .foregroundStyle(.white.opacity(0.9))
-            .opacity(cardFaceOpacity(front: false))
-
-            if let movie = selectedMovie {
+            if showCover, let movie = selectedMovie {
                 JavDBImage(url: movie.coverURL ?? movie.thumbURL, maxPixelSize: 900)
-                    .overlay(alignment: .bottomLeading) {
-                        Text(movie.displayNumber)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(.black.opacity(0.55), in: Capsule())
-                            .padding(10)
-                    }
-                    .opacity(cardFaceOpacity(front: true))
-                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                    .frame(width: 230, height: 322)
+                    .clipped()
+            } else {
+                VStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 34, weight: .semibold))
+                    Text("AVDB")
+                        .font(.system(size: 28, weight: .black))
+                }
+                .foregroundStyle(.white.opacity(0.9))
             }
         }
         .frame(width: 230, height: 322)
@@ -133,25 +124,22 @@ struct DailyDrawView: View {
         .shadow(color: .black.opacity(0.28), radius: 16, y: 8)
     }
 
-    private func cardFaceOpacity(front: Bool) -> Double {
-        let normalized = rotation.truncatingRemainder(dividingBy: 360)
-        let degrees = normalized < 0 ? normalized + 360 : normalized
-        let showingFront = degrees > 90 && degrees < 270
-        return (front == showingFront) ? 1 : 0
-    }
-
     private func draw() async {
         guard !isSpinning, let movie = vm.randomMovie(excludingToday: true) else { return }
         isSpinning = true
         showResult = false
+        showCover = false
         GlassHaptic.tap()
-        let spins = Double(Int.random(in: 4...6))
-        withAnimation(.easeInOut(duration: 1.8)) {
-            rotation += 360 * spins + 180
+        withAnimation(.easeIn(duration: 0.45)) {
+            rotation += 90
         }
-        try? await Task.sleep(nanoseconds: 950_000_000)
+        try? await Task.sleep(nanoseconds: 450_000_000)
         selectedMovie = movie
-        try? await Task.sleep(nanoseconds: 900_000_000)
+        showCover = true
+        rotation += 180
+        withAnimation(.easeOut(duration: 0.55)) {
+            rotation += 90
+        }
         withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
             showResult = true
         }
