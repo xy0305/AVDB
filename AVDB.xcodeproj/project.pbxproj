@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1FCC523DAF4878448C890BF3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB59A308766B79E1C4EB955B /* HomeView.swift */; };
 		CC6826C1B66D7480C17F874F /* AVDBApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 380FFE9F6E4CF01F277CD7BD /* AVDBApp.swift */; };
 		36911BA2DB310B86238FD29F /* Movie.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2983B5FE03DB5129649F2FCD /* Movie.swift */; };
 		66B329B8B504D1A4ABD66D6A /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36425E01D91EA8878F32C60 /* User.swift */; };
@@ -46,6 +47,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BB59A308766B79E1C4EB955B /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		AVDB00000000000000000000A2 /* AVDB.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AVDB.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		380FFE9F6E4CF01F277CD7BD /* AVDBApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVDBApp.swift; sourceTree = "<group>"; };
 		2983B5FE03DB5129649F2FCD /* Movie.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Movie.swift; sourceTree = "<group>"; };
