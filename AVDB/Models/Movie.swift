@@ -17,10 +17,50 @@ public struct Movie: Decodable, Identifiable, Hashable {
         coverURL: String? = nil
     ) {
         self.id = id
+        self.type = nil
         self.number = number
+        self.numberLetter = nil
         self.title = title
+        self.originTitle = nil
+        self.summary = nil
+        self.desc = nil
         self.thumbURL = thumbURL
         self.coverURL = coverURL
+        self.duration = nil
+        self.score = nil
+        self.rating = nil
+        self.releaseDate = nil
+        self.magnetsCount = nil
+        self.canPlay = nil
+        self.playSubtitle = nil
+        self.hasPreviewVideo = nil
+        self.hasCnsub = nil
+        self.hasPreviewImages = nil
+        self.tags = nil
+        self.category = nil
+        self.actors = nil
+        self.actorNames = nil
+        self.makerID = nil
+        self.makerName = nil
+        self.directorID = nil
+        self.directorName = nil
+        self.publisherID = nil
+        self.publisherName = nil
+        self.seriesID = nil
+        self.seriesName = nil
+        self.fileSize = nil
+        self.reviewsCount = nil
+        self.commentsCount = nil
+        self.wantWatchCount = nil
+        self.watchedCount = nil
+        self.newMagnets = nil
+        self.hasNewMagnets = false
+        self.previewImages = nil
+        self.playSources = nil
+        self.previewVideoURL = nil
+        self.relativeMovies = nil
+        self.actorMovies = nil
+        self.review = nil
     }
     public let id: String
     public let type: String?
