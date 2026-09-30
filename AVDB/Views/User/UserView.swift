@@ -107,6 +107,18 @@ struct UserView: View {
                     }
 
                     Section {
+                        NavigationLink { WatchLaterView() } label: {
+                            Label("稍后再看", systemImage: "clock")
+                        }
+                        NavigationLink { UpdateNoticesView() } label: {
+                            Label("新作提醒", systemImage: "bell")
+                        }
+                        NavigationLink { DownloadQueueView() } label: {
+                            Label("下载队列", systemImage: "arrow.down.circle")
+                        }
+                        NavigationLink { DrawHistoryView() } label: {
+                            Label("抽签历史", systemImage: "sparkles")
+                        }
                         NavigationLink {
                             FollowingTagsView()
                         } label: {

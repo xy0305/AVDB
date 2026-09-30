@@ -9,6 +9,19 @@ import Foundation
 
 /// 影片通用模型
 public struct Movie: Decodable, Identifiable, Hashable {
+    public init(
+        id: String,
+        number: String? = nil,
+        title: String? = nil,
+        thumbURL: String? = nil,
+        coverURL: String? = nil
+    ) {
+        self.id = id
+        self.number = number
+        self.title = title
+        self.thumbURL = thumbURL
+        self.coverURL = coverURL
+    }
     public let id: String
     public let type: String?
     public let number: String?

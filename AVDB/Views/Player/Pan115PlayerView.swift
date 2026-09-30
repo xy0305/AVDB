@@ -23,7 +23,8 @@ struct Pan115PlayerView: View {
                     url: url,
                     title: movie.displayNumber,
                     subtitle: vm.qualityLabel,
-                    headers: vm.headers
+                    headers: vm.headers,
+                    progressID: movie.id
                 )
             } else if let err = vm.errorMessage {
                 ContentUnavailableView {

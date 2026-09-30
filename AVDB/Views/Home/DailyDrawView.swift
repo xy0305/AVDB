@@ -141,7 +141,7 @@ struct DailyDrawView: View {
     }
 
     private func draw() async {
-        guard !isSpinning, let movie = vm.randomMovie() else { return }
+        guard !isSpinning, let movie = vm.randomMovie(excludingToday: true) else { return }
         isSpinning = true
         showResult = false
         GlassHaptic.tap()
@@ -156,6 +156,7 @@ struct DailyDrawView: View {
             showResult = true
         }
         GlassHaptic.success()
+        DrawHistoryStore.shared.add(movie)
         isSpinning = false
     }
 }
@@ -177,8 +178,10 @@ final class DailyDrawViewModel: ObservableObject {
         statusText = pool.isEmpty ? "签池加载失败，请稍后重试" : "今日 \(pool.count) 张卡牌"
     }
 
-    func randomMovie() -> Movie? {
-        pool.randomElement()
+    func randomMovie(excludingToday: Bool = false) -> Movie? {
+        let today = DrawHistoryStore.today
+        let available = excludingToday ? pool.filter { !DrawHistoryStore.shared.contains($0.id, on: today) } : pool
+        return (available.isEmpty ? pool : available).randomElement()
     }
 
     private func dailyPage() -> Int {

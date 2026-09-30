@@ -235,6 +235,24 @@ struct MovieDetailView: View {
                 ) {
                     Task { await vm.setReviewStatus("watched") }
                 }
+                Button {
+                    WatchLaterStore.shared.toggle(movie)
+                    GlassHaptic.success()
+                } label: {
+                    actionLabel(
+                        WatchLaterStore.shared.contains(movie.id) ? "已稍後" : "稍後看",
+                        icon: "clock"
+                    )
+                }
+                .buttonStyle(.plain)
+                Button {
+                    let links = vm.magnets.compactMap(\.magnetURL)
+                    DownloadQueueStore.shared.enqueue(movie: movie, links: links)
+                    GlassHaptic.success()
+                } label: {
+                    actionLabel("全部推送", icon: "arrow.down.circle")
+                }
+                .buttonStyle(.plain)
                 NavigationLink {
                     MyListsView(movieID: movie.id)
                 } label: {
@@ -342,6 +360,20 @@ struct MovieDetailView: View {
 
     private func deferredSection<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
         DeferredDetailSection(content: content)
+    }
+
+    private func actionLabel(_ title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+        }
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .contentShape(Capsule())
+        .liquidGlass(interactive: false)
     }
 
     private func detailInfoLine(_ label: String, _ value: String, underline: Bool = false) -> some View {

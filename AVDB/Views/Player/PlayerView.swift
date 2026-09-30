@@ -132,6 +132,7 @@ struct KSChromePlayer: View {
     var title: String = ""
     var subtitle: String = ""
     var headers: [String: String] = [:]
+    var progressID: String? = nil
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
@@ -641,6 +642,9 @@ struct KSChromePlayer: View {
                     hasStarted = true
                 }
                 if state == .readyToPlay {
+                    if let progressID, let saved = PlaybackProgressStore.progress(for: progressID), saved.time >= 5 {
+                        coordinator.playerLayer?.seek(time: saved.time, autoPlay: true) { _ in }
+                    }
                     coordinator.playerLayer?.play()
                     applyFillMode()
                     syncTime()
@@ -664,6 +668,9 @@ struct KSChromePlayer: View {
         currentTime = layer.player.currentPlaybackTime
         let d = layer.player.duration
         if d.isFinite, d > 0 { duration = d }
+        if let progressID {
+            PlaybackProgressStore.save(movieID: progressID, time: currentTime, duration: duration)
+        }
     }
 
     private func seek(to time: TimeInterval) {
