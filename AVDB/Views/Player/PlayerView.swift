@@ -305,7 +305,8 @@ struct KSChromePlayer: View {
         }
         if horizontalDrag {
             let span = max(duration, 1)
-            let delta = Double(dx / scrubWidth) * span
+            let secondsPerPoint = duration > 3600 ? 0.55 : 0.35
+            let delta = Double(dx) * secondsPerPoint
             let next = min(span, max(0, scrubStart + delta))
             seekValue = next
             overlayValue = next
@@ -569,6 +570,8 @@ struct KSChromePlayer: View {
                     scheduleHide()
                 }
             }
+            .frame(height: 34)
+            .contentShape(Rectangle())
             .tint(.white)
             .controlSize(.small)
             Text(formatTime(duration))
