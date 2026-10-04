@@ -60,6 +60,11 @@ struct ActorsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                Text("演員")
+                    .font(.largeTitle.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                    .padding(.vertical, 8)
                 UnderlineTabBar(tabs: ActorTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                     .padding(.top, 4)
                 content
@@ -68,8 +73,8 @@ struct ActorsView: View {
                 LiquidGlassBackground()
             }
             .frame(maxWidth: .infinity)
-            .navigationTitle("演員")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSearch = true } label: {
@@ -191,52 +196,65 @@ final class ActorsHomeViewModel: ObservableObject {
     private var page = 1
     private var hasMore = true
     private var currentTab: ActorTab = .recommend
+    private var requestID = UUID()
     private let sdk = JavDBSDK.shared
 
     func loadRecommend() async {
-        isLoading = true
-        defer { isLoading = false }
-        let data = try? await sdk.recommendActors()
-        newActors = data?.newActors ?? []
-        monthlyActors = data?.monthlyActors ?? []
-        recommendActors = data?.recommendActors ?? []
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "zh_Hant")
-        f.dateFormat = "M月d日更新"
-        newUpdateLabel = f.string(from: Date())
+        await switchTab(.recommend)
     }
 
     func switchTab(_ tab: ActorTab, force: Bool = false) async {
-        if tab == .recommend {
-            currentTab = tab
-            if force || newActors.isEmpty { await loadRecommend() }
-            return
+        if !force, tab == currentTab {
+            if isLoading { return }
+            if tab == .recommend, !newActors.isEmpty { return }
+            if tab != .recommend, !list.isEmpty { return }
         }
-        if !force, tab == currentTab, !list.isEmpty { return }
+        let changed = tab != currentTab
         currentTab = tab
-        page = 1
-        hasMore = true
-        list = []
-        await fetch()
+        let id = UUID()
+        requestID = id
+        isLoading = true
+        defer { if requestID == id { isLoading = false } }
+        if changed { list = [] }
+        do {
+            if tab == .recommend {
+                let data = try await sdk.recommendActors()
+                guard requestID == id, !Task.isCancelled else { return }
+                newActors = data.newActors ?? []
+                monthlyActors = data.monthlyActors ?? []
+                recommendActors = data.recommendActors ?? []
+                let f = DateFormatter()
+                f.locale = Locale(identifier: "zh_Hant")
+                f.dateFormat = "M月d日更新"
+                newUpdateLabel = f.string(from: Date())
+            } else {
+                let next = try await sdk.actors(page: 1, type: tab.type, gender: tab.gender)
+                guard requestID == id, !Task.isCancelled else { return }
+                list = next
+                page = 1
+                hasMore = !next.isEmpty
+            }
+        } catch {
+            // Keep the last successful content and pagination on refresh failure.
+        }
     }
 
     func loadMore() async {
         guard currentTab != .recommend, hasMore, !isLoading else { return }
-        page += 1
-        await fetch()
-    }
-
-    private func fetch() async {
+        let id = requestID
+        let tab = currentTab
+        let nextPage = page + 1
         isLoading = true
-        defer { isLoading = false }
-        let next = (try? await sdk.actors(page: page, type: currentTab.type, gender: currentTab.gender)) ?? []
-        if next.isEmpty {
-            hasMore = false
-        } else if page == 1 {
-            list = next
-        } else {
+        defer { if requestID == id { isLoading = false } }
+        do {
+            let next = try await sdk.actors(page: nextPage, type: tab.type, gender: tab.gender)
+            guard requestID == id, !Task.isCancelled else { return }
+            page = nextPage
+            hasMore = !next.isEmpty
             let ids = Set(list.map(\.id))
             list.append(contentsOf: next.filter { !ids.contains($0.id) })
+        } catch {
+            // Retry the same page rather than skipping it.
         }
     }
 }

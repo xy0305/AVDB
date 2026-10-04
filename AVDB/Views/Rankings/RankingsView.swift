@@ -53,6 +53,11 @@ struct RankingsView: View {
 
     private var rankingBody: some View {
         VStack(spacing: 0) {
+            Text("排行榜")
+                .font(.largeTitle.bold())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                .padding(.vertical, 8)
             UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                 .padding(.top, 4)
 
@@ -88,8 +93,8 @@ struct RankingsView: View {
             LiquidGlassBackground()
         }
         .frame(maxWidth: .infinity)
-        .navigationTitle("排行榜")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if tab == .top250 {
                 ToolbarItem(placement: .topBarTrailing) {

@@ -16,6 +16,11 @@ struct CategoriesView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                Text("類別")
+                    .font(.largeTitle.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                    .padding(.vertical, 8)
                 UnderlineTabBar(
                     tabs: MovieCatalogType.categoryTabs.map { ($0, $0.title) },
                     selection: $catalog,
@@ -41,8 +46,8 @@ struct CategoriesView: View {
                 LiquidGlassBackground()
             }
             .frame(maxWidth: .infinity)
-            .navigationTitle("類別")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSearch = true } label: {
@@ -205,36 +210,30 @@ final class CategoriesViewModel: ObservableObject {
     }
 
     func load(type: MovieCatalogType, force: Bool = false) async {
-        if !force, type == catalog, !movies.isEmpty { return }
+        if !force, type == catalog, (isLoading || !movies.isEmpty) { return }
+        let changed = type != catalog
         catalog = type
-        page = 1
-        hasMore = true
-        movies = []
-        selected.removeAll()
-        groups = (try? await sdk.tagGroups(type: type.rawValue)) ?? []
-        await fetch()
+        if changed {
+            movies = []
+            groups = []
+            selected.removeAll()
+        }
+        await fetch(replacing: true, reloadGroups: true)
     }
 
     func applyFilter() async {
-        page = 1
-        hasMore = true
-        movies = []
-        await fetch()
+        await fetch(replacing: true)
     }
 
     func selectSort(_ sort: CatalogSort) async {
         guard self.sort != sort else { return }
         self.sort = sort
-        page = 1
-        hasMore = true
-        movies = []
-        await fetch()
+        await fetch(replacing: true)
     }
 
     func loadMore() async {
         guard hasMore, !isLoading else { return }
-        page += 1
-        await fetch()
+        await fetch(replacing: false)
     }
 
     func pick(groupID: String, tagID: String?) {
@@ -252,25 +251,42 @@ final class CategoriesViewModel: ObservableObject {
         return ""
     }
 
-    private func fetch() async {
+    private var requestID = UUID()
+
+    private func fetch(replacing: Bool, reloadGroups: Bool = false) async {
+        let id = UUID()
+        requestID = id
+        let type = catalog
+        let nextPage = replacing ? 1 : page + 1
+        let requestedSort = sort
         isLoading = true
-        defer { isLoading = false }
-        let list = (try? await sdk.moviesByTag(
-            filterBy: filterBy,
-            type: nil,
-            page: page,
-            limit: 24,
-            sortBy: sort.sortBy,
-            orderBy: sort.orderBy
-        )) ?? []
-        if list.isEmpty {
-            hasMore = false
-            if page == 1 { movies = [] }
-        } else if page == 1 {
-            movies = list
-        } else {
-            let ids = Set(movies.map(\.id))
-            movies.append(contentsOf: list.filter { !ids.contains($0.id) })
+        defer { if requestID == id { isLoading = false } }
+        do {
+            if reloadGroups {
+                let refreshedGroups = try await sdk.tagGroups(type: type.rawValue)
+                guard requestID == id, !Task.isCancelled else { return }
+                groups = refreshedGroups
+            }
+            let requestedFilter = filterBy
+            let list = try await sdk.moviesByTag(
+                filterBy: requestedFilter,
+                type: nil,
+                page: nextPage,
+                limit: 24,
+                sortBy: requestedSort.sortBy,
+                orderBy: requestedSort.orderBy
+            )
+            guard requestID == id, !Task.isCancelled else { return }
+            page = nextPage
+            hasMore = !list.isEmpty
+            if replacing {
+                movies = list
+            } else {
+                let ids = Set(movies.map(\.id))
+                movies.append(contentsOf: list.filter { !ids.contains($0.id) })
+            }
+        } catch {
+            // Keep successful content and pagination; failed requests are retryable.
         }
     }
 }
