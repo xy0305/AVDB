@@ -105,7 +105,20 @@ final class NativeLUTController: ObservableObject {
     private var generation = 0
     private var composition: AVVideoComposition?
     private let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
-    private var supported = false
+    private(set) var supported = false
+    private var formatTask: Task<Void, Never>?
+    private var formatTimeout: Task<Void, Never>?
+
+    private func finishFormatCheck(_ token: Int, _ next: AVPlayerItem, message: String, ready: Bool = false) {
+        guard generation == token, item === next else { return }
+        formatTimeout?.cancel(); formatTimeout = nil
+        formatTask?.cancel(); formatTask = nil
+        supported = ready; enabled = false; status = message
+        if ready {
+            let out = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+            next.add(out); output = out
+        }
+    }
 
     func tick(_ player: KSAVPlayer?) {
         guard let next = player?.player.currentItem else { detach(); return }
@@ -113,11 +126,33 @@ final class NativeLUTController: ObservableObject {
             detach(); item = next; original = next.videoComposition
             status = "检查视频格式…"
             let token = generation
-            Task {
+            // Reject known HLS before any remote AVAsset property loading.
+            if (next.asset as? AVURLAsset)?.url.pathExtension.lowercased() == "m3u8" {
+                finishFormatCheck(token, next, message: "HLS 不支持原生 composition LUT")
+                return
+            }
+            formatTimeout = Task { [weak self, weak next] in
+                do { try await Task.sleep(nanoseconds: 8_000_000_000) } catch { return }
+                guard let self, let next, self.generation == token, self.item === next else { return }
+                // Invalidate first: even a property loader ignoring cancellation cannot publish late.
+                self.finishFormatCheck(token, next, message: "格式检查超时，LUT 已禁用；视频可继续播放")
+                self.generation += 1
+            }
+            formatTask = Task { [weak self, weak next] in
+                guard let self, let next else { return }
                 do {
                     let tracks = try await next.asset.loadTracks(withMediaType: .video)
-                    guard let track = tracks.first else { return }
+                    try Task.checkCancellation()
+                    guard let track = tracks.first else {
+                        finishFormatCheck(token, next, message: "未发现视频轨道，LUT 已禁用")
+                        return
+                    }
                     let descriptions = try await track.load(.formatDescriptions)
+                    try Task.checkCancellation()
+                    guard !descriptions.isEmpty else {
+                        finishFormatCheck(token, next, message: "视频格式信息为空，LUT 已禁用")
+                        return
+                    }
                     let hdr = descriptions.contains { d in
                         guard let extensions = CMFormatDescriptionGetExtensions(d) else { return false }
                         let ext = extensions as NSDictionary
@@ -126,22 +161,27 @@ final class NativeLUTController: ObservableObject {
                     }
                     let playable = try await next.asset.load(.isComposable)
                     guard generation == token, item === next else { return }
-                    let hls = (next.asset as? AVURLAsset)?.url.pathExtension.lowercased() == "m3u8"
-                    guard playable && !hdr && !hls else {
-                        status = hdr ? "HDR 不支持 LUT" : "此视频不支持原生 composition LUT（HLS/非可合成流）"
-                        enabled = false; return
+                    try Task.checkCancellation()
+                    guard generation == token, item === next else { return }
+                    guard playable && !hdr else {
+                        finishFormatCheck(token, next, message: hdr ? "HDR 不支持 LUT" : "此视频不支持原生 composition LUT（HLS/非可合成流）")
+                        return
                     }
-                    supported = true
-                    let out = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
-                    next.add(out); output = out
-                    status = "SDR 就绪，点击开启 LUT"
-                } catch { if generation == token { status = "格式检查失败：\(error.localizedDescription)" } }
+                    finishFormatCheck(token, next, message: "SDR 就绪，点击开启 LUT", ready: true)
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    finishFormatCheck(token, next, message: "格式检查失败，LUT 已禁用：\(error.localizedDescription)")
+                }
             }
         }
         if supported && enabled && requested && !busy { analyze() }
     }
     func detach() {
         generation += 1
+        formatTask?.cancel(); formatTask = nil
+        formatTimeout?.cancel(); formatTimeout = nil
+        enabled = false
+        status = "等待播放器视频轨道；LUT 未启用"
         if let item { item.videoComposition = original; if let output { item.remove(output) } }
         item = nil; output = nil; original = nil; composition = nil
         supported = false; busy = false; requested = true
@@ -232,6 +272,7 @@ struct NativeLUTPanel: View {
     var body: some View {
         Form {
             Text(model.status).font(.footnote)
+            Group {
             Button(model.enabled ? "关闭 LUT" : "开启 LUT") { model.toggle() }
             Button("重新分析原始帧") { model.reanalyze() }
             Button("重置 / 原始画面") { model.reset() }
@@ -241,6 +282,7 @@ struct NativeLUTPanel: View {
                     Slider(value:Binding(get:{ model.parameters.values[i] },set:{ model.parameters.values[i] = $0; model.apply() }),in:-50...50,step:1)
                 }
             }
+            }.disabled(!model.supported)
         }.presentationDetents([.medium,.large])
     }
 }

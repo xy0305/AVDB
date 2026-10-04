@@ -32,6 +32,9 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
+      - name: Check LUT timeout and sheet lifecycle regressions
+        run: python3 scripts/test-player-regressions.py
+
       - name: Test native LUT cube and search
         run: python3 scripts/test-native-lut.py
 

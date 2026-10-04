@@ -138,6 +138,7 @@ struct KSChromePlayer: View {
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
     @StateObject private var lut = NativeLUTController()
     @State private var showLUT = false
+    @State private var playbackActive = false
     @State private var isPlaying = false
     @State private var isBuffering = true
     @State private var hasStarted = false
@@ -197,12 +198,26 @@ struct KSChromePlayer: View {
         .background(Color.black)
         .ignoresSafeArea()
         .statusBarHidden(true)
-        .sheet(isPresented: $showLUT) { NativeLUTPanel(model: lut) }
+        .sheet(isPresented: $showLUT, onDismiss: {
+            // Sheet dismissal is not a playback-route exit. Preserve item, LUT and orientation.
+            showChrome = true
+            startTicker()
+            scheduleHide()
+        }) { NativeLUTPanel(model: lut) }
+        .onChange(of: showLUT) { _, presented in
+            if presented { hideTask?.cancel(); showChrome = true }
+        }
         .toolbar(.hidden, for: .navigationBar)
         // 保留一个可布局的 MPVolumeView；尺寸为 0 时系统可能不创建 UISlider，
         // 导致横屏右侧滑动虽然触发，但音量实际不会变化。
         .background(HiddenVolumeView().frame(width: 2, height: 2).opacity(0.01))
         .onAppear {
+            guard !playbackActive else {
+                showChrome = true
+                startTicker()
+                return
+            }
+            playbackActive = true
             coordinator.isMaskShow = false
             // 激活播放音频会话，确保右侧手势修改的是当前播放器音量。
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
@@ -213,12 +228,20 @@ struct KSChromePlayer: View {
             OrientationLock.set(.landscapeRight, keepLocked: true)
         }
         .onDisappear {
-            hideTask?.cancel()
-            tickTask?.cancel()
-            lut.detach()
-            coordinator.playerLayer?.pause()
-            OrientationLock.set(.portrait, keepLocked: true)
+            // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
+            // They must not tear down playback or force the whole app to portrait.
+            guard !showLUT else { return }
+            stopPlayback()
         }
+    }
+
+    private func stopPlayback() {
+        playbackActive = false
+        hideTask?.cancel()
+        tickTask?.cancel()
+        lut.detach()
+        coordinator.playerLayer?.pause()
+        OrientationLock.set(.portrait, keepLocked: true)
     }
 
     @ViewBuilder
@@ -666,6 +689,7 @@ struct KSChromePlayer: View {
         tickTask = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
+                guard !Task.isCancelled else { return }
                 syncTime()
                 lut.tick(coordinator.playerLayer?.player as? KSAVPlayer)
             }
