@@ -1138,7 +1138,15 @@ private enum Pan115Crypto {
 		0x76, 0xd5, 0x1b, 0x8f, 0xcc, 0xc3, 0xb8, 0xf5,
 	]
     static func derive(_ key: [UInt8], _ count: Int) -> [UInt8] {
-        (0..<count).map { (key[$0] &+ seed[count * $0]) ^ seed[count * (count - $0 - 1)] }
+        var result = [UInt8]()
+        result.reserveCapacity(count)
+        for index in 0..<count {
+            let forward = count * index
+            let reverse = count * (count - index - 1)
+            let sum: UInt8 = key[index] &+ seed[forward]
+            result.append(sum ^ seed[reverse])
+        }
+        return result
     }
     static func xor(_ bytes: [UInt8], _ key: [UInt8]) -> [UInt8] {
         let mod = bytes.count % 4
