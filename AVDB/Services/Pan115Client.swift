@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import Security
 
 /// 115 离线推送结果
 public enum Pan115PushResult: Equatable {
@@ -187,6 +188,9 @@ public final class Pan115Client: @unchecked Sendable {
         public let name: String
         public let url: String
         public let bandwidth: Int
+        public var headers: [String: String] = [:]
+        public var isOriginal: Bool = false
+        public var resolvedAt = Date()
     }
 
     /// 轮询离线任务直到完成（默认 90 秒）
@@ -430,10 +434,10 @@ public final class Pan115Client: @unchecked Sendable {
         throw Pan115Error.fileNotFound
     }
 
-    /// 原画：优先 m3u8 master 最高码率，失败再走 video 直链
+    /// 原文件下载地址；与 HLS 转码接口明确分离。
     public func originalPlayURL(pickCode: String, cookie: String, filename: String = "") async throws -> URL {
-        let streams = try await streamsForVideo(pickCode: pickCode, cookie: cookie, filename: filename)
-        guard let best = streams.first, let url = URL(string: best.url) else {
+        let original = try await originalStream(pickCode: pickCode, cookie: cookie)
+        guard let url = URL(string: original.url) else {
             throw Pan115Error.playURLNotFound
         }
         return url
@@ -450,28 +454,46 @@ public final class Pan115Client: @unchecked Sendable {
             let parsed = parseMaster(text)
             if !parsed.isEmpty { return parsed }
             if !text.contains("#EXT-X-STREAM-INF") {
-                return [PlayStream(name: "原画", url: m3u8URL.absoluteString, bandwidth: 0)]
-            }
-        }
-        let candidates = [
-            "https://115vod.com/webapi/files/video?pickcode=\(pickCode.formEncoded)&local=1",
-            "https://webapi.115.com/files/video?pickcode=\(pickCode.formEncoded)&local=1",
-        ]
-        for u in candidates {
-            guard let url = URL(string: u) else { continue }
-            var r = URLRequest(url: url)
-            r.httpMethod = "GET"
-            appendCommonHeaders(&r, cookie: cookie)
-            if let obj = try? await json(for: r) {
-                let data = obj["data"] as? [String: Any] ?? [:]
-                let direct = stringValue(obj["download_url"] ?? obj["video_url"] ?? obj["url"]
-                    ?? data["download_url"] ?? data["video_url"] ?? data["url"])
-                if direct.hasPrefix("http"), URL(string: direct) != nil {
-                    return [PlayStream(name: "原文件", url: direct, bandwidth: 0)]
-                }
+                return [PlayStream(name: "HLS", url: m3u8URL.absoluteString, bandwidth: 0)]
             }
         }
         throw Pan115Error.playURLNotFound
+    }
+
+    /// Personal file downurl: encrypted pickcode, never trust files/video metadata.
+    public func originalStream(pickCode: String, cookie: String) async throws -> PlayStream {
+        guard !pickCode.isEmpty else { throw Pan115Error.playURLNotFound }
+        let key = try Pan115Crypto.random(16)
+        let payload = try JSONSerialization.data(withJSONObject: ["pickcode": pickCode])
+        let encoded = try Pan115Crypto.encode(payload, key: key)
+        var request = URLRequest(url: URL(string: "https://proapi.115.com/app/chrome/downurl?t=\(Int(Date().timeIntervalSince1970))")!)
+        request.httpMethod = "POST"
+        appendCommonHeaders(&request, cookie: cookie)
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = "data=\(encoded.formEncoded)".data(using: .utf8)
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (envelope["state"] as? Bool) == true,
+              let encrypted = envelope["data"] as? String else { throw Pan115Error.playURLNotFound }
+        let decoded = try Pan115Crypto.decode(encrypted, key: key)
+        guard let files = try JSONSerialization.jsonObject(with: decoded) as? [String: Any] else { throw Pan115Error.playURLNotFound }
+        let matches = files.values.compactMap { $0 as? [String: Any] }.filter { ($0["pick_code"] as? String) == pickCode }
+        guard matches.count == 1, let nested = matches[0]["url"] as? [String: Any],
+              let text = nested["url"] as? String, let url = URL(string: text),
+              ["https", "http"].contains(url.scheme?.lowercased() ?? ""),
+              url.host != nil, url.user == nil, url.password == nil else { throw Pan115Error.playURLNotFound }
+        var headers = Self.playHeaders(cookie: cookie)
+        var pairs: [String: String] = [:]
+        for item in Pan115Settings.normalizeCookie(cookie).split(separator: ";") {
+            let parts = item.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
+            if parts.count == 2 { pairs[String(parts[0])] = String(parts[1]) }
+        }
+        let fields = http.allHeaderFields.reduce(into: [String: String]()) { result, field in result[String(describing: field.key)] = String(describing: field.value) }
+        for cookie in HTTPCookie.cookies(withResponseHeaderFields: fields, for: request.url!) { pairs[cookie.name] = cookie.value }
+        headers["Cookie"] = pairs.keys.sorted().map { "\($0)=\(pairs[$0]!)" }.joined(separator: "; ")
+        // No static Range header: AVFoundation/FFmpeg generate byte ranges for seek.
+        return PlayStream(name: "原文件 / 原画", url: url.absoluteString, bandwidth: 0, headers: headers, isOriginal: true)
     }
 
     /// 推送磁力并等到可播，返回原画 URL
@@ -1082,5 +1104,78 @@ private extension Array where Element == String {
     var uniqued: [String] {
         var seen = Set<String>()
         return filter { seen.insert($0).inserted }
+    }
+}
+
+// m115 protocol adapted from SheltonZhu/115driver (MIT).
+// See THIRD_PARTY/115driver-MIT.txt. This is protocol obfuscation, not secrecy.
+private enum Pan115Crypto {
+    static let seed: [UInt8] = [
+		0xf0, 0xe5, 0x69, 0xae, 0xbf, 0xdc, 0xbf, 0x8a,
+		0x1a, 0x45, 0xe8, 0xbe, 0x7d, 0xa6, 0x73, 0xb8,
+		0xde, 0x8f, 0xe7, 0xc4, 0x45, 0xda, 0x86, 0xc4,
+		0x9b, 0x64, 0x8b, 0x14, 0x6a, 0xb4, 0xf1, 0xaa,
+		0x38, 0x01, 0x35, 0x9e, 0x26, 0x69, 0x2c, 0x86,
+		0x00, 0x6b, 0x4f, 0xa5, 0x36, 0x34, 0x62, 0xa6,
+		0x2a, 0x96, 0x68, 0x18, 0xf2, 0x4a, 0xfd, 0xbd,
+		0x6b, 0x97, 0x8f, 0x4d, 0x8f, 0x89, 0x13, 0xb7,
+		0x6c, 0x8e, 0x93, 0xed, 0x0e, 0x0d, 0x48, 0x3e,
+		0xd7, 0x2f, 0x88, 0xd8, 0xfe, 0xfe, 0x7e, 0x86,
+		0x50, 0x95, 0x4f, 0xd1, 0xeb, 0x83, 0x26, 0x34,
+		0xdb, 0x66, 0x7b, 0x9c, 0x7e, 0x9d, 0x7a, 0x81,
+		0x32, 0xea, 0xb6, 0x33, 0xde, 0x3a, 0xa9, 0x59,
+		0x34, 0x66, 0x3b, 0xaa, 0xba, 0x81, 0x60, 0x48,
+		0xb9, 0xd5, 0x81, 0x9c, 0xf8, 0x6c, 0x84, 0x77,
+		0xff, 0x54, 0x78, 0x26, 0x5f, 0xbe, 0xe8, 0x1e,
+		0x36, 0x9f, 0x34, 0x80, 0x5c, 0x45, 0x2c, 0x9b,
+		0x76, 0xd5, 0x1b, 0x8f, 0xcc, 0xc3, 0xb8, 0xf5,
+	]
+    static func derive(_ key: [UInt8], _ count: Int) -> [UInt8] {
+        (0..<count).map { (key[$0] &+ seed[count * $0]) ^ seed[count * (count - $0 - 1)] }
+    }
+    static func xor(_ bytes: [UInt8], _ key: [UInt8]) -> [UInt8] {
+        let mod = bytes.count % 4
+        return bytes.enumerated().map { i, b in b ^ key[(i < mod ? i : i - mod) % key.count] }
+    }
+    static func random(_ count: Int) throws -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: count)
+        guard SecRandomCopyBytes(kSecRandomDefault, count, &bytes) == errSecSuccess else { throw Pan115Error.api("随机数生成失败") }
+        return bytes
+    }
+    static func transform(_ input: [UInt8]) throws -> [UInt8] {
+        // PKCS#1 RSAPublicKey DER; positive 1024-bit modulus, exponent 65537.
+        let hex = "8686980c0f5a24c4b9d43020cd2c22703ff3f450756529058b1cf88f09b8602136477198a6e2683149659bd122c33592fdb5ad47944ad1ea4d36c6b172aad6338c3bb6ac6227502d010993ac967d1aef00f0c8e038de2e4d3bc2ec368af2e9f10a6f1eda4f7262f136420c07c331b871bf139f74f3010e3c4fe57df3afb71683"
+        var n: [UInt8] = []
+        var i = hex.startIndex
+        while i < hex.endIndex { let end = hex.index(i, offsetBy: 2); n.append(UInt8(hex[i..<end], radix: 16)!); i = end }
+        let der = Data([0x30,0x81,0x89,0x02,0x81,0x81,0] + n + [0x02,0x03,0x01,0,0x01])
+        var error: Unmanaged<CFError>?
+        guard input.count == 128,
+              let key = SecKeyCreateWithData(der as CFData, [kSecAttrKeyType: kSecAttrKeyTypeRSA, kSecAttrKeyClass: kSecAttrKeyClassPublic, kSecAttrKeySizeInBits: 1024] as CFDictionary, &error),
+              let out = SecKeyCreateEncryptedData(key, .rsaEncryptionRaw, Data(input) as CFData, &error) else { throw Pan115Error.api("115 RSA 数据无效") }
+        return Array(out as Data)
+    }
+    static func encode(_ data: Data, key: [UInt8]) throws -> String {
+        let payload = key + xor(Array(xor(Array(data), derive(key, 4)).reversed()), [0x78,0x06,0xad,0x4c,0x33,0x86,0x5d,0x18,0x4c,0x01,0x3f,0x46])
+        var output: [UInt8] = []
+        for offset in stride(from: 0, to: payload.count, by: 117) {
+            let part = Array(payload[offset..<min(offset + 117, payload.count)])
+            var padding = try random(125 - part.count)
+            for i in padding.indices { while padding[i] == 0 { padding[i] = try random(1)[0] } }
+            output += try transform([0,2] + padding + [0] + part)
+        }
+        return Data(output).base64EncodedString()
+    }
+    static func decode(_ text: String, key: [UInt8]) throws -> Data {
+        guard let data = Data(base64Encoded: text), !data.isEmpty, data.count % 128 == 0, data.count <= 1024 * 1024 else { throw Pan115Error.api("115 加密响应无效") }
+        let bytes = Array(data)
+        var plain: [UInt8] = []
+        for offset in stride(from: 0, to: bytes.count, by: 128) {
+            let block = try transform(Array(bytes[offset..<offset+128]))
+            guard block.count == 128, block[0] == 0, [1,2].contains(block[1]), let end = block.dropFirst(2).firstIndex(of: 0), end >= 10 else { throw Pan115Error.api("115 RSA 填充无效") }
+            plain += block[(end+1)...]
+        }
+        guard plain.count >= 16 else { throw Pan115Error.api("115 解密响应过短") }
+        return Data(xor(Array(xor(Array(plain.dropFirst(16)), derive(Array(plain.prefix(16)), 12)).reversed()), derive(key, 4)))
     }
 }

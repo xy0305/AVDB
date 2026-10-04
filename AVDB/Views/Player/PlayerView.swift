@@ -133,6 +133,8 @@ struct KSChromePlayer: View {
     var subtitle: String = ""
     var headers: [String: String] = [:]
     var progressID: String? = nil
+    var onPlaybackFailure: (() -> Void)? = nil
+    @State private var failureReported = false
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
@@ -667,6 +669,10 @@ struct KSChromePlayer: View {
         coordinator.isMaskShow = false
         coordinator.onStateChanged = { _, state in
             Task { @MainActor in
+                if state == .error, !failureReported {
+                    failureReported = true
+                    onPlaybackFailure?()
+                }
                 isPlaying = state.isPlaying
                 isBuffering = state == .buffering || state == .preparing
                 if state.isPlaying || state == .readyToPlay || state == .paused {
@@ -687,10 +693,15 @@ struct KSChromePlayer: View {
     private func startTicker() {
         tickTask?.cancel()
         tickTask = Task { @MainActor in
+            let start = Date()
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled else { return }
                 syncTime()
+                if !hasStarted, !failureReported, Date().timeIntervalSince(start) > 30, onPlaybackFailure != nil {
+                    failureReported = true
+                    onPlaybackFailure?()
+                }
                 lut.tick(coordinator.playerLayer?.player as? KSAVPlayer)
             }
         }

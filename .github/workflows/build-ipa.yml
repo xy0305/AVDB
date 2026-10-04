@@ -35,6 +35,9 @@ jobs:
       - name: Check LUT timeout and sheet lifecycle regressions
         run: python3 scripts/test-player-regressions.py
 
+      - name: Test native 115 RSA protocol
+        run: python3 scripts/test-115-native.py
+
       - name: Test native LUT cube and search
         run: python3 scripts/test-native-lut.py
 

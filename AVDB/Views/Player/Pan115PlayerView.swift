@@ -14,6 +14,7 @@ struct Pan115PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var vm = Pan115PlayerViewModel()
     @State private var showEpisodes = false
+    @State private var showQuality = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -24,8 +25,10 @@ struct Pan115PlayerView: View {
                     title: movie.displayNumber,
                     subtitle: vm.qualityLabel,
                     headers: vm.headers,
-                    progressID: movie.id
+                    progressID: movie.id,
+                    onPlaybackFailure: { Task { await vm.failed() } }
                 )
+                .id(url)
             } else if let err = vm.errorMessage {
                 ContentUnavailableView {
                     Label("无法播放", systemImage: "exclamationmark.triangle")
@@ -52,6 +55,19 @@ struct Pan115PlayerView: View {
                 }
             }
 
+            if vm.playURL != nil {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(vm.qualityLabel) { showQuality = true }
+                            .padding(12).foregroundStyle(.white)
+                    }
+                    if !vm.playbackNotice.isEmpty {
+                        Text(vm.playbackNotice).font(.caption).foregroundStyle(.white)
+                            .padding(8).background(.black.opacity(0.65))
+                    }
+                }.padding(.top, 60)
+            }
             if vm.playURL != nil, vm.episodes.count > 1 {
                 HStack {
                     Spacer()
@@ -83,6 +99,12 @@ struct Pan115PlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.hidden, for: .navigationBar)
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
+        .confirmationDialog("播放源（原文件不保证支持 HDR/LUT）", isPresented: $showQuality) {
+            ForEach(Array(vm.streams.enumerated()), id: \.offset) { _, stream in
+                Button(stream.name) { Task { await vm.select(stream) } }
+            }
+            Button("取消", role: .cancel) {}
+        }
         .confirmationDialog("选择集数", isPresented: $showEpisodes) {
             ForEach(Array(vm.episodes.enumerated()), id: \.element.fileID) { index, file in
                 Button(episodeTitle(index: index, name: file.name)) {
@@ -156,10 +178,17 @@ final class Pan115PlayerViewModel: ObservableObject {
     @Published var episodes: [Pan115Client.FileItem] = []
     @Published var playURL: URL?
     @Published var streams: [Pan115Client.PlayStream] = []
-    @Published var qualityLabel = "原画"
+    @Published var qualityLabel = "原文件 / 原画"
+    @Published var playbackNotice = ""
+    private var activeStream: Pan115Client.PlayStream?
+    private var currentFile: Pan115Client.FileItem?
+    private var refreshing = false
+    private var refreshUsed = false
+    private var fallbackUsed = false
+    private var generation = 0
 
     var headers: [String: String] {
-        Pan115Client.playHeaders(cookie: Pan115Settings.shared.cookie)
+        activeStream?.headers.isEmpty == false ? activeStream!.headers : Pan115Client.playHeaders(cookie: Pan115Settings.shared.cookie)
     }
 
     func start(movie: Movie, magnetURL: String?) async {
@@ -222,9 +251,67 @@ final class Pan115PlayerViewModel: ObservableObject {
         }
     }
 
-    func select(_ stream: Pan115Client.PlayStream) {
+    func select(_ stream: Pan115Client.PlayStream) async {
+        guard !refreshing else { return }
+        refreshing = true
+        defer { refreshing = false }
+        let token = generation
+        var chosen = stream
+        if Date().timeIntervalSince(stream.resolvedAt) > 120, let file = currentFile {
+            do {
+                if stream.isOriginal {
+                    chosen = try await Pan115Client.shared.originalStream(pickCode: file.pickCode, cookie: Pan115Settings.shared.cookie)
+                } else {
+                    let list = try await Pan115Client.shared.streamsForVideo(pickCode: file.pickCode, cookie: Pan115Settings.shared.cookie, filename: file.name)
+                    guard let match = list.first(where: { $0.name == stream.name }) ?? list.first else { throw Pan115Error.playURLNotFound }
+                    chosen = match
+                }
+            } catch {
+                guard token == generation else { return }
+                playbackNotice = "地址刷新失败，请重试或选择 HLS"
+                return
+            }
+        }
+        guard token == generation else { return }
+        activate(chosen)
+        refreshUsed = false
+        fallbackUsed = false
+        playbackNotice = chosen.isOriginal ? "原文件：容器/编码/HDR 支持取决于设备；LUT 仅支持可分析的 SDR" : "HLS 转码播放"
+    }
+
+    private func activate(_ stream: Pan115Client.PlayStream) {
+        activeStream = stream
         qualityLabel = stream.name
         playURL = URL(string: stream.url)
+    }
+
+    func failed() async {
+        guard !refreshing, let file = currentFile, let active = activeStream else { return }
+        refreshing = true
+        defer { refreshing = false }
+        let token = generation
+        if active.isOriginal && !refreshUsed {
+            refreshUsed = true
+            playbackNotice = "原文件播放失败，正在刷新一次地址…"
+            if let fresh = try? await Pan115Client.shared.originalStream(pickCode: file.pickCode, cookie: Pan115Settings.shared.cookie) {
+                guard token == generation else { return }
+                activate(fresh)
+                return
+            }
+        }
+        guard token == generation else { return }
+        if active.isOriginal && !fallbackUsed {
+            fallbackUsed = true
+            playbackNotice = "原文件不兼容或不可用，回退 HLS 转码…"
+            let list = (try? await Pan115Client.shared.streamsForVideo(pickCode: file.pickCode, cookie: Pan115Settings.shared.cookie, filename: file.name)) ?? []
+            guard token == generation else { return }
+            if let first = list.first {
+                streams = streams.filter { $0.isOriginal } + list
+                activate(first)
+                return
+            }
+        }
+        errorMessage = "播放失败，原文件及可用 HLS 已尝试；请重新打开或检查 Cookie。"
     }
 
     func selectEpisode(_ index: Int) async {
@@ -293,16 +380,20 @@ final class Pan115PlayerViewModel: ObservableObject {
     }
 
     private func play(file: Pan115Client.FileItem, cookie: String) async throws {
+        generation += 1
+        currentFile = file
+        refreshUsed = false
+        fallbackUsed = false
         fileName = file.name
-        status = "获取 115 播放地址…"
-        let list = try await Pan115Client.shared.streamsForVideo(
-            pickCode: file.pickCode, cookie: cookie, filename: file.name)
-        streams = list
-        guard let best = list.first, let url = URL(string: best.url) else {
-            throw Pan115Error.playURLNotFound
-        }
-        qualityLabel = best.name
-        playURL = url
+        status = "获取 115 原文件地址…"
+        // Only one lookup per opening; no signed URL is persisted.
+        let original = try? await Pan115Client.shared.originalStream(pickCode: file.pickCode, cookie: cookie)
+        let hls = (try? await Pan115Client.shared.streamsForVideo(pickCode: file.pickCode, cookie: cookie, filename: file.name)) ?? []
+        streams = original.map { [$0] + hls } ?? hls
+        guard let best = streams.first else { throw Pan115Error.playURLNotFound }
+        activate(best)
+        playbackNotice = original == nil ? "原文件地址不可用，使用 HLS 转码" : "原文件：容器/编码/HDR 支持取决于设备；LUT 仅支持可分析的 SDR"
+
     }
 }
 
