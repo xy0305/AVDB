@@ -20,9 +20,9 @@ assert 'guard !showLUT else { return }' in disappear
 assert 'guard !playbackActive else' in player
 assert 'guard !Task.isCancelled else { return }\n                syncTime()' in player
 info = plistlib.loads(Path('AVDB/Resources/Info.plist').read_bytes())
-assert info['CFBundleVersion'] == '153'
-assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 153;') == 2
-print('PASS: format-check and sheet-lifecycle source contracts; consistent build153')
+assert info['CFBundleVersion'] == '154'
+assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 154;') == 2
+print('PASS: format-check and sheet-lifecycle source contracts; consistent build154')
 
 # UI source contracts only: device rendering/VoiceOver still require manual validation.
 pan = Path('AVDB/Views/Player/Pan115PlayerView.swift').read_text()

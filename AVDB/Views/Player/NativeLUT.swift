@@ -4,6 +4,7 @@ import SwiftUI
 import AVFoundation
 import CoreImage
 import Vision
+import JavaScriptCore
 import KSPlayer
 
 struct LUTParameters: Equatable {
@@ -12,83 +13,33 @@ struct LUTParameters: Equatable {
     static let names = ["色温", "色调", "饱和度", "亮度", "对比度", "高光", "阴影"]
 }
 
+// Each invocation owns an isolated JavaScriptCore VM; no DOM, network or WebGL.
+// Analysis is called only from the detached worker. Cube generation uses its own VM.
 enum NativeLUT {
-    static func lum(_ c: [Double]) -> Double { c[0]*0.2126 + c[1]*0.7152 + c[2]*0.0722 }
-    static func transform(_ input: [Double], _ p: LUTParameters) -> [Double] {
-        let v = p.values
-        var c = input
-        var l = lum(c)
-        let damp = max(0.3, 1 - max(0, (l-0.7)/0.3)*0.7)
-        c = c.map { $0 * (1 + v[3]/50*0.67*damp) }
-        l = lum(c)
-        let hs = (1 + v[5]/50*0.7*max(0,(l-0.5)/0.5)) * (1 + v[6]/50*0.7*max(0,(0.5-l)/0.5))
-        c = c.map { $0*hs }
-        var gain = [(1+v[0]/50*0.23)*(1+v[1]/50*0.045), (1+v[0]/50*0.058)*(1-v[1]/50*0.09), (1-v[0]/50*0.23)*(1+v[1]/50*0.045)]
-        let normalization = lum(gain)
-        if normalization > 0.001 { gain = gain.map { $0/normalization } }
-        let protection = 1-min(1,max(0,(lum(c)-0.7)/0.3))*0.95
-        c = (0..<3).map { c[$0]*(1+(gain[$0]-1)*protection) }
-        l = lum(c)
-        c = c.map { l+(1+v[2]/50*1.5)*($0-l) }
-        let contrast = 1+v[4]/50*0.57*max(0.5,1-max(0,(lum(c)-0.7)/0.3)*0.5)
-        c = c.map { 0.5+contrast*($0-0.5) }
-        l = lum(c)
-        let white = (c.max()!-c.min()!) < 0.08 && c.min()! > 0.85
-        if l > 0.96 && !white { c = c.map { $0*0.96/l } }
-        return c.map { min(1,max(0,$0)) }
+    private static func engine() -> JSContext? {
+        guard let url = Bundle.main.url(forResource: "OriginalLUT", withExtension: "js"),
+              let source = try? String(contentsOf: url, encoding: .utf8),
+              let context = JSContext() else { return nil }
+        context.evaluateScript(source)
+        guard context.exception == nil else { return nil }
+        return context
     }
-    static func cube(_ p: LUTParameters) -> Data {
-        var floats = [Float]()
-        floats.reserveCapacity(33*33*33*4)
-        for b in 0..<33 { for g in 0..<33 { for r in 0..<33 {
-            floats.append(contentsOf: transform([Double(r)/32,Double(g)/32,Double(b)/32],p).map(Float.init))
-            floats.append(1)
-        } } }
+    static func analyze(bytes: [UInt8], width: Int, height: Int, box: [String: Int]?) -> (LUTParameters, String)? {
+        guard let context = engine(),
+              let result = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("analyzeFrame")?.call(withArguments: [bytes, width, height, box as Any? ?? NSNull()]),
+              context.exception == nil, !result.isNull, !result.isUndefined,
+              let dict = result.toDictionary(), let params = dict["params"] as? [String: Any] else { return nil }
+        let keys = ["temp", "tint", "sat", "bright", "contrast", "highlight", "shadow"]
+        let values = keys.compactMap { (params[$0] as? NSNumber)?.doubleValue }
+        guard values.count == 7, values.allSatisfy({ $0.isFinite }) else { return nil }
+        return (LUTParameters(values: values), dict["stage"] as? String ?? "标准")
+    }
+    static func cube(_ p: LUTParameters) -> Data? {
+        guard let context = engine(),
+              let result = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("cubeRGBA")?.call(withArguments: [p.values]),
+              context.exception == nil, let numbers = result.toArray() as? [NSNumber], numbers.count == 33*33*33*4 else { return nil }
+        let floats = numbers.map { $0.floatValue }
         return floats.withUnsafeBytes { Data($0) }
-    }
-    // Ported sampleSkinStats: mean ratios, luma, saturation, contrast, HL/SH fractions.
-    static func stats(_ pixels: [[Double]]) -> [Double] {
-        let n = Double(pixels.count)
-        var means = [Double](repeating: 0,count: 3)
-        var saturation = 0.0, high = 0.0, low = 0.0
-        for c in pixels {
-            for i in 0..<3 { means[i] += c[i]/n }
-            saturation += (c.max()! > 1e-6 ? (c.max()!-c.min()!)/c.max()! : 0)/n
-            if lum(c)>0.7 { high += 1/n }; if lum(c)<0.2 { low += 1/n }
-        }
-        let l = lum(means)
-        let variance = pixels.reduce(0.0) { $0 + pow(lum($1)-l,2)/n }
-        return [means[0]/max(1e-6,means[2]),means[0]/max(1e-6,means[1]),l,saturation,sqrt(variance),high,low]
-    }
-    // Native bounded coordinate search using original templates/target ranges.
-    // Not a line-for-line port of browser predictParams' scene-specific guards.
-    static func search(_ pixels: [[Double]]) -> LUTParameters {
-        let s = stats(pixels)
-        let dark = s[2]<0.22 && s[0]<1.6
-        var p = LUTParameters(values: dark ? [-18,3,-1,25,-2,-1,20] : [-20,0,0,0,0,-2,2])
-        let targets: [[Double]] = dark ? [[1.05,1.32],[1.12,1.28],[0.46,0.66],[0.14,0.25],[0.13,0.23],[0,0.15],[0.14,0.35]] : [[1.2,1.5],[1.15,1.35],[0.4,0.58],[0.12,0.26],[0.1,0.2],[0,0.2],[0,0.4]]
-        let ranges = dark ? [(-26,-14),(0,8),(-6,0),(10,45),(-5,0),(-4,1),(5,35)] : [(-50,-16),(-6,6),(-6,4),(-8,50),(-4,3),(-8,2),(-4,8)]
-        let base = p.values
-        func score(_ candidate: LUTParameters) -> Double {
-            let t = stats(pixels.map { transform($0,candidate) })
-            var error = 0.0
-            let weights = [15.0,5,10,4,2,8,3]
-            for i in 0..<7 {
-                let d = max(0,max(targets[i][0]-t[i],t[i]-targets[i][1]))
-                error += weights[i]*d*d + 0.0001*pow(candidate.values[i]-base[i],2)
-            }
-            return error
-        }
-        for _ in 0..<2 { for index in [0,1,3,5,6,2,4] {
-            var best = p, bestError = score(p)
-            for value in ranges[index].0...ranges[index].1 {
-                var trial = p; trial.values[index] = Double(value)
-                let e = score(trial)
-                if e<bestError { best = trial; bestError = e }
-            }
-            p = best
-        } }
-        return p
     }
 }
 
@@ -203,7 +154,7 @@ final class NativeLUTController: ObservableObject {
     }
     func apply() {
         guard supported, let item else { return }
-        let cube = NativeLUT.cube(parameters)
+        guard let cube = NativeLUT.cube(parameters) else { status = "原版 LUT 引擎加载失败，未应用调色"; return }
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
         let ci = context
         let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
@@ -227,41 +178,33 @@ final class NativeLUTController: ObservableObject {
            transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
             enabled = false; supported = false; status = "HDR 解码帧已禁用 LUT"; return
         }
-        busy = true; requested = false; status = "Vision 自动分析…"
+        busy = true; requested = false; status = "获取 Vision ROI → 原版动态 Cr / 分阶段搜索…"
         let token = generation
         let ciImage = CIImage(cvPixelBuffer:buffer)
-        let scale = min(1,640/max(ciImage.extent.width,ciImage.extent.height))
+        let scale = 640/max(ciImage.extent.width,ciImage.extent.height)
         guard let image = context.createCGImage(ciImage.transformed(by:CGAffineTransform(scaleX:scale,y:scale)),from:CGRect(x:0,y:0,width:ciImage.extent.width*scale,height:ciImage.extent.height*scale)) else { busy = false; requested = true; return }
         Task {
             let result = await Task.detached(priority:.userInitiated) { () -> (LUTParameters, String)? in
                 let face = VNDetectFaceRectanglesRequest()
                 try? VNImageRequestHandler(cgImage:image).perform([face])
                 let box = face.results?.max(by: { $0.boundingBox.width*$0.boundingBox.height < $1.boundingBox.width*$1.boundingBox.height })?.boundingBox
-                let region = box ?? CGRect(x:0.25,y:0.25,width:0.5,height:0.5)
                 let w = image.width, h = image.height
-                var bytes = [UInt8](repeating:0,count:w*h*4)
-                guard let ctx = CGContext(data:&bytes,width:w,height:h,bitsPerComponent:8,bytesPerRow:w*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-                ctx.draw(image,in:CGRect(x:0,y:0,width:w,height:h))
-                var skin = [[Double]](), fallback = [[Double]]()
-                for y in stride(from:0,to:h,by:3) { for x in stride(from:0,to:w,by:3) {
-                    guard region.contains(CGPoint(x:Double(x)/Double(w),y:1-Double(y)/Double(h))) else { continue }
-                    let i = (y*w+x)*4
-                    let r = Double(bytes[i]), g = Double(bytes[i+1]), b = Double(bytes[i+2])
-                    let pixel = [r/255,g/255,b/255]
-                    fallback.append(pixel)
-                    let cb = 128-0.168736*r-0.331264*g+0.5*b
-                    let cr = 128+0.5*r-0.418688*g-0.081312*b
-                    if (77...127).contains(cb) && (130...180).contains(cr) && NativeLUT.lum(pixel)<0.9 { skin.append(pixel) }
-                } }
-                let selected = skin.count >= 150 ? skin : fallback
-                guard selected.count >= 30 else { return nil }
-                let step = max(1,selected.count/400)
-                let coarse = stride(from:0,to:selected.count,by:step).prefix(400).map { selected[$0] }
-                return (NativeLUT.search(coarse),box == nil ? "中央区域" : "Vision 人脸区域")
+                var bytes = [UInt8](repeating: 0, count: w*h*4)
+                guard let ctx = CGContext(data: &bytes, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w*4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+                ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+                // Vision supplies a rectangle, not MediaPipe landmark extrema. Never claim ROI parity.
+                let roi: [String: Int]? = box.map { rect in
+                    ["x1": max(0, Int(floor(rect.minX * Double(w)))),
+                     "y1": max(0, Int(floor((1-rect.maxY) * Double(h)))),
+                     "x2": min(w, Int(ceil(rect.maxX * Double(w)))),
+                     "y2": min(h, Int(ceil((1-rect.minY) * Double(h))))]
+                }
+                guard let analysis = NativeLUT.analyze(bytes: bytes, width: w, height: h, box: roi) else { return nil }
+                return (analysis.0, "原版6.7.5 · \(analysis.1) · \(box == nil ? "中央50%" : "Vision ROI（非MediaPipe）")")
             }.value
             guard generation == token else { return }
             busy = false
-            guard let result else { status = "采样不足，请重新分析"; return }
+            guard let result else { status = "原版肤色采样不足（<150）或引擎失败；保留旧 LUT"; return }
             parameters = result.0; apply(); status = "33³ LUT · \(result.1) · SDR"
         }
     }

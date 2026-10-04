@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        A15400000000000000000001 = {isa = PBXBuildFile; fileRef = A15400000000000000000002; };
         A15000000000000000000001 /* NativeLUT.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15000000000000000000002; };
 		1FCC523DAF4878448C890BF3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB59A308766B79E1C4EB955B /* HomeView.swift */; };
 		CC6826C1B66D7480C17F874F /* AVDBApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 380FFE9F6E4CF01F277CD7BD /* AVDBApp.swift */; };
@@ -48,6 +49,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        A15400000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = OriginalLUT.js; sourceTree = "<group>"; };
         A15000000000000000000002 /* NativeLUT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLUT.swift; sourceTree = "<group>"; };
 		BB59A308766B79E1C4EB955B /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		AVDB00000000000000000000A2 /* AVDB.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AVDB.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -273,6 +275,7 @@
 		4ED555353441D19559249EC8 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+                A15400000000000000000002,
 				A115C11E7A7B115C11E7A108 /* Assets.xcassets */,
 			);
 			name = Resources;
@@ -352,6 +355,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+                A15400000000000000000001,
 				A115C11E7A7B115C11E7A008 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -461,7 +465,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 153;
+				CURRENT_PROJECT_VERSION = 154;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -484,7 +488,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 153;
+				CURRENT_PROJECT_VERSION = 154;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
