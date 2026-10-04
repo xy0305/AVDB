@@ -449,12 +449,19 @@ public final class Pan115Client: @unchecked Sendable {
         req.httpMethod = "GET"
         appendCommonHeaders(&req, cookie: cookie)
         req.setValue("*/*", forHTTPHeaderField: "Accept")
-        let (data, _) = try await session.data(for: req)
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw Pan115Error.playURLNotFound }
+        var sourceHeaders = Self.playHeaders(cookie: cookie)
+        let fields = http.allHeaderFields.reduce(into: [String: String]()) { result, field in result[String(describing: field.key)] = String(describing: field.value) }
+        let responseCookies = HTTPCookie.cookies(withResponseHeaderFields: fields, for: req.url!)
+        if !responseCookies.isEmpty {
+            sourceHeaders["Cookie"] = (sourceHeaders["Cookie"] ?? "") + "; " + responseCookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+        }
         if let text = String(data: data, encoding: .utf8), text.contains("#EXTM3U") {
-            let parsed = parseMaster(text)
+            let parsed = parseMaster(text).map { stream in var copy = stream; copy.headers = sourceHeaders; return copy }
             if !parsed.isEmpty { return parsed }
             if !text.contains("#EXT-X-STREAM-INF") {
-                return [PlayStream(name: "HLS", url: m3u8URL.absoluteString, bandwidth: 0)]
+                return [PlayStream(name: "HLS", url: m3u8URL.absoluteString, bandwidth: 0, headers: sourceHeaders)]
             }
         }
         throw Pan115Error.playURLNotFound
@@ -895,7 +902,7 @@ public final class Pan115Client: @unchecked Sendable {
         if height >= 480 { return "480P" }
         if height >= 360 { return "360P" }
         if bandwidth > 0 { return "\(bandwidth / 1000)k" }
-        return "原画"
+        return "HLS（分辨率未知）"
     }
 
     private func qualityPriority(name: String?, height: Int) -> Int {
