@@ -136,6 +136,8 @@ struct KSChromePlayer: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
+    @StateObject private var lut = NativeLUTController()
+    @State private var showLUT = false
     @State private var isPlaying = false
     @State private var isBuffering = true
     @State private var hasStarted = false
@@ -195,6 +197,7 @@ struct KSChromePlayer: View {
         .background(Color.black)
         .ignoresSafeArea()
         .statusBarHidden(true)
+        .sheet(isPresented: $showLUT) { NativeLUTPanel(model: lut) }
         .toolbar(.hidden, for: .navigationBar)
         // 保留一个可布局的 MPVolumeView；尺寸为 0 时系统可能不创建 UISlider，
         // 导致横屏右侧滑动虽然触发，但音量实际不会变化。
@@ -212,6 +215,7 @@ struct KSChromePlayer: View {
         .onDisappear {
             hideTask?.cancel()
             tickTask?.cancel()
+            lut.detach()
             coordinator.playerLayer?.pause()
             OrientationLock.set(.portrait, keepLocked: true)
         }
@@ -456,6 +460,7 @@ struct KSChromePlayer: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)
+                Button { showLUT = true } label: { Text("LUT").font(.caption.bold()).foregroundStyle(.white) }
                 Spacer(minLength: 8)
 
                 Menu {
@@ -662,6 +667,7 @@ struct KSChromePlayer: View {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 syncTime()
+                lut.tick(coordinator.playerLayer?.player as? KSAVPlayer)
             }
         }
     }
