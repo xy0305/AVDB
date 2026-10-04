@@ -119,7 +119,8 @@ final class NativeLUTController: ObservableObject {
                     guard let track = tracks.first else { return }
                     let descriptions = try await track.load(.formatDescriptions)
                     let hdr = descriptions.contains { d in
-                        let ext = CMFormatDescriptionGetExtensions(d) as NSDictionary
+                        guard let extensions = CMFormatDescriptionGetExtensions(d) else { return false }
+                        let ext = extensions as NSDictionary
                         let transfer = ext[kCMFormatDescriptionExtension_TransferFunction] as? String
                         return transfer == (kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String)
                     }
@@ -182,7 +183,7 @@ final class NativeLUTController: ObservableObject {
         let time = item.currentTime()
         guard output.hasNewPixelBuffer(forItemTime: time), let buffer = output.copyPixelBuffer(forItemTime:time,itemTimeForDisplay:nil) else { return }
         // Conservative transfer-function check on the actual decoded frame too.
-        if let transfer = CVBufferCopyAttachment(buffer,kCVImageBufferTransferFunctionKey,nil)?.takeRetainedValue() as? String,
+        if let transfer = CVBufferCopyAttachment(buffer,kCVImageBufferTransferFunctionKey,nil) as? String,
            transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
             enabled = false; supported = false; status = "HDR 解码帧已禁用 LUT"; return
         }

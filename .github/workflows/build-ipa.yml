@@ -32,6 +32,9 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
+      - name: Test native LUT cube and search
+        run: python3 scripts/test-native-lut.py
+
       - name: Build unsigned (iphoneos)
         run: |
           set -euo pipefail
