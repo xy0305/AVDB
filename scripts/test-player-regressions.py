@@ -20,6 +20,27 @@ assert 'guard !showLUT else { return }' in disappear
 assert 'guard !playbackActive else' in player
 assert 'guard !Task.isCancelled else { return }\n                syncTime()' in player
 info = plistlib.loads(Path('AVDB/Resources/Info.plist').read_bytes())
-assert info['CFBundleVersion'] == '152'
-assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 152;') == 2
-print('PASS: format-check and sheet-lifecycle source contracts; consistent build152')
+assert info['CFBundleVersion'] == '153'
+assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 153;') == 2
+print('PASS: format-check and sheet-lifecycle source contracts; consistent build153')
+
+# UI source contracts only: device rendering/VoiceOver still require manual validation.
+pan = Path('AVDB/Views/Player/Pan115PlayerView.swift').read_text()
+assert '原文件：容器/编码/HDR 支持取决于设备' not in pan
+assert 'chosen.isOriginal ?' not in pan
+assert 'titleVisibility: .visible' in pan and '} message: {' in pan
+assert '6_000_000_000' in pan
+assert 'guard shownNotices.insert(message).inserted else { return }' in pan
+assert 'noticeTask?.cancel()' in pan and 'catch { return }' in pan
+assert 'Button { vm.dismissNotice() }' in pan
+assert pan.count('resetNotices()') == 3  # definition, start, episode playback
+assert pan.count('playbackNotice =') == 3  # declaration, clear, bounded show only
+panel = lut.split('struct NativeLUTPanel: View {')[1]
+assert 'NavigationStack {' in panel
+assert panel.index('}.disabled(!model.supported)') < panel.index('.toolbar {')
+assert 'ToolbarItem(placement: .confirmationAction)' in panel
+assert 'Button { dismiss() }' in panel
+assert '.frame(minHeight: 44)' in panel and '.accessibilityLabel(' in panel
+assert '.onChange' not in panel  # no automatic dismiss during analysis/enabling
+assert '返回播放' in panel and '.presentationDetents([.medium,.large])' in panel
+print('PASS: transient notice dedup/dismiss and persistent LUT Done source contracts (not runtime UI tests)')

@@ -269,7 +269,9 @@ final class NativeLUTController: ObservableObject {
 
 struct NativeLUTPanel: View {
     @ObservedObject var model: NativeLUTController
+    @Environment(\.dismiss) private var dismiss
     var body: some View {
+        NavigationStack {
         Form {
             Text(model.status).font(.footnote)
             Group {
@@ -283,6 +285,24 @@ struct NativeLUTPanel: View {
                 }
             }
             }.disabled(!model.supported)
+            Section {
+                Text("原文件的容器、编码及 HDR 支持取决于设备；LUT 仅支持可分析的 SDR。开启或分析后，点右上角返回播放；分析无需停留在此面板等待。")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("LUT 调色")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button { dismiss() } label: {
+                    Label("返回播放", systemImage: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .frame(minHeight: 44)
+                }
+                .accessibilityLabel("完成 LUT 设置，返回播放")
+                .accessibilityHint("关闭面板，保留调色设置与播放进度")
+            }
+        }
         }.presentationDetents([.medium,.large])
     }
 }
