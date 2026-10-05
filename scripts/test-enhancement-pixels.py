@@ -35,7 +35,7 @@ for mode in 0...2 {
  precondition(result.extent == input.extent)
  let a=pixels(input), b=pixels(result), c=pixels(deband(input))
  precondition(b == c,"determinism")
- if mode != 1 { precondition(zip(a,b).allSatisfy { abs($0-$1)<0.00001 },"constant/edge identity") }
+ if mode != 1 { precondition(zip(a,b).allSatisfy { abs($0-$1)<0.0005 },"constant/edge identity (half-float color conversion tolerance)") }
  else { precondition(zip(a,b).contains { abs($0-$1)>0.00001 },"gradient band changed") }
  for n in stride(from:3,to:b.count,by:4) { precondition(abs(b[n]-1)<0.00001) }
 }
