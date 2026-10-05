@@ -34,10 +34,15 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
+      - name: Install pinned native MediaPipe SDK
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod install --repo-update
+
       - name: Build (simulator, no signing)
         run: |
           xcodebuild build \
-            -project AVDB.xcodeproj \
+            -workspace AVDB.xcworkspace \
             -scheme AVDB \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \

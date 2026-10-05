@@ -39,13 +39,20 @@ jobs:
         run: python3 scripts/test-115-native.py
 
       - name: Test native LUT cube and search
-        run: python3 scripts/test-native-lut.py
+        run: |
+          python3 scripts/test-native-lut.py
+          python3 scripts/test-mediapipe-parity.py
+
+      - name: Install pinned native MediaPipe SDK
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod install --repo-update
 
       - name: Build unsigned (iphoneos)
         run: |
           set -euo pipefail
           xcodebuild \
-            -project AVDB.xcodeproj \
+            -workspace AVDB.xcworkspace \
             -scheme AVDB \
             -configuration Release \
             -sdk iphoneos \

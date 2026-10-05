@@ -3,7 +3,8 @@
 import SwiftUI
 import AVFoundation
 import CoreImage
-import Vision
+import MediaPipeTasksVision
+import UIKit
 import JavaScriptCore
 import KSPlayer
 
@@ -178,34 +179,97 @@ final class NativeLUTController: ObservableObject {
            transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
             enabled = false; supported = false; status = "HDR 解码帧已禁用 LUT"; return
         }
-        busy = true; requested = false; status = "获取 Vision ROI → 原版动态 Cr / 分阶段搜索…"
+        busy = true; requested = false; status = "获取 MediaPipe 关键点 → 原版动态 Cr / 分阶段搜索…"
         let token = generation
         let ciImage = CIImage(cvPixelBuffer:buffer)
-        let scale = 640/max(ciImage.extent.width,ciImage.extent.height)
-        guard let image = context.createCGImage(ciImage.transformed(by:CGAffineTransform(scaleX:scale,y:scale)),from:CGRect(x:0,y:0,width:ciImage.extent.width*scale,height:ciImage.extent.height*scale)) else { busy = false; requested = true; return }
+        let sourceWidth = ciImage.extent.width, sourceHeight = ciImage.extent.height
+        let aw = sourceWidth >= sourceHeight ? 640 : max(1, Int(floor(sourceWidth * 640 / sourceHeight + 0.5)))
+        let ah = sourceWidth >= sourceHeight ? max(1, Int(floor(sourceHeight * 640 / sourceWidth + 0.5))) : 640
+        // Original canvas stretches to independently rounded integer dimensions (also upscales).
+        let resized = ciImage.transformed(by: CGAffineTransform(scaleX: CGFloat(aw)/sourceWidth, y: CGFloat(ah)/sourceHeight))
+        guard let image = context.createCGImage(resized, from: CGRect(x: 0, y: 0, width: aw, height: ah), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { busy = false; requested = true; return }
         Task {
             let result = await Task.detached(priority:.userInitiated) { () -> (LUTParameters, String)? in
-                let face = VNDetectFaceRectanglesRequest()
-                try? VNImageRequestHandler(cgImage:image).perform([face])
-                let box = face.results?.max(by: { $0.boundingBox.width*$0.boundingBox.height < $1.boundingBox.width*$1.boundingBox.height })?.boundingBox
                 let w = image.width, h = image.height
                 var bytes = [UInt8](repeating: 0, count: w*h*4)
                 guard let ctx = CGContext(data: &bytes, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w*4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
                 ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-                // Vision supplies a rectangle, not MediaPipe landmark extrema. Never claim ROI parity.
-                let roi: [String: Int]? = box.map { rect in
-                    ["x1": max(0, Int(floor(rect.minX * Double(w)))),
-                     "y1": max(0, Int(floor((1-rect.maxY) * Double(h)))),
-                     "x2": min(w, Int(ceil(rect.maxX * Double(w)))),
-                     "y2": min(h, Int(ceil((1-rect.minY) * Double(h))))]
-                }
+                // Feed the very same top-left RGBA raster to MediaPipe and sampleFrame.
+                guard let provider = CGDataProvider(data: Data(bytes) as CFData),
+                      let rgbaImage = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w*4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else { return nil }
+                let detection = OriginalFaceLandmarker.shared.region(image: rgbaImage)
+                let roi = detection.box
                 guard let analysis = NativeLUT.analyze(bytes: bytes, width: w, height: h, box: roi) else { return nil }
-                return (analysis.0, "原版6.7.5 · \(analysis.1) · \(box == nil ? "中央50%" : "Vision ROI（非MediaPipe）")")
+                return (analysis.0, "原版6.7.5 · \(analysis.1) · \(detection.description)")
             }.value
             guard generation == token else { return }
             busy = false
             guard let result else { status = "原版肤色采样不足（<150）或引擎失败；保留旧 LUT"; return }
             parameters = result.0; apply(); status = "33³ LUT · \(result.1) · SDR"
+        }
+    }
+}
+
+// Foundation-only geometry shared by native inference and independent oracle tests.
+enum OriginalLandmarkGeometry {
+    static func region(faces: [[[Double]]], width: Int, height: Int) -> [String: Int]? {
+        guard let landmarks = faces.first, !landmarks.isEmpty else { return nil }
+        var x1 = Double.infinity, y1 = Double.infinity
+        var x2 = -Double.infinity, y2 = -Double.infinity
+        for lm in landmarks {
+            let x = lm[0], y = lm[1]
+            x1 = min(x1, x); y1 = min(y1, y)
+            x2 = max(x2, x); y2 = max(y2, y)
+        }
+        let cx = (x1+x2)/2, cy = (y1+y2)/2
+        let hw = (x2-x1)/2 * 1.0, hh = (y2-y1)/2 * 1.0
+        let w = Double(width), h = Double(height)
+        return ["x1": max(0, Int(floor((cx-hw)*w))),
+                "y1": max(0, Int(floor((cy-hh)*h))),
+                "x2": min(width, Int(ceil((cx+hw)*w))),
+                "y2": min(height, Int(ceil((cy+hh)*h)))]
+    }
+}
+
+/// Official Tasks Vision 0.10.14, model float16/1. No Vision or rectangle substitute.
+/// Serializes the stateful VIDEO tracker and uses increasing wall-clock timestamps, as original.
+private final class OriginalFaceLandmarker: @unchecked Sendable {
+    static let shared = OriginalFaceLandmarker()
+    private let lock = NSLock()
+    private var task: FaceLandmarker?
+    private var lastTimestamp = -1
+
+    func region(image: CGImage) -> (box: [String: Int]?, description: String) {
+        lock.lock(); defer { lock.unlock() }
+        do {
+            if task == nil {
+                guard let path = Bundle.main.path(forResource: "face_landmarker", ofType: "task") else {
+                    return (nil, "中央50%（MediaPipe 模型缺失）")
+                }
+                let options = FaceLandmarkerOptions()
+                options.baseOptions.modelAssetPath = path
+                options.baseOptions.delegate = .GPU
+                options.runningMode = .video
+                options.numFaces = 1
+                options.minFaceDetectionConfidence = 0.3
+                options.minFacePresenceConfidence = 0.3
+                options.minTrackingConfidence = 0.5 // JS 0.10.14 default
+                options.outputFaceBlendshapes = false
+                options.outputFacialTransformationMatrixes = false
+                task = try FaceLandmarker(options: options)
+            }
+            let timestamp = max(lastTimestamp + 1, Int(ProcessInfo.processInfo.systemUptime * 1000))
+            lastTimestamp = timestamp
+            let input = try MPImage(uiImage: UIImage(cgImage: image, scale: 1, orientation: .up))
+            let result = try task!.detect(videoFrame: input, timestampInMilliseconds: timestamp)
+            guard let landmarks = result.faceLandmarks.first, !landmarks.isEmpty else {
+                return (nil, "中央50%（MediaPipe 未检测到人脸）")
+            }
+            let box = OriginalLandmarkGeometry.region(faces: [landmarks.map { [Double($0.x), Double($0.y)] }], width: image.width, height: image.height)
+            return (box, "MediaPipe 第一人脸关键点 ROI")
+        } catch {
+            // Original catches inference exceptions and only then uses the center fallback.
+            return (nil, "中央50%（MediaPipe 错误：\(error.localizedDescription)）")
         }
     }
 }
