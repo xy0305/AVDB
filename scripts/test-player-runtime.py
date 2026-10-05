@@ -75,7 +75,7 @@ MainActor.assumeIsolated {
    c.toggle(); precondition(!c.enabled && c.item?.videoComposition == nil && !c.busy)
    precondition(c.analysisGeneration != token)
  }
- c.composition = nil; c.toggle(); precondition(c.enabled && c.requested)
+ c.composition = nil; c.cachedCube = nil; c.toggle(); precondition(c.enabled && c.requested)
  c.busy = true; c.toggle(); c.toggle(); precondition(c.enabled && c.requested && !c.busy)
  c.reset(); precondition(!c.enabled && c.composition == nil && c.requested)
  c.reanalyze(); precondition(c.requested && c.item?.videoComposition == nil)
