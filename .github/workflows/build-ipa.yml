@@ -36,6 +36,7 @@ jobs:
         run: |
           python3 scripts/test-player-regressions.py
           python3 scripts/test-player-runtime.py
+          python3 scripts/test-enhancement-pixels.py
 
       - name: Test native 115 RSA protocol
         run: python3 scripts/test-115-native.py
