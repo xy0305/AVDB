@@ -9,6 +9,7 @@ on:
       - "AVDB/**"
       - "AVDB.xcodeproj/**"
       - ".github/workflows/build-ipa.yml"
+      - "scripts/test-*.py"
 
 permissions:
   contents: read
