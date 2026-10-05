@@ -7,9 +7,18 @@
 
 import AVFoundation
 import SwiftUI
+import KSPlayer
+import UIKit
+
+final class AVDBAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        KSOptions.supportedInterfaceOrientations
+    }
+}
 
 @main
 struct AVDBApp: App {
+    @UIApplicationDelegateAdaptor(AVDBAppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
 
     init() {

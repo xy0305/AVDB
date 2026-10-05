@@ -33,7 +33,9 @@ jobs:
           xcodebuild -showsdks
 
       - name: Check LUT timeout and sheet lifecycle regressions
-        run: python3 scripts/test-player-regressions.py
+        run: |
+          python3 scripts/test-player-regressions.py
+          python3 scripts/test-player-runtime.py
 
       - name: Test native 115 RSA protocol
         run: python3 scripts/test-115-native.py

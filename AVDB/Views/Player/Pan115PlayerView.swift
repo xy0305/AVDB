@@ -27,7 +27,9 @@ struct Pan115PlayerView: View {
                     headers: vm.headers,
                     progressID: movie.id,
                     onPlaybackFailure: { Task { await vm.failed() } },
-                    managesOrientation: false
+                    managesOrientation: false,
+                    onSelectSource: { showQuality = true },
+                    onSelectEpisode: vm.episodes.count > 1 ? { showEpisodes = true } : nil
                 )
                 .id(url)
             } else if let err = vm.errorMessage {
@@ -56,42 +58,6 @@ struct Pan115PlayerView: View {
                 }
             }
 
-            if vm.playURL != nil {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button(vm.qualityLabel) { showQuality = true }
-                            .padding(12).foregroundStyle(.white)
-                    }
-                    if !vm.playbackNotice.isEmpty {
-                        HStack(spacing: 8) {
-                            Text(vm.playbackNotice).font(.caption)
-                            Button { vm.dismissNotice() } label: {
-                                Image(systemName: "xmark").frame(width: 44, height: 44)
-                            }
-                            .accessibilityLabel("关闭播放提示")
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.leading, 12).background(.black.opacity(0.65))
-                        .accessibilityElement(children: .contain)
-                    }
-                }.padding(.top, 60)
-            }
-            if vm.playURL != nil, vm.episodes.count > 1 {
-                HStack {
-                    Spacer()
-                    Button { showEpisodes = true } label: {
-                        Image(systemName: "rectangle.stack.badge.play")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(12)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 12)
-                .padding(.trailing, 12)
-            }
-
             if vm.playURL == nil || vm.errorMessage != nil {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
@@ -108,8 +74,7 @@ struct Pan115PlayerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.hidden, for: .navigationBar)
         // Stable route owns orientation across .id(url), loading/error branches and HLS refresh.
-        .onAppear { OrientationLock.set(.landscapeRight, keepLocked: true) }
-        .onDisappear { OrientationLock.set(.portrait, keepLocked: true) }
+        .background(PlaybackOrientationHost().allowsHitTesting(false))
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
         .confirmationDialog("播放源", isPresented: $showQuality, titleVisibility: .visible) {
             ForEach(Array(vm.streams.enumerated()), id: \.offset) { _, stream in

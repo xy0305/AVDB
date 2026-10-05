@@ -44,6 +44,43 @@ enum NativeLUT {
     }
 }
 
+/// One decoded frame, two CoreImage branches. Never touches the main actor per frame.
+final class LUTRevealState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var start: TimeInterval?
+    private var covered = false
+    private var active = false
+    private var reduceMotion = false
+    func begin(reduceMotion: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        self.reduceMotion = reduceMotion; active = true
+        start = covered ? nil : ProcessInfo.processInfo.systemUptime
+    }
+    func setCovered(_ value: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        covered = value
+        if !value && active { start = ProcessInfo.processInfo.systemUptime }
+    }
+    func cancel() {
+        lock.lock(); defer { lock.unlock() }
+        active = false; start = nil
+    }
+    /// Left original initially occupies half the frame, then shrinks to zero.
+    func originalFraction(now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Double {
+        lock.lock(); defer { lock.unlock() }
+        guard active, !reduceMotion else { return 0 }
+        guard let start else { return 0.5 }
+        return max(0, min(0.5, 0.5 * (1 - max(0, now - start - 0.35))))
+    }
+    static func composite(original: CIImage, filtered: CIImage, originalFraction: Double) -> CIImage {
+        let extent = original.extent
+        let fraction = max(0, min(1, originalFraction))
+        guard fraction > 0 else { return filtered.cropped(to: extent) }
+        let left = CGRect(x: extent.minX, y: extent.minY, width: extent.width * fraction, height: extent.height)
+        return original.cropped(to: left).composited(over: filtered).cropped(to: extent)
+    }
+}
+
 @MainActor
 final class NativeLUTController: ObservableObject {
     @Published var enabled = false
@@ -55,6 +92,9 @@ final class NativeLUTController: ObservableObject {
     private var requested = true
     private var busy = false
     private var generation = 0
+    private var analysisGeneration = 0
+    private let reveal = LUTRevealState()
+    func setPanelCovered(_ covered: Bool) { reveal.setCovered(covered) }
     private var composition: AVVideoComposition?
     private let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
     private(set) var supported = false
@@ -73,7 +113,8 @@ final class NativeLUTController: ObservableObject {
     }
 
     func tick(_ player: KSAVPlayer?) {
-        guard let next = player?.player.currentItem else { detach(); return }
+        // A transient backend/layer gap is not an item change; do not destroy format state.
+        guard let next = player?.player.currentItem else { return }
         if item !== next {
             detach(); item = next; original = next.videoComposition
             status = "检查视频格式…"
@@ -130,6 +171,8 @@ final class NativeLUTController: ObservableObject {
     }
     func detach() {
         generation += 1
+        analysisGeneration += 1
+        reveal.cancel()
         formatTask?.cancel(); formatTask = nil
         formatTimeout?.cancel(); formatTimeout = nil
         enabled = false
@@ -141,15 +184,25 @@ final class NativeLUTController: ObservableObject {
     func toggle() {
         guard supported else { return }
         enabled.toggle()
-        if enabled { if let composition { item?.videoComposition = composition } else { requested = true } }
-        else { item?.videoComposition = original }
+        if enabled {
+            if let composition {
+                reveal.begin(reduceMotion: UIAccessibility.isReduceMotionEnabled)
+                item?.videoComposition = composition
+            } else { requested = true }
+        } else {
+            analysisGeneration += 1; busy = false
+            reveal.cancel(); item?.videoComposition = original
+            if composition == nil { requested = true }
+        }
     }
     func reanalyze() {
         guard supported else { return }
+        analysisGeneration += 1; busy = false; reveal.cancel()
         item?.videoComposition = original
         requested = true; status = "等待原始解码帧…"
     }
     func reset() {
+        analysisGeneration += 1; busy = false; reveal.cancel()
         enabled = false; parameters = LUTParameters(); composition = nil
         item?.videoComposition = original; requested = true; status = "已重置"
     }
@@ -158,6 +211,7 @@ final class NativeLUTController: ObservableObject {
         guard let cube = NativeLUT.cube(parameters) else { status = "原版 LUT 引擎加载失败，未应用调色"; return }
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
         let ci = context
+        let reveal = self.reveal
         let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
             guard let filter = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":cube,"inputColorSpace":cs,kCIInputImageKey:request.sourceImage]) else {
                 request.finish(with: NSError(domain:"AVDB.LUT",code:1)); return
@@ -165,10 +219,15 @@ final class NativeLUTController: ObservableObject {
             guard let result = filter.outputImage else {
                 request.finish(with: NSError(domain:"AVDB.LUT",code:2)); return
             }
-            request.finish(with: result.cropped(to:request.sourceImage.extent),context:ci)
+            let frame = LUTRevealState.composite(original: request.sourceImage, filtered: result,
+                                                 originalFraction: reveal.originalFraction())
+            request.finish(with: frame, context: ci)
         })
         composition = comp
-        if enabled { item.videoComposition = comp }
+        if enabled {
+            reveal.begin(reduceMotion: UIAccessibility.isReduceMotionEnabled)
+            item.videoComposition = comp
+        }
     }
     private func analyze() {
         guard let item, let output, item.videoComposition == nil else { return }
@@ -181,6 +240,7 @@ final class NativeLUTController: ObservableObject {
         }
         busy = true; requested = false; status = "获取 MediaPipe 关键点 → 原版动态 Cr / 分阶段搜索…"
         let token = generation
+        let analysisToken = analysisGeneration
         let ciImage = CIImage(cvPixelBuffer:buffer)
         let sourceWidth = ciImage.extent.width, sourceHeight = ciImage.extent.height
         let aw = sourceWidth >= sourceHeight ? 640 : max(1, Int(floor(sourceWidth * 640 / sourceHeight + 0.5)))
@@ -202,7 +262,7 @@ final class NativeLUTController: ObservableObject {
                 guard let analysis = NativeLUT.analyze(bytes: bytes, width: w, height: h, box: roi) else { return nil }
                 return (analysis.0, "原版6.7.5 · \(analysis.1) · \(detection.description)")
             }.value
-            guard generation == token else { return }
+            guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
             busy = false
             guard let result else { status = "原版肤色采样不足（<150）或引擎失败；保留旧 LUT"; return }
             parameters = result.0; apply(); status = "33³ LUT · \(result.1) · SDR"

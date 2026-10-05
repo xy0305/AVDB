@@ -136,6 +136,8 @@ struct KSChromePlayer: View {
     var onPlaybackFailure: (() -> Void)? = nil
     // A source child must not restore portrait while its owning playback route remains alive.
     var managesOrientation: Bool = true
+    var onSelectSource: (() -> Void)? = nil
+    var onSelectEpisode: (() -> Void)? = nil
     @State private var failureReported = false
 
     @Environment(\.dismiss) private var dismiss
@@ -188,27 +190,22 @@ struct KSChromePlayer: View {
 
     var body: some View {
         GeometryReader { geo in
-            let landscape = geo.size.width > geo.size.height
-            let videoHeight = landscape ? geo.size.height : geo.size.width * 9 / 16
-            VStack(spacing: 0) {
-                videoArea(height: videoHeight, width: geo.size.width)
-                if !landscape {
-                    infoBar
-                    Spacer(minLength: 0)
-                }
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
+            videoArea(height: geo.size.height, width: geo.size.width)
+                .frame(width: geo.size.width, height: geo.size.height)
         }
         .background(Color.black)
         .ignoresSafeArea()
         .statusBarHidden(true)
+        .background { if managesOrientation { PlaybackOrientationHost().allowsHitTesting(false) } }
         .sheet(isPresented: $showLUT, onDismiss: {
             // Sheet dismissal is not a playback-route exit. Preserve item, LUT and orientation.
+            lut.setPanelCovered(false)
             showChrome = true
             startTicker()
             scheduleHide()
         }) { NativeLUTPanel(model: lut) }
         .onChange(of: showLUT) { _, presented in
+            lut.setPanelCovered(presented)
             if presented { hideTask?.cancel(); showChrome = true }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -229,7 +226,6 @@ struct KSChromePlayer: View {
             wireCoordinator()
             startTicker()
             scheduleHide()
-            if managesOrientation { OrientationLock.set(.landscapeRight, keepLocked: true) }
         }
         .onDisappear {
             // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
@@ -245,7 +241,6 @@ struct KSChromePlayer: View {
         tickTask?.cancel()
         lut.detach()
         coordinator.playerLayer?.pause()
-        if managesOrientation { OrientationLock.set(.portrait, keepLocked: true) }
     }
 
     @ViewBuilder
@@ -281,9 +276,6 @@ struct KSChromePlayer: View {
             if let skipHUD {
                 skipOverlay(skipHUD)
                     .allowsHitTesting(false)
-            }
-            if showChrome {
-                chromeOverlay
             }
         }
         .frame(maxWidth: .infinity)
@@ -450,26 +442,6 @@ struct KSChromePlayer: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private var infoBar: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title.isEmpty ? "正在播放" : title)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(white: 0.12))
-    }
-
     private var chromeOverlay: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
@@ -488,11 +460,11 @@ struct KSChromePlayer: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 Button { showLUT = true } label: {
-                    Text("LUT")
-                        .font(.subheadline.bold())
+                    Image(systemName: "camera.filters")
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(.white)
                         .frame(width: 48, height: 48)
-                        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                        .background(lut.enabled ? Color.white.opacity(0.22) : Color.black.opacity(0.35), in: Capsule())
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -574,10 +546,19 @@ struct KSChromePlayer: View {
 
                 Spacer()
 
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white)
+                if let onSelectEpisode {
+                    Button(action: onSelectEpisode) {
+                        Image(systemName: "rectangle.stack.badge.play").frame(width: 48, height: 48)
+                    }.accessibilityLabel("选择集数")
+                }
+                if let onSelectSource {
+                    Button(action: onSelectSource) {
+                        Text(subtitle.isEmpty ? "播放源" : subtitle)
+                            .font(.caption.weight(.medium)).lineLimit(1)
+                            .frame(minHeight: 48)
+                    }.accessibilityLabel("选择播放源")
+                } else if !subtitle.isEmpty {
+                    Text(subtitle).font(.caption).foregroundStyle(.white.opacity(0.8))
                 }
             }
             .padding(.horizontal, 16)
@@ -768,42 +749,52 @@ struct KSChromePlayer: View {
     }
 }
 
-enum OrientationLock {
-    static func set(_ mask: UIInterfaceOrientationMask, keepLocked: Bool = false) {
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        // iPad 点 X 关播放器时若 requestGeometryUpdate(.portrait)，窗口会被踢出全屏 / Stage Manager。
-        if isPad, mask == .portrait {
-            apply(.all, requestGeometry: false, keepLocked: true)
-            return
+/// Route lifetime, not source-item or sheet visibility, owns orientation.
+struct PlaybackOrientationHost: UIViewControllerRepresentable {
+    final class Controller: UIViewController {
+        var entered = false
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard !entered else { return }
+            entered = true
+            OrientationLock.set(.landscapeRight, keepLocked: true)
         }
-        apply(mask, requestGeometry: true, keepLocked: keepLocked)
     }
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {}
+    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
+        if controller.entered { OrientationLock.set(.portrait, keepLocked: true) }
+    }
+}
 
-    private static func apply(
-        _ mask: UIInterfaceOrientationMask,
-        requestGeometry: Bool,
-        keepLocked: Bool
-    ) {
-        KSOptions.supportedInterfaceOrientations = mask
-        guard let windowScene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first else { return }
-        if let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController {
-            rootVC.setNeedsUpdateOfSupportedInterfaceOrientations()
+@MainActor
+enum OrientationLock {
+    private static var generation = 0
+    static func set(_ mask: UIInterfaceOrientationMask, keepLocked: Bool = false) {
+        generation += 1
+        let token = generation
+        let target: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad && mask == .portrait ? .all : mask
+        KSOptions.supportedInterfaceOrientations = target
+        request(target, token: token, attempt: 0)
+    }
+    private static func request(_ mask: UIInterfaceOrientationMask, token: Int, attempt: Int) {
+        guard token == generation else { return }
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }),
+              let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
+        var host = root
+        while let presented = host.presentedViewController, !presented.isBeingDismissed { host = presented }
+        // Refresh the entire presentation chain: SwiftUI's presenting controller also votes.
+        root.setNeedsUpdateOfSupportedInterfaceOrientations()
+        host.setNeedsUpdateOfSupportedInterfaceOrientations()
+        if let parent = host.parent { parent.setNeedsUpdateOfSupportedInterfaceOrientations() }
+        if mask != .all, host.viewIfLoaded?.window != nil, !host.isBeingDismissed, !host.isBeingPresented {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { _ in }
         }
-        DispatchQueue.main.async {
-            if requestGeometry {
-                windowScene.requestGeometryUpdate(
-                    UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
-                ) { _ in }
-            }
-            guard !keepLocked else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                KSOptions.supportedInterfaceOrientations = .allButUpsideDown
-                if let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController {
-                    rootVC.setNeedsUpdateOfSupportedInterfaceOrientations()
-                }
-            }
+        // Presentation may still be animating on entry. Bounded retries are cancelled by exit.
+        guard attempt < 5, !mask.contains(UIInterfaceOrientationMask(rawValue: 1 << scene.interfaceOrientation.rawValue)) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            request(mask, token: token, attempt: attempt + 1)
         }
     }
 }

@@ -20,9 +20,9 @@ assert 'guard !showLUT else { return }' in disappear
 assert 'guard !playbackActive else' in player
 assert 'guard !Task.isCancelled else { return }\n                syncTime()' in player
 info = plistlib.loads(Path('AVDB/Resources/Info.plist').read_bytes())
-assert info['CFBundleVersion'] == '155'
-assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 155;') == 2
-print('PASS: format-check and sheet-lifecycle source contracts; consistent build155')
+assert info['CFBundleVersion'] == '156'
+assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 156;') == 2
+print('PASS: format-check and sheet-lifecycle source contracts; consistent build156')
 
 # UI source contracts only: device rendering/VoiceOver still require manual validation.
 pan = Path('AVDB/Views/Player/Pan115PlayerView.swift').read_text()
@@ -32,7 +32,7 @@ assert 'titleVisibility: .visible' in pan and '} message: {' in pan
 assert '6_000_000_000' in pan
 assert 'guard shownNotices.insert(message).inserted else { return }' in pan
 assert 'noticeTask?.cancel()' in pan and 'catch { return }' in pan
-assert 'Button { vm.dismissNotice() }' in pan
+assert 'Button(vm.qualityLabel)' not in pan  # source name only in auto-hide chrome
 assert pan.count('resetNotices()') == 3  # definition, start, episode playback
 assert pan.count('playbackNotice =') == 3  # declaration, clear, bounded show only
 panel = lut.split('struct NativeLUTPanel: View {')[1]
@@ -47,10 +47,10 @@ print('PASS: transient notice dedup/dismiss and persistent LUT Done source contr
 
 # Source replacement must clean up old playback without touching the stable route orientation.
 assert '.id(url)' in pan and 'managesOrientation: false' in pan
-assert '.onAppear { OrientationLock.set(.landscapeRight, keepLocked: true) }' in pan
-assert '.onDisappear { OrientationLock.set(.portrait, keepLocked: true) }' in pan
+assert '.background(PlaybackOrientationHost().allowsHitTesting(false))' in pan
+assert 'static func dismantleUIViewController' in player
 stop = player.split('private func stopPlayback()')[1].split('@ViewBuilder')[0]
-assert 'if managesOrientation { OrientationLock.set(.portrait' in stop
+assert 'if controller.entered { OrientationLock.set(.portrait' in player
 assert 'lut.detach()' in stop and 'playerLayer?.pause()' in stop
 assert 'Button("横屏全屏")' in player and 'Button("竖屏播放")' in player
 button = player.split('Button { showLUT = true } label: {')[1].split('Spacer(minLength: 8)')[0]
@@ -59,3 +59,11 @@ assert '.contentShape(Rectangle())' in button and '.zIndex(20)' in button
 assert '.accessibilityIdentifier("player.lut.settings")' in button
 assert 'chromeOverlay.zIndex(10)' in player
 print('PASS: route-owned orientation across source replacement; explicit fullscreen and 48pt LUT hit-target contracts (not device tests)')
+
+assert 'infoBar' not in player
+assert player.count('chromeOverlay.zIndex(10)') == 1
+assert 'final class AVDBAppDelegate' in Path('AVDB/AVDBApp.swift').read_text()
+assert 'scene.requestGeometryUpdate' in player and 'attempt < 5' in player
+assert 'analysisGeneration == analysisToken, self.item === item' in lut
+assert 'LUTRevealState.composite(original: request.sourceImage' in lut
+print('PASS build156: app delegate, bounded route host orientation, same-frame wipe and analysis epoch contracts')
