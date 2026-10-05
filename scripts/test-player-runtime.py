@@ -21,6 +21,13 @@ controller='''@MainActor final class TransitionHarness {
  var busy = false
  var requested = false
  var status = ""
+ var cachedCube: Data? = Data()
+ var sharpen = false
+ var deband = false
+ var comparison = false
+ var buildGeneration = 0
+ var buildTask: Task<Void, Never>?
+ func apply() { item?.videoComposition = enabled ? composition : original }
  let reveal = LUTRevealState()
 '''+method('toggle','reanalyze')+method('reanalyze','reset')+method('reset','apply')+'}\n'
 swift='''import Foundation

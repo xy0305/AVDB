@@ -51,6 +51,8 @@ final class LUTRevealState: @unchecked Sendable {
     private var covered = false
     private var active = false
     private var reduceMotion = false
+    private var split: Double?
+    func setSplit(_ value: Double?) { lock.lock(); split = value; lock.unlock() }
     func begin(reduceMotion: Bool) {
         lock.lock(); defer { lock.unlock() }
         self.reduceMotion = reduceMotion; active = true
@@ -68,6 +70,7 @@ final class LUTRevealState: @unchecked Sendable {
     /// Left original initially occupies half the frame, then shrinks to zero.
     func originalFraction(now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Double {
         lock.lock(); defer { lock.unlock() }
+        if let split { return split }
         guard active, !reduceMotion else { return 0 }
         guard let start else { return 0.5 }
         return max(0, min(0.5, 0.5 * (1 - max(0, now - start - 0.35))))
@@ -86,6 +89,29 @@ final class NativeLUTController: ObservableObject {
     @Published var enabled = false
     @Published var status = "LUT 未启用（仅 SDR 文件视频）"
     @Published var parameters = LUTParameters()
+    @Published var strength = 1.0
+    @Published var sharpen = false
+    @Published var sharpness = 0.10
+    @Published var deband = false
+    @Published var threshold = 0.002
+    @Published var radius = 8.0
+    @Published var comparison = false
+    @Published var divider = 0.5
+    @Published var safePerformance = true
+    private var buildTask: Task<Void, Never>?
+    private var buildGeneration = 0
+    private var cachedCube: Data?
+    private weak var avPlayer: AVPlayer?
+    func updateComparison() { reveal.setSplit(comparison ? divider : nil) }
+    func pauseComparison() { avPlayer?.pause(); comparison = true; updateComparison() }
+    private var constrained: Bool {
+        safePerformance && (ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState == .serious || ProcessInfo.processInfo.thermalState == .critical)
+    }
+    private var lastConstrained = false
+    private static let debandKernel: CIKernel? = {
+        guard let url = Bundle.main.url(forResource: "Enhancement", withExtension: "metallib"), let data = try? Data(contentsOf: url) else { return nil }
+        return try? CIKernel(functionName: "avdbDeband", fromMetalLibraryData: data)
+    }()
     private weak var item: AVPlayerItem?
     private var output: AVPlayerItemVideoOutput?
     private var original: AVVideoComposition?
@@ -115,6 +141,8 @@ final class NativeLUTController: ObservableObject {
     func tick(_ player: KSAVPlayer?) {
         // A transient backend/layer gap is not an item change; do not destroy format state.
         guard let next = player?.player.currentItem else { return }
+        avPlayer = player?.player
+        if lastConstrained != constrained { lastConstrained = constrained; apply() }
         if item !== next {
             detach(); item = next; original = next.videoComposition
             status = "检查视频格式…"
@@ -171,6 +199,8 @@ final class NativeLUTController: ObservableObject {
     }
     func detach() {
         generation += 1
+        buildGeneration += 1; buildTask?.cancel(); cachedCube = nil
+        sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
         analysisGeneration += 1
         reveal.cancel()
         formatTask?.cancel(); formatTask = nil
@@ -184,16 +214,9 @@ final class NativeLUTController: ObservableObject {
     func toggle() {
         guard supported else { return }
         enabled.toggle()
-        if enabled {
-            if let composition {
-                reveal.begin(reduceMotion: UIAccessibility.isReduceMotionEnabled)
-                item?.videoComposition = composition
-            } else { requested = true }
-        } else {
-            analysisGeneration += 1; busy = false
-            reveal.cancel(); item?.videoComposition = original
-            if composition == nil { requested = true }
-        }
+        if enabled && cachedCube == nil { requested = true }
+        if !enabled { analysisGeneration += 1; busy = false }
+        apply()
     }
     func reanalyze() {
         guard supported else { return }
@@ -203,30 +226,59 @@ final class NativeLUTController: ObservableObject {
     }
     func reset() {
         analysisGeneration += 1; busy = false; reveal.cancel()
-        enabled = false; parameters = LUTParameters(); composition = nil
+        enabled = false; sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
+        buildGeneration += 1; buildTask?.cancel()
+        parameters = LUTParameters(); composition = nil
         item?.videoComposition = original; requested = true; status = "已重置"
     }
     func apply() {
         guard supported, let item else { return }
-        guard let cube = NativeLUT.cube(parameters) else { status = "原版 LUT 引擎加载失败，未应用调色"; return }
-        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
-        let ci = context
-        let reveal = self.reveal
-        let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
-            guard let filter = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":cube,"inputColorSpace":cs,kCIInputImageKey:request.sourceImage]) else {
-                request.finish(with: NSError(domain:"AVDB.LUT",code:1)); return
-            }
-            guard let result = filter.outputImage else {
-                request.finish(with: NSError(domain:"AVDB.LUT",code:2)); return
-            }
-            let frame = LUTRevealState.composite(original: request.sourceImage, filtered: result,
-                                                 originalFraction: reveal.originalFraction())
-            request.finish(with: frame, context: ci)
-        })
-        composition = comp
-        if enabled {
+        buildGeneration += 1
+        let revision = buildGeneration, sourceGeneration = generation
+        buildTask?.cancel()
+        let useLUT = enabled && strength > 0
+        let useSharpen = sharpen && !constrained
+        let useDeband = deband && !constrained
+        guard useLUT || useSharpen || useDeband else {
+            reveal.cancel(); composition = nil; item.videoComposition = original
+            status = constrained && (sharpen || deband) ? "节能/高温保护：增强已旁路" : "原始画面（全部增强已旁路）"
+            return
+        }
+        let params = parameters
+        let amount = min(1, max(0, strength)), sharp = min(0.20, max(0, sharpness))
+        let limit = min(0.003, max(0.001, threshold)), sampleRadius = min(16, max(4, radius))
+        let kernel = Self.debandKernel
+        let ci = context, reveal = self.reveal
+        buildTask = Task { [weak self, weak item] in
+            do { try await Task.sleep(nanoseconds: 100_000_000) } catch { return }
+            let cube = useLUT ? await Task.detached(priority: .userInitiated) { NativeLUT.cube(params) }.value : nil
+            guard let self, let item, !Task.isCancelled, self.generation == sourceGeneration, self.buildGeneration == revision, self.item === item else { return }
+            if useLUT && cube == nil { self.status = "原版 LUT 引擎失败"; return }
+            if useDeband && kernel == nil { self.status = "Metal 去色带不可用；未伪装为模糊" }
+            self.cachedCube = cube ?? self.cachedCube
+            let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+            let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
+                let source = request.sourceImage, extent = source.extent
+                var result = source
+                // LUT domain intentionally unchanged; intensity is a true image dissolve.
+                if let cube, let mapped = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":cube,"inputColorSpace":cs,kCIInputImageKey:source])?.outputImage {
+                    if amount == 1 { result = mapped }
+                    else { result = mapped.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": source, "inputTime": 1-amount]) }
+                }
+                if useDeband, let kernel {
+                    // Threshold measured in nonlinear SDR sRGB, not linear working RGB.
+                    let nonlinear = result.matchedFromWorkingSpace(to: cs)
+                    if let output = kernel.apply(extent: extent, roiCallback: { _, rect in rect.insetBy(dx: -sampleRadius, dy: -sampleRadius) }, arguments: [nonlinear.clampedToExtent(), limit, sampleRadius]) {
+                        result = output.matchedToWorkingSpace(from: cs).cropped(to: extent)
+                    }
+                }
+                if useSharpen && sharp > 0 { result = result.clampedToExtent().applyingFilter("CISharpenLuminance", parameters: [kCIInputSharpnessKey: sharp]).cropped(to: extent) }
+                request.finish(with: LUTRevealState.composite(original: source, filtered: result, originalFraction: reveal.originalFraction()).cropped(to: extent), context: ci)
+            })
+            self.composition = comp
             reveal.begin(reduceMotion: UIAccessibility.isReduceMotionEnabled)
             item.videoComposition = comp
+            if !useDeband || kernel != nil { self.status = self.constrained ? "节能/高温：锐化与去色带旁路；LUT 保留" : "SDR 增强已应用；去色带为实验功能" }
         }
     }
     private func analyze() {
@@ -345,6 +397,23 @@ struct NativeLUTPanel: View {
             Button(model.enabled ? "关闭 LUT" : "开启 LUT") { model.toggle() }
             Button("重新分析原始帧") { model.reanalyze() }
             Button("重置 / 原始画面") { model.reset() }
+            Section("画质增强 · SDR") {
+                Text("LUT 强度 \(model.strength, specifier: "%.2f")")
+                Slider(value: Binding(get: { model.strength }, set: { model.strength = $0; model.apply() }), in: 0...1)
+                Toggle("轻微亮度锐化（默认关闭）", isOn: Binding(get: { model.sharpen }, set: { model.sharpen = $0; model.apply() }))
+                Slider(value: Binding(get: { model.sharpness }, set: { model.sharpness = $0; model.apply() }), in: 0...0.20)
+                Toggle("实验性 Metal 去色带（默认关闭）", isOn: Binding(get: { model.deband }, set: { model.deband = $0; model.apply() }))
+                Text("阈值 \(model.threshold, specifier: "%.3f") · 半径 \(Int(model.radius)) 源像素 · 单次 · 无颗粒")
+                Slider(value: Binding(get: { model.threshold }, set: { model.threshold = $0; model.apply() }), in: 0.001...0.003)
+                Slider(value: Binding(get: { model.radius }, set: { model.radius = $0; model.apply() }), in: 4...16, step: 1)
+                Toggle("低电量/高温时停用画质增强", isOn: Binding(get: { model.safePerformance }, set: { model.safePerformance = $0; model.apply() }))
+            }
+            Section("固定同帧对比 · 左原始 / 右处理") {
+                Toggle("持续分屏", isOn: Binding(get: { model.comparison }, set: { model.comparison = $0; model.updateComparison() }))
+                Slider(value: Binding(get: { model.divider }, set: { model.divider = $0; model.updateComparison() }), in: 0...1)
+                Button("暂停并比较同一帧") { model.pauseComparison() }
+                Text("原始分支直接使用解码请求 sourceImage；原始按钮关闭所有增强。")
+            }
             ForEach(0..<7,id:\.self) { i in
                 VStack(alignment:.leading) {
                     Text("\(LUTParameters.names[i]) \(Int(model.parameters.values[i]))")

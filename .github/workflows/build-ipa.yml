@@ -50,6 +50,11 @@ jobs:
           gem install cocoapods -v 1.16.2 --no-document
           pod install --repo-update
 
+      - name: Compile independent Core Image Metal kernel
+        run: |
+          xcrun -sdk iphoneos metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphoneos metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+
       - name: Build unsigned (iphoneos)
         run: |
           set -euo pipefail

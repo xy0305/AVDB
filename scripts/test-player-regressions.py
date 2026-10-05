@@ -20,9 +20,9 @@ assert 'guard !showLUT else { return }' in disappear
 assert 'guard !playbackActive else' in player
 assert 'guard !Task.isCancelled else { return }\n                syncTime()' in player
 info = plistlib.loads(Path('AVDB/Resources/Info.plist').read_bytes())
-assert info['CFBundleVersion'] == '156'
-assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 156;') == 2
-print('PASS: format-check and sheet-lifecycle source contracts; consistent build156')
+assert info['CFBundleVersion'] == '157'
+assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 157;') == 2
+print('PASS: format-check and sheet-lifecycle source contracts; consistent build157')
 
 # UI source contracts only: device rendering/VoiceOver still require manual validation.
 pan = Path('AVDB/Views/Player/Pan115PlayerView.swift').read_text()
@@ -65,5 +65,5 @@ assert player.count('chromeOverlay.zIndex(10)') == 1
 assert 'final class AVDBAppDelegate' in Path('AVDB/AVDBApp.swift').read_text()
 assert 'scene.requestGeometryUpdate' in player and 'attempt < 5' in player
 assert 'analysisGeneration == analysisToken, self.item === item' in lut
-assert 'LUTRevealState.composite(original: request.sourceImage' in lut
-print('PASS build156: app delegate, bounded route host orientation, same-frame wipe and analysis epoch contracts')
+assert 'LUTRevealState.composite(original: source' in lut
+print('PASS build157: app delegate, bounded route host orientation, same-frame wipe and analysis epoch contracts')
