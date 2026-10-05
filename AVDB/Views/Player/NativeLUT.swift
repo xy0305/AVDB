@@ -273,9 +273,8 @@ final class NativeLUTController: ObservableObject {
                 }
                 if useDeband, let kernel {
                     // Threshold measured in nonlinear SDR sRGB, not linear working RGB.
-                    let nonlinear = result.matchedFromWorkingSpace(to: cs)
-                    if let output = kernel.apply(extent: extent, roiCallback: { _, rect in rect.insetBy(dx: -sampleRadius, dy: -sampleRadius) }, arguments: [nonlinear.clampedToExtent(), limit, sampleRadius]) {
-                        result = output.matchedToWorkingSpace(from: cs).cropped(to: extent)
+                    if let nonlinear = result.matchedFromWorkingSpace(to: cs), let output = kernel.apply(extent: extent, roiCallback: { _, rect in rect.insetBy(dx: -sampleRadius, dy: -sampleRadius) }, arguments: [nonlinear.clampedToExtent(), limit, sampleRadius]), let working = output.matchedToWorkingSpace(from: cs) {
+                        result = working.cropped(to: extent)
                     }
                 }
                 if useSharpen && sharp > 0 { result = result.clampedToExtent().applyingFilter("CISharpenLuminance", parameters: [kCIInputSharpnessKey: sharp]).cropped(to: extent) }

@@ -27,8 +27,8 @@ func pixels(_ i:CIImage)->[Float] {
  return out
 }
 func deband(_ i:CIImage)->CIImage {
- let n=i.matchedFromWorkingSpace(to:cs)
- return kernel.apply(extent:i.extent,roiCallback:{ _,r in r.insetBy(dx:-8,dy:-8) },arguments:[n.clampedToExtent(),0.002,8.0])!.matchedToWorkingSpace(from:cs).cropped(to:i.extent)
+ let n=i.matchedFromWorkingSpace(to:cs)!
+ return kernel.apply(extent:i.extent,roiCallback:{ _,r in r.insetBy(dx:-8,dy:-8) },arguments:[n.clampedToExtent(),0.002,8.0])!.matchedToWorkingSpace(from:cs)!.cropped(to:i.extent)
 }
 for mode in 0...2 {
  let input=image(mode), result=deband(input)
