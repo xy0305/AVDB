@@ -214,13 +214,19 @@ final class NativeLUTController: ObservableObject {
     func toggle() {
         guard supported else { return }
         enabled.toggle()
-        if enabled && cachedCube == nil { requested = true }
+        if enabled && cachedCube == nil {
+            requested = true
+            buildGeneration += 1; buildTask?.cancel()
+            item?.videoComposition = original
+            return
+        }
         if !enabled { analysisGeneration += 1; busy = false }
         apply()
     }
     func reanalyze() {
         guard supported else { return }
         analysisGeneration += 1; busy = false; reveal.cancel()
+        buildGeneration += 1; buildTask?.cancel()
         item?.videoComposition = original
         requested = true; status = "等待原始解码帧…"
     }
