@@ -44,3 +44,18 @@ assert '.frame(minHeight: 44)' in panel and '.accessibilityLabel(' in panel
 assert '.onChange' not in panel  # no automatic dismiss during analysis/enabling
 assert '返回播放' in panel and '.presentationDetents([.medium,.large])' in panel
 print('PASS: transient notice dedup/dismiss and persistent LUT Done source contracts (not runtime UI tests)')
+
+# Source replacement must clean up old playback without touching the stable route orientation.
+assert '.id(url)' in pan and 'managesOrientation: false' in pan
+assert '.onAppear { OrientationLock.set(.landscapeRight, keepLocked: true) }' in pan
+assert '.onDisappear { OrientationLock.set(.portrait, keepLocked: true) }' in pan
+stop = player.split('private func stopPlayback()')[1].split('@ViewBuilder')[0]
+assert 'if managesOrientation { OrientationLock.set(.portrait' in stop
+assert 'lut.detach()' in stop and 'playerLayer?.pause()' in stop
+assert 'Button("横屏全屏")' in player and 'Button("竖屏播放")' in player
+button = player.split('Button { showLUT = true } label: {')[1].split('Spacer(minLength: 8)')[0]
+assert '.frame(width: 48, height: 48)' in button
+assert '.contentShape(Rectangle())' in button and '.zIndex(20)' in button
+assert '.accessibilityIdentifier("player.lut.settings")' in button
+assert 'chromeOverlay.zIndex(10)' in player
+print('PASS: route-owned orientation across source replacement; explicit fullscreen and 48pt LUT hit-target contracts (not device tests)')

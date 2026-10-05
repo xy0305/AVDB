@@ -26,7 +26,8 @@ struct Pan115PlayerView: View {
                     subtitle: vm.qualityLabel,
                     headers: vm.headers,
                     progressID: movie.id,
-                    onPlaybackFailure: { Task { await vm.failed() } }
+                    onPlaybackFailure: { Task { await vm.failed() } },
+                    managesOrientation: false
                 )
                 .id(url)
             } else if let err = vm.errorMessage {
@@ -106,6 +107,9 @@ struct Pan115PlayerView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.hidden, for: .navigationBar)
+        // Stable route owns orientation across .id(url), loading/error branches and HLS refresh.
+        .onAppear { OrientationLock.set(.landscapeRight, keepLocked: true) }
+        .onDisappear { OrientationLock.set(.portrait, keepLocked: true) }
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
         .confirmationDialog("播放源", isPresented: $showQuality, titleVisibility: .visible) {
             ForEach(Array(vm.streams.enumerated()), id: \.offset) { _, stream in

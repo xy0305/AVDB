@@ -134,6 +134,8 @@ struct KSChromePlayer: View {
     var headers: [String: String] = [:]
     var progressID: String? = nil
     var onPlaybackFailure: (() -> Void)? = nil
+    // A source child must not restore portrait while its owning playback route remains alive.
+    var managesOrientation: Bool = true
     @State private var failureReported = false
 
     @Environment(\.dismiss) private var dismiss
@@ -227,7 +229,7 @@ struct KSChromePlayer: View {
             wireCoordinator()
             startTicker()
             scheduleHide()
-            OrientationLock.set(.landscapeRight, keepLocked: true)
+            if managesOrientation { OrientationLock.set(.landscapeRight, keepLocked: true) }
         }
         .onDisappear {
             // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
@@ -243,7 +245,7 @@ struct KSChromePlayer: View {
         tickTask?.cancel()
         lut.detach()
         coordinator.playerLayer?.pause()
-        OrientationLock.set(.portrait, keepLocked: true)
+        if managesOrientation { OrientationLock.set(.portrait, keepLocked: true) }
     }
 
     @ViewBuilder
@@ -253,7 +255,7 @@ struct KSChromePlayer: View {
             KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
                 .onAppear { applyFillMode() }
             if showChrome {
-                chromeOverlay
+                chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
             }
             PlayerGestureLayer(
                 onDoubleTap: { x, width in
@@ -485,10 +487,29 @@ struct KSChromePlayer: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                Button { showLUT = true } label: { Text("LUT").font(.caption.bold()).foregroundStyle(.white) }
+                Button { showLUT = true } label: {
+                    Text("LUT")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 48)
+                        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .layoutPriority(2)
+                .zIndex(20)
+                .accessibilityLabel("LUT 调色设置")
+                .accessibilityIdentifier("player.lut.settings")
                 Spacer(minLength: 8)
 
                 Menu {
+                    Button("横屏全屏") {
+                        OrientationLock.set(.landscapeRight, keepLocked: true)
+                    }
+                    Button("竖屏播放") {
+                        OrientationLock.set(.portrait, keepLocked: true)
+                    }
+                    Divider()
                     ForEach(FillMode.allCases, id: \.self) { mode in
                         Button {
                             fillMode = mode
