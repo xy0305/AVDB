@@ -542,6 +542,7 @@ struct MoviePosterGrid: View {
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
                 .contentShape(Rectangle())
                 .clipped()
+                .contentShape(Rectangle())
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)
