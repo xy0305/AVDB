@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['UITests/**', 'AVDB/Views/Home/**', 'AVDB/Views/Components/JAVDBUI.swift', 'scripts/setup-poster-uitests.rb', '.github/workflows/poster-navigation.yml']
+    paths: ['UITests/**', 'AVDB/Views/Home/**', 'AVDB/Views/Components/JAVDBUI.swift', 'scripts/setup-poster-uitests.rb', 'scripts/test-player-regressions.py', '.github/workflows/poster-navigation.yml']
 jobs:
   navigation:
     runs-on: macos-26
