@@ -39,6 +39,12 @@ jobs:
           gem install cocoapods -v 1.16.2 --no-document
           pod install --repo-update
 
+      - name: Compile simulator Core Image Metal kernel
+        run: |
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+          python3 scripts/test-ipad-layout.py
+
       - name: Build (simulator, no signing)
         run: |
           xcodebuild build \
