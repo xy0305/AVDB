@@ -6,6 +6,7 @@ t.add_dependency(app)
 f = p.main_group.new_group('UITests').new_file('UITests/PosterNavigationTests.swift')
 t.source_build_phase.add_file_reference(f)
 t.build_configurations.each do |c|
+  c.build_settings['PRODUCT_NAME'] = 'PosterNavigationUITests'
   c.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.avdb.PosterNavigationUITests'
   c.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
   c.build_settings['TEST_TARGET_NAME'] = 'AVDB'
