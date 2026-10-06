@@ -45,6 +45,7 @@ struct CategoriesView: View {
             .background {
                 LiquidGlassBackground()
             }
+            .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
             .frame(maxWidth: .infinity)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

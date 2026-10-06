@@ -431,6 +431,8 @@ struct NativeLUTPanel: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: 640)
+        .frame(maxWidth: .infinity)
         .navigationTitle("LUT 调色")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -438,7 +440,7 @@ struct NativeLUTPanel: View {
                 Button { dismiss() } label: {
                     Label("返回播放", systemImage: "checkmark")
                         .font(.body.weight(.semibold))
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 48)
                 }
                 .accessibilityLabel("完成 LUT 设置，返回播放")
                 .accessibilityHint("关闭面板，保留调色设置与播放进度")

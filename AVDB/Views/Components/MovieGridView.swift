@@ -11,9 +11,11 @@ struct MovieGridView: View {
     let title: String
     @ObservedObject var viewModel: MovieListViewModel
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 110), spacing: 12)
-    ]
+    @Environment(\.availableLayoutSize) private var layoutSize
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12), count:
+            AdaptiveLayout.columnCount(width: layoutSize.width, padding: AdaptiveLayout.gridPadding))
+    }
 
     var body: some View {
         ScrollView {

@@ -92,6 +92,7 @@ struct RankingsView: View {
         .background {
             LiquidGlassBackground()
         }
+        .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
         .frame(maxWidth: .infinity)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -349,10 +350,10 @@ private struct RankingPreviewCarousel: View {
 /// 演员排行网格（自适应列数，不用 GeometryReader）
 private struct ActorRankingGridContent: View {
     @ObservedObject var vm: RankingsViewModel
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.availableLayoutSize) private var layoutSize
 
     private var columns: [GridItem] {
-        let count = sizeClass == .regular ? 5 : 3
+        let count = AdaptiveLayout.columnCount(width: layoutSize.width, padding: AdaptiveLayout.gridPadding, spacing: 14)
         return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
     }
 

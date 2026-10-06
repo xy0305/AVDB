@@ -50,10 +50,10 @@ struct ActorsView: View {
     @State private var tab: ActorTab = .recommend
     @StateObject private var vm = ActorsHomeViewModel()
     @State private var showSearch = false
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.availableLayoutSize) private var layoutSize
 
     private var columns: [GridItem] {
-        let count = sizeClass == .regular ? 5 : 3
+        let count = AdaptiveLayout.columnCount(width: layoutSize.width, padding: AdaptiveLayout.gridPadding, spacing: 14)
         return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
     }
 
@@ -72,6 +72,7 @@ struct ActorsView: View {
             .background {
                 LiquidGlassBackground()
             }
+            .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
             .frame(maxWidth: .infinity)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -261,6 +262,7 @@ final class ActorsHomeViewModel: ObservableObject {
 
 /// 演员详情：/api/v1/actors/{id} 嵌套 actor + filter_tags，作品走 movies/tags
 struct ActorDetailView: View {
+    @Environment(\.availableLayoutSize) private var layoutSize
     let actorID: String
     @StateObject private var vm: ActorDetailViewModel
 
@@ -366,7 +368,7 @@ struct ActorDetailView: View {
 
     private var collapsedFilterHeight: CGFloat { 118 }
     private var expandedFilterHeight: CGFloat {
-        min(UIScreen.main.bounds.height * 0.72, 640)
+        min(layoutSize.height * 0.72, 640)
     }
     private var currentFilterHeight: CGFloat {
         min(expandedFilterHeight, max(collapsedFilterHeight, collapsedFilterHeight + filterPanelHeight))

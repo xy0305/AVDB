@@ -83,6 +83,7 @@ struct ContentView: View {
                 }
                 .tag(AppTab.me)
         }
+        .modifier(SceneLayoutReader())
         .tint(JAVDBPalette.accent)
         .sensoryFeedback(.selection, trigger: selectedTab)
         .modifier(LiquidGlassTabBarModifier())

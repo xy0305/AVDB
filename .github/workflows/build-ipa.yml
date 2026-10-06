@@ -35,6 +35,7 @@ jobs:
 
       - name: Check LUT timeout and sheet lifecycle regressions
         run: |
+          python3 scripts/test-ipad-layout.py
           python3 scripts/test-player-regressions.py
           python3 scripts/test-player-runtime.py
           python3 scripts/test-enhancement-pixels.py

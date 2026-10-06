@@ -12,7 +12,7 @@ import UIKit
 
 final class AVDBAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        KSOptions.supportedInterfaceOrientations
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : KSOptions.supportedInterfaceOrientations
     }
 }
 

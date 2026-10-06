@@ -12,6 +12,13 @@ import SwiftUI
 
 /// 根据设备提供自适应布局参数。
 enum AdaptiveLayout {
+    static func columnCount(width: CGFloat, padding: CGFloat, spacing: CGFloat = 12) -> Int {
+        let usable = max(0, min(width, contentMaxWidth) - padding * 2)
+        // Keep the familiar phone three-column layout, but never crush split-window cards.
+        let minimum: CGFloat = width < 600 ? 100 : 150
+        return min(6, max(1, Int((usable + spacing) / (minimum + spacing))))
+    }
+
     /// 是否 iPad（或 Mac Catalyst 等大屏）
     static var isPad: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
@@ -25,6 +32,25 @@ enum AdaptiveLayout {
 
     /// 网格水平内边距
     static var gridPadding: CGFloat { isPad ? 20 : 12 }
+}
+
+// Scene-local geometry: never infer split-window dimensions from UIScreen.
+private struct AvailableLayoutSizeKey: EnvironmentKey {
+    static let defaultValue = CGSize(width: 375, height: 667)
+}
+extension EnvironmentValues {
+    var availableLayoutSize: CGSize {
+        get { self[AvailableLayoutSizeKey.self] }
+        set { self[AvailableLayoutSizeKey.self] = newValue }
+    }
+}
+struct SceneLayoutReader: ViewModifier {
+    func body(content: Content) -> some View {
+        GeometryReader { geometry in
+            content.environment(\.availableLayoutSize, geometry.size)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+    }
 }
 
 enum JAVDBPalette {
@@ -482,10 +508,11 @@ struct MoviePosterGrid: View {
     var showRank: Bool = false
     var onAppearLast: ((Movie) -> Void)? = nil
 
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.availableLayoutSize) private var layoutSize
+    @State private var measuredWidth: CGFloat = 0
 
     private var columnCount: Int {
-        sizeClass == .regular ? 5 : 3
+        AdaptiveLayout.columnCount(width: measuredWidth > 0 ? measuredWidth : layoutSize.width, padding: AdaptiveLayout.gridPadding, spacing: 12)
     }
 
     private var columns: [GridItem] {
@@ -511,6 +538,13 @@ struct MoviePosterGrid: View {
             }
         }
         .padding(.horizontal, AdaptiveLayout.gridPadding)
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { measuredWidth = geometry.size.width }
+                    .onChange(of: geometry.size.width) { _, width in measuredWidth = width }
+            }
+        }
     }
 }
 

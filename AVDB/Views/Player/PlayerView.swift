@@ -475,11 +475,13 @@ struct KSChromePlayer: View {
                 Spacer(minLength: 8)
 
                 Menu {
+                    if !AdaptiveLayout.isPad {
                     Button("横屏全屏") {
                         OrientationLock.set(.landscapeRight, keepLocked: true)
                     }
                     Button("竖屏播放") {
                         OrientationLock.set(.portrait, keepLocked: true)
+                    }
                     }
                     Divider()
                     ForEach(FillMode.allCases, id: \.self) { mode in
@@ -498,7 +500,7 @@ struct KSChromePlayer: View {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 48, height: 48)
                 }
             }
             .padding(.horizontal, 20)
@@ -513,7 +515,7 @@ struct KSChromePlayer: View {
             progressBar
                 .padding(.horizontal, 16)
 
-            HStack(spacing: 22) {
+            HStack(spacing: 12) {
                 Button {
                     if isPlaying {
                         coordinator.playerLayer?.pause()
@@ -530,7 +532,7 @@ struct KSChromePlayer: View {
                         }
                     }
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 48, height: 48)
                 }
                 .buttonStyle(.plain)
 
@@ -540,7 +542,7 @@ struct KSChromePlayer: View {
                     Image(systemName: "forward.fill")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 48, height: 48)
                 }
                 .buttonStyle(.plain)
 
@@ -555,6 +557,7 @@ struct KSChromePlayer: View {
                     Button(action: onSelectSource) {
                         Text(subtitle.isEmpty ? "播放源" : subtitle)
                             .font(.caption.weight(.medium)).lineLimit(1)
+                            .frame(maxWidth: 180)
                             .frame(minHeight: 48)
                     }.accessibilityLabel("选择播放源")
                 } else if !subtitle.isEmpty {
@@ -631,7 +634,7 @@ struct KSChromePlayer: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
-                .frame(width: 40, height: 40)
+                .frame(width: 48, height: 48)
                 .liquidGlass()
         }
         .pressableGlass(scale: 0.9)
@@ -647,7 +650,7 @@ struct KSChromePlayer: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
-                .frame(width: 30, height: 30)
+                .frame(width: 48, height: 48)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
                 .liquidGlass()
@@ -771,6 +774,7 @@ struct PlaybackOrientationHost: UIViewControllerRepresentable {
 enum OrientationLock {
     private static var generation = 0
     static func set(_ mask: UIInterfaceOrientationMask, keepLocked: Bool = false) {
+        guard UIDevice.current.userInterfaceIdiom != .pad else { return }
         generation += 1
         let token = generation
         let target: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad && mask == .portrait ? .all : mask

@@ -20,9 +20,9 @@ assert 'guard !showLUT else { return }' in disappear
 assert 'guard !playbackActive else' in player
 assert 'guard !Task.isCancelled else { return }\n                syncTime()' in player
 info = plistlib.loads(Path('AVDB/Resources/Info.plist').read_bytes())
-assert info['CFBundleVersion'] == '157'
-assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 157;') == 2
-print('PASS: format-check and sheet-lifecycle source contracts; consistent build157')
+assert info['CFBundleVersion'] == '158'
+assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 158;') == 2
+print('PASS: format-check and sheet-lifecycle source contracts; consistent build158')
 
 # UI source contracts only: device rendering/VoiceOver still require manual validation.
 pan = Path('AVDB/Views/Player/Pan115PlayerView.swift').read_text()
@@ -40,7 +40,7 @@ assert 'NavigationStack {' in panel
 assert panel.index('}.disabled(!model.supported)') < panel.index('.toolbar {')
 assert 'ToolbarItem(placement: .confirmationAction)' in panel
 assert 'Button { dismiss() }' in panel
-assert '.frame(minHeight: 44)' in panel and '.accessibilityLabel(' in panel
+assert '.frame(minHeight: 48)' in panel and '.accessibilityLabel(' in panel
 assert '.onChange' not in panel  # no automatic dismiss during analysis/enabling
 assert '返回播放' in panel and '.presentationDetents([.medium,.large])' in panel
 print('PASS: transient notice dedup/dismiss and persistent LUT Done source contracts (not runtime UI tests)')
@@ -66,4 +66,4 @@ assert 'final class AVDBAppDelegate' in Path('AVDB/AVDBApp.swift').read_text()
 assert 'scene.requestGeometryUpdate' in player and 'attempt < 5' in player
 assert 'analysisGeneration == analysisToken, self.item === item' in lut
 assert 'LUTRevealState.composite(original: source' in lut
-print('PASS build157: app delegate, bounded route host orientation, same-frame wipe and analysis epoch contracts')
+print('PASS build158: app delegate, bounded route host orientation, same-frame wipe and analysis epoch contracts')

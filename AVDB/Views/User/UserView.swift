@@ -210,6 +210,8 @@ struct UserView: View {
                     }
                 }
             }
+            .frame(maxWidth: AdaptiveLayout.isPad ? 760 : .infinity)
+            .frame(maxWidth: .infinity)
             .navigationTitle("我的")
             .liquidGlassList()
             .sheet(isPresented: $showLogin) {
@@ -367,10 +369,10 @@ private struct CollectedActorGrid: View {
     @ObservedObject var vm: CollectedViewModel
     var isEditing: Bool
     @Binding var selectedActors: Set<String>
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.availableLayoutSize) private var layoutSize
 
     private var columns: [GridItem] {
-        let count = sizeClass == .regular ? 5 : 3
+        let count = AdaptiveLayout.columnCount(width: layoutSize.width, padding: AdaptiveLayout.gridPadding, spacing: 14)
         return Array(repeating: GridItem(.flexible()), count: count)
     }
 

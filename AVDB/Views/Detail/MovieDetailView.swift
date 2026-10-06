@@ -17,6 +17,7 @@ struct MovieDetailView: View {
     @State private var reviewPanelHeight: CGFloat = 76
     @StateObject private var reviewsVM = ReviewsListViewModel()
     @State private var showSearch = false
+    @Environment(\.availableLayoutSize) private var layoutSize
     @Environment(\.dismiss) private var dismiss
 
     init(movieID: String) {
@@ -67,7 +68,7 @@ struct MovieDetailView: View {
                     total: movie.commentsCount ?? 0,
                     panelHeight: $reviewPanelHeight,
                     vm: reviewsVM,
-                    availableHeight: max(280, UIScreen.main.bounds.height)
+                    availableHeight: max(280, layoutSize.height)
                 )
                 .frame(height: reviewPanelHeight, alignment: .top)
             }
@@ -169,7 +170,7 @@ struct MovieDetailView: View {
             .background(Color(.systemBackground))
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
         }
-        .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
+        .frame(maxWidth: AdaptiveLayout.isPad ? 900 : AdaptiveLayout.contentMaxWidth)
         .frame(maxWidth: .infinity)
     }
 
