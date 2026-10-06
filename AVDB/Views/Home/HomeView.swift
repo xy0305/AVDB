@@ -252,6 +252,7 @@ struct HomeView: View {
     private var latestSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeaderBar(title: "最新上架", trailing: "全部") { goLatest = true }
+                .accessibilityIdentifier("home-latest-header")
                 .staggerAppear(index: 3)
             if vm.latest.isEmpty {
                 EmptyStateView(text: "載入最新…")

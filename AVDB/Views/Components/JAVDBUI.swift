@@ -47,7 +47,8 @@ extension EnvironmentValues {
 struct SceneLayoutReader: ViewModifier {
     func body(content: Content) -> some View {
         GeometryReader { geometry in
-            content.environment(\.availableLayoutSize, geometry.size)
+            content
+                .environment(\.availableLayoutSize, geometry.size)
                 .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
@@ -371,6 +372,8 @@ private extension View {
 }
 
 /// 先用无内容视图定宽高，再 overlay 图片。避免 Image 按原图像素撑开格子。
+/// iPad 宽窗口里 LazyVGrid 会把格子的布局边界放大到整行；绘制裁剪不够，
+/// 必须同时把命中测试裁回封面，否则点一张会落到邻居或点不中。
 struct ClippedAspectFill<Content: View>: View {
     var aspectRatio: CGFloat
     var cornerRadius: CGFloat = 8
@@ -387,7 +390,7 @@ struct ClippedAspectFill<Content: View>: View {
 }
 
 /// 三列海报卡 —— 内容干净，封面带高光边、角标玻璃化。
-/// 不要在这里加手势：外层是 NavigationLink，手势会吃掉点击。
+/// 不要在这里加手势：外层负责导航，卡片手势会和 ScrollView 抢点击。
 struct MoviePosterCard: View {
     let movie: Movie
     var rank: Int? = nil
@@ -457,6 +460,7 @@ struct MoviePosterCard: View {
             }
             .compositingGroup()
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             Text(movie.displayTitle)
                 .font(.subheadline)
@@ -499,10 +503,11 @@ struct MoviePosterCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .clipped()
     }
 }
 
-/// 自适应列数海报网格（iPhone 3 列，iPad 4–5 列）
+/// 自适应列数海报网格（iPhone 3 列，iPad 4–6 列）
 struct MoviePosterGrid: View {
     let movies: [Movie]
     var showRank: Bool = false
@@ -510,6 +515,7 @@ struct MoviePosterGrid: View {
 
     @Environment(\.availableLayoutSize) private var layoutSize
     @State private var measuredWidth: CGFloat = 0
+    @State private var openMovieID: String?
 
     private var columnCount: Int {
         AdaptiveLayout.columnCount(width: measuredWidth > 0 ? measuredWidth : layoutSize.width, padding: AdaptiveLayout.gridPadding, spacing: 12)
@@ -522,26 +528,20 @@ struct MoviePosterGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 16) {
             ForEach(Array(movies.enumerated()), id: \.element.id) { idx, movie in
-                NavigationLink {
-                    #if DEBUG
-                    if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
-                        Text("Neutral detail \(movie.id)")
-                            .accessibilityIdentifier("detail-\(movie.id)")
-                            .navigationTitle("Neutral detail")
-                            .toolbar(.visible, for: .navigationBar)
-                    } else {
-                        MovieDetailView(movieID: movie.id)
-                    }
-                    #else
-                    MovieDetailView(movieID: movie.id)
-                    #endif
+                // iPad regular width expands a NavigationLink's accessibility/hit
+                // frame across neighboring LazyVGrid cells. A visible cover tap
+                // then misses or opens the wrong movie. Keep one link outside
+                // the cell and clip every cell to its own card.
+                Button {
+                    openMovieID = movie.id
                 } label: {
                     MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
                 }
-                .accessibilityIdentifier("poster-\(movie.id)")
                 .buttonStyle(.plain)
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("poster-\(movie.id)")
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
                 .contentShape(Rectangle())
+                .clipped()
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)
@@ -552,11 +552,59 @@ struct MoviePosterGrid: View {
         .padding(.horizontal, AdaptiveLayout.gridPadding)
         .background {
             GeometryReader { geometry in
-                Color.clear
-                    .onAppear { measuredWidth = geometry.size.width }
-                    .onChange(of: geometry.size.width) { _, width in measuredWidth = width }
+                Color.clear.preference(key: PosterGridWidthKey.self, value: geometry.size.width)
             }
         }
+        .onPreferenceChange(PosterGridWidthKey.self) { measuredWidth = $0 }
+        .background {
+            // iOS 17 API. NavigationLink(value:) needs a path owned by HomeView
+            // and would rewrite every catalog page. Keep the link out of the
+            // grid cells, but do not hide it: a hidden link is not activated
+            // by isActive on iPad and the UI test cannot find Back.
+            NavigationLink(isActive: posterIsActive) {
+                posterDestination
+            } label: {
+                EmptyView()
+            }
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var posterIsActive: Binding<Bool> {
+        Binding(
+            get: { openMovieID != nil },
+            set: { isActive in if !isActive { openMovieID = nil } }
+        )
+    }
+
+    @ViewBuilder
+    private var posterDestination: some View {
+        if let openMovieID {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
+                Text("Neutral detail \(openMovieID)")
+                    .accessibilityIdentifier("detail-\(openMovieID)")
+                    .navigationTitle("Neutral detail")
+                    .toolbar(.visible, for: .navigationBar)
+            } else {
+                MovieDetailView(movieID: openMovieID)
+            }
+            #else
+            MovieDetailView(movieID: openMovieID)
+            #endif
+        } else {
+            EmptyView()
+        }
+    }
+}
+
+private struct PosterGridWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next > 0 { value = next }
     }
 }
 

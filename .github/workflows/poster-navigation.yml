@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['UITests/**', 'scripts/setup-poster-uitests.rb', '.github/workflows/poster-navigation.yml']
+    paths: ['UITests/**', 'AVDB/Views/Home/**', 'AVDB/Views/Components/JAVDBUI.swift', 'scripts/setup-poster-uitests.rb', '.github/workflows/poster-navigation.yml']
 jobs:
   navigation:
     runs-on: macos-26
@@ -31,10 +31,10 @@ jobs:
         run: |
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
           xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
-      - name: Tap actual Home grid poster centers
+      - name: Tap visible Home latest covers in narrow and wide windows
         run: |
           set -o pipefail
-          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PosterNavigation.xcresult" CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/poster-navigation.log"
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PosterNavigation.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testHomeLatestCoverNavigatesInNarrowAndWideWindows 2>&1 | tee "$RUNNER_TEMP/poster-navigation.log"
       - name: Upload screenshots hierarchy and results
         if: always()
         uses: actions/upload-artifact@v4
