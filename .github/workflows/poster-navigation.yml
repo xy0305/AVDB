@@ -1,6 +1,9 @@
 name: iPad Poster Navigation
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['UITests/**', 'scripts/setup-poster-uitests.rb', '.github/workflows/poster-navigation.yml']
 jobs:
   navigation:
     runs-on: macos-26
