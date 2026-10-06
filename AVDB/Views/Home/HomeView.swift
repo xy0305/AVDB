@@ -491,6 +491,13 @@ final class HomeViewModel: ObservableObject {
     private let sdk = JavDBSDK.shared
 
     func initialLoad() async {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
+            latest = (1...9).map { Movie(id: "fixture-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)") }
+            magnets = latest
+            return
+        }
+        #endif
         async let rec = try? sdk.recommendMovies(page: 1)
         async let latestTask = try? sdk.latestMovies(page: 1, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
         async let magTask = try? sdk.latestMovies(page: 2, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")

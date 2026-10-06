@@ -47,6 +47,9 @@ final class AppState: ObservableObject {
     @Published var currentUser: User?
 
     init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") { return }
+        #endif
         // 检查本地是否有保存的 Token
         if APIClient.shared.hasToken {
             isLoggedIn = true

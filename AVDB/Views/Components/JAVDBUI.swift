@@ -523,10 +523,22 @@ struct MoviePosterGrid: View {
         LazyVGrid(columns: columns, spacing: 16) {
             ForEach(Array(movies.enumerated()), id: \.element.id) { idx, movie in
                 NavigationLink {
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
+                        Text("Neutral detail \(movie.id)")
+                            .accessibilityIdentifier("detail-\(movie.id)")
+                            .navigationTitle("Neutral detail")
+                            .toolbar(.visible, for: .navigationBar)
+                    } else {
+                        MovieDetailView(movieID: movie.id)
+                    }
+                    #else
                     MovieDetailView(movieID: movie.id)
+                    #endif
                 } label: {
                     MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
                 }
+                .accessibilityIdentifier("poster-\(movie.id)")
                 .buttonStyle(.plain)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())

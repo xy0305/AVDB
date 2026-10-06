@@ -1,0 +1,43 @@
+name: iPad Poster Navigation
+on:
+  workflow_dispatch:
+jobs:
+  navigation:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies and test scheme
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          ruby scripts/setup-poster-uitests.rb
+          pod install --repo-update
+      - name: Choose available iPad simulator
+        run: |
+          xcrun simctl list devices available -j > devices.json
+          python3 - <<'PY'
+          import json,os
+          devices=json.load(open('devices.json'))['devices']
+          pads=[d for ds in devices.values() for d in ds if 'iPad' in d['name']]
+          assert pads, 'No available iPad simulator'
+          chosen=next((d for d in pads if '13-inch' in d['name']), pads[0])
+          print(chosen)
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('IPAD_UDID='+chosen['udid']+'\n')
+          PY
+      - name: Compile simulator Metal resource
+        run: |
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Tap actual Home grid poster centers
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PosterNavigation.xcresult" CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/poster-navigation.log"
+      - name: Upload screenshots hierarchy and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-poster-navigation-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/PosterNavigation.xcresult
+            ${{ runner.temp }}/poster-navigation.log
+            devices.json

@@ -345,6 +345,17 @@ public struct JavDBImage: View {
             }
             .clipped()
             .task(id: imageURLs.joined(separator: "|")) {
+            #if DEBUG
+            if let url, url.hasPrefix("fixture://poster/") {
+                let renderer = UIGraphicsImageRenderer(size: CGSize(width: 900, height: 600))
+                image = renderer.image { context in
+                    UIColor.systemTeal.setFill()
+                    context.fill(CGRect(x: 0, y: 0, width: 900, height: 600))
+                    ("NEUTRAL " + url.components(separatedBy: "/").last!) .draw(at: CGPoint(x: 300, y: 260), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.white])
+                }
+                return
+            }
+            #endif
             // 不先清空 image。LazyVGrid 滚动时 task 会被取消，先清空会让中间封面变空白。
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
