@@ -494,7 +494,7 @@ final class HomeViewModel: ObservableObject {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
             latest = (1...9).map { Movie(id: "fixture-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)") }
-            magnets = latest
+            magnets = (1...9).map { Movie(id: "magnet-\($0)", number: "TEST-M\($0)", title: "Neutral magnet \($0)", coverURL: "fixture://poster/\($0)") }
             return
         }
         #endif

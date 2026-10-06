@@ -11,7 +11,11 @@ final class PosterNavigationTests: XCTestCase {
             for index in [8, 7, 9, 2] {
                 let poster = app.buttons["poster-fixture-\(index)"]
                 for _ in 0..<8 {
-                    if poster.exists && poster.isHittable && poster.frame.maxY < app.frame.maxY - 70 { break }
+                    if poster.exists {
+                        let centerY = poster.frame.minY + poster.frame.width / 0.72 / 2
+                        if poster.isHittable && centerY > 130 && centerY < app.frame.maxY - 70 { break }
+                        if centerY < 130 { app.swipeDown(); continue }
+                    }
                     app.swipeUp()
                 }
                 XCTAssertTrue(poster.waitForExistence(timeout: 10), app.debugDescription)
