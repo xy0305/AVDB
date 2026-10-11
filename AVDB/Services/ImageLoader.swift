@@ -344,6 +344,8 @@ public struct JavDBImage: View {
                 }
             }
             .clipped()
+            .contentShape(Rectangle())
+            .allowsHitTesting(false)
             .task(id: imageURLs.joined(separator: "|")) {
             #if DEBUG
             if let url, url.hasPrefix("fixture://poster/") {
