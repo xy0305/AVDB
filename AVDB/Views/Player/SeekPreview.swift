@@ -26,6 +26,10 @@ struct PreviewLRU<Value> {
     private(set) var bytes = 0
     let countLimit: Int
     let byteLimit: Int
+    init(countLimit: Int, byteLimit: Int) {
+        self.countLimit = countLimit
+        self.byteLimit = byteLimit
+    }
     mutating func value(for key: Int) -> Value? {
         guard let value = values[key]?.0 else { return nil }
         order.removeAll { $0 == key }; order.append(key)
