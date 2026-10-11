@@ -21,7 +21,7 @@ assert 'guard !playbackActive else' in player
 assert 'guard !Task.isCancelled else { return }\n                syncTime()' in player
 info = plistlib.loads(Path('AVDB/Resources/Info.plist').read_bytes())
 build = info['CFBundleVersion']
-assert build == '159'
+assert build == '161'
 assert Path('AVDB.xcodeproj/project.pbxproj').read_text().count(f'CURRENT_PROJECT_VERSION = {build};') == 2
 print(f'PASS: format-check and sheet-lifecycle source contracts; consistent build{build}')
 

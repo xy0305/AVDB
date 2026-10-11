@@ -10,6 +10,7 @@ on:
       - "AVDB.xcodeproj/**"
       - ".github/workflows/build-ipa.yml"
       - "scripts/test-*.py"
+      - "scripts/GestureRegression.swift"
 
 permissions:
   contents: read
@@ -38,6 +39,7 @@ jobs:
           python3 scripts/test-ipad-layout.py
           python3 scripts/test-player-regressions.py
           python3 scripts/test-player-runtime.py
+          python3 scripts/test-player-gestures.py
           python3 scripts/test-enhancement-pixels.py
 
       - name: Test native 115 RSA protocol

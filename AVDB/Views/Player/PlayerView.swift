@@ -2,7 +2,7 @@
 //  PlayerView.swift
 //  AVDB
 //
-//  KSPlayer：进入横屏、进度条、左侧亮度 / 右侧音量。
+//  KSPlayer SwiftUI render layer + AVDB-owned chrome and exclusive pan output.
 //
 
 import SwiftUI
@@ -159,8 +159,9 @@ struct KSChromePlayer: View {
 
     @State private var overlay: OverlayKind?
     @State private var overlayValue: Double = 0
-    @State private var dragStart: Double = 0
-    @State private var verticalDrag = false
+    @State private var adjustmentNotice: String?
+    @State private var seekPending = false
+    @State private var seekGeneration = 0
     @State private var horizontalDrag = false
     @State private var scrubStart: Double = 0
     @State private var skipHUD: SkipHUD?
@@ -206,12 +207,9 @@ struct KSChromePlayer: View {
         }) { NativeLUTPanel(model: lut) }
         .onChange(of: showLUT) { _, presented in
             lut.setPanelCovered(presented)
-            if presented { hideTask?.cancel(); showChrome = true }
+            if presented { cancelPlayerDrag(); hideTask?.cancel(); showChrome = true }
         }
         .toolbar(.hidden, for: .navigationBar)
-        // 保留一个可布局的 MPVolumeView；尺寸为 0 时系统可能不创建 UISlider，
-        // 导致横屏右侧滑动虽然触发，但音量实际不会变化。
-        .background(HiddenVolumeView().frame(width: 2, height: 2).opacity(0.01))
         .onAppear {
             guard !playbackActive else {
                 showChrome = true
@@ -227,6 +225,11 @@ struct KSChromePlayer: View {
             startTicker()
             scheduleHide()
         }
+        .onChange(of: url) { _, _ in
+            seekGeneration += 1
+            seekPending = false
+            cancelPlayerDrag()
+        }
         .onDisappear {
             // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
             // They must not tear down playback or force the whole app to portrait.
@@ -237,6 +240,9 @@ struct KSChromePlayer: View {
 
     private func stopPlayback() {
         playbackActive = false
+        seekGeneration += 1
+        seekPending = false
+        cancelPlayerDrag()
         hideTask?.cancel()
         tickTask?.cancel()
         lut.detach()
@@ -252,25 +258,46 @@ struct KSChromePlayer: View {
             if showChrome {
                 chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
             }
+            // KSVideoPlayer renders only the underlying player view (no official pan).
+            // This transparent sibling owns the only pan output; chrome stays above it.
             PlayerGestureLayer(
-                onDoubleTap: { x, width in
-                    skip(by: x < width * 0.5 ? -10 : 10)
-                },
+                blocked: showLUT || seekPending || (isSeeking && !horizontalDrag),
+                sourceID: url,
+                onDoubleTap: { x, width in skip(by: x < width * 0.5 ? -10 : 10) },
                 onSingleTap: { toggleChrome() },
-                onDragChanged: { value, size in
-                    handlePlayerDrag(value, size: size, ended: false)
+                onAdjustment: { side, value, notice in
+                    hideTask?.cancel()
+                    adjustmentNotice = notice
+                    if let value {
+                        overlay = side == .brightness ? .brightness : .volume
+                        overlayValue = Double(value)
+                    } else { overlay = nil }
                 },
-                onDragEnded: { value, size in
-                    handlePlayerDrag(value, size: size, ended: true)
+                onSeekChanged: { dx in handleHorizontalDrag(dx) },
+                onEnded: { cancelled in
+                    if horizontalDrag && !cancelled {
+                        seek(to: seekValue)
+                        currentTime = seekValue
+                    }
+                    cancelPlayerDrag()
+                    if showChrome { scheduleHide() }
                 }
             )
             if !hasStarted {
                 ProgressView()
                     .tint(.white)
                     .scaleEffect(1.15)
+                    .allowsHitTesting(false)
             }
             if let overlay {
                 overlayHUD(overlay)
+                    .allowsHitTesting(false)
+            }
+            if let adjustmentNotice {
+                Text(adjustmentNotice)
+                    .foregroundStyle(.white)
+                    .padding(16)
+                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 14))
                     .allowsHitTesting(false)
             }
             if let skipHUD {
@@ -284,61 +311,27 @@ struct KSChromePlayer: View {
         .contentShape(Rectangle())
     }
 
-    private func handlePlayerDrag(_ value: PlayerDragValue, size: CGSize, ended: Bool) {
-        let width = size.width
-        let height = size.height
-        let dx = value.translation.width
-        let dy = value.translation.height
-        let travel = max(140, height * 0.42)
-        let scrubWidth = max(160, width * 0.55)
-        if ended {
-            if horizontalDrag {
-                seek(to: seekValue)
-                currentTime = seekValue
-                isSeeking = false
-            }
-            verticalDrag = false
-            horizontalDrag = false
-            overlay = nil
-            if showChrome { scheduleHide() }
-            return
+    private func cancelPlayerDrag() {
+        if horizontalDrag { isSeeking = false }
+        horizontalDrag = false
+        overlay = nil
+        adjustmentNotice = nil
+    }
+
+    private func handleHorizontalDrag(_ dx: CGFloat) {
+        guard !seekPending, duration.isFinite, duration > 0 else { return }
+        if !horizontalDrag {
+            horizontalDrag = true
+            isSeeking = true
+            scrubStart = currentTime
+            seekValue = currentTime
+            hideTask?.cancel()
         }
-        if !verticalDrag && !horizontalDrag && overlay == nil {
-            if abs(dx) > abs(dy) + 6 {
-                horizontalDrag = true
-                isSeeking = true
-                scrubStart = currentTime
-                seekValue = currentTime
-                overlay = .seek
-                hideTask?.cancel()
-            } else if abs(dy) > abs(dx) + 6 {
-                verticalDrag = true
-                hideTask?.cancel()
-                if value.start.x < width * 0.5 {
-                    overlay = .brightness
-                    dragStart = UIScreen.main.brightness
-                } else {
-                    overlay = .volume
-                    dragStart = Double(SystemVolume.current)
-                }
-                overlayValue = dragStart
-            } else {
-                return
-            }
-        }
-        if horizontalDrag {
-            let span = max(duration, 1)
-            let secondsPerPoint = duration > 3600 ? 0.55 : 0.35
-            let delta = Double(dx) * secondsPerPoint
-            let next = min(span, max(0, scrubStart + delta))
-            seekValue = next
-            overlayValue = next
-            return
-        }
-        guard verticalDrag, overlay == .brightness || overlay == .volume else { return }
-        let next = min(1, max(0, dragStart - dy / travel))
-        overlayValue = next
-        applyOverlay(next)
+        // Preserve AVDB's duration-dependent horizontal seek scale and bounded preview.
+        let secondsPerPoint = duration > 3600 ? 0.55 : 0.35
+        seekValue = min(duration, max(0, scrubStart + Double(dx) * secondsPerPoint))
+        overlayValue = seekValue
+        overlay = .seek
     }
 
     private func skip(by seconds: Double) {
@@ -374,17 +367,6 @@ struct KSChromePlayer: View {
             .background(.black.opacity(0.45), in: Circle())
             .padding(.horizontal, 28)
             if !hud.forward { Spacer() }
-        }
-    }
-
-    private func applyOverlay(_ value: Double) {
-        switch overlay {
-        case .brightness:
-            UIScreen.main.brightness = value
-        case .volume:
-            SystemVolume.set(Float(value))
-        case .seek, nil:
-            break
         }
     }
 
@@ -685,7 +667,15 @@ struct KSChromePlayer: View {
                 }
                 if state == .readyToPlay {
                     if let progressID, let saved = PlaybackProgressStore.progress(for: progressID), saved.time >= 5 {
-                        coordinator.playerLayer?.seek(time: saved.time, autoPlay: true) { _ in }
+                        seekGeneration += 1
+                        let token = seekGeneration
+                        seekPending = true
+                        coordinator.playerLayer?.seek(time: saved.time, autoPlay: true) { _ in
+                            Task { @MainActor in
+                                guard seekGeneration == token else { return }
+                                seekPending = false
+                            }
+                        }
                     }
                     coordinator.playerLayer?.play()
                     applyFillMode()
@@ -713,7 +703,7 @@ struct KSChromePlayer: View {
     }
 
     private func syncTime() {
-        guard !isSeeking, let layer = coordinator.playerLayer else { return }
+        guard !isSeeking, !seekPending, let layer = coordinator.playerLayer else { return }
         currentTime = layer.player.currentPlaybackTime
         let d = layer.player.duration
         if d.isFinite, d > 0 { duration = d }
@@ -723,7 +713,16 @@ struct KSChromePlayer: View {
     }
 
     private func seek(to time: TimeInterval) {
-        coordinator.playerLayer?.seek(time: time, autoPlay: coordinator.playerLayer?.options.isSeekedAutoPlay ?? false) { _ in }
+        guard let layer = coordinator.playerLayer, time.isFinite else { return }
+        seekGeneration += 1
+        let token = seekGeneration
+        seekPending = true
+        layer.seek(time: time, autoPlay: layer.options.isSeekedAutoPlay) { _ in
+            Task { @MainActor in
+                guard seekGeneration == token else { return }
+                seekPending = false
+            }
+        }
     }
 
     private func formatTime(_ t: TimeInterval) -> String {
@@ -803,81 +802,80 @@ enum OrientationLock {
     }
 }
 
-private struct HiddenVolumeView: UIViewRepresentable {
-    func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView(frame: .zero)
-        view.showsRouteButton = false
-        view.showsVolumeSlider = true
-        view.isUserInteractionEnabled = false
-        captureSlider(from: view)
-        // MPVolumeView 的 slider 有时要到下一轮布局才创建。
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            captureSlider(from: view)
-        }
-        return view
+/// Best-effort public UIKit adapter, not an Apple-guaranteed system-volume API.
+/// Keep the real MPVolumeView nonhidden, alpha 1, in this player's live scene.
+private final class PlayerVolumeView: MPVolumeView {
+    init() {
+        super.init(frame: CGRect(x: -120, y: 0, width: 100, height: 44))
+        showsRouteButton = false
+        showsVolumeSlider = true
+        isUserInteractionEnabled = false
+        accessibilityElementsHidden = true
     }
-
-    func updateUIView(_ uiView: MPVolumeView, context: Context) {
-        captureSlider(from: uiView)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        setNeedsLayout(); layoutIfNeeded()
     }
-
-    private func captureSlider(from view: UIView) {
-        if let slider = findSlider(in: view) { SystemVolume.slider = slider }
-    }
-
-    private func findSlider(in view: UIView) -> UISlider? {
+    private func slider(in view: UIView) -> UISlider? {
         if let slider = view as? UISlider { return slider }
-        return view.subviews.lazy.compactMap(findSlider(in:)).first
+        return view.subviews.lazy.compactMap { self.slider(in: $0) }.first
     }
-}
-
-enum SystemVolume {
-    static weak var slider: UISlider?
-
-    static var current: Float {
-        if let slider { return slider.value }
-        return AVAudioSession.sharedInstance().outputVolume
+    func submit(_ value: CGFloat) -> Bool {
+        guard window != nil, !isHidden, alpha == 1 else { return false }
+        setNeedsLayout(); layoutIfNeeded()
+        guard let slider = slider(in: self), slider.window === window, slider.isEnabled else { return false }
+        slider.setValue(Float(min(1, max(0, value))), animated: false)
+        slider.sendActions(for: .valueChanged)
+        return true // submitted request, not an independent hardware measurement
     }
-
-    static func set(_ value: Float) {
-        let value = max(0, min(1, value))
-        if let slider {
-            slider.setValue(value, animated: false)
-            slider.sendActions(for: .valueChanged)
-            return
-        }
-        // MPVolumeView 还没建好时，先保证手势 HUD 不丢；下一帧再补一次。
-        DispatchQueue.main.async {
-            slider?.setValue(value, animated: false)
-            slider?.sendActions(for: .valueChanged)
-        }
-    }
-}
-
-struct PlayerDragValue {
-    var start: CGPoint
-    var translation: CGSize
 }
 
 struct PlayerGestureLayer: UIViewRepresentable {
     final class GestureView: UIView {
+        fileprivate let volume = PlayerVolumeView()
+        var cancelPan: (() -> Void)?
+        private var previousBounds = CGRect.zero
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            addSubview(volume) // mounted before the first touch; same UIWindowScene as player
+            NotificationCenter.default.addObserver(self, selector: #selector(environmentChanged), name: UIDevice.orientationDidChangeNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(environmentChanged), name: UIApplication.willResignActiveNotification, object: nil)
+        }
+        @objc private func environmentChanged() { cancelPan?() }
+        deinit { NotificationCenter.default.removeObserver(self) }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            if previousBounds != .zero, previousBounds != bounds { cancelPan?() }
+            previousBounds = bounds
+        }
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if window == nil { cancelPan?() }
+        }
         override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             guard bounds.contains(point) else { return false }
-            if point.y < 72 || point.y > bounds.height - 108 { return false }
-            return true
+            return point.y >= 72 && point.y <= bounds.height - 108
         }
     }
+    var blocked: Bool
+    var sourceID: URL
     var onDoubleTap: (CGFloat, CGFloat) -> Void
     var onSingleTap: () -> Void
-    var onDragChanged: (PlayerDragValue, CGSize) -> Void
-    var onDragEnded: (PlayerDragValue, CGSize) -> Void
+    var onAdjustment: (AVDBAdjustmentPan.Side, CGFloat?, String?) -> Void
+    var onSeekChanged: (CGFloat) -> Void
+    var onEnded: (Bool) -> Void
 
     func makeUIView(context: Context) -> GestureView {
         let view = GestureView()
         view.backgroundColor = .clear
+        view.clipsToBounds = true
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
         pan.maximumNumberOfTouches = 1
         pan.delegate = context.coordinator
+        context.coordinator.recognizer = pan
+        view.cancelPan = { [weak coordinator = context.coordinator] in coordinator?.cancel() }
         let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         doubleTap.delegate = context.coordinator
@@ -889,55 +887,89 @@ struct PlayerGestureLayer: UIViewRepresentable {
         view.addGestureRecognizer(singleTap)
         return view
     }
-
     func updateUIView(_ uiView: GestureView, context: Context) {
-        context.coordinator.parent = self
+        let c = context.coordinator
+        if sourceID != c.parent.sourceID || (blocked && !c.parent.blocked) { c.cancel() }
+        c.parent = self
     }
-
+    static func dismantleUIView(_ uiView: GestureView, coordinator: Coordinator) {
+        coordinator.cancel()
+        uiView.cancelPan = nil
+    }
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: PlayerGestureLayer
+        weak var recognizer: UIPanGestureRecognizer?
+        var state = AVDBAdjustmentPan()
         var dragStart = CGPoint.zero
         init(parent: PlayerGestureLayer) { self.parent = parent }
-
+        func cancel() {
+            let active = state.active
+            state.end()
+            if active { parent.onEnded(true) }
+            if let recognizer, recognizer.state == .began || recognizer.state == .changed {
+                recognizer.isEnabled = false; recognizer.isEnabled = true
+            }
+        }
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            !parent.blocked && gestureRecognizer.view?.window != nil
+            // Do not test velocity/displacement here: UIKit does not retry a slow start.
+        }
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            guard let view = gestureRecognizer.view else { return true }
+            guard !parent.blocked, let view = gestureRecognizer.view else { return false }
+            var target = touch.view
+            while let node = target {
+                if node is UIControl { return false }
+                if node === view { break }
+                target = node.superview
+            }
             let point = touch.location(in: view)
-            let height = view.bounds.height
-            let width = view.bounds.width
-            if point.y < 72 || point.y > height - 108 { return false }
+            guard point.y >= 72, point.y <= view.bounds.height - 108 else { return false }
+            if gestureRecognizer === recognizer { dragStart = point } // original touchdown half
             return true
         }
-
         @objc func pan(_ gesture: UIPanGestureRecognizer) {
-            guard let view = gesture.view else { return }
+            guard let view = gesture.view as? GestureView else { return }
+            if gesture.state == .cancelled || gesture.state == .failed { cancel(); return }
             if gesture.state == .began {
-                dragStart = gesture.location(in: view)
+                guard !parent.blocked else { cancel(); return }
+                state.begin(origin: dragStart, size: view.bounds.size)
             }
-            let value = PlayerDragValue(
-                start: dragStart,
-                translation: gesture.translation(in: view).size
-            )
-            if gesture.state == .changed || gesture.state == .began {
-                parent.onDragChanged(value, view.bounds.size)
-            } else if gesture.state == .ended || gesture.state == .cancelled {
-                parent.onDragEnded(value, view.bounds.size)
+            guard state.active else { return }
+            guard !parent.blocked, state.size == view.bounds.size else { cancel(); return }
+            let point = gesture.translation(in: view)
+            if state.axis == nil {
+                let initial = state.side == .brightness ? (view.window?.screen.brightness ?? UIScreen.main.brightness) : CGFloat(AVAudioSession.sharedInstance().outputVolume)
+                _ = state.lock(translation: point, initial: initial)
+            }
+            if state.axis == .vertical {
+                // Horizontal seek remains available in portrait; adjustments are landscape-only.
+                guard view.bounds.width > view.bounds.height else { cancel(); return }
+                if let value = state.update(translation: point, size: view.bounds.size) {
+                    if state.side == .brightness {
+                        guard let screen = view.window?.screen else { cancel(); return }
+                        screen.brightness = value
+                        parent.onAdjustment(.brightness, value, nil)
+                    } else if view.volume.submit(value) {
+                        parent.onAdjustment(.volume, value, nil)
+                    } else {
+                        parent.onAdjustment(.volume, nil, "当前音频路由无法调节音量，请使用硬件音量键")
+                    }
+                }
+            } else if let dx = state.horizontal(translation: point, size: view.bounds.size) {
+                parent.onSeekChanged(dx)
+            }
+            if gesture.state == .ended {
+                state.end()
+                parent.onEnded(false)
             }
         }
-
         @objc func doubleTap(_ gesture: UITapGestureRecognizer) {
-            guard let view = gesture.view else { return }
+            guard !parent.blocked, let view = gesture.view else { return }
             let point = gesture.location(in: view)
             parent.onDoubleTap(point.x, view.bounds.width)
         }
-
-        @objc func singleTap(_ gesture: UITapGestureRecognizer) {
-            parent.onSingleTap()
-        }
+        @objc func singleTap(_ gesture: UITapGestureRecognizer) { parent.onSingleTap() }
     }
-}
-
-private extension CGPoint {
-    var size: CGSize { CGSize(width: x, height: y) }
 }
