@@ -515,7 +515,6 @@ struct MoviePosterGrid: View {
 
     @Environment(\.availableLayoutSize) private var layoutSize
     @State private var measuredWidth: CGFloat = 0
-    @State private var openMovieID: String?
 
     private var columnCount: Int {
         AdaptiveLayout.columnCount(width: measuredWidth > 0 ? measuredWidth : layoutSize.width, padding: AdaptiveLayout.gridPadding, spacing: 12)
@@ -532,8 +531,8 @@ struct MoviePosterGrid: View {
                 // frame across neighboring LazyVGrid cells. A visible cover tap
                 // then misses or opens the wrong movie. Keep one link outside
                 // the cell and clip every cell to its own card.
-                Button {
-                    openMovieID = movie.id
+                NavigationLink {
+                    posterDestination(movie.id)
                 } label: {
                     MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
                 }
@@ -557,47 +556,22 @@ struct MoviePosterGrid: View {
             }
         }
         .onPreferenceChange(PosterGridWidthKey.self) { measuredWidth = $0 }
-        .background {
-            // iOS 17 API. NavigationLink(value:) needs a path owned by HomeView
-            // and would rewrite every catalog page. Keep the link out of the
-            // grid cells, but do not hide it: a hidden link is not activated
-            // by isActive on iPad and the UI test cannot find Back.
-            NavigationLink(isActive: posterIsActive) {
-                posterDestination
-            } label: {
-                EmptyView()
-            }
-            .frame(width: 0, height: 0)
-            .accessibilityHidden(true)
-            .allowsHitTesting(false)
-        }
-    }
-
-    private var posterIsActive: Binding<Bool> {
-        Binding(
-            get: { openMovieID != nil },
-            set: { isActive in if !isActive { openMovieID = nil } }
-        )
     }
 
     @ViewBuilder
-    private var posterDestination: some View {
-        if let openMovieID {
-            #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
-                Text("Neutral detail \(openMovieID)")
-                    .accessibilityIdentifier("detail-\(openMovieID)")
-                    .navigationTitle("Neutral detail")
-                    .toolbar(.visible, for: .navigationBar)
-            } else {
-                MovieDetailView(movieID: openMovieID)
-            }
-            #else
-            MovieDetailView(movieID: openMovieID)
-            #endif
+    private func posterDestination(_ movieID: String) -> some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
+            Text("Neutral detail \(movieID)")
+                .accessibilityIdentifier("detail-\(movieID)")
+                .navigationTitle("Neutral detail")
+                .toolbar(.visible, for: .navigationBar)
         } else {
-            EmptyView()
+            MovieDetailView(movieID: movieID)
         }
+        #else
+        MovieDetailView(movieID: movieID)
+        #endif
     }
 }
 
