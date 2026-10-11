@@ -10,7 +10,9 @@ assert 'setActive(' not in a and 'setCategory(' not in a
 assert 'mixWithOthers' not in s
 assert 'options: .notifyOthersOnDeactivation' in s
 assert 'options: []' in s
-assert s.index('audio.begin()\n        return player.makeView') > 0
+assert s.index('audio.begin()\n        let view = player.makeView') > 0
+assert 'player?.playerLayer?.stop()\n                audio?.end()' in s
+assert 'command.removeTarget(nil)' in s and 'installStopCommand()' in s
 assert 'AudioOwnedKSVideoPlayer(' in p and 'AudioOwnedTrailerPlayer(' in d
 assert 'VideoPlayer(player: AVPlayer(url:' not in d
 assert 'player.observe(\\.timeControlStatus' in s

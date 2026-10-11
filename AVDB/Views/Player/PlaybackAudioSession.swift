@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import AVKit
+import MediaPlayer
 import SwiftUI
 import KSPlayer
 
@@ -100,12 +101,28 @@ struct AudioOwnedKSVideoPlayer: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(player: player, audio: audio, onStop: onStop) }
     func makeUIView(context: Context) -> UIView {
         audio.begin()
-        return player.makeView(url: url, options: options)
+        let view = player.makeView(url: url, options: options)
+        installStopCommand()
+        return view
+    }
+    private func installStopCommand() {
+        // KSPlayer's default stopCommand only calls player.shutdown(), leaving the layer/session
+        // owned. Replace ONLY that command; preserve play/pause/seek/rate and all other controls.
+        let command = MPRemoteCommandCenter.shared().stopCommand
+        command.removeTarget(nil)
+        command.addTarget { [weak player, weak audio] _ in
+            Task { @MainActor in
+                player?.playerLayer?.stop()
+                audio?.end()
+            }
+            return .success
+        }
     }
     func updateUIView(_ view: UIView, context: Context) {
         if player.playerLayer?.url != url {
             audio.begin()
             _ = player.makeView(url: url, options: options)
+            installStopCommand()
         }
     }
     static func dismantleUIView(_ view: UIView, coordinator: Coordinator) {
