@@ -11,6 +11,7 @@ on:
       - ".github/workflows/build-ipa.yml"
       - "scripts/test-*.py"
       - "scripts/GestureRegression.swift"
+      - "scripts/SeekPreviewRegression.swift"
 
 permissions:
   contents: read
@@ -42,6 +43,9 @@ jobs:
           python3 scripts/test-player-gestures.py
           python3 scripts/test-audio-session.py
           python3 scripts/test-enhancement-pixels.py
+
+      - name: Test scrub preview policy and real AVFoundation frames
+        run: python3 scripts/test-seek-preview.py
 
       - name: Test native 115 RSA protocol
         run: python3 scripts/test-115-native.py

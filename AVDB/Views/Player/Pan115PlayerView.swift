@@ -26,6 +26,7 @@ struct Pan115PlayerView: View {
                     subtitle: vm.qualityLabel,
                     headers: vm.headers,
                     progressID: movie.id,
+                    supportsFramePreview: vm.supportsFramePreview,
                     onPlaybackFailure: { Task { await vm.failed() } },
                     managesOrientation: false,
                     onSelectSource: { showQuality = true },
@@ -190,6 +191,8 @@ final class Pan115PlayerViewModel: ObservableObject {
     private var refreshUsed = false
     private var fallbackUsed = false
     private var generation = 0
+
+    var supportsFramePreview: Bool { activeStream?.isOriginal == true }
 
     var headers: [String: String] {
         activeStream?.headers.isEmpty == false ? activeStream!.headers : Pan115Client.playHeaders(cookie: Pan115Settings.shared.cookie)

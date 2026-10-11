@@ -133,6 +133,7 @@ struct KSChromePlayer: View {
     var subtitle: String = ""
     var headers: [String: String] = [:]
     var progressID: String? = nil
+    var supportsFramePreview: Bool = true
     var onPlaybackFailure: (() -> Void)? = nil
     // A source child must not restore portrait while its owning playback route remains alive.
     var managesOrientation: Bool = true
@@ -144,6 +145,7 @@ struct KSChromePlayer: View {
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
     @StateObject private var audio = PlaybackAudioLease()
     @StateObject private var lut = NativeLUTController()
+    @StateObject private var seekPreview = SeekPreviewController()
     @State private var showLUT = false
     @State private var playbackActive = false
     @State private var isPlaying = false
@@ -192,7 +194,7 @@ struct KSChromePlayer: View {
 
     var body: some View {
         GeometryReader { geo in
-            videoArea(height: geo.size.height, width: geo.size.width)
+            videoArea(height: geo.size.height, width: geo.size.width, safeArea: geo.safeAreaInsets)
                 .frame(width: geo.size.width, height: geo.size.height)
         }
         .background(Color.black)
@@ -212,6 +214,7 @@ struct KSChromePlayer: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
+            configureSeekPreview()
             guard !playbackActive else {
                 showChrome = true
                 startTicker()
@@ -228,8 +231,18 @@ struct KSChromePlayer: View {
             seekGeneration += 1
             seekPending = false
             cancelPlayerDrag()
+            configureSeekPreview()
+        }
+        .onChange(of: headers) { _, _ in
+            cancelPlayerDrag()
+            configureSeekPreview()
+        }
+        .onChange(of: supportsFramePreview) { _, _ in
+            cancelPlayerDrag()
+            configureSeekPreview()
         }
         .onDisappear {
+            seekPreview.close()
             // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
             // They must not tear down playback or force the whole app to portrait.
             guard !showLUT else { return }
@@ -240,7 +253,12 @@ struct KSChromePlayer: View {
         }
     }
 
+    private func configureSeekPreview() {
+        seekPreview.configure(url: url, headers: headers, supported: supportsFramePreview)
+    }
+
     private func stopPlayback() {
+        seekPreview.close()
         playbackActive = false
         seekGeneration += 1
         seekPending = false
@@ -252,13 +270,17 @@ struct KSChromePlayer: View {
     }
 
     @ViewBuilder
-    private func videoArea(height: CGFloat, width: CGFloat) -> some View {
+    private func videoArea(height: CGFloat, width: CGFloat, safeArea: EdgeInsets) -> some View {
         ZStack {
             Color.black
             AudioOwnedKSVideoPlayer(player: coordinator, audio: audio, url: url, options: playerOptions, onStop: stopPlayback)
                 .onAppear { applyFillMode() }
             if showChrome {
                 chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
+                    .padding(.top, safeArea.top)
+                    .padding(.leading, safeArea.leading)
+                    .padding(.trailing, safeArea.trailing)
+                    .padding(.bottom, safeArea.bottom)
             }
             // KSVideoPlayer renders only the underlying player view (no official pan).
             // This transparent sibling owns the only pan output; chrome stays above it.
@@ -314,7 +336,8 @@ struct KSChromePlayer: View {
     }
 
     private func cancelPlayerDrag() {
-        if horizontalDrag { isSeeking = false }
+        seekPreview.cancel()
+        isSeeking = false
         horizontalDrag = false
         overlay = nil
         adjustmentNotice = nil
@@ -333,6 +356,7 @@ struct KSChromePlayer: View {
         let secondsPerPoint = duration > 3600 ? 0.55 : 0.35
         seekValue = min(duration, max(0, scrubStart + Double(dx) * secondsPerPoint))
         overlayValue = seekValue
+        seekPreview.request(time: seekValue, duration: duration)
         overlay = .seek
     }
 
@@ -382,25 +406,35 @@ struct KSChromePlayer: View {
     }
 
     private var seekHUD: some View {
-        VStack(spacing: 8) {
-            Text(formatTime(seekValue))
-                .font(.title3.monospacedDigit().weight(.semibold))
-            Text(formatTime(duration))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
-            Capsule()
-                .fill(Color.white.opacity(0.25))
-                .frame(width: 160, height: 4)
-                .overlay(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white)
-                        .frame(width: 160 * min(1, seekValue / max(duration, 0.1)))
+        seekPreviewCard.frame(width: 192)
+    }
+
+    private var seekPreviewCard: some View {
+        VStack(spacing: 4) {
+            ZStack {
+                Color.black.opacity(0.8)
+                if let image = seekPreview.image {
+                    Image(decorative: image, scale: 1)
+                        .resizable().aspectRatio(contentMode: .fit)
+                } else {
+                    VStack(spacing: 5) {
+                        if seekPreview.loading { ProgressView().tint(.white) }
+                        Text(seekPreview.loading ? "正在提取画面…" : "此位置暂无预览")
+                            .font(.caption2)
+                    }
                 }
+            }
+            .aspectRatio(16 / 9, contentMode: .fit)
+            Text("\(formatTime(seekValue)) / \(formatTime(duration))")
+                .font(.caption.monospacedDigit().weight(.semibold))
+            Text("原始画面 · 不含 LUT")
+                .font(.system(size: 9)).foregroundStyle(.white.opacity(0.65))
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(6)
+        .background(.black.opacity(0.85), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityIdentifier("player.seek.preview")
+        .allowsHitTesting(false)
     }
 
     private func levelHUD(_ kind: OverlayKind) -> some View {
@@ -574,23 +608,43 @@ struct KSChromePlayer: View {
                 value: Binding(
                     get: { isSeeking ? seekValue : currentTime },
                     set: { newValue in
+                        guard !seekPending, duration.isFinite, duration > 0 else { return }
                         isSeeking = true
-                        seekValue = newValue
+                        seekValue = min(duration, max(0, newValue))
+                        seekPreview.request(time: seekValue, duration: duration)
                     }
                 ),
                 in: 0...max(duration, 0.1)
             ) { editing in
                 if editing {
+                    guard !seekPending, duration.isFinite, duration > 0 else { return }
                     hideTask?.cancel()
+                    if !isSeeking { seekValue = min(duration, max(0, currentTime)) }
                     isSeeking = true
-                } else {
+                    seekPreview.request(time: seekValue, duration: duration)
+                } else if isSeeking && !horizontalDrag {
                     seek(to: seekValue)
                     currentTime = seekValue
                     isSeeking = false
+                    seekPreview.cancel()
                     scheduleHide()
                 }
             }
             .frame(height: 34)
+            .overlay {
+                GeometryReader { geometry in
+                    if isSeeking && !horizontalDrag {
+                        let cardWidth = min(192.0, max(0, geometry.size.width - 16))
+                        let fraction = min(1, max(0, seekValue / max(duration, 0.1)))
+                        let half = cardWidth / 2 + 8
+                        seekPreviewCard
+                            .frame(width: cardWidth)
+                            .position(x: min(max(half, geometry.size.width * fraction), geometry.size.width - half), y: -82)
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+            .disabled(seekPending || duration <= 0)
             .contentShape(Rectangle())
             .tint(.white)
             .controlSize(.small)
