@@ -524,7 +524,7 @@ extension View {
         self
     }
 
-    /// 错落入场：轻微上浮 + 缩放淡入。
+    /// 页面入场：轻微淡入，不移动或缩放。
     func staggerAppear(index: Int = 0, enabled: Bool = true) -> some View {
         modifier(StaggerAppearModifier(index: index, enabled: enabled))
     }
@@ -593,9 +593,7 @@ private struct StaggerAppearModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .opacity(enabled ? (isVisible ? 1 : 0) : 1)
-            .offset(y: !enabled || isVisible || reduceMotion ? 0 : 12)
-            .scaleEffect(!enabled || isVisible || reduceMotion ? 1 : 0.985)
+            .opacity(enabled ? (isVisible ? 1 : 0.82) : 1)
             .onAppear {
                 guard enabled else { return }
                 guard !isVisible else { return }
@@ -603,7 +601,7 @@ private struct StaggerAppearModifier: ViewModifier {
                     isVisible = true
                 } else {
                     let delay = Double(min(max(index, 0), 10)) * 0.035
-                    withAnimation(GlassMotion.enter.delay(delay)) {
+                    withAnimation(.easeOut(duration: 0.16).delay(delay)) {
                         isVisible = true
                     }
                 }
