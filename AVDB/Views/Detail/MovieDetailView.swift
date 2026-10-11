@@ -1482,9 +1482,16 @@ final class ReviewsListViewModel: ObservableObject {
 struct TrailerPlayerView: View {
     let url: URL
     var onClose: (() -> Void)? = nil
+    @StateObject private var playback: TrailerPlayback
+
+    init(url: URL, onClose: (() -> Void)? = nil) {
+        self.url = url
+        self.onClose = onClose
+        _playback = StateObject(wrappedValue: TrailerPlayback(url: url))
+    }
 
     var body: some View {
-        VideoPlayer(player: AVPlayer(url: url))
+        AudioOwnedTrailerPlayer(playback: playback)
             .ignoresSafeArea()
             .overlay(alignment: .topLeading) {
                 Button {
@@ -1496,9 +1503,7 @@ struct TrailerPlayerView: View {
                         .padding()
                 }
             }
-            .onDisappear {
-                // 播放器随视图销毁自动释放
-            }
+            // Player/model destruction, not transient disappearance, stops and releases this preview.
     }
 }
 

@@ -21,13 +21,7 @@ struct AVDBApp: App {
     @UIApplicationDelegateAdaptor(AVDBAppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
 
-    init() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .moviePlayback, options: [])
-            try session.setActive(true)
-        } catch {}
-    }
+    // Audio is intentionally untouched at launch. Only a concrete player may own the session.
 
     var body: some Scene {
         WindowGroup {

@@ -142,6 +142,7 @@ struct KSChromePlayer: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
+    @StateObject private var audio = PlaybackAudioLease()
     @StateObject private var lut = NativeLUTController()
     @State private var showLUT = false
     @State private var playbackActive = false
@@ -218,9 +219,7 @@ struct KSChromePlayer: View {
             }
             playbackActive = true
             coordinator.isMaskShow = false
-            // 激活播放音频会话，确保右侧手势修改的是当前播放器音量。
-            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-            try? AVAudioSession.sharedInstance().setActive(true)
+            // Audio ownership starts in AudioOwnedKSVideoPlayer.makeUIView, before KSPlayer construction.
             wireCoordinator()
             startTicker()
             scheduleHide()
@@ -234,7 +233,10 @@ struct KSChromePlayer: View {
             // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
             // They must not tear down playback or force the whole app to portrait.
             guard !showLUT else { return }
-            stopPlayback()
+            // Visibility is not lifetime: background/PiP/covering presentations must keep playing.
+            cancelPlayerDrag()
+            hideTask?.cancel()
+            tickTask?.cancel()
         }
     }
 
@@ -253,7 +255,7 @@ struct KSChromePlayer: View {
     private func videoArea(height: CGFloat, width: CGFloat) -> some View {
         ZStack {
             Color.black
-            KSVideoPlayer(coordinator: coordinator, url: url, options: playerOptions)
+            AudioOwnedKSVideoPlayer(player: coordinator, audio: audio, url: url, options: playerOptions, onStop: stopPlayback)
                 .onAppear { applyFillMode() }
             if showChrome {
                 chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
@@ -502,6 +504,7 @@ struct KSChromePlayer: View {
                     if isPlaying {
                         coordinator.playerLayer?.pause()
                     } else {
+                        audio.begin()
                         coordinator.playerLayer?.play()
                     }
                 } label: {
@@ -654,8 +657,15 @@ struct KSChromePlayer: View {
 
     private func wireCoordinator() {
         coordinator.isMaskShow = false
-        coordinator.onStateChanged = { _, state in
+        coordinator.onStateChanged = { layer, state in
             Task { @MainActor in
+                // Ignore stale completion from a source that has already been replaced.
+                guard coordinator.playerLayer === layer else { return }
+                if state.isPlaying { audio.begin() } // Includes system remote/PiP resume after completion.
+                if state == .playedToTheEnd || state == .error {
+                    layer.pause()
+                    audio.end()
+                }
                 if state == .error, !failureReported {
                     failureReported = true
                     onPlaybackFailure?()
@@ -677,6 +687,7 @@ struct KSChromePlayer: View {
                             }
                         }
                     }
+                    audio.begin()
                     coordinator.playerLayer?.play()
                     applyFillMode()
                     syncTime()
@@ -717,6 +728,7 @@ struct KSChromePlayer: View {
         seekGeneration += 1
         let token = seekGeneration
         seekPending = true
+        if layer.options.isSeekedAutoPlay { audio.begin() }
         layer.seek(time: time, autoPlay: layer.options.isSeekedAutoPlay) { _ in
             Task { @MainActor in
                 guard seekGeneration == token else { return }

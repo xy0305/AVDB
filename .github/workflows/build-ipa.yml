@@ -40,6 +40,7 @@ jobs:
           python3 scripts/test-player-regressions.py
           python3 scripts/test-player-runtime.py
           python3 scripts/test-player-gestures.py
+          python3 scripts/test-audio-session.py
           python3 scripts/test-enhancement-pixels.py
 
       - name: Test native 115 RSA protocol
