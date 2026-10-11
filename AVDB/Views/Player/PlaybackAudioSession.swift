@@ -28,9 +28,12 @@ final class PlaybackAudioSession {
     static let shared = PlaybackAudioSession()
     private var ownership = PlaybackAudioOwnership()
     private var active = false
+    private var needsDeactivation = false
 
     func acquire(_ id: UUID) {
         ownership.acquire(id)
+        // KSPlayer/AVKit may activate too, even if our own attempt was refused.
+        needsDeactivation = true
         do {
             if !active {
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
@@ -51,10 +54,11 @@ final class PlaybackAudioSession {
 
     private func deactivateWhenIdle(token: Int, attempts: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [self] in
-            guard ownership.mayDeactivate(token), active else { return }
+            guard ownership.mayDeactivate(token), needsDeactivation else { return }
             do {
                 try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
                 active = false
+                needsDeactivation = false
             } catch {
                 NSLog("AVDB playback audio deactivation failed: %@", error.localizedDescription)
                 if attempts > 1 { deactivateWhenIdle(token: token, attempts: attempts - 1) }

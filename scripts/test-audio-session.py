@@ -23,6 +23,9 @@ assert 'playerViewControllerDidStopPictureInPicture' in s
 assert 'if state.isPlaying { audio.begin() }' in p
 assert 'if layer.options.isSeekedAutoPlay { audio.begin() }' in p
 assert 'state == .playedToTheEnd || state == .error' in p
+terminal = p.split('if state == .playedToTheEnd || state == .error {')[1].split('if state == .error,')[0]
+assert 'guard layer.state == state' in terminal and 'layer.player.pause()' in terminal
+assert '\n                    layer.pause()' not in terminal # Preserve terminal state for replay/retry.
 visibility = p.split('.onDisappear {')[1].split('private func stopPlayback')[0]
 assert 'stopPlayback()' not in visibility and '.pause()' not in visibility
 assert 'audio.end()' not in visibility

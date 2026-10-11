@@ -663,7 +663,10 @@ struct KSChromePlayer: View {
                 guard coordinator.playerLayer === layer else { return }
                 if state.isPlaying { audio.begin() } // Includes system remote/PiP resume after completion.
                 if state == .playedToTheEnd || state == .error {
-                    layer.pause()
+                    guard layer.state == state else { return } // A newer source/retry already superseded this terminal event.
+                    // Stop output without overwriting KSPlayerLayer's terminal state: play() must
+                    // still see playedToTheEnd (seek to zero) / error (prepare retry).
+                    layer.player.pause()
                     audio.end()
                 }
                 if state == .error, !failureReported {
