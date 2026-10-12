@@ -68,7 +68,7 @@ enum JRPolicy {
     // FC2-PPV is not interchangeable with FC2; no prefix/substring matching.
     static func catalogueCode(_ input: String) -> String? {
         let value = input.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).uppercased()
-        return JRHTML.matches(#"^(FC2[-_ ]PPV[-_ ][0-9]+|[A-Z]{2,12}[-_][0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
+        return JRHTML.matches(#"^(FC2[-_ ]PPV[-_ ][0-9]+|[A-Z]{2,12}[-_]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
     }
     static func exactCode(_ input: String) -> String? {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)

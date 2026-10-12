@@ -69,7 +69,12 @@ struct Movie: Hashable { let id: String; let number: String? }
   calls[keyword,default:0] += 1; active += 1; maximum=max(active,maximum)
   defer { active -= 1 }
   try await Task.sleep(nanoseconds:40_000_000)
+  precondition(type == "code" && limit == 20)
   if keyword == "MISS-001" { return [] }
+  if keyword == "EMPTY-001" { return [Movie(id:"",number:keyword)] }
+  if keyword == "WRONG-001" { return [Movie(id:"wrong",number:"OTHER-001")] }
+  if keyword == "FAIL-001" { throw JRError.message("mock lookup unavailable") }
+  if keyword == "FC2-PPV-12345" { return [Movie(id:"fc2",number:"FC2PPV12345")] }
   if keyword == "AMB-001" { return [Movie(id:"a",number:keyword),Movie(id:"b",number:keyword)] }
   if keyword == "IPX-811" { return [Movie(id:"bad",number:"IPX-8110"),Movie(id:"right",number:"IPX811")] }
   return [Movie(id:keyword,number:keyword)]
@@ -136,6 +141,15 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
   }
   precondition(JavDBSDK.shared.maximum <= 3)
   precondition(JavDBSDK.shared.calls.count == 15)
+  let empty=try await source.matchedMovie(code:"EMPTY-001")
+  let wrong=try await source.matchedMovie(code:"WRONG-001")
+  let fc2=try await source.matchedMovie(code:"FC2-PPV-12345")
+  precondition(empty == nil && wrong == nil && fc2?.id == "fc2")
+  do { _=try await source.matchedMovie(code:"FAIL-001"); preconditionFailure("error hidden") } catch {}
+  _=try await source.matchedMovie(code:"IPX-811",refresh:true)
+  precondition(JavDBSDK.shared.calls["IPX-811"] == 2)
+  precondition(JRPolicy.catalogueCode("IPX247 title") == "IPX247")
+  precondition(JRPolicy.catalogueCode("unrelated IPX-247 title") == nil)
   let old=Task { try await source.page("/zh-hans/help/") }
   try await Task.sleep(nanoseconds:1_000_000)
   try source.configure("https://example.org",defaults:defaults)

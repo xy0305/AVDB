@@ -102,20 +102,16 @@ private struct JRMeasuredGrid: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
             ForEach(videos) { video in
                 VStack(alignment: .leading, spacing: 4) {
-                    if let movie = mapped[video.path] {
-                        NavigationLink { MovieDetailView(movieID: movie.id) } label: { MoviePosterCard(movie: movie) }.buttonStyle(.plain)
-                    } else {
-                        NavigationLink { JRPageView(path: video.path) } label: {
-                            MoviePosterCard(movie: Movie(id: video.id, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
-                        }.buttonStyle(.plain)
-                    }
+                    NavigationLink { JRMovieRoute(video: video) } label: {
+                        MoviePosterCard(movie: mapped[video.path] ?? Movie(id: video.id, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
+                    }.buttonStyle(.plain)
                     if let rank = video.rank { Text("来源排名 #\(rank)").font(.caption).foregroundStyle(.secondary) }
                     if mapped[video.path] != nil {
                         Text(video.title).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                        NavigationLink("来源资料") { JRPageView(path: video.path) }.font(.caption2)
+                        NavigationLink("来源资料") { JRPageView(path: video.path, sourceOnly: true) }.font(.caption2)
                     }
                     if !video.code.isEmpty {
-                        Text(mapped[video.path] != nil ? "完整番号已核验 · JavDB" : completed.contains(video.path) ? "未获唯一匹配 · 可查看来源" : "来源资料 · 正在核验番号")
+                        Text(mapped[video.path] != nil ? "完整番号已核验 · JavDB" : completed.contains(video.path) ? "点击重试核验 · 来源资料仅辅助" : "点击核验并打开原生详情")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                 }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).contentShape(Rectangle()).clipped()
@@ -146,7 +142,7 @@ private struct JRMeasuredGrid: View {
                 }
             }
         }
-        .onDisappear { source.cancelMappings() }
+
     }
 }
 
@@ -289,16 +285,22 @@ struct JRIndexView: View {
 
 struct JRPageView: View {
     let path: String
+    var sourceOnly = false
     @ObservedObject private var source = JavRankingSource.shared
     @State private var page: JRPage?
     @State private var isPreview = false
     @State private var error = ""
     @State private var loading = false
     @State private var limit = 12
-    @State private var verified: Movie?
-    @State private var verification = ""
-    @State private var checking = false
     var body: some View {
+        Group {
+            if let detail = page?.detail, !sourceOnly {
+                JRMovieRoute(video: detail)
+            } else { sourceContent }
+        }
+        .task(id: source.generation) { await load() }
+    }
+    private var sourceContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if path.hasPrefix("/zh-hans/explore/") {
@@ -313,11 +315,7 @@ struct JRPageView: View {
                             Text(detail.code).font(.headline).foregroundStyle(.tint)
                             Text(detail.title).font(.title3.bold()).textSelection(.enabled)
                             ForEach(Array(page.metadata.enumerated()), id: \.offset) { _, text in Text(text).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled) }
-                            if !detail.code.isEmpty {
-                                Button(checking ? "核验番号中…" : "按番号查找 JavDB / 115 播放入口") { Task { await verify(detail.code) } }.disabled(checking)
-                                if !verification.isEmpty { Text(verification).font(.caption).foregroundStyle(.secondary) }
-                                if let verified { NavigationLink("打开已核验的 JavDB 详情") { MovieDetailView(movieID: verified.id) } }
-                            }
+                            NavigationLink("核验并打开原生详情") { JRMovieRoute(video: detail) }
                             if let url = URL(string: path, relativeTo: source.base)?.absoluteURL { Link("在外部浏览器查看来源页", destination: url).font(.footnote) }
                         }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
                     }
@@ -352,7 +350,6 @@ struct JRPageView: View {
         .onReceive(source.$previews) { previews in
             if page == nil, let preview = previews[path] { page = preview; isPreview = true }
         }
-        .task(id: source.generation) { await load() }
         .refreshable { await load(refresh: true) }
         .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
     }
@@ -368,22 +365,60 @@ struct JRPageView: View {
     }
     private func load(refresh: Bool = false) async {
         let epoch = source.generation
-        page = source.cachedPage(path); isPreview = false; verified = nil; verification = ""; checking = false; limit = 12; error = ""; loading = true
+        page = source.cachedPage(path); isPreview = false; limit = 12; error = ""; loading = true
         do {
             let result = try await source.page(path, refresh: refresh)
             guard epoch == source.generation, !Task.isCancelled else { return }; page = result; isPreview = false
         } catch { if epoch == source.generation && !Task.isCancelled { self.error = error.localizedDescription } }
         if epoch == source.generation { loading = false }
     }
-    private func verify(_ code: String) async {
-        let epoch = source.generation
-        checking = true; verified = nil; verification = ""
-        do {
-            let match = try await source.matchedMovie(code: code)
-            guard epoch == source.generation, !Task.isCancelled else { return }
-            if let match { verified = match; verification = "已按完整番号核验；后续播放由原有 JavDB / 115 流程处理。" }
-            else { verification = "没有唯一且完整番号一致的 JavDB 结果；保留来源原生详情，不猜测 ID。" }
-        } catch { if epoch == source.generation { verification = "JavDB 核验暂不可用：" + error.localizedDescription } }
-        if epoch == source.generation { checking = false }
+
+}
+
+// One gateway for every source movie entry. Only a verified JavDB identity may
+// instantiate the application's existing detail (including its 115 actions).
+struct JRMovieRoute: View {
+    let video: JRVideo
+    @ObservedObject private var source = JavRankingSource.shared
+    @State private var movie: Movie?
+    @State private var message = ""
+    @State private var loading = true
+    @State private var attempt = 0
+    private var code: String { JRPolicy.exactCode(video.code) != nil ? video.code : (JRPolicy.catalogueCode(video.title) ?? "") }
+    var body: some View {
+        Group {
+            if let movie {
+                MovieDetailView(movieID: movie.id)
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink { JRPageView(path: video.path, sourceOnly: true) } label: { Image(systemName: "info.circle") }
+                            .accessibilityLabel("榜单来源资料（辅助）")
+                    } }
+            } else {
+                VStack(spacing: 16) {
+                    Text(code.isEmpty ? "来源未提供可核验的完整番号" : code).font(.headline)
+                    if loading { ProgressView("正在核验 JavDB 完整番号…") }
+                    else {
+                        Text(message).font(.callout).multilineTextAlignment(.center)
+                        Button("重试核验") { attempt += 1 }
+                    }
+                    NavigationLink("来源资料（辅助，只读）") { JRPageView(path: video.path, sourceOnly: true) }
+                }.padding().navigationTitle("影片核验")
+            }
+        }
+        .task(id: "\(source.generation):\(attempt):\(video.path)") {
+            let epoch = source.generation, request = attempt
+            loading = true; movie = nil; message = ""
+            defer { if epoch == source.generation, request == attempt { loading = false } }
+            guard !code.isEmpty else { message = "不能从标题猜测影片；请查看来源资料。"; return }
+            do {
+                let match = try await source.matchedMovie(code: code, refresh: attempt > 0)
+                guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
+                movie = match
+                if match == nil { message = "番号 \(code) 未获得唯一、有效 ID 的精确匹配；不会自动打开来源详情。请重试或查看辅助来源资料。" }
+            } catch {
+                guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
+                message = "番号 \(code) 核验失败：" + error.localizedDescription
+            }
+        }
     }
 }

@@ -71,19 +71,23 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     func cancelMappings() {
         matchFlights.values.forEach { $0.cancel() }; matchFlights.removeAll(); matchTokens.removeAll()
     }
-    func matchedMovie(code: String) async throws -> Movie? {
+    func matchedMovie(code: String, refresh: Bool = false) async throws -> Movie? {
         guard let key = JRPolicy.exactCode(code) else { return nil }
-        if let cached = matches[key], Date().timeIntervalSince(cached.date) < (cached.movie == nil ? 60 : 21600) { return cached.movie }
+        if !refresh, let cached = matches[key], Date().timeIntervalSince(cached.date) < (cached.movie == nil ? 60 : 21600) { return cached.movie }
         if let flight = matchFlights[key] { return try await flight.value }
         let epoch = generation, token = UUID()
         let flight = Task<Movie?, Error> {
-            while self.activeMatches >= 3 { try await Task.sleep(nanoseconds: 50_000_000) }
+            let deadline = Date().addingTimeInterval(65)
+            while self.activeMatches >= 3 {
+                guard Date() < deadline else { throw JRError.message("核验队列繁忙，请重试") }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
             try Task.checkCancellation()
             self.activeMatches += 1
             defer { self.activeMatches -= 1 }
             let results = try await JavDBSDK.shared.search(keyword: code, type: "code", limit: 20)
             try Task.checkCancellation(); guard epoch == self.generation else { throw CancellationError() }
-            let exact = results.filter { JRPolicy.exactCode($0.number ?? "") == key }
+            let exact = results.filter { !$0.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && JRPolicy.exactCode($0.number ?? "") == key }
             let unique = Dictionary(exact.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             let movie = unique.count == 1 ? unique.values.first : nil
             if self.matches.count >= 256, let oldest = self.matches.min(by: { $0.value.date < $1.value.date })?.key { self.matches[oldest] = nil }
