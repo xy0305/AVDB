@@ -70,10 +70,12 @@ final class APIClient { static let shared = APIClient(); var token: String? }
   assert(race.currentUser?.id == 8) // B cache only; late result cannot validate C.
   assert(race.sessionStatus == .cached)
   beforeReturn = nil
+  client.token = "synthetic-B"
   let unauthorized = AppState(defaults: store, fetchProfile: { throw JavDBError.httpError(401,"mock") }, pause: {_ in}, observeNetwork: false)
   await unauthorized.restoreTask?.value
   assert(unauthorized.sessionStatus == .needsReauth && unauthorized.currentUser == nil)
-  assert(client.token == "synthetic-C")
+  assert(client.token == "synthetic-B")
+  assert(store.dictionaryRepresentation().filter { $0.key.hasPrefix("avdb.profile.") }.count == 1, "401 removes only rejected account snapshot")
   unauthorized.resumeValidation(); assert(unauthorized.restoreTask == nil)
   client.token = "synthetic-B"
   let loggedOut = make(); loggedOut.logout(); await Task.yield()
