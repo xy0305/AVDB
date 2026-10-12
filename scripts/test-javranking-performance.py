@@ -38,7 +38,7 @@ import Foundation
     baseline=subprocess.check_output(['git','show','c2eaf4b:AVDB/Services/JavRankingCore.swift'],cwd=root,text=True)
     args=[str(fixtures/'index.html'),str(fixtures/'videos-detail.html'),str(fixtures/'rankings.html'),str(d/'javlibrary-top250.html'),str(d/'most-awarded-videos.html')]
     for label,core in [('before',baseline),('after',current)]:
-        p=d/(label+'.swift');p.write_text(core+'\n'+bench)
+        p=d/(label+'.swift');p.write_text(core+'\n'+bench.replace('    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)', '' if label == 'before' else '    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)'))
         subprocess.run(['swiftc','-O','-swift-version','5','-parse-as-library',str(p),'-o',str(d/label)],check=True)
         print('CONTROLLED PRODUCTION PARSER',label,flush=True)
         subprocess.run([str(d/label)]+args,check=True,timeout=180)
