@@ -58,6 +58,14 @@ struct RankingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, AdaptiveLayout.horizontalPadding)
                 .padding(.vertical, 8)
+            HStack {
+                Text("当前来源 · JavDB").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                NavigationLink { JavRankingView(rankingsOnly: true) } label: {
+                    Label("JAV Ranking 榜单", systemImage: "list.number")
+                        .font(.subheadline)
+                }
+            }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
             UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                 .padding(.top, 4)
 

@@ -64,6 +64,18 @@ enum JRPolicy {
         guard sameHost(u, base: base) || allowed else { return nil }
         return u.absoluteString
     }
+    // Only complete ASCII catalogue tokens are eligible for cross-source lookup.
+    // FC2-PPV is not interchangeable with FC2; no prefix/substring matching.
+    static func catalogueCode(_ input: String) -> String? {
+        let value = input.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).uppercased()
+        return JRHTML.matches(#"^(FC2[-_ ]PPV[-_ ][0-9]+|[A-Z]{2,12}[-_][0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
+    }
+    static func exactCode(_ input: String) -> String? {
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let folded = value.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).uppercased()
+        guard !JRHTML.matches(#"^(?:FC2[-_ ]?PPV[-_ ]?[0-9]+|[A-Z]{2,12}[-_ ]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})$"#, folded).isEmpty else { return nil }
+        return normalizedCode(folded)
+    }
     static func normalizedCode(_ code: String) -> String {
         code.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
             .uppercased().filter { $0.isLetter || $0.isNumber }
@@ -86,6 +98,7 @@ struct JRVideo: Identifiable, Hashable {
     var date: String = ""
     var score: Double = 0
     var categories: [Int] = []
+    var rank: Int? = nil
     var id: String { "javranking:" + path }
 }
 struct JRPage {
@@ -152,35 +165,73 @@ final class JRNode {
     let tag: String; let attrs: [String: String]
     var children: [JRNode] = []; var raw = ""
     init(_ tag: String, _ attrs: [String: String] = [:]) { self.tag = tag; self.attrs = attrs }
-    var text: String { JRHTML.text(raw + children.map(\.text).joined(separator: " ")) }
+    private var cachedText: String?
+    var text: String {
+        if let cachedText { return cachedText }
+        let value = JRHTML.text(raw + children.map(\.text).joined(separator: " "))
+        cachedText = value
+        return value
+    }
     func all(_ predicate: (JRNode) -> Bool) -> [JRNode] {
-        var found: [JRNode] = []; for n in children { if predicate(n) { found.append(n) }; found += n.all(predicate) }; return found
+        var found: [JRNode] = []
+        var pending = Array(children.reversed())
+        while let node = pending.popLast() {
+            if predicate(node) { found.append(node) }
+            pending.append(contentsOf: node.children.reversed())
+        }
+        return found
     }
     func has(_ name: String) -> Bool { attrs[name] != nil }
     func cls(_ value: String) -> Bool { (attrs["class"] ?? "").split(separator: " ").contains(Substring(value)) }
 }
 enum JRHTML {
+    private static let expressions = NSCache<NSString, NSRegularExpression>()
     static func matches(_ pattern: String, _ s: String) -> [[String]] {
-        guard let re = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return [] }
+        let key = pattern as NSString
+        let re: NSRegularExpression
+        if let cached = expressions.object(forKey: key) { re = cached }
+        else {
+            guard let compiled = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return [] }
+            expressions.countLimit = 32
+            expressions.setObject(compiled, forKey: key)
+            re = compiled
+        }
         let ns = s as NSString
         return re.matches(in: s, range: NSRange(location: 0, length: ns.length)).map { m in
             (0..<m.numberOfRanges).map { m.range(at: $0).location == NSNotFound ? "" : ns.substring(with: m.range(at: $0)) }
         }
     }
-    static func text(_ s: String) -> String {
-        var s = s
-        for (a,b) in [("&amp;","&"),("&quot;","\""),("&#39;","'"),("&apos;","'"),("&lt;","<"),("&gt;",">"),("&nbsp;"," ")] { s = s.replacingOccurrences(of: a, with: b) }
-        for m in matches(#"&#(x[0-9a-f]+|[0-9]+);"#, s) {
-            let hex = m[1].lowercased().hasPrefix("x")
-            if let n = UInt32(hex ? String(m[1].dropFirst()) : m[1], radix: hex ? 16 : 10), let scalar = UnicodeScalar(n) { s = s.replacingOccurrences(of: m[0], with: String(scalar)) }
+    private static let whitespace = try! NSRegularExpression(pattern: #"\s+"#)
+    private static let numericEntity = try! NSRegularExpression(pattern: #"&#(x[0-9a-f]+|[0-9]+);"#, options: .caseInsensitive)
+    static func text(_ input: String) -> String {
+        var s = input
+        if s.contains("&") {
+            for (a,b) in [("&amp;","&"),("&quot;","\""),("&#39;","'"),("&apos;","'"),("&lt;","<"),("&gt;",">"),("&nbsp;"," ")] { s = s.replacingOccurrences(of: a, with: b) }
+            let ns = s as NSString
+            let output = NSMutableString(string: s)
+            // Reverse range replacement is bounded, unlike rescanning the whole
+            // string for every numeric entity (including duplicate entities).
+            for m in numericEntity.matches(in: s, range: NSRange(location: 0, length: ns.length)).reversed() {
+                let value = ns.substring(with: m.range(at: 1))
+                let hex = value.lowercased().hasPrefix("x")
+                if let n = UInt32(hex ? String(value.dropFirst()) : value, radix: hex ? 16 : 10), let scalar = UnicodeScalar(n) {
+                    output.replaceCharacters(in: m.range, with: String(scalar))
+                }
+            }
+            s = output as String
         }
-        return s.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+        return whitespace.stringByReplacingMatches(in: s, range: NSRange(location: 0, length: (s as NSString).length), withTemplate: " ").trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    static func tree(_ html: String) -> JRNode {
-        let inert = html.replacingOccurrences(of: #"<(script|style|template)\b[^>]*>.*?</\1\s*>|<!--.*?-->"#, with: "", options: [.regularExpression, .caseInsensitive])
+    private static let inertBlocks = try! NSRegularExpression(pattern: #"<(script|style|template)\b[^>]*>.*?</\1\s*>|<!--.*?-->"#, options: [.caseInsensitive, .dotMatchesLineSeparators])
+    static func tree(_ html: String) throws -> JRNode {
+        let inert = inertBlocks.stringByReplacingMatches(in: html, range: NSRange(location: 0, length: (html as NSString).length), withTemplate: "")
         let root = JRNode("root"); var stack = [root]
         let void: Set<String> = ["img","input","meta","link","br","hr","source","wbr","area","embed"]
+        var tokenCount = 0
         for token in tokens(inert) {
+            tokenCount += 1
+            if tokenCount % 1024 == 0 { try Task.checkCancellation() }
+            guard tokenCount <= 500_000, stack.count <= 128 else { throw JRError.message("页面结构超出安全解析限制，请在来源浏览器查看完整内容") }
             let t = token
             if t.hasPrefix("</") {
                 let name = t.dropFirst(2).prefix { $0.isLetter || $0.isNumber }.lowercased()
@@ -225,7 +276,8 @@ enum JRHTML {
         return result
     }
     static func parse(_ html: String, path: String, base: URL) throws -> JRPage {
-        let root = tree(html); var page = JRPage()
+        guard html.utf8.count <= 12 * 1024 * 1024 else { throw JRError.message("公开页面超出安全大小限制") }
+        let root = try tree(html); var page = JRPage()
         guard let main = root.all({ $0.tag == "main" }).first else { throw JRError.message("站点未返回公开内容，可能受到访问限制。请稍后重试。") }
         page.title = main.all { $0.tag == "h1" }.first?.text ?? "JAV Ranking"
         var seen = Set<String>()
@@ -257,9 +309,22 @@ enum JRHTML {
                 page.metadata = [j["datePublished"] as? String, j["duration"] as? String].compactMap { $0 }
                 if let actors = j["actor"] as? [[String:Any]] { page.metadata.append(actors.compactMap { $0["name"] as? String }.joined(separator: " · ")) }
             }
-            if j["@type"] as? String == "ItemList", let entries = j["itemListElement"] as? [[String:Any]], !path.contains("most-awarded-videos") {
+            if j["@type"] as? String == "ItemList", let entries = j["itemListElement"] as? [[String:Any]] {
+                var ranked: [JRVideo] = []
+                var rankedPaths = Set<String>()
+                for entry in entries {
+                    guard let href = entry["url"] as? String,
+                          let route = JRPolicy.route(href, relativeTo: path, base: base), route.contains("/videos/"),
+                          let title = entry["name"] as? String, rankedPaths.insert(route).inserted else { continue }
+                    let card = page.videos.first { $0.path == route }
+                    ranked.append(JRVideo(path: route, code: JRPolicy.catalogueCode(title) ?? card?.code ?? "", title: title,
+                                          image: card?.image, subtitle: card?.subtitle ?? "", rank: entry["position"] as? Int))
+                }
+                if !ranked.isEmpty {
+                    page.videos = ranked + page.videos.filter { !rankedPaths.contains($0.path) }
+                }
                 let links = entries.compactMap { r -> JRLink? in
-                    guard let u = r["url"] as? String, let p = JRPolicy.route(u, relativeTo: path, base: base), let title = r["name"] as? String else { return nil }; return JRLink(path: p, title: title)
+                    guard let u = r["url"] as? String, let p = JRPolicy.route(u, relativeTo: path, base: base), !p.contains("/videos/"), let title = r["name"] as? String else { return nil }; return JRLink(path: p, title: title)
                 }
                 if !links.isEmpty { page.links = links + page.links.filter { a in !links.contains(where: { $0.path == a.path }) } }
             }

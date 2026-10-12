@@ -14,7 +14,7 @@ fixtures = root / "scripts/javranking-fixtures"
 
 assert "WKWebView" not in core + source + view
 assert "javranking:" in core
-assert "JavDBSDK.shared.search" in view and "MovieDetailView(movieID: verified.id)" in view
+assert "JavDBSDK.shared.search" in source and "MovieDetailView(movieID: verified.id)" in view
 assert "Pan115" not in view and "offline" not in view.lower()
 assert "JavRankingView()" in user
 assert "invalidateAndCancel" in source and "pages.removeAll()" in source and "generation +=" in source

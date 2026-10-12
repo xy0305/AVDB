@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct JavRankingView: View {
+    var rankingsOnly = false
     @ObservedObject private var source = JavRankingSource.shared
     @AppStorage("javranking.adultConfirmed") private var adultConfirmed = false
     private let entries: [(String, String, String)] = [
@@ -13,7 +14,9 @@ struct JavRankingView: View {
         ("隐私政策", "/zh-hans/privacy/", "hand.raised"), ("使用条款", "/zh-hans/terms/", "doc.text"), ("商业合作说明", "/zh-hans/sponsor/", "info.circle")]
     var body: some View {
         Group {
-            if adultConfirmed {
+            if adultConfirmed && rankingsOnly {
+                JRPageView(path: "/zh-hans/rankings/").id(source.generation)
+            } else if adultConfirmed {
                 List {
                     Section { Text("独立公开元数据来源 · 不替换原 JavDB 标签页。账号、网站清单、插件安装及第三方播放不在此执行。") .font(.footnote).foregroundStyle(.secondary) }
                     Section("浏览") {
@@ -39,7 +42,7 @@ struct JavRankingView: View {
     }
     @ViewBuilder private func destination(_ path: String) -> some View {
         switch path {
-        case "explore": JRIndexView(mode: .explore)
+        case "explore": JRPageView(path: "/zh-hans/explore/")
         case "search": JRIndexView(mode: .search)
         case "pick": JRIndexView(mode: .pick)
         default: JRPageView(path: path)
@@ -92,16 +95,53 @@ private struct JRWidthKey: PreferenceKey {
 private struct JRMeasuredGrid: View {
     let videos: [JRVideo]
     @State private var width: CGFloat = 390
+    @ObservedObject private var source = JavRankingSource.shared
+    @State private var mapped: [String: Movie] = [:]
+    @State private var completed = Set<String>()
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
             ForEach(videos) { video in
-                NavigationLink { JRPageView(path: video.path) } label: {
-                    MoviePosterCard(movie: Movie(id: video.id, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
-                }.buttonStyle(.plain).frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).contentShape(Rectangle()).clipped()
+                VStack(alignment: .leading, spacing: 4) {
+                    if let movie = mapped[video.path] {
+                        NavigationLink { MovieDetailView(movieID: movie.id) } label: { MoviePosterCard(movie: movie) }.buttonStyle(.plain)
+                    } else {
+                        NavigationLink { JRPageView(path: video.path) } label: {
+                            MoviePosterCard(movie: Movie(id: video.id, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
+                        }.buttonStyle(.plain)
+                    }
+                    if let rank = video.rank { Text("来源排名 #\(rank)").font(.caption).foregroundStyle(.secondary) }
+                    if !video.code.isEmpty {
+                        Text(mapped[video.path] != nil ? "完整番号已核验 · JavDB" : completed.contains(video.path) ? "未获唯一匹配 · 可查看来源" : "来源资料 · 正在核验番号")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).contentShape(Rectangle()).clipped()
             }
         }.padding(.horizontal, AdaptiveLayout.gridPadding)
         .background { GeometryReader { g in Color.clear.preference(key: JRWidthKey.self, value: g.size.width) } }
         .onPreferenceChange(JRWidthKey.self) { if $0 > 0 { width = $0 } }
+        .task(id: "\(source.generation):" + videos.map(\.path).joined(separator: ",")) {
+            let epoch = source.generation
+            // Only the explicitly displayed page, three lookups at a time.
+            // Source placeholders are already rendered; publish each match alone.
+            await withTaskGroup(of: (String, Movie?).self) { group in
+                var iterator = videos.filter { !$0.code.isEmpty && mapped[$0.path] == nil }.makeIterator()
+                func add(_ video: JRVideo) {
+                    group.addTask {
+                        guard !Task.isCancelled else { return (video.path, nil) }
+                        let movie = try? await source.matchedMovie(code: video.code)
+                        return (video.path, movie)
+                    }
+                }
+                for _ in 0..<3 { if let video = iterator.next() { add(video) } }
+                while let (path, movie) = await group.next() {
+                    guard !Task.isCancelled, epoch == source.generation else { group.cancelAll(); break }
+                    if let movie { mapped[path] = movie }
+                    completed.insert(path)
+                    if let video = iterator.next() { add(video) }
+                }
+            }
+        }
+        .onDisappear { source.cancelMappings() }
     }
 }
 
@@ -114,25 +154,32 @@ struct JRIndexView: View {
     @State private var selected = Set<Int>()
     @State private var sort = "score"
     @State private var year = "全部年份"
-    @State private var limit = 30
+    @State private var limit = 12
     @State private var loading = false
     @State private var error = ""
     @State private var picked: JRVideo?
     private var title: String { mode == .search ? "来源搜索" : mode == .pick ? "今天冲哪个？" : "片库与题材" }
-    private var filtered: [JRVideo] {
-        let q = JRPolicy.normalizedCode(query)
-        return (index?.videos ?? []).filter { v in
-            (q.isEmpty || JRPolicy.normalizedCode(v.code + v.title + v.subtitle).contains(q)) && selected.isSubset(of: Set(v.categories)) && (year == "全部年份" || v.date.hasPrefix(year))
-        }.sorted { a,b in
-            if sort == "newest", a.date != b.date { return a.date > b.date }
-            if sort == "oldest", a.date != b.date { return (a.date.isEmpty ? "9999" : a.date) < (b.date.isEmpty ? "9999" : b.date) }
-            if a.score != b.score { return a.score > b.score }; return a.path < b.path
+    @State private var filtered: [JRVideo] = []
+    @State private var entities: [JRLink] = []
+    private var filterKey: String { "\(source.generation):\(query):\(sort):\(year):" + selected.sorted().map(String.init).joined(separator: ",") }
+    private func updateResults() async {
+        guard let snapshot = index else { filtered = []; entities = []; return }
+        let epoch = source.generation, request = filterKey
+        let q = JRPolicy.normalizedCode(query), chosen = selected, ordering = sort, chosenYear = year
+        let worker = Task.detached(priority: .userInitiated) { () -> ([JRVideo], [JRLink]) in
+            let videos = snapshot.videos.filter { v in
+                (q.isEmpty || JRPolicy.normalizedCode(v.code + v.title + v.subtitle).contains(q)) && chosen.isSubset(of: Set(v.categories)) && (chosenYear == "全部年份" || v.date.hasPrefix(chosenYear))
+            }.sorted { a, b in
+                if ordering == "newest", a.date != b.date { return a.date > b.date }
+                if ordering == "oldest", a.date != b.date { return (a.date.isEmpty ? "9999" : a.date) < (b.date.isEmpty ? "9999" : b.date) }
+                if a.score != b.score { return a.score > b.score }; return a.path < b.path
+            }
+            let links = q.isEmpty ? [] : snapshot.entities.filter { JRPolicy.normalizedCode(snapshot.aliases[$0.path] ?? $0.title).contains(q) }
+            return (videos, links)
         }
-    }
-    private var entities: [JRLink] {
-        let q = JRPolicy.normalizedCode(query)
-        guard !q.isEmpty else { return [] }
-        return (index?.entities ?? []).filter { JRPolicy.normalizedCode(index?.aliases[$0.path] ?? $0.title).contains(q) }
+        let value = await withTaskCancellationHandler(operation: { await worker.value }, onCancel: { worker.cancel() })
+        guard !Task.isCancelled, epoch == source.generation, request == filterKey else { return }
+        filtered = value.0; entities = value.1
     }
     private var years: [String] {
         var values = Set<String>()
@@ -148,6 +195,7 @@ struct JRIndexView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if loading { ProgressView("加载公开索引…").frame(maxWidth: .infinity) }
                 if !error.isEmpty { Text(error).foregroundStyle(.secondary); Button("重试") { Task { await load() } } }
+                if mode == .search && index == nil { results }
                 if let index { indexContent(index) }
             }.padding(.vertical).frame(maxWidth: AdaptiveLayout.contentMaxWidth).frame(maxWidth: .infinity)
         }
@@ -155,10 +203,19 @@ struct JRIndexView: View {
         .searchable(text: $query, prompt: "番号 / 名称")
         .navigationTitle(title).navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
         .task(id: source.generation) { await load() }
-        .onChange(of: query) { _,_ in limit = 30; picked = nil }
-        .onChange(of: selected) { _,_ in limit = 30; picked = nil }
-        .onChange(of: sort) { _,_ in limit = 30 }
-        .onChange(of: year) { _,_ in limit = 30; picked = nil }
+        .refreshable { await load(refresh: true) }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
+        .task(id: filterKey) {
+            if mode == .search && index == nil && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+                await load()
+            }
+            await updateResults()
+        }
+        .onChange(of: query) { _,_ in limit = 12; picked = nil }
+        .onChange(of: selected) { _,_ in limit = 12; picked = nil }
+        .onChange(of: sort) { _,_ in limit = 12 }
+        .onChange(of: year) { _,_ in limit = 12; picked = nil }
     }
     @ViewBuilder private func indexContent(_ index: JRIndex) -> some View {
         if mode != .search { filters(index) }
@@ -209,14 +266,17 @@ struct JRIndexView: View {
             JRPosterGrid(videos: Array(filtered.prefix(limit)))
             if filtered.isEmpty && entities.isEmpty { ContentUnavailableView("没有匹配资料", systemImage: "magnifyingglass") }
             if filtered.count > limit || entities.count > limit {
-                Button("加载更多") { limit += 30 }.frame(maxWidth: .infinity).padding()
+                Button("加载更多") { limit += 12 }.frame(maxWidth: .infinity).padding()
             }
         }
     }
-    private func load() async {
+    private func load(refresh: Bool = false) async {
         let epoch = source.generation
-        index = nil; picked = nil; loading = true; error = ""; limit = 30; selected.removeAll()
-        do { let value = try await source.index(search: mode == .search); guard epoch == source.generation, !Task.isCancelled else { return }; index = value }
+        index = source.cachedIndex(search: mode == .search); picked = nil; error = ""
+        if mode == .search && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { loading = false; return }
+        loading = true
+        if let _ = index { await updateResults() }
+        do { let value = try await source.index(search: mode == .search, refresh: refresh); guard epoch == source.generation, !Task.isCancelled else { return }; index = value; await updateResults() }
         catch { if epoch == source.generation && !Task.isCancelled { self.error = error.localizedDescription } }
         if epoch == source.generation { loading = false }
     }
@@ -228,13 +288,16 @@ struct JRPageView: View {
     @State private var page: JRPage?
     @State private var error = ""
     @State private var loading = false
-    @State private var limit = 30
+    @State private var limit = 12
     @State private var verified: Movie?
     @State private var verification = ""
     @State private var checking = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if path.hasPrefix("/zh-hans/explore/") {
+                    NavigationLink { JRIndexView(mode: .explore) } label: { Label("题材 / 年份 / 排序筛选（按需加载索引）", systemImage: "line.3.horizontal.decrease.circle") }.padding(.horizontal)
+                }
                 if loading { ProgressView("加载公开内容…").frame(maxWidth: .infinity) }
                 if !error.isEmpty { Text(error).foregroundStyle(.secondary); Button("重试") { Task { await load() } } }
                 if let page {
@@ -264,7 +327,7 @@ struct JRPageView: View {
                     if !page.videos.isEmpty {
                         Text("\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                         JRPosterGrid(videos: Array(page.videos.prefix(limit)))
-                        if limit < page.videos.count { Button("加载更多") { limit += 30 }.frame(maxWidth: .infinity).padding() }
+                        if limit < page.videos.count { Button("加载更多") { limit += 12 }.frame(maxWidth: .infinity).padding() }
                     }
                     if !page.images.isEmpty {
                         DisclosureGroup("公开图片（\(page.images.count)）") {
@@ -283,12 +346,14 @@ struct JRPageView: View {
         }.background { LiquidGlassBackground() }
         .navigationTitle(page?.title ?? "JAV Ranking").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
         .task(id: source.generation) { await load() }
+        .refreshable { await load(refresh: true) }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
     }
-    private func load() async {
+    private func load(refresh: Bool = false) async {
         let epoch = source.generation
-        page = nil; verified = nil; verification = ""; checking = false; limit = 30; error = ""; loading = true
+        page = source.cachedPage(path); verified = nil; verification = ""; checking = false; limit = 12; error = ""; loading = true
         do {
-            let result = try await source.page(path)
+            let result = try await source.page(path, refresh: refresh)
             guard epoch == source.generation, !Task.isCancelled else { return }; page = result
         } catch { if epoch == source.generation && !Task.isCancelled { self.error = error.localizedDescription } }
         if epoch == source.generation { loading = false }
@@ -297,10 +362,9 @@ struct JRPageView: View {
         let epoch = source.generation
         checking = true; verified = nil; verification = ""
         do {
-            let results = try await JavDBSDK.shared.search(keyword: code, type: "code", limit: 20)
+            let match = try await source.matchedMovie(code: code)
             guard epoch == source.generation, !Task.isCancelled else { return }
-            let matches = results.filter { JRPolicy.normalizedCode($0.number ?? "") == JRPolicy.normalizedCode(code) }
-            if matches.count == 1 { verified = matches[0]; verification = "已按完整番号核验；后续播放由原有 JavDB / 115 流程处理。" }
+            if let match { verified = match; verification = "已按完整番号核验；后续播放由原有 JavDB / 115 流程处理。" }
             else { verification = "没有唯一且完整番号一致的 JavDB 结果；保留来源原生详情，不猜测 ID。" }
         } catch { if epoch == source.generation { verification = "JavDB 核验暂不可用：" + error.localizedDescription } }
         if epoch == source.generation { checking = false }
