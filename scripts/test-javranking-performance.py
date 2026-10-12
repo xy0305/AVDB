@@ -19,6 +19,12 @@ import Foundation
   setbuf(stdout, nil)
   let base=URL(string:"https://javranking.cc")!
   for path in CommandLine.arguments.dropFirst() {
+   if path.hasSuffix(".json") {
+    let data = try Data(contentsOf: URL(fileURLWithPath: path)); let start = Date()
+    let index = try JRIndex.parse(data, base: base)
+    print("INDEX file=\(URL(fileURLWithPath: path).lastPathComponent) decoded=\(data.count) seconds=\(Date().timeIntervalSince(start)) videos=\(index.videos.count)")
+    continue
+   }
    let html=try String(contentsOfFile:path, encoding:.utf8)
    let route=path.contains("javlibrary") ? "/zh-hans/rankings/javlibrary-top250/" : path.contains("most-awarded") ? "/zh-hans/most-awarded-videos/" : path.contains("detail") ? "/zh-hans/videos/26/" : "/zh-hans/"
    let start=Date()
@@ -37,7 +43,7 @@ import Foundation
 '''
     current=(root/'AVDB/Services/JavRankingCore.swift').read_text()
     baseline=subprocess.check_output(['git','show','c2eaf4b:AVDB/Services/JavRankingCore.swift'],cwd=root,text=True)
-    args=[str(fixtures/'index.html'),str(fixtures/'videos-detail.html'),str(fixtures/'rankings.html'),str(d/'javlibrary-top250.html'),str(d/'most-awarded-videos.html')]
+    args=[str(fixtures/'index.html'),str(fixtures/'videos-detail.html'),str(fixtures/'rankings.html'),str(d/'javlibrary-top250.html'),str(d/'most-awarded-videos.html'),str(fixtures/'filter-index.json'),str(fixtures/'search-index.json')]
     for label,core in [('before',baseline),('after',current)]:
         p=d/(label+'.swift');p.write_text(core+'\n'+bench.replace('    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)', '' if label == 'before' else '    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)'))
         subprocess.run(['swiftc','-O','-swift-version','5','-parse-as-library',str(p),'-o',str(d/label)],check=True)
@@ -79,8 +85,13 @@ final class Mock: URLProtocol, @unchecked Sendable {
  }
  override func stopLoading() {}
 }
+func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
+ if !condition() { fputs("FAIL production client line=\(line)\n", stderr); exit(1) }
+}
 @main struct ClientTest {
  @MainActor static func main() async throws {
+  setbuf(stdout, nil)
+  print("CLIENT begin")
   let dir=CommandLine.arguments[1]
   let large=try Data(contentsOf:URL(fileURLWithPath:CommandLine.arguments[2]))
   Mock.bodies["/zh-hans/filter-index.json"]=try Data(contentsOf:URL(fileURLWithPath:dir+"/filter-index.json"))
@@ -126,6 +137,7 @@ final class Mock: URLProtocol, @unchecked Sendable {
   let modern=URLSession(configuration:config,delegate:delegate,delegateQueue:nil)
   start=Date(); let chunks=try await delegate.download(URLRequest(url:url),session:modern)
   let after=Date().timeIntervalSince(start)
+  print("TRANSFER CHECK legacy=\(result.count) chunks=\(chunks.count) fixture=\(large.count)")
   precondition(result == chunks && chunks == large)
   print("CONTROLLED TRANSFER decoded=\(large.count) legacyMainActorByteSeconds=\(before) backgroundChunkSeconds=\(after) (URLProtocol replay, not device/network)")
   legacy.invalidateAndCancel(); modern.invalidateAndCancel()
@@ -133,6 +145,6 @@ final class Mock: URLProtocol, @unchecked Sendable {
  }
 }
 '''
-    p=d/'client.swift';p.write_text(current+'\n'+(root/'AVDB/Services/JavRankingSource.swift').read_text()+'\n'+main)
+    p=d/'client.swift';p.write_text(current+'\n'+(root/'AVDB/Services/JavRankingSource.swift').read_text()+'\n'+main.replace('precondition(', 'check('))
     subprocess.run(['swiftc','-O','-swift-version','5','-parse-as-library',str(p),'-o',str(d/'client')],check=True)
     subprocess.run([str(d/'client'),str(fixtures),str(d/'most-awarded-videos.html')],check=True,timeout=180)

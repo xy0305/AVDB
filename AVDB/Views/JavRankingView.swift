@@ -121,6 +121,7 @@ private struct JRMeasuredGrid: View {
         .onPreferenceChange(JRWidthKey.self) { if $0 > 0 { width = $0 } }
         .task(id: "\(source.generation):" + videos.map(\.path).joined(separator: ",")) {
             let epoch = source.generation
+            mapped.removeAll(); completed.removeAll()
             // Only the explicitly displayed page, three lookups at a time.
             // Source placeholders are already rendered; publish each match alone.
             await withTaskGroup(of: (String, Movie?).self) { group in
@@ -315,20 +316,18 @@ struct JRPageView: View {
                             if let url = URL(string: path, relativeTo: source.base)?.absoluteURL { Link("在外部浏览器查看来源页", destination: url).font(.footnote) }
                         }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
                     }
-                    if !page.links.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text(page.detail == nil ? "分类 / 人物 / 榜单导航" : "演员 / 片商 / 导演 / 入榜记录").font(.headline)
-                            ForEach(page.links) { link in
-                                NavigationLink { JRPageView(path: link.path) } label: { HStack { Text(link.title).multilineTextAlignment(.leading); Spacer(); Image(systemName: "chevron.right").font(.caption) }.padding(.vertical, 4) }
-                            }
-                        }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                    }
-                    ForEach(Array(page.paragraphs.enumerated()), id: \.offset) { _, text in Text(text).font(.subheadline).textSelection(.enabled).padding(.horizontal, AdaptiveLayout.horizontalPadding) }
                     if !page.videos.isEmpty {
                         Text("\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                         JRPosterGrid(videos: Array(page.videos.prefix(limit)))
                         if limit < page.videos.count { Button("加载更多") { limit += 12 }.frame(maxWidth: .infinity).padding() }
                     }
+                    if !page.links.isEmpty {
+                        if page.videos.isEmpty { sourceNavigation(page) }
+                        else {
+                            DisclosureGroup("来源导航 / 人物 / 榜单（\(page.links.count)）") { sourceNavigation(page) }.padding(.horizontal)
+                        }
+                    }
+                    ForEach(Array(page.paragraphs.enumerated()), id: \.offset) { _, text in Text(text).font(.subheadline).textSelection(.enabled).padding(.horizontal, AdaptiveLayout.horizontalPadding) }
                     if !page.images.isEmpty {
                         DisclosureGroup("公开图片（\(page.images.count)）") {
                             ForEach(page.images, id: \.self) { image in JavDBImage(url: image).aspectRatio(4/3, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 12)) }
@@ -348,6 +347,16 @@ struct JRPageView: View {
         .task(id: source.generation) { await load() }
         .refreshable { await load(refresh: true) }
         .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
+    }
+    private func sourceNavigation(_ page: JRPage) -> some View {
+        LazyVStack(alignment: .leading, spacing: 12) {
+            Text(page.detail == nil ? "来源分类 / 人物 / 榜单导航" : "演员 / 片商 / 导演 / 入榜记录").font(.headline)
+            ForEach(page.links) { link in
+                NavigationLink { JRPageView(path: link.path) } label: {
+                    HStack { Text(link.title).multilineTextAlignment(.leading); Spacer(); Image(systemName: "chevron.right").font(.caption) }.padding(.vertical, 4)
+                }
+            }
+        }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
     }
     private func load(refresh: Bool = false) async {
         let epoch = source.generation
