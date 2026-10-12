@@ -24,23 +24,27 @@ enum JRPolicy {
     }
     static func route(_ href: String, relativeTo page: String, base: URL) -> String? {
         let raw = JRHTML.text(href)
-        guard !raw.isEmpty, !raw.hasPrefix("#"), !raw.lowercased().hasPrefix("javascript:"),
+        guard !raw.isEmpty, !raw.contains("#"), !raw.lowercased().hasPrefix("javascript:"),
               !raw.lowercased().hasPrefix("mailto:") else { return nil }
-        let origin = page.hasPrefix("http") ? page : base.absoluteString + (page.hasPrefix("/") ? page : "/" + page)
-        let absolute: String
-        if raw.hasPrefix("https://") || raw.hasPrefix("http://") { absolute = raw }
-        else if raw.hasPrefix("//") { absolute = "https:" + raw }
-        else if raw.hasPrefix("?") || raw.hasPrefix("&") {
-            absolute = origin + (origin.contains("?") ? "&" + String(raw.dropFirst()) : raw)
-        } else if raw.hasPrefix("/") { absolute = base.absoluteString + raw }
-        else {
-            let dir = origin.hasSuffix("/") ? origin : origin.replacingOccurrences(of: "/[^/]*$", with: "/", options: .regularExpression)
-            absolute = dir + raw
+        guard var origin = URLComponents(string: page.hasPrefix("http") ? page : base.absoluteString + (page.hasPrefix("/") ? page : "/" + page)),
+              let originURL = origin.url, sameHost(originURL, base: base) else { return nil }
+        let url: URL
+        if raw.hasPrefix("?") {
+            // A query-only href replaces (never appends to) the current query.
+            // Keep the directory path explicit rather than re-resolving it as a file.
+            origin.percentEncodedQuery = String(raw.dropFirst())
+            origin.fragment = nil
+            guard let resolved = origin.url else { return nil }
+            url = resolved
+        } else {
+            guard let resolved = URL(string: raw, relativeTo: originURL)?.absoluteURL else { return nil }
+            url = resolved
         }
-        let queryPart = absolute.split(separator: "?", maxSplits: 1).dropFirst().first.map(String.init)
-        let pathOnly = String(absolute.split(separator: "?", maxSplits: 1).first ?? "")
-        guard let url = URL(string: pathOnly), sameHost(url, base: base), url.fragment == nil else { return nil }
-        let p = url.path
+        guard sameHost(url, base: base), let components = URLComponents(url: url, resolvingAgainstBaseURL: true), components.fragment == nil else { return nil }
+        let queryPart = components.percentEncodedQuery
+        // URL.path on Darwin omits trailing directory slashes. Read the component
+        // path so /zh-hans/ and pagination retain their canonical identities.
+        let p = components.path
         guard p.hasPrefix("/zh-hans/"), !p.contains(".."), !p.hasSuffix(".md") else { return nil }
         let allowed = ["videos", "actors", "makers", "directors", "rankings", "explore", "pick", "most-awarded-videos", "most-awarded-actors", "most-awarded-male-actors", "search", "about", "help", "privacy", "terms", "feedback", "extension", "sponsor"]
         guard p == "/zh-hans/" || allowed.contains(p.split(separator: "/").dropFirst().first.map(String.init) ?? "") else { return nil }
@@ -217,13 +221,16 @@ enum JRHTML {
         }
         var linkSeen = Set<String>()
         for a in main.all({ $0.tag == "a" }) {
-            guard let href = a.attrs["href"], let route = JRPolicy.route(href, relativeTo: path, base: base), !route.contains("/videos/"), route != path, linkSeen.insert(route).inserted else { continue }
+            guard let href = a.attrs["href"], let route = JRPolicy.route(href, relativeTo: path, base: base), !route.contains("/videos/"), route != path else { continue }
             let title = a.text.isEmpty ? (a.attrs["aria-label"] ?? route) : a.text
+            // Numeric pagination and the Next button share a URL. Inspect every
+            // pagination anchor before deduplicating ordinary navigation links.
             if route.contains("page=") {
                 let label = title + (a.attrs["aria-label"] ?? "")
                 if a.attrs["rel"] == "next" || label.contains("下一") { page.next = route }
                 continue
             }
+            guard linkSeen.insert(route).inserted else { continue }
             page.links.append(JRLink(path: route, title: title))
         }
         for m in matches(#"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>"#,html) {

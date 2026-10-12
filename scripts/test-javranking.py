@@ -43,7 +43,18 @@ for bad in ["http://user:pass@javranking.cc", "https://javranking.cc/zh-hans/", 
 }
 let videoRoute = JRPolicy.route("/zh-hans/videos/26/", relativeTo: "/zh-hans/", base: base) ?? "nil"
 check("route video", videoRoute == "/zh-hans/videos/26/", videoRoute)
+let pageRoute = JRPolicy.route("?page=2", relativeTo: "/zh-hans/explore/", base: base) ?? "nil"
+check("route page", pageRoute == "/zh-hans/explore/?page=2", pageRoute)
 check("route page", JRPolicy.route("?page=2", relativeTo: "https://javranking.cc/zh-hans/explore/", base: base) == "/zh-hans/explore/?page=2", JRPolicy.route("?page=2", relativeTo: "https://javranking.cc/zh-hans/explore/", base: base) ?? "nil")
+check("route replace query", JRPolicy.route("?page=3", relativeTo: "/zh-hans/explore/?page=2", base: base) == "/zh-hans/explore/?page=3")
+check("route root", JRPolicy.route("/zh-hans/", relativeTo: "/zh-hans/explore/", base: base) == "/zh-hans/")
+check("route parent", JRPolicy.route("../rankings/?page=2", relativeTo: "/zh-hans/explore/", base: base) == "/zh-hans/rankings/?page=2")
+check("route fragment", JRPolicy.route("?page=2#next", relativeTo: "/zh-hans/explore/", base: base) == nil)
+let paginationHTML = """
+<main><a href="?page=3">3</a><a href="?page=3" aria-label="下一页"><span>下一页</span></a></main>
+"""
+let secondPage = try JRHTML.parse(paginationHTML, path: "/zh-hans/explore/?page=2", base: base)
+check("duplicate numeric and next", secondPage.next == "/zh-hans/explore/?page=3", secondPage.next ?? "nil")
 check("route evil", JRPolicy.route("https://evil.example/zh-hans/videos/1/", relativeTo: "/zh-hans/", base: base) == nil)
 check("route token", JRPolicy.route("/zh-hans/videos/1/?token=secret", relativeTo: "/zh-hans/", base: base) == nil)
 check("route locale", JRPolicy.route("/en/videos/1/", relativeTo: "/zh-hans/", base: base) == nil)
