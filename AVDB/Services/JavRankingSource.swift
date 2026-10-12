@@ -57,6 +57,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
 @MainActor final class JavRankingSource: ObservableObject {
     static let shared = JavRankingSource()
     @Published private(set) var generation = 0
+    @Published private(set) var previews: [String: JRPage] = [:]
     @Published private(set) var base: URL
     private var session: URLSession
     private let protocolClasses: [AnyClass]?
@@ -98,7 +99,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private var pageFlights: [String: Task<JRPage, Error>] = [:]
     private var indexFlights: [String: Task<JRIndex, Error>] = [:]
     private func clear() {
-        cancelMappings(); matches.removeAll()
+        cancelMappings(); matches.removeAll(); previews.removeAll()
         pageFlights.values.forEach { $0.cancel() }; indexFlights.values.forEach { $0.cancel() }
         pageFlights.removeAll(); indexFlights.removeAll()
         pages.removeAll(); indexes.removeAll(); pageDates.removeAll(); indexDates.removeAll()
@@ -166,11 +167,16 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
             store(parsed, path: path); return parsed
         }
         let data = try await data(path)
-        let worker = Task.detached(priority: .userInitiated) {
+        let first = Task.detached(priority: .userInitiated) { () throws -> (String, JRPage?) in
             try Task.checkCancellation()
             guard let html = String(data: data, encoding: .utf8) else { throw JRError.message("无法解码公开页面") }
-            return try JRHTML.parse(html, path: path, base: origin)
+            return (html, try JRHTML.firstCards(html, path: path, base: origin))
         }
+        let (html, preview) = try await withTaskCancellationHandler(operation: { try await first.value }, onCancel: { first.cancel() })
+        try Task.checkCancellation(); guard epoch == generation else { throw CancellationError() }
+        if let preview { previews[path] = preview }
+        defer { if epoch == generation { previews[path] = nil } }
+        let worker = Task.detached(priority: .userInitiated) { try JRHTML.parse(html, path: path, base: origin) }
         let parsed = try await withTaskCancellationHandler(operation: { try await worker.value }, onCancel: { worker.cancel() })
         try Task.checkCancellation(); guard epoch == generation else { throw CancellationError() }
         store(parsed, path: path); return parsed
@@ -188,7 +194,8 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         let epoch = generation, origin = base
         let flight = Task {
             let data = try await self.data(path)
-            let parsed = try await Task.detached(priority: .userInitiated) { try JRIndex.parse(data, base: origin) }.value
+            let worker = Task.detached(priority: .userInitiated) { try JRIndex.parse(data, base: origin) }
+            let parsed = try await withTaskCancellationHandler(operation: { try await worker.value }, onCancel: { worker.cancel() })
             try Task.checkCancellation(); guard epoch == self.generation else { throw CancellationError() }
             self.indexes[path] = parsed; self.indexDates[path] = Date(); return parsed
         }

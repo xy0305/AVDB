@@ -45,7 +45,16 @@ import Foundation
     baseline=subprocess.check_output(['git','show','c2eaf4b:AVDB/Services/JavRankingCore.swift'],cwd=root,text=True)
     args=[str(fixtures/'index.html'),str(fixtures/'videos-detail.html'),str(fixtures/'rankings.html'),str(d/'javlibrary-top250.html'),str(d/'most-awarded-videos.html'),str(fixtures/'filter-index.json'),str(fixtures/'search-index.json')]
     for label,core in [('before',baseline),('after',current)]:
-        p=d/(label+'.swift');p.write_text(core+'\n'+bench.replace('    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)', '' if label == 'before' else '    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)'))
+        timed = bench
+        if label == 'after':
+            timed = timed.replace('   let start=Date()\n   let page=', r'''   let previewStart=Date()
+   if let preview=try JRHTML.firstCards(html,path:route,base:base) {
+    print("FIRST_CARDS file=\(URL(fileURLWithPath:path).lastPathComponent) seconds=\(Date().timeIntervalSince(previewStart)) videos=\(preview.videos.count)")
+    precondition(preview.videos.count > 0 && preview.videos.count <= 13)
+   }
+   let start=Date()
+   let page=''')
+        p=d/(label+'.swift');p.write_text(core+'\n'+timed.replace('    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)', '' if label == 'before' else '    precondition(page.videos.first?.rank == 1 && page.videos.last?.rank == 250)'))
         subprocess.run(['swiftc','-O','-swift-version','5','-parse-as-library',str(p),'-o',str(d/label)],check=True)
         print('CONTROLLED PRODUCTION PARSER',label,flush=True)
         subprocess.run([str(d/label)]+args,check=True,timeout=180)
@@ -97,6 +106,7 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
   Mock.bodies["/zh-hans/filter-index.json"]=try Data(contentsOf:URL(fileURLWithPath:dir+"/filter-index.json"))
   Mock.bodies["/zh-hans/explore/"]=try Data(contentsOf:URL(fileURLWithPath:dir+"/explore.html"))
   Mock.bodies["/transfer/"]=large
+  Mock.bodies["/zh-hans/most-awarded-videos/"]=large
   let defaults=UserDefaults(suiteName:"jr-test-\(UUID())")!
   let source=JavRankingSource(defaults:defaults,protocolClasses:[Mock.self])
   async let a=source.page("/zh-hans/explore/"); async let b=source.page("/zh-hans/explore/")
@@ -106,6 +116,13 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
   _=try await source.page("/zh-hans/explore/?page=2")
   _=try await source.page("/zh-hans/explore/?page=3")
   precondition(Mock.counts["/zh-hans/filter-index.json"] == 1)
+  var previewCount=0
+  let subscription=source.$previews.sink { previews in
+   if let preview=previews["/zh-hans/most-awarded-videos/"] { previewCount=preview.videos.count }
+  }
+  let complete=try await source.page("/zh-hans/most-awarded-videos/")
+  precondition(previewCount > 0 && previewCount <= 13 && complete.videos.count == 2685)
+  subscription.cancel()
   async let x=source.matchedMovie(code:"IPX-811"); async let y=source.matchedMovie(code:"IPX-811")
   let pair=try await (x,y); precondition(pair.0?.id == "right" && pair.1?.id == "right")
   precondition(JavDBSDK.shared.calls["IPX-811"] == 1)

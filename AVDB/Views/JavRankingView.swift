@@ -291,6 +291,7 @@ struct JRPageView: View {
     let path: String
     @ObservedObject private var source = JavRankingSource.shared
     @State private var page: JRPage?
+    @State private var isPreview = false
     @State private var error = ""
     @State private var loading = false
     @State private var limit = 12
@@ -321,7 +322,7 @@ struct JRPageView: View {
                         }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
                     }
                     if !page.videos.isEmpty {
-                        Text("\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+                        Text(isPreview ? "首批 \(page.videos.count) 部 · 正在读取完整榜单" : "\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                         JRPosterGrid(videos: Array(page.videos.prefix(limit)))
                         if limit < page.videos.count { Button("加载更多") { limit += 12 }.frame(maxWidth: .infinity).padding() }
                     }
@@ -348,6 +349,9 @@ struct JRPageView: View {
             }.padding(.vertical).frame(maxWidth: AdaptiveLayout.contentMaxWidth).frame(maxWidth: .infinity)
         }.background { LiquidGlassBackground() }
         .navigationTitle(page?.title ?? "JAV Ranking").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
+        .onReceive(source.$previews) { previews in
+            if page == nil, let preview = previews[path] { page = preview; isPreview = true }
+        }
         .task(id: source.generation) { await load() }
         .refreshable { await load(refresh: true) }
         .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
@@ -364,10 +368,10 @@ struct JRPageView: View {
     }
     private func load(refresh: Bool = false) async {
         let epoch = source.generation
-        page = source.cachedPage(path); verified = nil; verification = ""; checking = false; limit = 12; error = ""; loading = true
+        page = source.cachedPage(path); isPreview = false; verified = nil; verification = ""; checking = false; limit = 12; error = ""; loading = true
         do {
             let result = try await source.page(path, refresh: refresh)
-            guard epoch == source.generation, !Task.isCancelled else { return }; page = result
+            guard epoch == source.generation, !Task.isCancelled else { return }; page = result; isPreview = false
         } catch { if epoch == source.generation && !Task.isCancelled { self.error = error.localizedDescription } }
         if epoch == source.generation { loading = false }
     }

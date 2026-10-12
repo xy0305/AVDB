@@ -139,7 +139,8 @@ struct JRIndex {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rows = root["videos"] as? [[String: Any]] else { throw JRError.message("站点索引格式已改变") }
         var result = JRIndex(); var seen = Set<String>()
-        for r in rows {
+        for (offset, r) in rows.enumerated() {
+            if offset % 128 == 0 { try Task.checkCancellation() }
             guard let n = r["videoId"] as? Int, n > 0 else { continue }
             let path = "/zh-hans/videos/\(n)/"
             guard seen.insert(path).inserted else { continue }
@@ -274,6 +275,21 @@ enum JRHTML {
         }
         if !current.isEmpty { result.append(current) }
         return result
+    }
+    // A list-only, explicitly provisional first screen. Full parsing still runs
+    // and replaces it; detail metadata/comments are never truncated here.
+    static func firstCards(_ html: String, path: String, base: URL) throws -> JRPage? {
+        guard !path.contains("/videos/"), html.utf8.count > 256_000,
+              let start = html.range(of: "<main", options: .caseInsensitive) else { return nil }
+        var cursor = start.lowerBound
+        var end: String.Index?
+        for _ in 0..<13 { // include the site's optional sponsor article
+            guard let close = html.range(of: "</article>", options: .caseInsensitive, range: cursor..<html.endIndex) else { break }
+            end = close.upperBound; cursor = close.upperBound
+        }
+        guard let end, html.distance(from: start.lowerBound, to: end) < 160_000 else { return nil }
+        let page = try parse(String(html[start.lowerBound..<end]) + "</main>", path: path, base: base)
+        return page.videos.isEmpty ? nil : page
     }
     static func parse(_ html: String, path: String, base: URL) throws -> JRPage {
         guard html.utf8.count <= 12 * 1024 * 1024 else { throw JRError.message("公开页面超出安全大小限制") }
