@@ -34,6 +34,11 @@ for invalid in ["https://user:pass@example.com", "https://example.com/path", "ht
  check((try? JLPolicy.domain(invalid)) == nil, "invalid domain " + invalid)
 }
 check((try? JLPolicy.domain("www.javlibrary.com")) == JLPolicy.canonical, "canonical domain")
+check(JLPolicy.cookieDomain(".javlibrary.com", matches: "www.javlibrary.com"), "normal parent-domain verification cookie")
+check(!JLPolicy.cookieDomain("javlibrary.com", matches: "eviljavlibrary.com"), "cookie suffix attack")
+check(!JLPolicy.cookieDomain("javdb.com", matches: "www.javlibrary.com"), "no JavDB cookie forwarding")
+check(!JLPolicy.cookieDomain("115.com", matches: "www.javlibrary.com"), "no 115 cookie forwarding")
+check(!JLPolicy.cookieDomain("com", matches: "www.javlibrary.com"), "no TLD cookie")
 check(JLPolicy.sourceURL("https://evil.example/cn/?v=x", relativeTo: url) == nil, "foreign route")
 let page = try JLHTML.parse(fixture("mock-videos.html"), pageURL: url)
 check(page.videos.count == 1, "dedup / invalid code / foreign host")

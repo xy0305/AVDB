@@ -46,7 +46,7 @@ struct JavLibraryView: View {
                         ForEach(page.actors) { actor in
                             HStack {
                                 if let rank = actor.rank { Text("#\(rank)").monospacedDigit() }
-                                AsyncImage(url: actor.image) { $0.resizable().scaledToFit() } placeholder: { Image(systemName: "person") }.frame(width: 48, height: 64)
+                                JLPublicImage(url: actor.image).frame(width: 48, height: 64)
                                 Text(actor.name)
                                 Spacer()
                                 Link("来源演员页", destination: actor.url)
@@ -109,7 +109,7 @@ private struct JLVideoGrid: View {
             ForEach(videos) { video in
                 NavigationLink { JLVideoDestination(video: video) } label: {
                     // The source-local ID is a display identity only; never sent to movieDetail.
-                    MoviePosterCard(movie: Movie(id: "javlibrary:\(video.id)", number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
+                    JLPosterCard(video: video)
                 }.buttonStyle(.plain)
             }
         }
@@ -211,6 +211,44 @@ private struct JLWebsiteBrowser: UIViewRepresentable {
             // The verification provider may load HTTPS subframes; top-level navigation stays on the configured host.
             if navigationAction.targetFrame?.isMainFrame == false { decisionHandler(.allow) }
             else { decisionHandler(url.host == host && navigationAction.targetFrame != nil ? .allow : .cancel) }
+        }
+    }
+}
+
+private struct JLPosterCard: View {
+    let video: JLVideo
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ClippedAspectFill(aspectRatio: 0.72) { JLPublicImage(url: video.image) }
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Text(video.title).font(.subheadline).foregroundStyle(.primary).lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading).frame(height: 36, alignment: .top)
+            Text(video.code).font(.caption.weight(.semibold)).foregroundStyle(.tint)
+        }
+    }
+}
+private struct JLPublicImage: View {
+    let url: URL?
+    @State private var image: UIImage?
+    var body: some View {
+        Group {
+            if let image { Image(uiImage: image).resizable().scaledToFill() }
+            else { Rectangle().fill(.quaternary).overlay { Image(systemName: "photo").foregroundStyle(.secondary) } }
+        }.clipped().task(id: url) {
+            image = nil
+            guard let url, url.scheme == "https", let host = url.host else { return }
+            let config = URLSessionConfiguration.ephemeral
+            config.httpCookieStorage = nil; config.httpShouldSetCookies = false
+            config.timeoutIntervalForRequest = 20; config.timeoutIntervalForResource = 25
+            let delegate = JLRedirectGuard(host: host)
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            do {
+                let (data, response) = try await session.data(from: url)
+                guard !Task.isCancelled, let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode), data.count < 8 * 1024 * 1024 else { return }
+                image = UIImage(data: data)
+            } catch { /* Public poster failure does not impersonate a successful source page. */ }
         }
     }
 }

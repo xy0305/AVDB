@@ -6,7 +6,7 @@ final class JLRedirectGuard: NSObject, URLSessionTaskDelegate, @unchecked Sendab
     let host: String
     init(host: String) { self.host = host }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        completionHandler(request.url?.scheme == "https" && request.url?.host == host ? request : nil)
+        completionHandler(request.url?.scheme == "https" && request.url?.host == host && request.url?.port == nil && request.url?.user == nil && request.url?.password == nil ? request : nil)
     }
 }
 @MainActor final class JavLibrarySource: ObservableObject {
@@ -40,7 +40,7 @@ final class JLRedirectGuard: NSObject, URLSessionTaskDelegate, @unchecked Sendab
     }
     func acceptVerifiedCookies(_ input: [HTTPCookie], host: String) {
         guard host == base.host else { return }
-        cookies = input.filter { $0.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased() == host.lowercased() && $0.isSecure && ($0.expiresDate ?? .distantFuture) > Date() }
+        cookies = input.filter { JLPolicy.cookieDomain($0.domain, matches: host) && $0.isSecure && ($0.expiresDate ?? .distantFuture) > Date() }
     }
     func load(_ url: URL) async throws -> JLPage {
         guard url.host == base.host, url.scheme == "https", url.path.hasPrefix("/cn/") else { throw JLError.invalidURL }

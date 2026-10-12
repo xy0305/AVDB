@@ -78,6 +78,11 @@ enum JLPolicy {
               url.scheme == "https", url.user == nil, url.password == nil else { return nil }
         return url
     }
+    static func cookieDomain(_ domain: String, matches host: String) -> Bool {
+        let domain = domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+        let host = host.lowercased()
+        return domain.contains(".") && (host == domain || host.hasSuffix("." + domain))
+    }
     static func validate(_ data: Data, response: HTTPURLResponse) throws -> String {
         let html = String(decoding: data, as: UTF8.self)
         let lower = html.lowercased()
