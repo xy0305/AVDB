@@ -110,6 +110,10 @@ private struct JRMeasuredGrid: View {
                         }.buttonStyle(.plain)
                     }
                     if let rank = video.rank { Text("来源排名 #\(rank)").font(.caption).foregroundStyle(.secondary) }
+                    if mapped[video.path] != nil {
+                        Text(video.title).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                        NavigationLink("来源资料") { JRPageView(path: video.path) }.font(.caption2)
+                    }
                     if !video.code.isEmpty {
                         Text(mapped[video.path] != nil ? "完整番号已核验 · JavDB" : completed.contains(video.path) ? "未获唯一匹配 · 可查看来源" : "来源资料 · 正在核验番号")
                             .font(.caption2).foregroundStyle(.secondary)

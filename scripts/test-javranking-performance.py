@@ -71,7 +71,7 @@ final class Mock: URLProtocol, @unchecked Sendable {
  override class func canInit(with request:URLRequest)->Bool { true }
  override class func canonicalRequest(for request:URLRequest)->URLRequest { request }
  override func startLoading() {
-  let path=request.url!.path
+  let path=URLComponents(url:request.url!,resolvingAgainstBaseURL:false)!.path
   Self.lock.lock(); Self.counts[path,default:0] += 1
   let body=Self.bodies[path] ?? Data("<main><h1>Mock</h1></main>".utf8); Self.lock.unlock()
   DispatchQueue.global().asyncAfter(deadline:.now()+0.02) { [self] in
