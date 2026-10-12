@@ -25,10 +25,19 @@ enum JRPolicy {
     static func route(_ href: String, relativeTo page: String, base: URL) -> String? {
         let raw = JRHTML.text(href)
         guard !raw.isEmpty, !raw.hasPrefix("#"), !raw.lowercased().hasPrefix("javascript:"),
-              !raw.lowercased().hasPrefix("mailto:"),
-              let origin = URL(string: page, relativeTo: base)?.absoluteURL,
-              let url = URL(string: raw, relativeTo: origin)?.absoluteURL,
-              sameHost(url, base: base), url.fragment == nil else { return nil }
+              !raw.lowercased().hasPrefix("mailto:") else { return nil }
+        let origin = page.hasPrefix("http") ? page : base.absoluteString + (page.hasPrefix("/") ? page : "/" + page)
+        let absolute: String
+        if raw.hasPrefix("https://") || raw.hasPrefix("http://") { absolute = raw }
+        else if raw.hasPrefix("//") { absolute = "https:" + raw }
+        else if raw.hasPrefix("?") || raw.hasPrefix("&") {
+            absolute = origin + (origin.contains("?") ? "&" + String(raw.dropFirst()) : raw)
+        } else if raw.hasPrefix("/") { absolute = base.absoluteString + raw }
+        else {
+            let dir = origin.hasSuffix("/") ? origin : origin.replacingOccurrences(of: "/[^/]*$", with: "/", options: .regularExpression)
+            absolute = dir + raw
+        }
+        guard let url = URL(string: absolute), sameHost(url, base: base), url.fragment == nil else { return nil }
         let p = url.path
         guard p.hasPrefix("/zh-hans/"), !p.contains(".."), !p.hasSuffix(".md") else { return nil }
         let allowed = ["videos", "actors", "makers", "directors", "rankings", "explore", "pick", "most-awarded-videos", "most-awarded-actors", "most-awarded-male-actors", "search", "about", "help", "privacy", "terms", "feedback", "extension", "sponsor"]
