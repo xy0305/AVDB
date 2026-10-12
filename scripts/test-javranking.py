@@ -55,7 +55,7 @@ check("code", JRPolicy.normalizedCode("dass-092") == JRPolicy.normalizedCode("DA
 
 let exploreHTML = try String(contentsOfFile: CommandLine.arguments[1], encoding: .utf8)
 let page = try JRHTML.parse(exploreHTML, path: "/zh-hans/explore/", base: base)
-check("cards", !page.videos.isEmpty, "count=\(page.videos.count)")
+check("cards", !page.videos.isEmpty, "count=\(page.videos.count) links=\(page.links.count)")
 check("next", page.next == "/zh-hans/explore/?page=2", page.next ?? "nil")
 check("english", !page.videos.contains { $0.path.contains("/en/") })
 check("rank link", page.links.contains { $0.path == "/zh-hans/rankings/" })
