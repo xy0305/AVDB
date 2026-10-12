@@ -42,16 +42,11 @@ enum JRPolicy {
         guard p.hasPrefix("/zh-hans/"), !p.contains(".."), !p.hasSuffix(".md") else { return nil }
         let allowed = ["videos", "actors", "makers", "directors", "rankings", "explore", "pick", "most-awarded-videos", "most-awarded-actors", "most-awarded-male-actors", "search", "about", "help", "privacy", "terms", "feedback", "extension", "sponsor"]
         guard p == "/zh-hans/" || allowed.contains(p.split(separator: "/").dropFirst().first.map(String.init) ?? "") else { return nil }
-        // Only read-only, documented listing parameters; discard actions/tracking.
-        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        guard query.allSatisfy({ ["page", "q", "cat", "sort"].contains($0.name) }) else { return nil }
-        let path = url.path.hasSuffix("/") || url.path == "/" ? url.path : url.path + "/"
-        let encoded = query.map { item in
-            let name = item.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? item.name
-            let value = (item.value ?? "").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            return name + "=" + value
-        }.joined(separator: "&")
-        return encoded.isEmpty ? path : path + "?" + encoded
+        let path = p.hasSuffix("/") || p == "/" ? p : p + "/"
+        guard let q = absolute.split(separator: "?", maxSplits: 1).dropFirst().first else { return path }
+        let items = q.split(separator: "&").map(String.init).filter { !$0.isEmpty }
+        guard items.allSatisfy({ ["page", "q", "cat", "sort"].contains($0.split(separator: "=").first.map(String.init) ?? "") }) else { return nil }
+        return path + "?" + items.joined(separator: "&")
     }
     static func image(_ value: String?, base: URL) -> String? {
         guard let value, let u = URL(string: value, relativeTo: base)?.absoluteURL,
