@@ -13,6 +13,8 @@ struct JavLibraryView: View {
     @State private var verification = false
     @State private var settings = false
     @State private var visited = Set<URL>()
+    @State private var width: CGFloat = 390
+    @State private var requestID = UUID()
     private var startURL: URL { JLPolicy.route(kind, mode: filter, base: source.base) }
     var body: some View {
         Group {
@@ -40,7 +42,7 @@ struct JavLibraryView: View {
                         GeometryReader { geometry in
                             Color.clear.preference(key: JLWidthKey.self, value: geometry.size.width)
                         }.frame(height: 0)
-                        JLVideoGrid(videos: page.videos)
+                        JLVideoGrid(videos: page.videos, width: width)
                         ForEach(page.actors) { actor in
                             HStack {
                                 if let rank = actor.rank { Text("#\(rank)").monospacedDigit() }
@@ -56,6 +58,7 @@ struct JavLibraryView: View {
                         }
                     }.padding(AdaptiveLayout.horizontalPadding)
                 }
+                .onPreferenceChange(JLWidthKey.self) { width = $0 }
                 .refreshable { await fetch(startURL, reset: true) }
                 .task(id: "\(kind.rawValue)|\(filter)|\(source.generation)") { await fetch(startURL, reset: true) }
             }
@@ -71,14 +74,15 @@ struct JavLibraryView: View {
         }
     }
     @MainActor private func fetch(_ url: URL, reset: Bool) async {
-        guard !loading else { return }
+        guard reset || !loading else { return }
+        let request = UUID(); requestID = request
         loading = true; message = ""; challenge = false
         let epoch = source.generation
-        defer { loading = false }
+        defer { if requestID == request { loading = false } }
         if reset { page = JLPage(); visited = [] }
         do {
             let result = try await source.load(url)
-            guard !Task.isCancelled, epoch == source.generation else { return }
+            guard !Task.isCancelled, epoch == source.generation, requestID == request else { return }
             visited.insert(url)
             if reset { page = result } else {
                 let ids = Set(page.videos.map(\.id)); let actors = Set(page.actors.map(\.id))
@@ -87,7 +91,7 @@ struct JavLibraryView: View {
                 page.next = result.next
             }
         } catch is CancellationError {} catch {
-            guard epoch == source.generation else { return }
+            guard !Task.isCancelled, epoch == source.generation, requestID == request else { return }
             message = error.localizedDescription
             if case JLError.verification = error { challenge = true }
         }
@@ -99,7 +103,7 @@ private struct JLWidthKey: PreferenceKey {
 }
 private struct JLVideoGrid: View {
     let videos: [JLVideo]
-    @State private var width: CGFloat = 390
+    let width: CGFloat
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
             ForEach(videos) { video in
@@ -108,7 +112,7 @@ private struct JLVideoGrid: View {
                     MoviePosterCard(movie: Movie(id: "javlibrary:\(video.id)", number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
                 }.buttonStyle(.plain)
             }
-        }.onPreferenceChange(JLWidthKey.self) { width = $0 }
+        }
     }
 }
 private struct JLVideoDestination: View {
@@ -129,7 +133,7 @@ private struct JLVideoDestination: View {
             defer { loading = false }
             do {
                 if let match = try await JavDBSDK.shared.exactMovie(code: video.code),
-                   JRPolicy.exactCode(match.number ?? "") == JRPolicy.exactCode(video.code) { movie = match }
+                   JRPolicy.movieCode(number: match.number, title: match.title) == JRPolicy.exactCode(video.code) { movie = match }
                 else { message = "未找到唯一、精确的 JavDB 番号匹配；不会使用来源 ID 伪造影片。" }
             } catch { message = "匹配暂不可用：\(error.localizedDescription)" }
         }
