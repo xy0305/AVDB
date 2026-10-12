@@ -204,6 +204,14 @@ struct UserView: View {
                     }
                 }
 
+                Section("来源") {
+                    NavigationLink {
+                        JavRankingView()
+                    } label: {
+                        Label("JAV Ranking", systemImage: "list.number")
+                    }
+                }
+
                 Section("关于") {
                     NavigationLink("关于 AVDB") {
                         AboutView()

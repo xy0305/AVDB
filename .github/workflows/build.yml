@@ -43,6 +43,7 @@ jobs:
         run: |
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
           xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+          python3 scripts/test-javranking.py
           python3 scripts/test-ipad-layout.py
 
       - name: Build (simulator, no signing)

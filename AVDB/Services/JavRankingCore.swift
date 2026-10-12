@@ -1,0 +1,211 @@
+import Foundation
+
+// Source identities are paths, NEVER JavDB IDs. No executable site code is evaluated.
+enum JRPolicy {
+    static let defaultDomain = "https://javranking.cc"
+    static func domain(_ input: String) throws -> URL {
+        let raw = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = raw.contains("://") ? raw : "https://" + raw
+        guard var c = URLComponents(string: value), let host = c.host?.lowercased(),
+              ["http", "https"].contains(c.scheme?.lowercased() ?? ""),
+              c.user == nil, c.password == nil, c.query == nil, c.fragment == nil,
+              c.path.isEmpty || c.path == "/", c.port == nil,
+              host.contains("."), !host.contains(":"), !host.contains(" "),
+              host != "localhost", !host.hasSuffix(".local"),
+              host.range(of: #"^[0-9.]+$"#, options: .regularExpression) == nil else {
+            throw JRError.message("请输入 HTTPS 域名，不含路径、端口、账号、查询或片段。")
+        }
+        c.scheme = "https"; c.host = host; c.path = ""; return c.url!
+    }
+    static func sameHost(_ url: URL, base: URL) -> Bool {
+        guard url.scheme == "https", url.user == nil, url.password == nil,
+              url.port == nil, let h = url.host?.lowercased(), let b = base.host?.lowercased() else { return false }
+        return h == b || h.hasSuffix("." + b)
+    }
+    static func route(_ href: String, relativeTo page: String, base: URL) -> String? {
+        guard let origin = URL(string: page, relativeTo: base),
+              let url = URL(string: JRHTML.text(href), relativeTo: origin)?.absoluteURL,
+              sameHost(url, base: base), url.fragment == nil else { return nil }
+        let p = url.path
+        guard p.hasPrefix("/zh-hans/"), !p.contains(".."), !p.hasSuffix(".md") else { return nil }
+        let allowed = ["videos", "actors", "makers", "directors", "rankings", "explore", "pick", "most-awarded-videos", "most-awarded-actors", "most-awarded-male-actors", "search", "about", "help", "privacy", "terms", "feedback", "extension", "sponsor"]
+        guard p == "/zh-hans/" || allowed.contains(p.split(separator: "/").dropFirst().first.map(String.init) ?? "") else { return nil }
+        // Only read-only, documented listing parameters; discard actions/tracking.
+        var c = URLComponents(); c.path = p
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        guard query.allSatisfy({ ["page", "q", "cat", "sort"].contains($0.name) }) else { return nil }
+        if !query.isEmpty { c.queryItems = query }
+        return c.string
+    }
+    static func image(_ value: String?, base: URL) -> String? {
+        guard let value, let u = URL(string: value, relativeTo: base)?.absoluteURL,
+              u.scheme == "https", u.user == nil, u.password == nil, u.port == nil else { return nil }
+        let h = u.host?.lowercased() ?? ""
+        // Observed public image hosts only. Third-party player sites are not image sources.
+        let allowed = h == "jdbstatic.com" || h.hasSuffix(".jdbstatic.com")
+            || h == "static.javranking.cc" || h == "javranking.cc"
+        guard sameHost(u, base: base) || allowed else { return nil }
+        return u.absoluteString
+    }
+    static func normalizedCode(_ code: String) -> String {
+        code.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .uppercased().filter { $0.isLetter || $0.isNumber }
+    }
+}
+enum JRError: LocalizedError {
+    case message(String)
+    var errorDescription: String? { if case .message(let s) = self { return s }; return nil }
+}
+struct JRLink: Identifiable, Hashable {
+    let path: String; let title: String
+    var id: String { path }
+}
+struct JRVideo: Identifiable, Hashable {
+    let path: String
+    var code: String = ""
+    var title: String = ""
+    var image: String?
+    var subtitle: String = ""
+    var date: String = ""
+    var score: Double = 0
+    var categories: [Int] = []
+    var id: String { "javranking:" + path }
+}
+struct JRPage {
+    var title = "JAV Ranking"
+    var videos: [JRVideo] = []
+    var links: [JRLink] = []
+    var detail: JRVideo?
+    var metadata: [String] = []
+    var paragraphs: [String] = []
+    var images: [String] = []
+    var magnets: [String] = []
+    var next: String?
+}
+struct JRCategory: Identifiable {
+    let id: Int; let name: String; let aliases: [String]
+}
+struct JRIndex {
+    var videos: [JRVideo] = []
+    var categories: [JRCategory] = []
+    var entities: [JRLink] = []
+    var aliases: [String: String] = [:]
+    static func parse(_ data: Data, base: URL) throws -> JRIndex {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = root["videos"] as? [[String: Any]] else { throw JRError.message("站点索引格式已改变") }
+        var result = JRIndex(); var seen = Set<String>()
+        for r in rows {
+            guard let n = r["videoId"] as? Int, n > 0 else { continue }
+            let path = "/zh-hans/videos/\(n)/"
+            guard seen.insert(path).inserted else { continue }
+            result.videos.append(JRVideo(path: path, code: r["code"] as? String ?? "", title: r["title"] as? String ?? "未提供标题", image: JRPolicy.image(r["coverUrl"] as? String, base: base), subtitle: (r["actorLinks"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }.joined(separator: " · "), date: r["releaseDate"] as? String ?? "", score: (r["score"] as? NSNumber)?.doubleValue ?? 0, categories: r["categoryIds"] as? [Int] ?? []))
+        }
+        for r in root["categories"] as? [[String: Any]] ?? [] {
+            if let id = r["id"] as? Int, let name = r["name"] as? String { result.categories.append(JRCategory(id: id, name: name, aliases: r["aliases"] as? [String] ?? [])) }
+        }
+        for r in root["entities"] as? [[String: Any]] ?? [] {
+            guard let kind = r["kind"] as? String, ["actor", "maker", "director"].contains(kind), let slug = r["slug"] as? String, let name = r["name"] as? String,
+                  slug.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil else { continue }
+            let path = "/zh-hans/\(kind)s/\(slug)/"
+            result.entities.append(JRLink(path: path, title: name))
+            result.aliases[path] = ([name] + (r["aliases"] as? [String] ?? [])).joined(separator: " ")
+        }
+        return result
+    }
+}
+
+// Small inert HTML tree: handles quoted attributes and void tags, strips scripts/styles.
+// Only known metadata/card selectors are consumed; there is no browser or JS runtime.
+final class JRNode {
+    let tag: String; let attrs: [String: String]
+    var children: [JRNode] = []; var raw = ""
+    init(_ tag: String, _ attrs: [String: String] = [:]) { self.tag = tag; self.attrs = attrs }
+    var text: String { JRHTML.text(raw + children.map(\.text).joined(separator: " ")) }
+    func all(_ predicate: (JRNode) -> Bool) -> [JRNode] {
+        var found: [JRNode] = []; for n in children { if predicate(n) { found.append(n) }; found += n.all(predicate) }; return found
+    }
+    func has(_ name: String) -> Bool { attrs[name] != nil }
+    func cls(_ value: String) -> Bool { (attrs["class"] ?? "").split(separator: " ").contains(Substring(value)) }
+}
+enum JRHTML {
+    static func matches(_ pattern: String, _ s: String) -> [[String]] {
+        guard let re = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return [] }
+        let ns = s as NSString
+        return re.matches(in: s, range: NSRange(location: 0, length: ns.length)).map { m in
+            (0..<m.numberOfRanges).map { m.range(at: $0).location == NSNotFound ? "" : ns.substring(with: m.range(at: $0)) }
+        }
+    }
+    static func text(_ s: String) -> String {
+        var s = s
+        for (a,b) in [("&amp;","&"),("&quot;","\""),("&#39;","'"),("&apos;","'"),("&lt;","<"),("&gt;",">"),("&nbsp;"," ")] { s = s.replacingOccurrences(of: a, with: b) }
+        for m in matches(#"&#(x[0-9a-f]+|[0-9]+);"#, s) {
+            let hex = m[1].lowercased().hasPrefix("x")
+            if let n = UInt32(hex ? String(m[1].dropFirst()) : m[1], radix: hex ? 16 : 10), let scalar = UnicodeScalar(n) { s = s.replacingOccurrences(of: m[0], with: String(scalar)) }
+        }
+        return s.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    static func tree(_ html: String) -> JRNode {
+        let inert = html.replacingOccurrences(of: #"<(script|style|template)\b[^>]*>.*?</\1\s*>|<!--.*?-->"#, with: "", options: [.regularExpression, .caseInsensitive])
+        let root = JRNode("root"); var stack = [root]
+        let void: Set<String> = ["img","input","meta","link","br","hr","source","wbr","area","embed"]
+        for token in matches(#"<[^>\"']*(?:\"[^\"]*\"[^>\"']*|'[^']*'[^>\"']*)*>|[^<]+"#, inert) {
+            let t = token[0]
+            if t.hasPrefix("</") {
+                let name = t.dropFirst(2).prefix { $0.isLetter || $0.isNumber }.lowercased()
+                if let idx = stack.lastIndex(where: { $0.tag == name }), idx > 0 { stack.removeSubrange(idx...) }
+            } else if t.hasPrefix("<") {
+                guard let name = matches(#"^<([a-z][a-z0-9-]*)"#,t).first?[1] else { continue }
+                var attrs: [String:String] = [:]
+                for m in matches(#"\s([a-z_:][a-z0-9_:.-]*)(?:\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>]+)))?"#,t) { attrs[m[1].lowercased()] = text(m[2].isEmpty ? (m[3].isEmpty ? m[4] : m[3]) : m[2]) }
+                let n = JRNode(name.lowercased(), attrs); stack.last!.children.append(n)
+                if !void.contains(n.tag) && !t.hasSuffix("/>") { stack.append(n) }
+            } else { let n = JRNode("text"); n.raw = t; stack.last!.children.append(n) }
+        }
+        return root
+    }
+    static func parse(_ html: String, path: String, base: URL) throws -> JRPage {
+        let root = tree(html); var page = JRPage()
+        guard let main = root.all({ $0.tag == "main" }).first else { throw JRError.message("站点未返回公开内容，可能受到访问限制。请稍后重试。") }
+        page.title = main.all { $0.tag == "h1" }.first?.text ?? "JAV Ranking"
+        var seen = Set<String>()
+        for node in main.all({ $0.has("data-video-card") || $0.cls("video-card") }) {
+            guard let a = node.all({ $0.has("data-video-card-title") }).first,
+                  let href = a.attrs["href"], let route = JRPolicy.route(href, relativeTo: path, base: base), route.contains("/videos/"), seen.insert(route).inserted else { continue }
+            page.videos.append(JRVideo(path: route, code: node.all { $0.has("data-video-card-code") }.first?.text ?? "", title: a.text, image: JRPolicy.image(node.all { $0.tag == "img" }.first?.attrs["src"], base: base), subtitle: node.all { $0.has("data-video-card-actors") }.first?.text ?? ""))
+        }
+        var linkSeen = Set<String>()
+        for a in main.all({ $0.tag == "a" }) {
+            guard let href = a.attrs["href"], let route = JRPolicy.route(href, relativeTo: path, base: base), !route.contains("/videos/"), route != path, linkSeen.insert(route).inserted else { continue }
+            let title = a.text.isEmpty ? (a.attrs["aria-label"] ?? route) : a.text
+            if route.contains("page=") {
+                let label = title + (a.attrs["aria-label"] ?? "")
+                if a.attrs["rel"] == "next" || label.contains("下一") { page.next = route }
+                continue
+            }
+            page.links.append(JRLink(path: route, title: title))
+        }
+        for m in matches(#"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>"#,html) {
+            guard let data = m[1].data(using: .utf8), let j = try? JSONSerialization.jsonObject(with: data) as? [String:Any] else { continue }
+            if j["@type"] as? String == "Movie" {
+                page.detail = JRVideo(path: path, code: j["alternateName"] as? String ?? "", title: j["name"] as? String ?? page.title, image: JRPolicy.image(j["image"] as? String, base: base), date: j["datePublished"] as? String ?? "")
+                page.metadata = [j["datePublished"] as? String, j["duration"] as? String].compactMap { $0 }
+                if let actors = j["actor"] as? [[String:Any]] { page.metadata.append(actors.compactMap { $0["name"] as? String }.joined(separator: " · ")) }
+            }
+            if j["@type"] as? String == "ItemList", let entries = j["itemListElement"] as? [[String:Any]], !path.contains("most-awarded-videos") {
+                let links = entries.compactMap { r -> JRLink? in
+                    guard let u = r["url"] as? String, let p = JRPolicy.route(u, relativeTo: path, base: base), let title = r["name"] as? String else { return nil }; return JRLink(path: p, title: title)
+                }
+                if !links.isEmpty { page.links = links + page.links.filter { a in !links.contains(where: { $0.path == a.path }) } }
+            }
+        }
+        if path.contains("/videos/") {
+            page.paragraphs = main.all { $0.tag == "blockquote" || $0.cls("review-card") || $0.cls("review-list") }.map(\.text).filter { !$0.isEmpty }
+            page.magnets = Array(Set(main.all { $0.tag == "a" }.compactMap { $0.attrs["href"] }.filter { $0.hasPrefix("magnet:?xt=urn:btih:") })).sorted()
+            page.images = Array(Set(main.all { $0.tag == "img" }.compactMap { JRPolicy.image($0.attrs["src"], base: base) })).sorted()
+            page.metadata += main.all { $0.tag == "dd" || $0.cls("facts-panel__row") }.map(\.text).filter { !$0.isEmpty }
+        } else if page.videos.isEmpty && page.links.isEmpty || ["about","help","privacy","terms","feedback","extension","sponsor"].contains(path.split(separator: "/").dropFirst().first.map(String.init) ?? "") {
+            page.paragraphs = main.all { ["h2","h3","p","li"].contains($0.tag) }.map(\.text).filter { !$0.isEmpty && $0.count < 3000 }
+        }
+        return page
+    }
+}
