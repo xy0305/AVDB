@@ -61,15 +61,15 @@ import Foundation
     main=r'''
 import Foundation
 import Combine
-struct Movie: Hashable { let id: String; let number: String? }
+struct Movie: Hashable { let id: String; let number: String?; var title: String? { nil } }
 @MainActor final class JavDBSDK {
  static let shared=JavDBSDK()
  var calls: [String:Int]=[:]; var active=0; var maximum=0
- func search(keyword:String,type:String,limit:Int) async throws -> [Movie] {
+ func search(keyword:String,page:Int = 1,type:String = "movie") async throws -> [Movie] {
   calls[keyword,default:0] += 1; active += 1; maximum=max(active,maximum)
   defer { active -= 1 }
   try await Task.sleep(nanoseconds:40_000_000)
-  precondition(type == "code" && limit == 20)
+  precondition(type == "movie")
   if keyword == "MISS-001" { return [] }
   if keyword == "EMPTY-001" { return [Movie(id:"",number:keyword)] }
   if keyword == "WRONG-001" { return [Movie(id:"wrong",number:"OTHER-001")] }
@@ -131,8 +131,9 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
   async let x=source.matchedMovie(code:"IPX-811"); async let y=source.matchedMovie(code:"IPX-811")
   let pair=try await (x,y); precondition(pair.0?.id == "right" && pair.1?.id == "right")
   precondition(JavDBSDK.shared.calls["IPX-811"] == 1)
-  let miss=try await source.matchedMovie(code:"MISS-001"); let amb=try await source.matchedMovie(code:"AMB-001")
-  precondition(miss == nil && amb == nil)
+  let miss=try await source.matchedMovie(code:"MISS-001")
+  precondition(miss == nil)
+  do { _=try await source.matchedMovie(code:"AMB-001"); preconditionFailure("ambiguity hidden") } catch {}
   precondition(JRPolicy.exactCode("IPX-811") != JRPolicy.exactCode("IPX-8110"))
   precondition(JRPolicy.exactCode("FC2-PPV-12345") == JRPolicy.exactCode("FC2PPV12345"))
   precondition(JRPolicy.exactCode("FC2-12345") == nil)
@@ -176,6 +177,10 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
  }
 }
 '''
+    # Exercise the shipping resolver, not a mock that repeats its matching policy.
+    sdk = (root/'AVDB/Services/JavDBSDK.swift').read_text()
+    helper = '    public func exactMovie' + sdk.split('    public func exactMovie', 1)[1].split('    /// 分类搜索：', 1)[0]
+    main = main.replace('final class Mock: URLProtocol', 'extension JavDBSDK {\n' + helper + '\n}\nfinal class Mock: URLProtocol')
     p=d/'client.swift';p.write_text(current+'\n'+(root/'AVDB/Services/JavRankingSource.swift').read_text()+'\n'+main.replace('precondition(', 'check('))
     subprocess.run(['swiftc','-O','-swift-version','5','-parse-as-library',str(p),'-o',str(d/'client')],check=True)
     subprocess.run([str(d/'client'),str(fixtures),str(d/'most-awarded-videos.html')],check=True,timeout=180)
