@@ -21,7 +21,7 @@ for code, mid in [('IPX580','68YVQ'),('IPX247','KmKGv')]:
 print('PASS captured production differential: code -> data.codes; movie -> data.movies, IPX580=68YVQ IPX247=KmKGv')
 response = read('AVDB/Networking/APIClient.swift').split('/// 统一响应包裹结构')[1].split('/// 空数据占位')[0]
 errors = read('AVDB/Networking/APIClient.swift').split('/// API 错误')[1].split('/// JAVDB HTTP 客户端')[0]
-swift = 'import Foundation\n' + core + read('AVDB/Models/JSONFlex.swift') + read('AVDB/Models/Movie.swift') + response + errors + r'''
+swift = 'import Foundation\n' + core + read('AVDB/Services/ExternalLibraryClient.swift').split('final class ExternalLibraryClient')[0] + read('AVDB/Models/JSONFlex.swift') + read('AVDB/Models/Movie.swift') + response + errors + r'''
 public enum CoverURLBuilder {
     public static func coverURLs(for number: String?) -> (poster: String?, backdrop: String?) { (nil, nil) }
 }
