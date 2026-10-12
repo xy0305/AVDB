@@ -156,8 +156,7 @@ struct LoginView: View {
         do {
             if loginMethod == .credentials {
                 let user = try await JavDBSDK.shared.login(username: username, password: password)
-                appState.currentUser = user
-                appState.isLoggedIn = true
+                appState.acceptLogin(user)
             } else {
                 // Token 登录
                 var cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -169,10 +168,14 @@ struct LoginView: View {
                     }
                 }
                 JavDBSDK.shared.setToken(cleanToken)
-                // 验证 Token 并获取用户信息
-                let (user, _) = try await JavDBSDK.shared.userInfo()
-                appState.currentUser = user
-                appState.isLoggedIn = true
+                appState.restoreLogin()
+                // AppState owns the sole validation task and token epoch.
+                await appState.restoreTask?.value
+                guard appState.sessionStatus == .validated else {
+                    throw JavDBError.apiError(action: nil, message: appState.sessionStatus == .needsReauth
+                        ? "服务器已拒绝凭证，请检查 Token"
+                        : "暂时无法验证账户，系统会在网络恢复或回到前台后自动重试")
+                }
             }
             dismiss()
         } catch {

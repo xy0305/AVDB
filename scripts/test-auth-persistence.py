@@ -1,103 +1,92 @@
 #!/usr/bin/env python3
-"""Compile shipping startup/token methods against isolated stores and a mocked SDK."""
+"""Execute the production AppState with isolated defaults and mocked transport."""
 from pathlib import Path
 import shutil, subprocess, tempfile
-
-def declaration(text, marker):
-    start = text.index(marker)
-    opening = text.index('{', start)
-    depth = 1
-    end = opening + 1
-    while depth:
-        depth += (text[end] == '{') - (text[end] == '}')
-        end += 1
-    return text[start:end]
-
 root = Path(__file__).resolve().parents[1]
-app = (root / 'AVDB/AVDBApp.swift').read_text()
-client = (root / 'AVDB/Networking/APIClient.swift').read_text()
-shipping_app = app[app.index('@MainActor\nfinal class AppState'):]
-methods = '\n'.join(declaration(client, marker) for marker in [
-    'public func setToken(', 'public var hasToken:'])
-error = declaration(client, 'public enum JavDBError:')
-source = '''import Foundation
+def declaration(text, marker):
+    start=text.index(marker); end=text.index('{',start)+1; depth=1
+    while depth:
+        depth+=(text[end]=='{')-(text[end]=='}');end+=1
+    return text[start:end]
+app=(root/'AVDB/AVDBApp.swift').read_text()
+model=declaration((root/'AVDB/Models/User.swift').read_text(),'public struct User:')
+error=declaration((root/'AVDB/Networking/APIClient.swift').read_text(),'public enum JavDBError:')
+source='''import Foundation
 import Combine
-struct User { let id: Int }
-''' + error + '''
-final class APIClient: @unchecked Sendable {
-    static let shared = APIClient()
-    static let tokenKey = "avdb.javdb.token"
-    static let store = UserDefaults(suiteName: "avdb.auth.regression." + UUID().uuidString)!
-    var token: String?
-    let tokenLock = NSLock()
-    init() { token = Self.store.string(forKey: Self.tokenKey) }
-''' + methods.replace('UserDefaults.standard', 'Self.store') + '''
-}
+import Network
+import CryptoKit
+'''+model+error+'''
+final class APIClient { static let shared = APIClient(); var token: String? }
 @MainActor final class JavDBSDK {
-    static let shared = JavDBSDK()
-    var outcome: Result<(User, Int), Error> = .success((User(id: 1), 0))
-    var beforeReturn: (() -> Void)?
-    var logoutCalls = 0
-    func userInfo() async throws -> (User, Int) {
-        await Task.yield()
-        beforeReturn?()
-        return try outcome.get()
-    }
-    func logout() { logoutCalls += 1; APIClient.shared.setToken(nil) }
+ static let shared = JavDBSDK()
+ func profile() async throws -> User { fatalError("must inject transport") }
+ func logout() { APIClient.shared.token = nil }
 }
-''' + shipping_app + '''
+'''+app[app.index('@MainActor\nfinal class AppState'):]+'''
 @main struct Regression {
-    @MainActor static func main() async {
-        let client = APIClient.shared, sdk = JavDBSDK.shared
-        let fixture = "synthetic-test-credential"
-        client.setToken(fixture)
-        assert(APIClient().token == fixture, "shipping setToken survives client recreation")
-        for error: Error in [URLError(.notConnectedToInternet), URLError(.timedOut), CancellationError(), JavDBError.decodeError("mock"), JavDBError.invalidSignature, JavDBError.httpError(403, "mock"), JavDBError.httpError(500, "mock")] {
-            sdk.outcome = .failure(error)
-            let state = AppState()
-            await state.restoreTask?.value
-            assert(state.isLoggedIn)
-            assert(client.token == fixture && APIClient().token == fixture)
-        }
-        sdk.outcome = .failure(URLError(.timedOut))
-        let offline = AppState()
-        await offline.restoreTask?.value
-        assert(offline.isLoggedIn && offline.currentUser == nil)
-        sdk.outcome = .success((User(id: 8), 0))
-        offline.restoreLogin()
-        await offline.restoreTask?.value
-        assert(offline.isLoggedIn && offline.currentUser?.id == 8)
-        sdk.outcome = .failure(JavDBError.httpError(401, "mock"))
-        let unauthorized = AppState()
-        await unauthorized.restoreTask?.value
-        assert(!unauthorized.isLoggedIn && APIClient().token == fixture)
-        sdk.outcome = .success((User(id: 7), 0))
-        let relaunched = AppState()
-        await relaunched.restoreTask?.value
-        assert(relaunched.isLoggedIn && relaunched.currentUser?.id == 7)
-        sdk.beforeReturn = { client.setToken(nil) }
-        let loggedOut = AppState()
-        loggedOut.isLoggedIn = false
-        await loggedOut.restoreTask?.value
-        assert(!loggedOut.isLoggedIn && loggedOut.currentUser == nil)
-        client.setToken(fixture)
-        sdk.beforeReturn = { client.setToken("synthetic-replacement") }
-        let changedAccount = AppState()
-        await changedAccount.restoreTask?.value
-        assert(changedAccount.currentUser == nil)
-        assert(APIClient().token == "synthetic-replacement")
-        assert(sdk.logoutCalls == 0, "startup never clears persisted credentials")
-        // Only remove synthetic test data in this UUID-named suite.
-        client.setToken(nil)
-        print("PASS: shipping auth restore, relaunch, transient/401/403 errors and account races")
-    }
+ @MainActor static func main() async throws {
+  let name = "avdb.auth.test." + UUID().uuidString
+  let store = UserDefaults(suiteName: name)!
+  defer { store.removePersistentDomain(forName: name) }
+  let client = APIClient.shared
+  client.token = "synthetic-A"
+  let user = try JSONDecoder().decode(User.self, from: Data("{\\"id\\":8,\\"username\\":\\"Example\\",\\"email\\":\\"private@example.invalid\\",\\"avatar_url\\":\\"https://invalid/?token=private\\",\\"bio\\":\\"private\\"}".utf8))
+  var calls = 0
+  var fail = false
+  var beforeReturn: (() -> Void)?
+  func make() -> AppState {
+   AppState(defaults: store, fetchProfile: {
+    calls += 1; await Task.yield(); beforeReturn?()
+    if fail { throw URLError(.timedOut) }
+    return user
+   }, pause: { _ in await Task.yield() }, observeNetwork: false)
+  }
+  let initial = make(); await initial.restoreTask?.value
+  assert(initial.currentUser?.id == 8 && initial.sessionStatus == .validated)
+  let data = store.dictionaryRepresentation().filter { $0.key.hasPrefix("avdb.profile.") }
+  assert(data.count == 1)
+  let bytes = data.values.first as! Data
+  let json = String(data: bytes, encoding: .utf8)!
+  assert(!json.contains("email") && !json.contains("avatar") && !json.contains("bio") && !json.contains("synthetic"))
+  assert(!data.keys.first!.contains("synthetic"))
+  fail = true; calls = 0
+  let cached = make()
+  assert(cached.currentUser?.id == 8 && cached.sessionStatus == .cached)
+  cached.resumeValidation(); await cached.restoreTask?.value
+  assert(calls == 4 && cached.currentUser?.id == 8)
+  fail = false; cached.resumeValidation(); await cached.restoreTask?.value
+  assert(cached.sessionStatus == .validated)
+  client.token = "synthetic-B"; fail = true; calls = 0
+  cached.restoreLogin()
+  assert(cached.currentUser == nil)
+  await cached.restoreTask?.value
+  assert(calls == 4 && cached.sessionStatus == .unavailable)
+  fail = false; cached.resumeValidation(); await cached.restoreTask?.value
+  assert(cached.currentUser?.id == 8)
+  beforeReturn = { client.token = "synthetic-C" }
+  let race = make(); await race.restoreTask?.value
+  assert(race.currentUser?.id == 8) // B cache only; late result cannot validate C.
+  assert(race.sessionStatus == .cached)
+  beforeReturn = nil
+  let unauthorized = AppState(defaults: store, fetchProfile: { throw JavDBError.httpError(401,"mock") }, pause: {_ in}, observeNetwork: false)
+  await unauthorized.restoreTask?.value
+  assert(unauthorized.sessionStatus == .needsReauth && unauthorized.currentUser == nil)
+  assert(client.token == "synthetic-C")
+  unauthorized.resumeValidation(); assert(unauthorized.restoreTask == nil)
+  client.token = "synthetic-B"
+  let loggedOut = make(); loggedOut.logout(); await Task.yield()
+  assert(loggedOut.currentUser == nil && client.token == nil)
+  client.token = "synthetic-B"; fail = true
+  let noSnapshot = make(); assert(noSnapshot.currentUser == nil)
+  await noSnapshot.restoreTask?.value
+  print("PASS production AppState: cold cache, sanitized snapshot, single flight, bounded retry, recovery, account switch/epoch, logout, 401")
+ }
 }
 '''
 if not shutil.which('swiftc'):
-    print('SKIP runtime: swiftc unavailable; CI macOS must run production auth replay')
+ print('SKIP runtime: swiftc unavailable; macOS CI executes production AppState')
 else:
-    with tempfile.TemporaryDirectory() as directory:
-        path = Path(directory)
-        (path / 'Auth.swift').write_text(source)
-        subprocess.run(['swiftc', '-parse-as-library', str(path / 'Auth.swift'), '-o', str(path / 'auth')], check=True)
-        subprocess.run([str(path / 'auth')], check=True)
+ with tempfile.TemporaryDirectory() as d:
+  p=Path(d); (p/'Auth.swift').write_text(source)
+  subprocess.run(['swiftc','-parse-as-library',str(p/'Auth.swift'),'-o',str(p/'auth')],check=True)
+  subprocess.run([str(p/'auth')],check=True)

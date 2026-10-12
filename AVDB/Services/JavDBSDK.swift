@@ -856,6 +856,16 @@ public final class JavDBSDK {
     }
 
     /// 用户信息（GET /api/v1/users，需 token）。关注列表不在此接口，需另走 batch_push。
+    /// Profile validation must not wait for unrelated following-tags requests or
+    /// mutate account stores before AppState checks its token epoch.
+    public func profile() async throws -> User {
+        let resp: JavDBResponse<UserData> = try await client.get("/api/v1/users", useToken: true)
+        guard resp.isSuccess, let user = resp.data?.user else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        return user
+    }
+
     public func userInfo() async throws -> (user: User, followingTags: [FollowingTag]) {
         let resp: JavDBResponse<UserData> = try await client.get("/api/v1/users", useToken: true)
         guard resp.isSuccess, let user = resp.data?.user else {

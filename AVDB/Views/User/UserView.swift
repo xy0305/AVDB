@@ -16,7 +16,11 @@ struct UserView: View {
         NavigationStack {
             List {
                 if let user = appState.currentUser {
-                    // 已登录
+                    // Native account navigation remains available with a cached profile.
+                    if appState.sessionStatus == .cached {
+                        Text("已恢复本机资料，正在自动同步；网络异常不影响账户入口")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Section {
                         HStack(spacing: 16) {
                             ZStack {
@@ -147,21 +151,23 @@ struct UserView: View {
 
                     Section {
                         Button("退出登录", role: .destructive) {
-                            JavDBSDK.shared.logout()
-                            appState.isLoggedIn = false
-                            appState.currentUser = nil
+                            appState.logout()
                         }
                     }
 
                 } else if appState.isLoggedIn {
-                    Section("已保留登录") {
-                        Label("登录凭证已保存，个人资料暂未加载", systemImage: "person.crop.circle.badge.checkmark")
-                        Text("网络或服务暂时异常不会退出账号。连接恢复后可重试，无需重新登录。")
+                    Section("正在恢复账户") {
+                        Label("正在自动加载个人资料", systemImage: "person.crop.circle.badge.checkmark")
+                        Text("网络或服务暂时异常，系统会自动重试，并在回到前台或连接恢复时继续。")
                             .font(.footnote).foregroundStyle(.secondary)
-                        Button("重新加载个人资料") { appState.restoreLogin() }
+
                     }
                 } else {
                     // 未登录
+                    if appState.sessionStatus == .needsReauth {
+                        Text("服务器已拒绝登录凭证，请重新登录")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     Section {
                         Button {
                             GlassHaptic.tap()
