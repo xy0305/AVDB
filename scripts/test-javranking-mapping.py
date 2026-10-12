@@ -8,7 +8,7 @@ read = lambda p: (root / p).read_text()
 sdk = read('AVDB/Services/JavDBSDK.swift').split('    /// 分类搜索：按演员/系列/片商/导演/清单/番号 搜索。')[0] + '\n}\n'
 core = read('AVDB/Services/JavRankingCore.swift')
 source = read('AVDB/Services/JavRankingSource.swift')
-assert 'JavDBSDK.shared.exactMovie(code: code)' in source
+assert 'JavDBSDK.shared.exactMovie(code: code, refresh: refresh)' in source
 assert 'type: "code"' not in source
 native = read('AVDB/Views/Search/SearchView.swift')
 assert 'type: "movie"' in native and 'JavDBSDK.shared.search(' in native
@@ -27,9 +27,10 @@ public enum CoverURLBuilder {
 }
 @MainActor final class APIClient {
     static let shared = APIClient()
-    var payloads: [Data] = []
+    var token: String? = "synthetic-initial"
+    var payloads: [Data] = [] { didSet { token = UUID().uuidString } }
     var queries: [[String: String]] = []
-    var failure: Error?
+    var failure: Error? { didSet { token = UUID().uuidString } }
     func get<T: Decodable>(_ path: String, query: [String: String]?) async throws -> T {
         precondition(path == "/api/v2/search")
         queries.append(query ?? [:])
@@ -60,8 +61,11 @@ Task { @MainActor in
             client.queries = []
             let resolved = try await sdk.exactMovie(code: code)
             check(resolved?.id == id, code + " production fixture exact ID")
+            check(client.queries.count == 1, "page-one exact hit uses one request")
             let resolverQuery = client.queries.first!
             client.queries = []
+            _ = try await sdk.exactMovie(code: code)
+            check(client.queries.isEmpty, "known exact movie uses zero requests")
             _ = try await sdk.search(keyword: code, type: "movie")
             check(client.queries.first! == resolverQuery, "resolver first request equals native search including defaults")
             check(resolverQuery["movie_type"] == nil && resolverQuery["movie_filter_by"] == nil, "unfiltered native scope")
@@ -83,6 +87,10 @@ Task { @MainActor in
             check(result?.id == expected, name)
         }
         let filler = Array(repeating: ["id":"fuzzy","number":"IPX247"], count:20)
+        client.payloads = [try payload(Array(filler.prefix(19)) + [["id":"fast","number":"IPX580"]])]
+        client.queries = []
+        check(try await sdk.exactMovie(code:"IPX580")?.id == "fast", "full page unique exact hit")
+        check(client.queries.count == 1, "full page hit does not fetch page two")
         client.payloads = [try payload(filler), try payload([["id":"later","number":"IPX580"]])]
         check(try await sdk.exactMovie(code:"IPX580")?.id == "later", "exact beyond first page")
         client.payloads = [try payload([["id":"a","number":"IPX580"],["id":"b","number":"IPX580"]])]

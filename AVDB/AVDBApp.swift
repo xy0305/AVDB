@@ -39,25 +39,31 @@ struct AVDBApp: App {
 final class AppState: ObservableObject {
     @Published var isLoggedIn = false
     @Published var currentUser: User?
+    private(set) var restoreTask: Task<Void, Never>?
 
     init() {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") { return }
         #endif
         // 检查本地是否有保存的 Token
-        if APIClient.shared.hasToken {
+        if let restoredToken = APIClient.shared.token, !restoredToken.isEmpty {
             isLoggedIn = true
-            // 异步验证 Token 并拉取用户信息
-            Task {
+            restoreTask = Task {
                 do {
                     let (user, _) = try await JavDBSDK.shared.userInfo()
+                    // A delayed launch request must not resurrect a logged-out/replaced account.
+                    guard APIClient.shared.token == restoredToken else { return }
                     self.currentUser = user
                     self.isLoggedIn = true
                 } catch {
-                    // Token 无效或过期，清除登录状态
-                    JavDBSDK.shared.logout()
-                    self.isLoggedIn = false
-                    self.currentUser = nil
+                    guard APIClient.shared.token == restoredToken else { return }
+                    // Offline, timeout, decoding, signing and 403 errors do not prove expiry.
+                    // Even a 401 must not destroy the saved credential: allow explicit re-login
+                    // and retry on next launch without deleting any account data.
+                    if case JavDBError.httpError(401, _) = error {
+                        self.isLoggedIn = false
+                        self.currentUser = nil
+                    }
                 }
             }
         }

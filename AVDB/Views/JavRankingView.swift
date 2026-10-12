@@ -120,26 +120,11 @@ private struct JRMeasuredGrid: View {
         .background { GeometryReader { g in Color.clear.preference(key: JRWidthKey.self, value: g.size.width) } }
         .onPreferenceChange(JRWidthKey.self) { if $0 > 0 { width = $0 } }
         .task(id: "\(source.generation):" + videos.map(\.path).joined(separator: ",")) {
-            let epoch = source.generation
+            // Never launch speculative JavDB searches while posters are loading.
+            // Reuse only verified cache entries; an actual tap owns resolution.
             mapped.removeAll(); completed.removeAll()
-            // Only the explicitly displayed page, three lookups at a time.
-            // Source placeholders are already rendered; publish each match alone.
-            await withTaskGroup(of: (String, Movie?).self) { group in
-                var iterator = videos.filter { !$0.code.isEmpty && mapped[$0.path] == nil }.makeIterator()
-                func add(_ video: JRVideo) {
-                    group.addTask {
-                        guard !Task.isCancelled else { return (video.path, nil) }
-                        let movie = try? await source.matchedMovie(code: video.code)
-                        return (video.path, movie)
-                    }
-                }
-                for _ in 0..<3 { if let video = iterator.next() { add(video) } }
-                while let (path, movie) = await group.next() {
-                    guard !Task.isCancelled, epoch == source.generation else { group.cancelAll(); break }
-                    if let movie { mapped[path] = movie }
-                    completed.insert(path)
-                    if let video = iterator.next() { add(video) }
-                }
+            for video in videos {
+                if let movie = source.cachedMovie(code: video.code) { mapped[video.path] = movie }
             }
         }
 
@@ -387,7 +372,7 @@ struct JRMovieRoute: View {
     private var code: String { JRPolicy.exactCode(video.code) != nil ? video.code : (JRPolicy.catalogueCode(video.title) ?? "") }
     var body: some View {
         Group {
-            if let movie {
+            if let movie = movie ?? source.cachedMovie(code: code) {
                 MovieDetailView(movieID: movie.id)
                     .toolbar { ToolbarItem(placement: .topBarTrailing) {
                         NavigationLink { JRPageView(path: video.path, sourceOnly: true) } label: { Image(systemName: "info.circle") }
@@ -411,7 +396,7 @@ struct JRMovieRoute: View {
             defer { if epoch == source.generation, request == attempt { loading = false } }
             guard !code.isEmpty else { message = "不能从标题猜测影片；请查看来源资料。"; return }
             do {
-                let match = try await source.matchedMovie(code: code, refresh: attempt > 0)
+                let match = try await source.matchedMovie(code: code, refresh: attempt > 0, interactive: true)
                 guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
                 movie = match
                 if match == nil { message = "原生影片搜索前 3 页未找到番号 \(code) 的有效 ID 精确结果（不代表影片不存在）。请重试或在原生搜索中核对；不会自动打开辅助来源详情。" }
@@ -420,5 +405,6 @@ struct JRMovieRoute: View {
                 message = "番号 \(code) 核验失败：" + error.localizedDescription
             }
         }
+        .onDisappear { source.cancelMappings() }
     }
 }

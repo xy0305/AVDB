@@ -81,6 +81,34 @@ public final class JavDBSDK {
 
     private init() {}
 
+    // Memory only, bounded, scoped to the active JavDB account (backend is fixed).
+    private var knownMovies: [String: [String: Movie]] = [:]
+    private var knownAccount: String?
+    private func updateKnownScope() {
+        if knownAccount != client.token { knownMovies.removeAll(); knownAccount = client.token }
+    }
+    private func rememberMovies(_ movies: [Movie]) {
+        updateKnownScope()
+        for movie in movies {
+            guard !movie.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let key = JRPolicy.movieCode(number: movie.number, title: movie.title) else { continue }
+            if knownMovies[key] == nil && knownMovies.count >= 256 { knownMovies.removeAll() }
+            if (knownMovies[key]?.count ?? 0) < 2 || knownMovies[key]?[movie.id] != nil {
+                knownMovies[key, default: [:]][movie.id] = movie
+            }
+        }
+    }
+    func hasAmbiguousMovie(code: String) -> Bool {
+        updateKnownScope()
+        guard let key = JRPolicy.exactCode(code) else { return false }
+        return (knownMovies[key]?.count ?? 0) > 1
+    }
+    func cachedExactMovie(code: String) -> Movie? {
+        updateKnownScope()
+        guard let key = JRPolicy.exactCode(code), let matches = knownMovies[key], matches.count == 1 else { return nil }
+        return matches.values.first
+    }
+
     // MARK: - 搜索类
 
     /// 主搜索（GET /api/v2/search）
@@ -110,13 +138,17 @@ public final class JavDBSDK {
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// Resolve through the same movie request/decoder as native SearchMovieResultView.
     /// `type=code` returns data.codes (series-number categories), NOT data.movies.
-    public func exactMovie(code: String) async throws -> Movie? {
+    public func exactMovie(code: String, refresh: Bool = false) async throws -> Movie? {
         guard let key = JRPolicy.exactCode(code) else { return nil }
+        if !refresh, let cached = cachedExactMovie(code: code) { return cached }
+        if (knownMovies[key]?.count ?? 0) > 1 { throw JRError.message("同一番号对应多个有效影片 ID，无法安全选择；请在原生搜索中核对。") }
         var candidates: [String: Movie] = [:]
         // Bounded search includes later pages; never select the first fuzzy hit.
         for page in 1...3 {
@@ -128,6 +160,9 @@ public final class JavDBSDK {
                 candidates[id] = movie
             }
             if candidates.count > 1 { throw JRError.message("同一番号对应多个有效影片 ID，无法安全选择；请在原生搜索中核对。") }
+            // Inspect the entire returned page for ambiguity, but do not delay a
+            // unique exact hit behind speculative pages 2/3.
+            if let match = candidates.values.first { return match }
             if results.count < 20 { break }
         }
         return candidates.values.first
@@ -176,7 +211,9 @@ public final class JavDBSDK {
     public func searchImage(_ imageURL: String) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v2/search_image", query: ["image_url": imageURL])
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 磁力搜索（GET /api/v1/search_magnet）
@@ -264,7 +301,9 @@ public final class JavDBSDK {
         if let filterBy { query["filter_by"] = filterBy }
         if let sortBy { query["sort_by"] = sortBy }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/latest", query: query)
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// TOP250（GET /api/v1/movies/top）
@@ -287,7 +326,9 @@ public final class JavDBSDK {
         ]
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/movies/top", query: query, useToken: true)
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 按标签/片单筛影片（GET /api/v1/movies/tags）
@@ -311,7 +352,9 @@ public final class JavDBSDK {
         if let type { query["type"] = type }
         if let filterByTags, !filterByTags.isEmpty { query["filter_by_tags"] = filterByTags }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query)
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 标签/分类（兼容旧调用）
@@ -327,7 +370,9 @@ public final class JavDBSDK {
         else { query["period"] = "-1" }
         let resp: JavDBResponse<RecommendMoviesData> = try await client.get(
             "/api/v1/movies/recommend", query: query)
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 推荐时间段（GET /api/v1/movies/recommend_periods）
@@ -342,7 +387,9 @@ public final class JavDBSDK {
     public func mayAlsoLike(_ id: String) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/movies/may_also_like", query: ["id": id, "limit": "9"])
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     // MARK: - 演员 / 导演 / 系列 / 片商 / 发行商
@@ -495,7 +542,9 @@ public final class JavDBSDK {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/rankings",
             query: ["type": type, "period": period, "page": "\(page)"])
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 演员排行榜（GET /api/v1/rankings/actors）
@@ -511,7 +560,9 @@ public final class JavDBSDK {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/rankings/playback",
             query: ["filter_by": filterBy, "period": period, "page": "\(page)"])
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 筛选项（GET /api/v2/tags）type: 0有码 1无码 2欧美 3 FC2
@@ -825,7 +876,9 @@ public final class JavDBSDK {
     public func recentViewed() async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/users/recent_viewed", useToken: true)
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 收藏的演员/番号/导演/片商/系列/片单（GET /api/v1/users/collected_*）
@@ -881,7 +934,9 @@ public final class JavDBSDK {
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
-        return resp.data?.movies ?? []
+        let movies = resp.data?.movies ?? []
+        rememberMovies(movies)
+        return movies
     }
 
     /// 某用户的影评（GET /api/v2/users/{id}/reviews）

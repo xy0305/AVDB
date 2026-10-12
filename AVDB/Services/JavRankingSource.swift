@@ -68,25 +68,52 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private var matchFlights: [String: Task<Movie?, Error>] = [:]
     private var matchTokens: [String: UUID] = [:]
     private var activeMatches = 0
+    private var matchAccount: String?
+    private func updateMatchScope() {
+        let account = APIClient.shared.token
+        if account != matchAccount {
+            cancelMappings(); matches.removeAll(); matchAccount = account
+        }
+    }
+    func cachedMovie(code: String) -> Movie? {
+        updateMatchScope()
+        guard !JavDBSDK.shared.hasAmbiguousMovie(code: code) else { return nil }
+        if let native = JavDBSDK.shared.cachedExactMovie(code: code) { return native }
+        guard let key = JRPolicy.exactCode(code), let cached = matches[key],
+              Date().timeIntervalSince(cached.date) < 21600 else { return nil }
+        return cached.movie
+    }
     func cancelMappings() {
         matchFlights.values.forEach { $0.cancel() }; matchFlights.removeAll(); matchTokens.removeAll()
     }
-    func matchedMovie(code: String, refresh: Bool = false) async throws -> Movie? {
+    func matchedMovie(code: String, refresh: Bool = false, interactive: Bool = false) async throws -> Movie? {
+        updateMatchScope()
         guard let key = JRPolicy.exactCode(code) else { return nil }
+        if JavDBSDK.shared.hasAmbiguousMovie(code: code) { throw JRError.message("同一番号对应多个有效影片 ID，请在原生搜索中核对。") }
+        if !refresh, let native = JavDBSDK.shared.cachedExactMovie(code: code) { return native }
         if !refresh, let cached = matches[key], Date().timeIntervalSince(cached.date) < (cached.movie == nil ? 60 : 21600) { return cached.movie }
         if let flight = matchFlights[key] { return try await flight.value }
-        let epoch = generation, token = UUID()
-        let flight = Task<Movie?, Error> {
-            let deadline = Date().addingTimeInterval(65)
-            while self.activeMatches >= 3 {
+        let epoch = generation, token = UUID(), account = matchAccount
+        let flight = Task<Movie?, Error>(priority: interactive ? .userInitiated : .utility) {
+            let deadline = Date().addingTimeInterval(12)
+            while !interactive && self.activeMatches >= 3 {
                 guard Date() < deadline else { throw JRError.message("核验队列繁忙，请重试") }
                 try await Task.sleep(nanoseconds: 50_000_000)
             }
             try Task.checkCancellation()
             self.activeMatches += 1
             defer { self.activeMatches -= 1 }
-            let movie = try await JavDBSDK.shared.exactMovie(code: code)
-            try Task.checkCancellation(); guard epoch == self.generation else { throw CancellationError() }
+            let movie = try await withThrowingTaskGroup(of: Movie?.self) { group in
+                group.addTask { try await JavDBSDK.shared.exactMovie(code: code, refresh: refresh) }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 12_000_000_000)
+                    throw JRError.message("核验超时，请重试或使用原生搜索")
+                }
+                defer { group.cancelAll() }
+                return try await group.next()!
+            }
+            try Task.checkCancellation()
+            guard epoch == self.generation, account == APIClient.shared.token else { throw CancellationError() }
             if self.matches.count >= 256, let oldest = self.matches.min(by: { $0.value.date < $1.value.date })?.key { self.matches[oldest] = nil }
             // Do not retain misses: a retry must reach the native backend again.
             if let movie { self.matches[key] = Match(movie: movie, date: Date()) }

@@ -68,7 +68,7 @@ struct Movie: Hashable { let id: String; let number: String?; var title: String?
  func search(keyword:String,page:Int = 1,type:String = "movie") async throws -> [Movie] {
   calls[keyword,default:0] += 1; active += 1; maximum=max(active,maximum)
   defer { active -= 1 }
-  try await Task.sleep(nanoseconds:40_000_000)
+  try await Task.sleep(nanoseconds: keyword.hasPrefix("SLOW-") ? 400_000_000 : 40_000_000)
   precondition(type == "movie")
   if keyword == "MISS-001" { return [] }
   if keyword == "EMPTY-001" { return [Movie(id:"",number:keyword)] }
@@ -142,6 +142,20 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
   }
   precondition(JavDBSDK.shared.maximum <= 3)
   precondition(JavDBSDK.shared.calls.count == 15)
+  let slowA = Task { try await source.matchedMovie(code:"SLOW-001") }
+  let slowB = Task { try await source.matchedMovie(code:"SLOW-002") }
+  let slowC = Task { try await source.matchedMovie(code:"SLOW-003") }
+  try await Task.sleep(nanoseconds:10_000_000)
+  let tapStart = Date()
+  let tapped = try await source.matchedMovie(code:"TAP-001", interactive:true)
+  precondition(tapped?.id == "TAP-001" && Date().timeIntervalSince(tapStart) < 0.25)
+  precondition(JavDBSDK.shared.maximum == 4)
+  _ = try await (slowA.value, slowB.value, slowC.value)
+  let cached = try await source.matchedMovie(code:"TAP-001", interactive:true)
+  precondition(cached?.id == "TAP-001" && JavDBSDK.shared.calls["TAP-001"] == 1)
+  APIClient.shared.token = "synthetic-new-account"
+  _ = try await source.matchedMovie(code:"TAP-001", interactive:true)
+  precondition(JavDBSDK.shared.calls["TAP-001"] == 2)
   let empty=try await source.matchedMovie(code:"EMPTY-001")
   let wrong=try await source.matchedMovie(code:"WRONG-001")
   let fc2=try await source.matchedMovie(code:"FC2-PPV-12345")
@@ -181,6 +195,8 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
     sdk = (root/'AVDB/Services/JavDBSDK.swift').read_text()
     helper = '    public func exactMovie' + sdk.split('    public func exactMovie', 1)[1].split('    /// 分类搜索：', 1)[0]
     main = main.replace('final class Mock: URLProtocol', 'extension JavDBSDK {\n' + helper + '\n}\nfinal class Mock: URLProtocol')
+    cache = sdk.split('    // Memory only,', 1)[1].split('    // MARK: - 搜索类', 1)[0]
+    main = main.replace('@MainActor final class JavDBSDK {', '@MainActor final class APIClient { static let shared = APIClient(); var token: String? }\n@MainActor final class JavDBSDK {\n private let client = APIClient.shared\n // Memory only,' + cache)
     p=d/'client.swift';p.write_text(current+'\n'+(root/'AVDB/Services/JavRankingSource.swift').read_text()+'\n'+main.replace('precondition(', 'check('))
     subprocess.run(['swiftc','-O','-swift-version','5','-parse-as-library',str(p),'-o',str(d/'client')],check=True)
     subprocess.run([str(d/'client'),str(fixtures),str(d/'most-awarded-videos.html')],check=True,timeout=180)
