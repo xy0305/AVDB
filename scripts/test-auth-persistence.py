@@ -15,7 +15,7 @@ source='''import Foundation
 import Combine
 import Network
 import CryptoKit
-'''+model+error+'''
+'''+model+'\n'+error+'''
 final class APIClient { static let shared = APIClient(); var token: String? }
 @MainActor final class JavDBSDK {
  static let shared = JavDBSDK()
@@ -33,10 +33,12 @@ final class APIClient { static let shared = APIClient(); var token: String? }
   let user = try JSONDecoder().decode(User.self, from: Data("{\\"id\\":8,\\"username\\":\\"Example\\",\\"email\\":\\"private@example.invalid\\",\\"avatar_url\\":\\"https://invalid/?token=private\\",\\"bio\\":\\"private\\"}".utf8))
   var calls = 0
   var fail = false
+  var failuresRemaining = 0
   var beforeReturn: (() -> Void)?
   func make() -> AppState {
    AppState(defaults: store, fetchProfile: {
     calls += 1; await Task.yield(); beforeReturn?()
+    if failuresRemaining > 0 { failuresRemaining -= 1; throw URLError(.notConnectedToInternet) }
     if fail { throw URLError(.timedOut) }
     return user
    }, pause: { _ in await Task.yield() }, observeNetwork: false)
@@ -79,6 +81,15 @@ final class APIClient { static let shared = APIClient(); var token: String? }
   client.token = "synthetic-B"; fail = true
   let noSnapshot = make(); assert(noSnapshot.currentUser == nil)
   await noSnapshot.restoreTask?.value
+  client.token = "synthetic-new-account"; fail = false; failuresRemaining = 2; calls = 0
+  let automatic = make()
+  assert(automatic.currentUser == nil)
+  await automatic.restoreTask?.value
+  assert(calls == 3 && automatic.sessionStatus == .validated && automatic.currentUser?.id == 8)
+  automatic.acceptLogin(user)
+  assert(automatic.sessionStatus == .validated)
+  automatic.resumeValidation(); automatic.logout(); await Task.yield()
+  assert(automatic.currentUser == nil && automatic.sessionStatus == .signedOut)
   print("PASS production AppState: cold cache, sanitized snapshot, single flight, bounded retry, recovery, account switch/epoch, logout, 401")
  }
 }
