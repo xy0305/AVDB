@@ -23,8 +23,11 @@ enum JRPolicy {
         return h == b || h.hasSuffix("." + b)
     }
     static func route(_ href: String, relativeTo page: String, base: URL) -> String? {
-        guard let origin = URL(string: page, relativeTo: base),
-              let url = URL(string: JRHTML.text(href), relativeTo: origin)?.absoluteURL,
+        let raw = JRHTML.text(href)
+        guard !raw.isEmpty, !raw.hasPrefix("#"), !raw.lowercased().hasPrefix("javascript:"),
+              !raw.lowercased().hasPrefix("mailto:"),
+              let origin = URL(string: page, relativeTo: base)?.absoluteURL,
+              let url = URL(string: raw, relativeTo: origin)?.absoluteURL,
               sameHost(url, base: base), url.fragment == nil else { return nil }
         let p = url.path
         guard p.hasPrefix("/zh-hans/"), !p.contains(".."), !p.hasSuffix(".md") else { return nil }
