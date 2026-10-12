@@ -47,6 +47,7 @@ final class JRRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Senda
         guard let url = URL(string: path, relativeTo: base)?.absoluteURL, JRPolicy.sameHost(url, base: base) else { throw JRError.message("不安全的来源地址") }
         var request = URLRequest(url: url)
         request.setValue("text/html,application/json", forHTTPHeaderField: "Accept")
+        request.setValue("AVDB-readonly", forHTTPHeaderField: "User-Agent")
         let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
               let final = response.url, JRPolicy.sameHost(final, base: base) else {
@@ -64,6 +65,15 @@ final class JRRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Senda
     func page(_ path: String) async throws -> JRPage {
         if let cached = pages[path] { return cached }
         let epoch = generation, origin = base
+        if let route = URLComponents(string: path), route.path == "/zh-hans/explore/",
+           (route.queryItems ?? []).allSatisfy({ $0.name == "page" }) {
+            let number = route.queryItems?.first(where: { $0.name == "page" })?.value.flatMap(Int.init) ?? 1
+            let catalog = try await index(search: false)
+            let parsed = try catalog.explorePage(number: number)
+            try Task.checkCancellation(); guard epoch == generation else { throw CancellationError() }
+            if pages.count >= 16 { pages.removeAll() }
+            pages[path] = parsed; return parsed
+        }
         let data = try await data(path)
         guard let html = String(data: data, encoding: .utf8) else { throw JRError.message("无法解码公开页面") }
         let parsed = try await Task.detached(priority: .userInitiated) { try JRHTML.parse(html, path: path, base: origin) }.value

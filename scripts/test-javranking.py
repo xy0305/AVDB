@@ -89,7 +89,20 @@ let index = try JRIndex.parse(indexData, base: base)
 check("index video", index.videos.contains { $0.path == "/zh-hans/videos/80/" && $0.code == "010115_001" })
 check("entities", index.entities.contains { $0.path.hasPrefix("/zh-hans/actors/") || $0.path.hasPrefix("/zh-hans/makers/") })
 check("source id", index.videos.allSatisfy { $0.id.hasPrefix("javranking:/zh-hans/") && !$0.id.contains("javdb") })
-print("PASS offline parser/domain videos=\(page.videos.count) magnets=\(detail.magnets.count)")
+let catalog = try JRIndex.parse(Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[4])), base: base)
+let first = try catalog.explorePage(number: 1)
+let second = try catalog.explorePage(number: 2)
+check("index pagination count", first.videos.count == 20 && second.videos.count == 20)
+check("index pagination distinct", Set(first.videos.map(\.id)).isDisjoint(with: Set(second.videos.map(\.id))))
+check("index pagination source order", second.videos.first == catalog.videos[20])
+check("index pagination next", second.next == "/zh-hans/explore/?page=3")
+let lastNumber = (catalog.videos.count + 19) / 20
+check("index pagination last", try catalog.explorePage(number: lastNumber).next == nil)
+check("index categories", catalog.categories.contains { $0.name == "中出" })
+for n in [0, -1, Int.max] {
+    do { _ = try catalog.explorePage(number: n); fputs("accepted invalid page\n", stderr); exit(1) } catch {}
+}
+print("PASS offline parser/domain videos=\(page.videos.count) magnets=\(detail.magnets.count) catalog=\(catalog.videos.count)")
 '''
 
 home = fixtures / "explore.html"
@@ -99,7 +112,7 @@ assert home.exists() and video.exists() and index.stat().st_size > 100, "fixture
 assert "data-video-card" in home.read_text(errors="replace") and "?page=2" in home.read_text(errors="replace")
 assert "DASS-092" in video.read_text(errors="replace")
 if shutil.which("swift"):
-    subprocess.run(["swift", "-e", swift, str(home), str(video), str(index)], check=True, cwd=root)
+    subprocess.run(["swift", "-e", swift, str(home), str(video), str(index), str(fixtures / "filter-index.json")], check=True, cwd=root)
 else:
     print("Swift unavailable locally; source contracts checked, Swift parser executes on macOS CI")
     html = home.read_text(errors="replace")
@@ -119,7 +132,16 @@ if "--live" in sys.argv:
     def get(path):
         req = urllib.request.Request("https://javranking.cc" + path, headers={"User-Agent": "AVDB-readonly", "Accept": "text/html,application/json"})
         with urllib.request.urlopen(req, timeout=45) as response:
-            body = response.read(2_000_000)
+            chunks = []
+            size = 0
+            while True:
+                chunk = response.read(65536)
+                if not chunk:
+                    break
+                size += len(chunk)
+                assert size <= 12 * 1024 * 1024, "public response too large"
+                chunks.append(chunk)
+            body = b"".join(chunks)
             assert 200 <= response.status < 300, response.status
             assert response.geturl().startswith("https://javranking.cc/"), response.geturl()
             return response.status, response.geturl(), body
@@ -135,5 +157,11 @@ if "--live" in sys.argv:
     status, final, body = get("/zh-hans/search-index.json")
     data = json.loads(body)
     assert data["videos"] and data["videos"][0]["videoId"] > 0
-    print("PASS readonly live pages", final)
+    status, final, body = get("/zh-hans/filter-index.json")
+    catalog = json.loads(body)
+    assert len(catalog["videos"]) > 40 and catalog["categories"]
+    first_ids = {v["videoId"] for v in catalog["videos"][:20]}
+    second_ids = {v["videoId"] for v in catalog["videos"][20:40]}
+    assert first_ids.isdisjoint(second_ids), "public index pagination overlaps"
+    print("PASS readonly live pages", final, "indexed videos", len(catalog["videos"]))
 print("PASS javranking")

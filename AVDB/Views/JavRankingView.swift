@@ -140,42 +140,7 @@ struct JRIndexView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if loading { ProgressView("加载公开索引…").frame(maxWidth: .infinity) }
                 if !error.isEmpty { Text(error).foregroundStyle(.secondary); Button("重试") { Task { await load() } } }
-                if let index {
-                    if mode != .search {
-                        HStack {
-                            Picker("排序", selection: $sort) { Text("战力积分").tag("score"); Text("最新发行").tag("newest"); Text("最早发行").tag("oldest") }
-                            Picker("年份", selection: $year) { ForEach(years, id: \.self) { Text($0).tag($0) } }
-                            Menu("题材 \(selected.count)") {
-                                Button("清除筛选") { selected.removeAll() }
-                                ForEach(index.categories) { c in
-                                    Button { if selected.contains(c.id) { selected.remove(c.id) } else { selected.insert(c.id) } } label: { Label(c.name, systemImage: selected.contains(c.id) ? "checkmark.circle.fill" : "circle") }
-                                }
-                            }
-                        }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                        if !selected.isEmpty {
-                            Text(index.categories.filter { selected.contains($0.id) }.map(\.name).joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                        }
-                    }
-                    if mode == .pick {
-                        Text("从来源当前公开片库按题材和年份随机抽取；不复制网站专用抽签算法。")
-                            .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                        Button("随机抽取") { picked = filtered.randomElement() }.buttonStyle(.borderedProminent).padding(.horizontal)
-                        if let picked { JRPosterGrid(videos: [picked]) }
-                    } else {
-                        if mode == .search && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            ContentUnavailableView("输入番号或名称", systemImage: "magnifyingglass", description: Text("搜索影片、演员别名、片商和导演。仅搜索来源收录的公开资料。"))
-                        } else {
-                            Text("\(filtered.count) 部影片 · \(entities.count) 个相关人物/机构") .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                            ForEach(Array(entities.prefix(limit))) { link in
-                                NavigationLink { JRPageView(path: link.path) } label: { Label(link.title, systemImage: "person.text.rectangle").frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal) }
-                            }
-                            JRPosterGrid(videos: Array(filtered.prefix(limit)))
-                            if filtered.isEmpty && entities.isEmpty { ContentUnavailableView("没有匹配资料", systemImage: "magnifyingglass") }
-                            if filtered.count > limit || entities.count > limit { Button("加载更多") { limit += 30 }.frame(maxWidth: .infinity).padding() }
-                        }
-                    }
-                }
+                if let index { indexContent(index) }
             }.padding(.vertical).frame(maxWidth: AdaptiveLayout.contentMaxWidth).frame(maxWidth: .infinity)
         }
         .background { LiquidGlassBackground() }
@@ -186,6 +151,59 @@ struct JRIndexView: View {
         .onChange(of: selected) { _,_ in limit = 30; picked = nil }
         .onChange(of: sort) { _,_ in limit = 30 }
         .onChange(of: year) { _,_ in limit = 30; picked = nil }
+    }
+    @ViewBuilder private func indexContent(_ index: JRIndex) -> some View {
+        if mode != .search { filters(index) }
+        if mode == .pick {
+            Text("从来源当前公开片库按题材和年份随机抽取；不复制网站专用抽签算法。")
+                .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+            Button("随机抽取") { picked = filtered.randomElement() }.buttonStyle(.borderedProminent).padding(.horizontal)
+            if let picked { JRPosterGrid(videos: [picked]) }
+        } else { results }
+    }
+    @ViewBuilder private func filters(_ index: JRIndex) -> some View {
+        HStack {
+            Picker("排序", selection: $sort) {
+                Text("战力积分").tag("score")
+                Text("最新发行").tag("newest")
+                Text("最早发行").tag("oldest")
+            }
+            Picker("年份", selection: $year) { ForEach(years, id: \.self) { Text($0).tag($0) } }
+            Menu("题材 \(selected.count)") {
+                Button("清除筛选") { selected.removeAll() }
+                ForEach(index.categories) { category in
+                    Button { toggleCategory(category.id) } label: {
+                        Label(category.name, systemImage: selected.contains(category.id) ? "checkmark.circle.fill" : "circle")
+                    }
+                }
+            }
+        }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
+        if !selected.isEmpty {
+            Text(index.categories.filter { selected.contains($0.id) }.map(\.name).joined(separator: " · "))
+                .font(.caption).foregroundStyle(.secondary).padding(.horizontal, AdaptiveLayout.horizontalPadding)
+        }
+    }
+    private func toggleCategory(_ id: Int) {
+        if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
+    }
+    @ViewBuilder private var results: some View {
+        if mode == .search && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            ContentUnavailableView("输入番号或名称", systemImage: "magnifyingglass", description: Text("搜索影片、演员别名、片商和导演。仅搜索来源收录的公开资料。"))
+        } else {
+            Text("\(filtered.count) 部影片 · \(entities.count) 个相关人物/机构")
+                .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+            ForEach(Array(entities.prefix(limit))) { link in
+                NavigationLink { JRPageView(path: link.path) } label: {
+                    Label(link.title, systemImage: "person.text.rectangle")
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal)
+                }
+            }
+            JRPosterGrid(videos: Array(filtered.prefix(limit)))
+            if filtered.isEmpty && entities.isEmpty { ContentUnavailableView("没有匹配资料", systemImage: "magnifyingglass") }
+            if filtered.count > limit || entities.count > limit {
+                Button("加载更多") { limit += 30 }.frame(maxWidth: .infinity).padding()
+            }
+        }
     }
     private func load() async {
         let epoch = source.generation

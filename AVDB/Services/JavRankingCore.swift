@@ -107,6 +107,21 @@ struct JRIndex {
     var categories: [JRCategory] = []
     var entities: [JRLink] = []
     var aliases: [String: String] = [:]
+    // The public explore HTML is a static first-page shell even for ?page=2.
+    // Its published filter index is the data source for native pagination.
+    func explorePage(number: Int) throws -> JRPage {
+        let size = 20
+        guard number > 0, number <= max(1, (videos.count + size - 1) / size) else {
+            throw JRError.message("片库页码超出公开索引范围")
+        }
+        let start = (number - 1) * size
+        var page = JRPage()
+        page.title = "片库探索 · 第 \(number) 页"
+        page.videos = Array(videos.dropFirst(start).prefix(size))
+        page.links = [JRLink(path: "/zh-hans/rankings/", title: "全部排行榜")]
+        if start + size < videos.count { page.next = "/zh-hans/explore/?page=\(number + 1)" }
+        return page
+    }
     static func parse(_ data: Data, base: URL) throws -> JRIndex {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rows = root["videos"] as? [[String: Any]] else { throw JRError.message("站点索引格式已改变") }
