@@ -18,7 +18,7 @@ struct UserView: View {
                 if let user = appState.currentUser {
                     // Native account navigation remains available with a cached profile.
                     if appState.sessionStatus == .cached {
-                        Text("已恢复本机资料，正在自动同步；网络异常不影响账户入口")
+                        Text("已恢复本机资料；网络异常不影响账户入口，连接恢复后自动同步")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Section {
@@ -157,8 +157,8 @@ struct UserView: View {
 
                 } else if appState.isLoggedIn {
                     Section("正在恢复账户") {
-                        Label("正在自动加载个人资料", systemImage: "person.crop.circle.badge.checkmark")
-                        Text("网络或服务暂时异常，系统会自动重试，并在回到前台或连接恢复时继续。")
+                        Label(appState.sessionStatus == .unavailable ? "账户服务暂时不可用" : "正在自动加载个人资料", systemImage: "person.crop.circle")
+                        Text("系统会自动重试；本轮重试结束后，将在回到前台或连接恢复时继续，无需手动加载。")
                             .font(.footnote).foregroundStyle(.secondary)
 
                     }
