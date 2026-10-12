@@ -66,13 +66,26 @@ enum JRPolicy {
     }
     // Only complete ASCII catalogue tokens are eligible for cross-source lookup.
     // FC2-PPV is not interchangeable with FC2; no prefix/substring matching.
+    static func foldedCode(_ input: String) -> String {
+        var value = input.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).uppercased()
+        for dash in ["‐", "‑", "‒", "–", "—", "−"] { value = value.replacingOccurrences(of: dash, with: "-") }
+        return value
+    }
     static func catalogueCode(_ input: String) -> String? {
-        let value = input.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).uppercased()
+        let value = foldedCode(input)
         return JRHTML.matches(#"^(FC2[-_ ]PPV[-_ ][0-9]+|[A-Z]{2,12}[-_]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
+    }
+    static func movieCode(number: String?, title: String?) -> String? {
+        // A present number is authoritative: a conflicting title cannot override it.
+        if let number, !number.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return exactCode(number)
+        }
+        guard let title, let initial = catalogueCode(title.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+        return exactCode(initial)
     }
     static func exactCode(_ input: String) -> String? {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        let folded = value.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).uppercased()
+        let folded = foldedCode(value)
         guard !JRHTML.matches(#"^(?:FC2[-_ ]?PPV[-_ ]?[0-9]+|[A-Z]{2,12}[-_ ]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})$"#, folded).isEmpty else { return nil }
         return normalizedCode(folded)
     }

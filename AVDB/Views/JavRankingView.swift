@@ -414,7 +414,7 @@ struct JRMovieRoute: View {
                 let match = try await source.matchedMovie(code: code, refresh: attempt > 0)
                 guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
                 movie = match
-                if match == nil { message = "番号 \(code) 未获得唯一、有效 ID 的精确匹配；不会自动打开来源详情。请重试或查看辅助来源资料。" }
+                if match == nil { message = "原生影片搜索前 3 页未找到番号 \(code) 的有效 ID 精确结果（不代表影片不存在）。请重试或在原生搜索中核对；不会自动打开辅助来源详情。" }
             } catch {
                 guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
                 message = "番号 \(code) 核验失败：" + error.localizedDescription

@@ -168,7 +168,9 @@ public final class APIClient: @unchecked Sendable {
         let (data, response) = try await session.data(for: req)
 
         if let http = response as? HTTPURLResponse {
-            if http.statusCode == 400 {
+            if http.statusCode == 401 || http.statusCode == 403 {
+                throw JavDBError.httpError(http.statusCode, "鉴权失败或无访问权限，请检查登录状态")
+            } else if http.statusCode == 400 {
                 // 400 多为 InvalidSignature 或 ParameterInvalid
                 if let err = try? decode(JavDBResponse<EmptyData>.self, from: data) {
                     throw JavDBError.apiError(action: err.action, message: err.message)

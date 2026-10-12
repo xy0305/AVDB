@@ -113,6 +113,26 @@ public final class JavDBSDK {
         return resp.data?.movies ?? []
     }
 
+    /// Resolve through the same movie request/decoder as native SearchMovieResultView.
+    /// `type=code` returns data.codes (series-number categories), NOT data.movies.
+    public func exactMovie(code: String) async throws -> Movie? {
+        guard let key = JRPolicy.exactCode(code) else { return nil }
+        var candidates: [String: Movie] = [:]
+        // Bounded search includes later pages; never select the first fuzzy hit.
+        for page in 1...3 {
+            try Task.checkCancellation()
+            let results = try await search(keyword: code, page: page, type: "movie")
+            for movie in results {
+                let id = movie.id.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !id.isEmpty, JRPolicy.movieCode(number: movie.number, title: movie.title) == key else { continue }
+                candidates[id] = movie
+            }
+            if candidates.count > 1 { throw JRError.message("同一番号对应多个有效影片 ID，无法安全选择；请在原生搜索中核对。") }
+            if results.count < 20 { break }
+        }
+        return candidates.values.first
+    }
+
     /// 分类搜索：按演员/系列/片商/导演/清单/番号 搜索。
     /// type 对应 /api/v2/search 的 type 参数：actor/series/maker/director/list/code。
     public func searchActors(keyword: String, page: Int = 1, limit: Int = 20) async throws -> [Actor] {

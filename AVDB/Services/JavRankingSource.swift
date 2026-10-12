@@ -85,13 +85,11 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
             try Task.checkCancellation()
             self.activeMatches += 1
             defer { self.activeMatches -= 1 }
-            let results = try await JavDBSDK.shared.search(keyword: code, type: "code", limit: 20)
+            let movie = try await JavDBSDK.shared.exactMovie(code: code)
             try Task.checkCancellation(); guard epoch == self.generation else { throw CancellationError() }
-            let exact = results.filter { !$0.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && JRPolicy.exactCode($0.number ?? "") == key }
-            let unique = Dictionary(exact.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            let movie = unique.count == 1 ? unique.values.first : nil
             if self.matches.count >= 256, let oldest = self.matches.min(by: { $0.value.date < $1.value.date })?.key { self.matches[oldest] = nil }
-            self.matches[key] = Match(movie: movie, date: Date())
+            // Do not retain misses: a retry must reach the native backend again.
+            if let movie { self.matches[key] = Match(movie: movie, date: Date()) }
             return movie
         }
         matchFlights[key] = flight; matchTokens[key] = token
