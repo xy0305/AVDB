@@ -41,7 +41,8 @@ check("domain slash", (try? JRPolicy.domain("https://javranking.cc/"))?.absolute
 for bad in ["http://user:pass@javranking.cc", "https://javranking.cc/zh-hans/", "https://javranking.cc:443", "https://127.0.0.1", "javascript:alert(1)", "https://javranking.cc/?q=1", "localhost"] {
     do { _ = try JRPolicy.domain(bad); fputs("accepted \(bad)\n", stderr); exit(1) } catch {}
 }
-check("route video", JRPolicy.route("/zh-hans/videos/26/", relativeTo: "/zh-hans/", base: base) == "/zh-hans/videos/26/")
+let videoRoute = JRPolicy.route("/zh-hans/videos/26/", relativeTo: "/zh-hans/", base: base) ?? "nil"
+check("route video", videoRoute == "/zh-hans/videos/26/", videoRoute)
 check("route page", JRPolicy.route("?page=2", relativeTo: "https://javranking.cc/zh-hans/explore/", base: base) == "/zh-hans/explore/?page=2", JRPolicy.route("?page=2", relativeTo: "https://javranking.cc/zh-hans/explore/", base: base) ?? "nil")
 check("route evil", JRPolicy.route("https://evil.example/zh-hans/videos/1/", relativeTo: "/zh-hans/", base: base) == nil)
 check("route token", JRPolicy.route("/zh-hans/videos/1/?token=secret", relativeTo: "/zh-hans/", base: base) == nil)
