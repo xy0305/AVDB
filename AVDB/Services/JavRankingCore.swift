@@ -43,13 +43,15 @@ enum JRPolicy {
         let allowed = ["videos", "actors", "makers", "directors", "rankings", "explore", "pick", "most-awarded-videos", "most-awarded-actors", "most-awarded-male-actors", "search", "about", "help", "privacy", "terms", "feedback", "extension", "sponsor"]
         guard p == "/zh-hans/" || allowed.contains(p.split(separator: "/").dropFirst().first.map(String.init) ?? "") else { return nil }
         // Only read-only, documented listing parameters; discard actions/tracking.
-        var c = URLComponents(); c.path = p
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         guard query.allSatisfy({ ["page", "q", "cat", "sort"].contains($0.name) }) else { return nil }
-        if !query.isEmpty { c.queryItems = query }
-        var route = c.string ?? p
-        if url.path.hasSuffix("/") && !route.hasSuffix("/") && !route.contains("?") { route += "/" }
-        return route
+        let path = url.path.hasSuffix("/") || url.path == "/" ? url.path : url.path + "/"
+        let encoded = query.map { item in
+            let name = item.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? item.name
+            let value = (item.value ?? "").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+            return name + "=" + value
+        }.joined(separator: "&")
+        return encoded.isEmpty ? path : path + "?" + encoded
     }
     static func image(_ value: String?, base: URL) -> String? {
         guard let value, let u = URL(string: value, relativeTo: base)?.absoluteURL,
