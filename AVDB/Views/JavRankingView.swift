@@ -134,7 +134,15 @@ struct JRIndexView: View {
         guard !q.isEmpty else { return [] }
         return (index?.entities ?? []).filter { JRPolicy.normalizedCode(index?.aliases[$0.path] ?? $0.title).contains(q) }
     }
-    private var years: [String] { ["全部年份"] + Set((index?.videos ?? []).map { String($0.date.prefix(4)) }.filter { $0.count == 4 }).sorted(by: >) }
+    private var years: [String] {
+        var values = Set<String>()
+        for video in index?.videos ?? [] {
+            let value = String(video.date.prefix(4))
+            if value.count == 4 { values.insert(value) }
+        }
+        let ordered: [String] = values.sorted { (left: String, right: String) -> Bool in left > right }
+        return ["全部年份"] + ordered
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
