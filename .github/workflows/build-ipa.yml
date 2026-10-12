@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feature/javlibrary-174
     paths:
       - "AVDB/**"
       - "AVDB.xcodeproj/**"
