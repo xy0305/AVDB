@@ -220,7 +220,9 @@ enum JRHTML {
             page.videos.append(JRVideo(path: route, code: node.all { $0.has("data-video-card-code") }.first?.text ?? "", title: a.text, image: JRPolicy.image(node.all { $0.tag == "img" }.first?.attrs["src"], base: base), subtitle: node.all { $0.has("data-video-card-actors") }.first?.text ?? ""))
         }
         var linkSeen = Set<String>()
-        for a in main.all({ $0.tag == "a" }) {
+        // Public site navigation lives in header/footer, outside <main>.
+        // The same route policy excludes account, external and executable links.
+        for a in root.all({ $0.tag == "a" }) {
             guard let href = a.attrs["href"], let route = JRPolicy.route(href, relativeTo: path, base: base), !route.contains("/videos/"), route != path else { continue }
             let title = a.text.isEmpty ? (a.attrs["aria-label"] ?? route) : a.text
             // Numeric pagination and the Next button share a URL. Inspect every

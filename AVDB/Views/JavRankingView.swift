@@ -250,7 +250,7 @@ struct JRPageView: View {
                             ForEach(page.magnets, id: \.self) { magnet in Text(magnet).font(.caption2.monospaced()).textSelection(.enabled).lineLimit(4).padding(.vertical, 4) }
                         }.padding(.horizontal)
                     }
-                    if let next = page.next, page.videos.count <= 30 { NavigationLink("来源下一页") { JRPageView(path: next) }.padding() }
+                    if let next = page.next { NavigationLink("来源下一页") { JRPageView(path: next) }.padding() }
                     if page.videos.isEmpty && page.detail == nil && page.paragraphs.isEmpty && page.links.isEmpty { ContentUnavailableView("没有可读取的公开资料", systemImage: "doc.text", description: Text("此页可能依赖网站脚本或已变更，未伪造内容。")) }
                 }
             }.padding(.vertical).frame(maxWidth: AdaptiveLayout.contentMaxWidth).frame(maxWidth: .infinity)
@@ -260,7 +260,7 @@ struct JRPageView: View {
     }
     private func load() async {
         let epoch = source.generation
-        page = nil; verified = nil; verification = ""; limit = 30; error = ""; loading = true
+        page = nil; verified = nil; verification = ""; checking = false; limit = 30; error = ""; loading = true
         do {
             let result = try await source.page(path)
             guard epoch == source.generation, !Task.isCancelled else { return }; page = result
