@@ -165,7 +165,7 @@ enum JRHTML {
         let root = JRNode("root"); var stack = [root]
         let void: Set<String> = ["img","input","meta","link","br","hr","source","wbr","area","embed"]
         for token in tokens(inert) {
-            let t = token[0]
+            let t = token
             if t.hasPrefix("</") {
                 let name = t.dropFirst(2).prefix { $0.isLetter || $0.isNumber }.lowercased()
                 if let idx = stack.lastIndex(where: { $0.tag == name }), idx > 0 { stack.removeSubrange(idx...) }
