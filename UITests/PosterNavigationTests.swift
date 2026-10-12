@@ -1,6 +1,42 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testRankingLoadMoreDetailBackPreservesVisibleRank() {
+        continueAfterFailure = false
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            let app = XCUIApplication()
+            // Reuse neutral poster image harness, but mount the shipping JR page/grid.
+            app.launchArguments = ["--poster-navigation-fixture", "--jr-navigation-fixture"]
+            XCUIDevice.shared.orientation = orientation
+            app.launch()
+            let more = app.buttons["jr-load-more"]
+            XCTAssertTrue(more.waitForExistence(timeout: 10))
+            for _ in 0..<12 where !more.isHittable { app.swipeUp() }
+            XCTAssertTrue(more.isHittable, app.debugDescription)
+            more.tap()
+            let poster = app.buttons["jr-poster-14"]
+            for _ in 0..<8 where !poster.isHittable { app.swipeUp() }
+            XCTAssertTrue(poster.isHittable, app.debugDescription)
+            let beforeY = poster.frame.minY
+            let before = XCTAttachment(screenshot: app.screenshot())
+            before.name = "ranking-before-rank14-\(orientation.rawValue)"
+            before.lifetime = .keepAlways
+            add(before)
+            poster.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28)).tap()
+            XCTAssertTrue(app.staticTexts["jr-detail-14"].waitForExistence(timeout: 5))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(poster.waitForExistence(timeout: 5))
+            XCTAssertTrue(poster.isHittable, "Returning discarded loaded count/anchor: \(app.debugDescription)")
+            XCTAssertFalse(app.buttons["jr-poster-1"].isHittable, "Returned to rank 1")
+            XCTAssertEqual(poster.frame.minY, beforeY, accuracy: 60, "Returning shifted more than row offset tolerance")
+            let after = XCTAttachment(screenshot: app.screenshot())
+            after.name = "ranking-after-rank14-\(orientation.rawValue)"
+            after.lifetime = .keepAlways
+            add(after)
+            app.terminate()
+        }
+    }
+
     func testHomeLatestCoverNavigatesInNarrowAndWideWindows() {
         continueAfterFailure = false
         let app = XCUIApplication()

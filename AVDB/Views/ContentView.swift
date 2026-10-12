@@ -37,6 +37,19 @@ struct ContentView: View {
     @State private var selectedTab: AppTab = .home
 
     var body: some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {
+            NavigationStack { JRPageView(path: "/neutral/ranking/") }
+                .modifier(SceneLayoutReader())
+        } else {
+            mainTabs
+        }
+        #else
+        mainTabs
+        #endif
+    }
+
+    private var mainTabs: some View {
         TabView(selection: $selectedTab) {
             HomeView()
                 .tabItem {

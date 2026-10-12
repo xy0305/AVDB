@@ -99,24 +99,22 @@ private struct JRMeasuredGrid: View {
     @State private var mapped: [String: Movie] = [:]
     @State private var completed = Set<String>()
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
             ForEach(videos) { video in
                 VStack(alignment: .leading, spacing: 4) {
-                    NavigationLink { JRMovieRoute(video: video) } label: {
-                        MoviePosterCard(movie: mapped[video.path] ?? Movie(id: video.id, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
-                    }.buttonStyle(.plain)
+                    NavigationLink { posterDestination(video) } label: {
+                        // Keep the source card geometry and metadata stable after verification.
+                        // Native metadata belongs in the destination, not a differently sized row.
+                        MoviePosterCard(movie: Movie(id: video.id, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
+                    }.buttonStyle(.plain).accessibilityIdentifier("jr-poster-\(video.rank ?? 0)")
                     if let rank = video.rank { Text("来源排名 #\(rank)").font(.caption).foregroundStyle(.secondary) }
-                    if mapped[video.path] != nil {
-                        Text(video.title).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                        NavigationLink("来源资料") { JRPageView(path: video.path, sourceOnly: true) }.font(.caption2)
-                    }
                     if !video.code.isEmpty {
                         Text(mapped[video.path] != nil ? "完整番号已核验 · JavDB" : completed.contains(video.path) ? "点击重试核验 · 来源资料仅辅助" : "点击核验并打开原生详情")
-                            .font(.caption2).foregroundStyle(.secondary)
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(2).frame(height: 30, alignment: .topLeading)
                     }
-                }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).contentShape(Rectangle()).clipped()
+                }.id(video.path).frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).contentShape(Rectangle()).clipped()
             }
-        }.padding(.horizontal, AdaptiveLayout.gridPadding)
+        }.scrollTargetLayout().padding(.horizontal, AdaptiveLayout.gridPadding)
         .background { GeometryReader { g in Color.clear.preference(key: JRWidthKey.self, value: g.size.width) } }
         .onPreferenceChange(JRWidthKey.self) { if $0 > 0 { width = $0 } }
         .task(id: "\(source.generation):" + videos.map(\.path).joined(separator: ",")) {
@@ -129,6 +127,21 @@ private struct JRMeasuredGrid: View {
         }
 
     }
+    @ViewBuilder private func posterDestination(_ video: JRVideo) -> some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {
+            // Same page, grid and navigation lifecycle; no live account/backend.
+            Text("Neutral detail \(video.rank ?? 0)")
+                .accessibilityIdentifier("jr-detail-\(video.rank ?? 0)")
+                .navigationTitle("Neutral detail")
+        } else {
+            JRMovieRoute(video: video)
+        }
+        #else
+        JRMovieRoute(video: video)
+        #endif
+    }
+
 }
 
 struct JRIndexView: View {
@@ -268,15 +281,28 @@ struct JRIndexView: View {
     }
 }
 
+// Owned by one navigation route, not keyed globally by URL: opening the same
+// source twice must not overwrite another instance's loaded count or position.
+private final class JRPageState: ObservableObject {
+    @Published var page: JRPage?
+    @Published var isPreview = false
+    @Published var error = ""
+    @Published var loading = false
+    @Published var limit = 12
+    @Published var anchor: String?
+    var loadedGeneration: Int?
+}
+
 struct JRPageView: View {
     let path: String
     var sourceOnly = false
     @ObservedObject private var source = JavRankingSource.shared
-    @State private var page: JRPage?
-    @State private var isPreview = false
-    @State private var error = ""
-    @State private var loading = false
-    @State private var limit = 12
+    @StateObject private var state = JRPageState()
+    private var page: JRPage? { state.page }
+    private var isPreview: Bool { state.isPreview }
+    private var error: String { state.error }
+    private var loading: Bool { state.loading }
+    private var limit: Int { state.limit }
     var body: some View {
         Group {
             if let detail = page?.detail, !sourceOnly {
@@ -307,7 +333,7 @@ struct JRPageView: View {
                     if !page.videos.isEmpty {
                         Text(isPreview ? "首批 \(page.videos.count) 部 · 正在读取完整榜单" : "\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                         JRPosterGrid(videos: Array(page.videos.prefix(limit)))
-                        if limit < page.videos.count { Button("加载更多") { limit += 12 }.frame(maxWidth: .infinity).padding() }
+                        if limit < page.videos.count { Button("加载更多") { state.limit += 12 }.accessibilityIdentifier("jr-load-more").frame(maxWidth: .infinity).padding() }
                     }
                     if !page.links.isEmpty {
                         if page.videos.isEmpty { sourceNavigation(page) }
@@ -330,10 +356,11 @@ struct JRPageView: View {
                     if page.videos.isEmpty && page.detail == nil && page.paragraphs.isEmpty && page.links.isEmpty { ContentUnavailableView("没有可读取的公开资料", systemImage: "doc.text", description: Text("此页可能依赖网站脚本或已变更，未伪造内容。")) }
                 }
             }.padding(.vertical).frame(maxWidth: AdaptiveLayout.contentMaxWidth).frame(maxWidth: .infinity)
-        }.background { LiquidGlassBackground() }
+        }.scrollPosition(id: $state.anchor, anchor: .top)
+        .background { LiquidGlassBackground() }
         .navigationTitle(page?.title ?? "JAV Ranking").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
         .onReceive(source.$previews) { previews in
-            if page == nil, let preview = previews[path] { page = preview; isPreview = true }
+            if page == nil, let preview = previews[path] { state.page = preview; state.isPreview = true }
         }
         .refreshable { await load(refresh: true) }
         .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
@@ -350,12 +377,29 @@ struct JRPageView: View {
     }
     private func load(refresh: Bool = false) async {
         let epoch = source.generation
-        page = source.cachedPage(path); isPreview = false; limit = 12; error = ""; loading = true
+        // SwiftUI restarts .task when returning from a pushed detail. That is
+        // visibility, not invalidation: preserve loaded count, order and anchor.
+        if !refresh, state.loadedGeneration == epoch, page != nil, !isPreview { return }
+        if state.loadedGeneration != epoch {
+            state.page = source.cachedPage(path); state.isPreview = false
+            state.limit = 12; state.anchor = nil
+        }
+        state.loadedGeneration = epoch
+        state.error = ""; state.loading = page == nil
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {
+            state.page = JRPage(title: "Neutral ranking", videos: (1...60).map {
+                JRVideo(path: "/neutral/\($0)/", code: "TEST-\($0)", title: "Neutral film \($0)", image: "fixture://poster/\($0)", rank: $0)
+            })
+            state.isPreview = false; state.loading = false
+            return
+        }
+        #endif
         do {
             let result = try await source.page(path, refresh: refresh)
-            guard epoch == source.generation, !Task.isCancelled else { return }; page = result; isPreview = false
-        } catch { if epoch == source.generation && !Task.isCancelled { self.error = error.localizedDescription } }
-        if epoch == source.generation { loading = false }
+            guard epoch == source.generation, !Task.isCancelled else { return }; state.page = result; state.isPreview = false
+        } catch { if epoch == source.generation && !Task.isCancelled { state.error = error.localizedDescription } }
+        if epoch == source.generation { state.loading = false }
     }
 
 }
@@ -392,7 +436,14 @@ struct JRMovieRoute: View {
         }
         .task(id: "\(source.generation):\(attempt):\(video.path)") {
             let epoch = source.generation, request = attempt
-            loading = true; movie = nil; message = ""
+            loading = true; message = ""
+            // A known verified ID already renders MovieDetailView above. Do not
+            // tear down that identity just because SwiftUI restarts this task.
+            if attempt == 0, let known = source.cachedMovie(code: code) {
+                movie = known; loading = false
+                return
+            }
+            movie = nil
             defer { if epoch == source.generation, request == attempt { loading = false } }
             guard !code.isEmpty else { message = "不能从标题猜测影片；请查看来源资料。"; return }
             do {
