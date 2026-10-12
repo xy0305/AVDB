@@ -26,7 +26,11 @@ assert "aria-label" in core
 info = plistlib.loads((root / "AVDB/Resources/Info.plist").read_bytes())
 build = info["CFBundleVersion"]
 assert build.isdigit() and int(build) >= 167
-assert (root / "AVDB.xcodeproj/project.pbxproj").read_text().count(f"CURRENT_PROJECT_VERSION = {build};") == 2
+project = (root / "AVDB.xcodeproj/project.pbxproj").read_text()
+assert project.count(f"CURRENT_PROJECT_VERSION = {build};") == 2
+for filename in ["JavRankingCore.swift", "JavRankingSource.swift", "JavRankingView.swift"]:
+    assert project.count(f"/* {filename} in Sources */") == 2, f"missing compile registration: {filename}"
+    assert f"path = {filename};" in project, f"missing file reference: {filename}"
 
 swift = r'''
 import Foundation

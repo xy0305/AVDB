@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A16700000000000000000001 /* JavRankingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16700000000000000000002; };
+		A16700000000000000000003 /* JavRankingSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16700000000000000000004; };
+		A16700000000000000000005 /* JavRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16700000000000000000006; };
 		A16600000000000000000001 /* SeekPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16600000000000000000002; };
         AB1620000000000000000001 /* PlaybackAudioSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1620000000000000000002; };
 		AB1610000000000000000001 /* AVDBAdjustmentPan.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1610000000000000000002 /* AVDBAdjustmentPan.swift */; };
@@ -54,6 +57,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A16700000000000000000002 /* JavRankingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavRankingCore.swift; sourceTree = "<group>"; };
+		A16700000000000000000004 /* JavRankingSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavRankingSource.swift; sourceTree = "<group>"; };
+		A16700000000000000000006 /* JavRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavRankingView.swift; sourceTree = "<group>"; };
 		A16600000000000000000002 /* SeekPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeekPreview.swift; sourceTree = "<group>"; };
         AB1620000000000000000002 /* PlaybackAudioSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackAudioSession.swift; sourceTree = "<group>"; };
 		AB1610000000000000000002 /* AVDBAdjustmentPan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVDBAdjustmentPan.swift; sourceTree = "<group>"; };
@@ -158,6 +164,8 @@
 		A1B9B43015237F5437EE30F3 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A16700000000000000000002 /* JavRankingCore.swift */,
+				A16700000000000000000004 /* JavRankingSource.swift */,
 				BB0CA06C662C216213639A15 /* ImageLoader.swift */,
 				7231C462DD413E8C76270418 /* JavDBSDK.swift */,
 				5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */,
@@ -174,6 +182,7 @@
 		E10C55E44EFEF051C8FA5D01 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				A16700000000000000000006 /* JavRankingView.swift */,
 				E21E8365384D35AB1B1B4C52 /* ContentView.swift */,
 				90AF03F73ECC44EEA75E592E /* ListsView.swift */,
 				BE1B261A3D98E18F55F9BF42 /* Home */,
@@ -384,6 +393,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A16700000000000000000001 /* JavRankingCore.swift in Sources */,
+				A16700000000000000000003 /* JavRankingSource.swift in Sources */,
+				A16700000000000000000005 /* JavRankingView.swift in Sources */,
 				CC6826C1B66D7480C17F874F /* AVDBApp.swift in Sources */,
 				36911BA2DB310B86238FD29F /* Movie.swift in Sources */,
 				66B329B8B504D1A4ABD66D6A /* User.swift in Sources */,
