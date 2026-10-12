@@ -164,7 +164,7 @@ enum JRHTML {
         let inert = html.replacingOccurrences(of: #"<(script|style|template)\b[^>]*>.*?</\1\s*>|<!--.*?-->"#, with: "", options: [.regularExpression, .caseInsensitive])
         let root = JRNode("root"); var stack = [root]
         let void: Set<String> = ["img","input","meta","link","br","hr","source","wbr","area","embed"]
-        for token in matches(#"<[^>\"']*(?:\"[^\"]*\"[^>\"']*|'[^']*'[^>\"']*)*>|[^<]+"#, inert) {
+        for token in tokens(inert) {
             let t = token[0]
             if t.hasPrefix("</") {
                 let name = t.dropFirst(2).prefix { $0.isLetter || $0.isNumber }.lowercased()
@@ -178,6 +178,35 @@ enum JRHTML {
             } else { let n = JRNode("text"); n.raw = t; stack.last!.children.append(n) }
         }
         return root
+    }
+    // Quote-aware split. A tag regex stops at the first unquoted '>' inside a real attribute.
+    static func tokens(_ html: String) -> [String] {
+        var result: [String] = []
+        var current = ""
+        var inTag = false
+        var quote: Character?
+        for ch in html {
+            if inTag {
+                current.append(ch)
+                if let q = quote {
+                    if ch == q { quote = nil }
+                } else if ch == "\"" || ch == "'" {
+                    quote = ch
+                } else if ch == ">" {
+                    result.append(current)
+                    current = ""
+                    inTag = false
+                }
+            } else if ch == "<" {
+                if !current.isEmpty { result.append(current); current = "" }
+                current = "<"
+                inTag = true
+            } else {
+                current.append(ch)
+            }
+        }
+        if !current.isEmpty { result.append(current) }
+        return result
     }
     static func parse(_ html: String, path: String, base: URL) throws -> JRPage {
         let root = tree(html); var page = JRPage()
