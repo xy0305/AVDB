@@ -47,7 +47,9 @@ enum JRPolicy {
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         guard query.allSatisfy({ ["page", "q", "cat", "sort"].contains($0.name) }) else { return nil }
         if !query.isEmpty { c.queryItems = query }
-        return c.string
+        var route = c.string ?? p
+        if url.path.hasSuffix("/") && !route.hasSuffix("/") && !route.contains("?") { route += "/" }
+        return route
     }
     static func image(_ value: String?, base: URL) -> String? {
         guard let value, let u = URL(string: value, relativeTo: base)?.absoluteURL,
