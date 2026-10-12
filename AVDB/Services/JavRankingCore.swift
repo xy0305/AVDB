@@ -37,13 +37,15 @@ enum JRPolicy {
             let dir = origin.hasSuffix("/") ? origin : origin.replacingOccurrences(of: "/[^/]*$", with: "/", options: .regularExpression)
             absolute = dir + raw
         }
-        guard let url = URL(string: absolute), sameHost(url, base: base), url.fragment == nil else { return nil }
+        let queryPart = absolute.split(separator: "?", maxSplits: 1).dropFirst().first.map(String.init)
+        let pathOnly = String(absolute.split(separator: "?", maxSplits: 1).first ?? "")
+        guard let url = URL(string: pathOnly), sameHost(url, base: base), url.fragment == nil else { return nil }
         let p = url.path
         guard p.hasPrefix("/zh-hans/"), !p.contains(".."), !p.hasSuffix(".md") else { return nil }
         let allowed = ["videos", "actors", "makers", "directors", "rankings", "explore", "pick", "most-awarded-videos", "most-awarded-actors", "most-awarded-male-actors", "search", "about", "help", "privacy", "terms", "feedback", "extension", "sponsor"]
         guard p == "/zh-hans/" || allowed.contains(p.split(separator: "/").dropFirst().first.map(String.init) ?? "") else { return nil }
         let path = p.hasSuffix("/") || p == "/" ? p : p + "/"
-        guard let q = absolute.split(separator: "?", maxSplits: 1).dropFirst().first else { return path }
+        guard let q = queryPart, !q.isEmpty else { return path }
         let items = q.split(separator: "&").map(String.init).filter { !$0.isEmpty }
         guard items.allSatisfy({ ["page", "q", "cat", "sort"].contains($0.split(separator: "=").first.map(String.init) ?? "") }) else { return nil }
         return path + "?" + items.joined(separator: "&")
