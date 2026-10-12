@@ -16,6 +16,7 @@ with tempfile.TemporaryDirectory() as td:
 import Foundation
 @main struct Benchmark {
  static func main() throws {
+  setbuf(stdout, nil)
   let base=URL(string:"https://javranking.cc")!
   for path in CommandLine.arguments.dropFirst() {
    let html=try String(contentsOfFile:path, encoding:.utf8)

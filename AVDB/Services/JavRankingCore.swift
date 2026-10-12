@@ -284,7 +284,7 @@ enum JRHTML {
         for node in main.all({ $0.has("data-video-card") || $0.cls("video-card") }) {
             guard let a = node.all({ $0.has("data-video-card-title") }).first,
                   let href = a.attrs["href"], let route = JRPolicy.route(href, relativeTo: path, base: base), route.contains("/videos/"), seen.insert(route).inserted else { continue }
-            page.videos.append(JRVideo(path: route, code: node.all { $0.has("data-video-card-code") }.first?.text ?? "", title: a.text, image: JRPolicy.image(node.all { $0.tag == "img" }.first?.attrs["src"], base: base), subtitle: node.all { $0.has("data-video-card-actors") }.first?.text ?? ""))
+            page.videos.append(JRVideo(path: route, code: node.all { $0.has("data-video-card-code") }.first?.text ?? "", title: a.text, image: JRPolicy.image(node.all { $0.tag == "img" }.first?.attrs["src"], base: base), subtitle: node.all { $0.has("data-video-card-actors") }.first?.text ?? "", rank: node.all { $0.cls("video-card__rank") }.first.flatMap { Int($0.text) }))
         }
         var linkSeen = Set<String>()
         // Public site navigation lives in header/footer, outside <main>.
