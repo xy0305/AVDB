@@ -61,6 +61,9 @@ struct RankingsView: View {
             HStack {
                 Text("当前来源 · JavDB").font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                NavigationLink { JavLibraryView() } label: {
+                    Label("JavLibrary", systemImage: "books.vertical").font(.subheadline)
+                }
                 NavigationLink { JavRankingView(rankingsOnly: true) } label: {
                     Label("JAV Ranking 榜单", systemImage: "list.number")
                         .font(.subheadline)
