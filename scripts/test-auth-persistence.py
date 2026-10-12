@@ -59,6 +59,14 @@ final class APIClient: @unchecked Sendable {
             assert(state.isLoggedIn)
             assert(client.token == fixture && APIClient().token == fixture)
         }
+        sdk.outcome = .failure(URLError(.timedOut))
+        let offline = AppState()
+        await offline.restoreTask?.value
+        assert(offline.isLoggedIn && offline.currentUser == nil)
+        sdk.outcome = .success((User(id: 8), 0))
+        offline.restoreLogin()
+        await offline.restoreTask?.value
+        assert(offline.isLoggedIn && offline.currentUser?.id == 8)
         sdk.outcome = .failure(JavDBError.httpError(401, "mock"))
         let unauthorized = AppState()
         await unauthorized.restoreTask?.value

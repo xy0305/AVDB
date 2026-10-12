@@ -153,6 +153,13 @@ struct UserView: View {
                         }
                     }
 
+                } else if appState.isLoggedIn {
+                    Section("已保留登录") {
+                        Label("登录凭证已保存，个人资料暂未加载", systemImage: "person.crop.circle.badge.checkmark")
+                        Text("网络或服务暂时异常不会退出账号。连接恢复后可重试，无需重新登录。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Button("重新加载个人资料") { appState.restoreLogin() }
+                    }
                 } else {
                     // 未登录
                     Section {

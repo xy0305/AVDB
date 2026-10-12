@@ -45,6 +45,11 @@ final class AppState: ObservableObject {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") { return }
         #endif
+        restoreLogin()
+    }
+
+    func restoreLogin() {
+        restoreTask?.cancel()
         // 检查本地是否有保存的 Token
         if let restoredToken = APIClient.shared.token, !restoredToken.isEmpty {
             isLoggedIn = true
@@ -52,11 +57,11 @@ final class AppState: ObservableObject {
                 do {
                     let (user, _) = try await JavDBSDK.shared.userInfo()
                     // A delayed launch request must not resurrect a logged-out/replaced account.
-                    guard APIClient.shared.token == restoredToken else { return }
+                    guard !Task.isCancelled, APIClient.shared.token == restoredToken else { return }
                     self.currentUser = user
                     self.isLoggedIn = true
                 } catch {
-                    guard APIClient.shared.token == restoredToken else { return }
+                    guard !Task.isCancelled, APIClient.shared.token == restoredToken else { return }
                     // Offline, timeout, decoding, signing and 403 errors do not prove expiry.
                     // Even a 401 must not destroy the saved credential: allow explicit re-login
                     // and retry on next launch without deleting any account data.
