@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-13 Asia/Shanghai",
+  "method": "Browser session GET 200; curl GET returned Cloudflare 403. Scripts and public CSRF tokens removed from successful fixtures. No login or captcha interaction.",
+  "urls": [
+    "https://missav.ws/dm301/cn/today-hot",
+    "https://missav.ws/dm170/cn/weekly-hot",
+    "https://missav.ws/dm170/cn/weekly-hot?page=2",
+    "https://missav.ws/dm273/cn/monthly-hot",
+    "https://missav.ws/cn/mimk-288"
+  ],
+  "fixtures": {
+    "weekly.html": {
+      "raw_sha256": "22748d2e20469a0f36503788a4db491b9011f94a322e91bb6e1fdf32d3254c19",
+      "raw_size": 185894
+    },
+    "weekly-page2.html": {
+      "raw_sha256": "9e81551f0ee7e974377dcf2a0c994fc8af5a7f87f24a3ef21d2751c1f9128474",
+      "raw_size": 186578
+    },
+    "detail.html": {
+      "raw_sha256": "db7cd5e2c2fd90a9ad523ad9b28d80413d5fbc679b9db212b201a04c52f093be",
+      "raw_size": 251778
+    },
+    "today.html": {
+      "raw_sha256": "5626ae567be9f0030f0e85e59f4a82c11f14678fceb55085536b74a0f0b09e38",
+      "raw_size": 191007
+    },
+    "monthly.html": {
+      "raw_sha256": "34fb30b145e99199d70db74e10e9a69b8f195666f5fbfec6cb90649ed0b3f2b0",
+      "raw_size": 188817
+    },
+    "blocked.html": {
+      "raw_sha256": "35ca1c94ae01c658db0e09828d15fbefa1ea9fa9cafd34926d3992d0dbd48a92",
+      "raw_size": 5304
+    }
+  }
+}

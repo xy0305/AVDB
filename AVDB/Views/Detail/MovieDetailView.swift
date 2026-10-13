@@ -936,6 +936,10 @@ struct MagnetRow: View {
             toast = "无磁力链接"
             return
         }
+        guard DownloadLinkDetector.isOfflineResource(url) else {
+            toast = "仅支持有效 magnet / ed2k 资源，网页或播放流不可推送"
+            return
+        }
         let settings = Pan115Settings.shared
         guard settings.isConfigured else {
             toast = settings.missingHint

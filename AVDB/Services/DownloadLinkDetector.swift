@@ -39,6 +39,18 @@ public enum DownloadLinkKind: Equatable {
 /// 从文本中识别磁力 / ed2k / 番号。
 public enum DownloadLinkDetector {
 
+    /// Pure preflight for native magnet rows; never accepts HTTP pages or streams.
+    public static func isOfflineResource(_ raw: String) -> Bool {
+        let link = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if link.lowercased().hasPrefix("magnet:?"), let c = URLComponents(string: link) {
+            return (c.queryItems ?? []).contains { item in
+                guard item.name.lowercased() == "xt", let value = item.value else { return false }
+                return value.range(of: #"^urn:btih:(?:[a-f0-9]{40}|[a-z2-7]{32})$"#, options: [.regularExpression, .caseInsensitive]) != nil
+            }
+        }
+        return link.range(of: #"^ed2k://\|file\|[^|]+\|[0-9]+\|[a-f0-9]{32}\|/$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
     // MARK: - 链接提取（对齐参考脚本 matchLinksFast）
 
     /// magnet 链接：magnet:?xt=urn:btih:xxx（可带 &dn= 等后缀，遇空白/中文标点截断）

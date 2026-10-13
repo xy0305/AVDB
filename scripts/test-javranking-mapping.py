@@ -91,6 +91,13 @@ Task { @MainActor in
         client.queries = []
         check(try await sdk.exactMovie(code:"IPX580")?.id == "fast", "full page unique exact hit")
         check(client.queries.count == 1, "full page hit does not fetch page two")
+        client.payloads = [try payload(Array(filler.prefix(19)) + [["id":"first","number":"IPX580"]]), try payload([["id":"second","number":"IPX580"]])]
+        client.queries = []
+        do { _ = try await sdk.exactMovie(code:"IPX580", verifyAllPages:true); fatalError("accepted cross-page ambiguity") }
+        catch { check(error.localizedDescription.contains("多个"), "MissAV strict mode rejects cross-page distinct exact IDs") }
+        check(client.queries.count == 2, "strict mode inspects following page")
+        client.payloads = [try payload(Array(filler.prefix(19)) + [["id":"first","number":"IPX580"]]), try payload([["id":"first","number":"IPX-580"]])]
+        check(try await sdk.exactMovie(code:"IPX580", verifyAllPages:true)?.id == "first", "strict mode deduplicates same exact ID across pages")
         client.payloads = [try payload(filler), try payload([["id":"later","number":"IPX580"]])]
         check(try await sdk.exactMovie(code:"IPX580")?.id == "later", "exact beyond first page")
         client.payloads = [try payload([["id":"a","number":"IPX580"],["id":"b","number":"IPX580"]])]

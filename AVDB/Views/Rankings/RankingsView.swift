@@ -66,6 +66,14 @@ struct RankingsView: View {
                         .font(.subheadline)
                 }
             }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
+            HStack {
+                Text("新增来源 · MissAV").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                NavigationLink { MissAVRankingView() } label: {
+                    Label("MissAV 日 / 周 / 月排行", systemImage: "list.number")
+                        .font(.subheadline)
+                }
+            }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
             UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                 .padding(.top, 4)
 

@@ -43,6 +43,7 @@ jobs:
           python3 scripts/test-auth-persistence.py
           python3 scripts/test-javranking.py
           python3 scripts/test-javranking-mapping.py
+          python3 scripts/test-missav.py
           python3 scripts/test-javranking-performance.py | tee javranking-performance.txt
           python3 scripts/test-ipad-layout.py
           python3 scripts/test-player-regressions.py

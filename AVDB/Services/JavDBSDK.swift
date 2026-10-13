@@ -145,15 +145,19 @@ public final class JavDBSDK {
 
     /// Resolve through the same movie request/decoder as native SearchMovieResultView.
     /// `type=code` returns data.codes (series-number categories), NOT data.movies.
-    public func exactMovie(code: String, refresh: Bool = false) async throws -> Movie? {
+    public func exactMovie(code: String, refresh: Bool = false, verifyAllPages: Bool = false) async throws -> Movie? {
         guard let key = JRPolicy.exactCode(code) else { return nil }
-        if !refresh, let cached = cachedExactMovie(code: code) { return cached }
+        let account = client.token
+        updateKnownScope()
+        if !refresh && !verifyAllPages, let cached = cachedExactMovie(code: code) { return cached }
         if (knownMovies[key]?.count ?? 0) > 1 { throw JRError.message("同一番号对应多个有效影片 ID，无法安全选择；请在原生搜索中核对。") }
         var candidates: [String: Movie] = [:]
         // Bounded search includes later pages; never select the first fuzzy hit.
         for page in 1...3 {
             try Task.checkCancellation()
             let results = try await search(keyword: code, page: page, type: "movie")
+            try Task.checkCancellation()
+            guard account == client.token else { throw CancellationError() }
             for movie in results {
                 let id = movie.id.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !id.isEmpty, JRPolicy.movieCode(number: movie.number, title: movie.title) == key else { continue }
@@ -162,7 +166,7 @@ public final class JavDBSDK {
             if candidates.count > 1 { throw JRError.message("同一番号对应多个有效影片 ID，无法安全选择；请在原生搜索中核对。") }
             // Inspect the entire returned page for ambiguity, but do not delay a
             // unique exact hit behind speculative pages 2/3.
-            if let match = candidates.values.first { return match }
+            if !verifyAllPages, let match = candidates.values.first { return match }
             if results.count < 20 { break }
         }
         return candidates.values.first

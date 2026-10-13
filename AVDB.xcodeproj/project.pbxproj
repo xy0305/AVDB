@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A17400000000000000000002 /* MissAVRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17400000000000000000002; };
+		A17400000000000000000001 /* MissAVSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17400000000000000000001; };
+		A17400000000000000000000 /* MissAVCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17400000000000000000000; };
 		A16700000000000000000001 /* JavRankingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16700000000000000000002; };
 		A16700000000000000000003 /* JavRankingSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16700000000000000000004; };
 		A16700000000000000000005 /* JavRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16700000000000000000006; };
@@ -57,6 +60,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B17400000000000000000002 /* MissAVRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVRankingView.swift; sourceTree = "<group>"; };
+		B17400000000000000000001 /* MissAVSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVSource.swift; sourceTree = "<group>"; };
+		B17400000000000000000000 /* MissAVCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVCore.swift; sourceTree = "<group>"; };
 		A16700000000000000000002 /* JavRankingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavRankingCore.swift; sourceTree = "<group>"; };
 		A16700000000000000000004 /* JavRankingSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavRankingSource.swift; sourceTree = "<group>"; };
 		A16700000000000000000006 /* JavRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavRankingView.swift; sourceTree = "<group>"; };
@@ -165,7 +171,9 @@
 			isa = PBXGroup;
 			children = (
 				A16700000000000000000002 /* JavRankingCore.swift */,
+				B17400000000000000000000 /* MissAVCore.swift */,
 				A16700000000000000000004 /* JavRankingSource.swift */,
+				B17400000000000000000001 /* MissAVSource.swift */,
 				BB0CA06C662C216213639A15 /* ImageLoader.swift */,
 				7231C462DD413E8C76270418 /* JavDBSDK.swift */,
 				5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */,
@@ -183,6 +191,7 @@
 			isa = PBXGroup;
 			children = (
 				A16700000000000000000006 /* JavRankingView.swift */,
+				B17400000000000000000002 /* MissAVRankingView.swift */,
 				E21E8365384D35AB1B1B4C52 /* ContentView.swift */,
 				90AF03F73ECC44EEA75E592E /* ListsView.swift */,
 				BE1B261A3D98E18F55F9BF42 /* Home */,
@@ -394,8 +403,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				A16700000000000000000001 /* JavRankingCore.swift in Sources */,
+				A17400000000000000000000 /* MissAVCore.swift in Sources */,
 				A16700000000000000000003 /* JavRankingSource.swift in Sources */,
+				A17400000000000000000001 /* MissAVSource.swift in Sources */,
 				A16700000000000000000005 /* JavRankingView.swift in Sources */,
+				A17400000000000000000002 /* MissAVRankingView.swift in Sources */,
 				CC6826C1B66D7480C17F874F /* AVDBApp.swift in Sources */,
 				36911BA2DB310B86238FD29F /* Movie.swift in Sources */,
 				66B329B8B504D1A4ABD66D6A /* User.swift in Sources */,
@@ -497,7 +509,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 173;
+				CURRENT_PROJECT_VERSION = 174;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -520,7 +532,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 173;
+				CURRENT_PROJECT_VERSION = 174;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
