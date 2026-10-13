@@ -38,7 +38,10 @@ Task { @MainActor in
  let requests=(1...6).map { MissAVMetadata.Request.movie(JRVideo(path:"/\($0)",code:"TEST-\($0)")) }
  q.reset()
  for r in requests { q.enqueue(r); q.enqueue(r) }
- try! await Task.sleep(nanoseconds: 200_000_000)
+ for _ in 0..<100 {
+  if requests.allSatisfy({ q.value($0).movie != nil }) { break }
+  try! await Task.sleep(nanoseconds: 30_000_000)
+ }
  precondition(maximum == 2 && calls == 6, "bounded concurrency and dedup")
  precondition(requests.allSatisfy { q.value($0).movie?.id == $0.key }, "identity ordered results")
  q.reset();q.enqueue(requests[0]);q.suspend()
