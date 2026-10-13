@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A17600000000000000000001 /* MissAVMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17600000000000000000001; };
 		A17400000000000000000002 /* MissAVRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17400000000000000000002; };
 		A17400000000000000000001 /* MissAVSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17400000000000000000001; };
 		A17400000000000000000000 /* MissAVCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17400000000000000000000; };
@@ -60,6 +61,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B17600000000000000000001 /* MissAVMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVMetadata.swift; sourceTree = "<group>"; };
 		B17400000000000000000002 /* MissAVRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVRankingView.swift; sourceTree = "<group>"; };
 		B17400000000000000000001 /* MissAVSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVSource.swift; sourceTree = "<group>"; };
 		B17400000000000000000000 /* MissAVCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVCore.swift; sourceTree = "<group>"; };
@@ -174,6 +176,7 @@
 				B17400000000000000000000 /* MissAVCore.swift */,
 				A16700000000000000000004 /* JavRankingSource.swift */,
 				B17400000000000000000001 /* MissAVSource.swift */,
+				B17600000000000000000001 /* MissAVMetadata.swift */,
 				BB0CA06C662C216213639A15 /* ImageLoader.swift */,
 				7231C462DD413E8C76270418 /* JavDBSDK.swift */,
 				5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */,
@@ -406,6 +409,7 @@
 				A17400000000000000000000 /* MissAVCore.swift in Sources */,
 				A16700000000000000000003 /* JavRankingSource.swift in Sources */,
 				A17400000000000000000001 /* MissAVSource.swift in Sources */,
+				A17600000000000000000001 /* MissAVMetadata.swift in Sources */,
 				A16700000000000000000005 /* JavRankingView.swift in Sources */,
 				A17400000000000000000002 /* MissAVRankingView.swift in Sources */,
 				CC6826C1B66D7480C17F874F /* AVDBApp.swift in Sources */,
@@ -509,7 +513,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 175;
+				CURRENT_PROJECT_VERSION = 176;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -532,7 +536,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 175;
+				CURRENT_PROJECT_VERSION = 176;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

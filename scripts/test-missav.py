@@ -38,6 +38,13 @@ func check(_ yes: Bool, _ name: String) {
 }
 func fixture(_ name: String) throws -> String { try String(contentsOfFile: CommandLine.arguments[1] + "/" + name + ".html", encoding: .utf8) }
 let base = URL(string: "https://missav.ws")!
+let actressHTML = "<html><h1>女优排行</h1><ul><li><a href='/cn/actresses/Example'><h4>Example Name</h4></a><span>第1名</span></li><li><a href='/cn/actresses/Second'><h4>Second Name</h4></a></li></ul></html>"
+let actressPage = try MissAVHTML.actresses(actressHTML, path: MissAVHTML.actressRanking, base: base)
+check(actressPage.actors.map(\.name) == ["Example Name", "Second Name"], "actress source order preserved")
+check(actressPage.actors.first?.rank == 1 && actressPage.next == nil, "only observed rank and pagination")
+check(MissAVIdentity.exact(["Example Name"], ["ＥＸＡＭＰＬＥ NAME"]), "width case whitespace exact aliases")
+check(!MissAVIdentity.exact(["Example"], ["Example Other"]), "substring actor matching forbidden")
+check(MissAVIdentity.exact(["別名"], ["本名、別名"]), "explicit alias identity")
 let first = try MissAVHTML.parse(fixture("weekly"), path: "/dm170/cn/weekly-hot", base: base)
 let second = try MissAVHTML.parse(fixture("weekly-page2"), path: "/dm170/cn/weekly-hot?page=2", base: base)
 check(first.videos.count == 12 && second.videos.count == 12, "captured real 12-card pages")

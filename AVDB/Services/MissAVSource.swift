@@ -69,6 +69,18 @@ import Combine
         routes.merge(parsed.routes) { _, new in new }
         return parsed
     }
+    func actressPage(_ path: String = MissAVHTML.actressRanking) async throws -> MissAVActressPage {
+        let epoch = generation, origin = base
+        let text = try await html(path)
+        let worker = Task.detached(priority: .userInitiated) { try MissAVHTML.actresses(text, path: path, base: origin) }
+        let parsed = try await withTaskCancellationHandler(operation: { try await worker.value }, onCancel: { worker.cancel() })
+        try Task.checkCancellation(); guard epoch == generation else { throw CancellationError() }
+        return parsed
+    }
+    func actressAliases(_ actor: MissAVActress) async throws -> [String] {
+        let text = try await html(actor.path)
+        return try MissAVHTML.actressAliases(text)
+    }
     func detail(_ video: JRVideo) async throws -> MissAVDetail {
         let epoch = generation, origin = base
         let text = try await html(video.path)

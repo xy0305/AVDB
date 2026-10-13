@@ -4,6 +4,10 @@ import SwiftUI
 struct MissAVRankingView: View {
     @ObservedObject private var source = MissAVSource.shared
     @AppStorage("missav.adultConfirmed") private var adultConfirmed = false
+    @StateObject private var metadata = MissAVMetadata()
+    @EnvironmentObject private var appState: AppState
+    @State private var actresses: [MissAVActress] = []
+    @State private var actressTitle = "MissAV 女优排行"
     @State private var period = "weekly-hot"
     @State private var attempt = 0
     @State private var videos: [JRVideo] = []
@@ -24,7 +28,9 @@ struct MissAVRankingView: View {
                 actions: { Button("我已满 18 岁，继续") { adultConfirmed = true } }
             }
         }
-        .onDisappear { pageTask?.cancel(); revision = UUID() }
+        .onDisappear { pageTask?.cancel(); revision = UUID(); metadata.suspend() }
+        .onChange(of: appState.currentUser?.id) { _, _ in metadata.reset(); attempt += 1 }
+        .onChange(of: appState.isLoggedIn) { _, _ in metadata.reset(); attempt += 1 }
     }
     private var content: some View {
         ScrollView {
@@ -34,8 +40,9 @@ struct MissAVRankingView: View {
                     Spacer()
                     NavigationLink { MissAVSettingsView() } label: { Image(systemName: "gearshape") }
                 }.padding(.horizontal)
-                CapsuleChipBar(tabs: MissAVHTML.periods, selection: $period)
-                Text("只提供排行与番号；点击核验后打开 AVDB 原生详情，在磁链列表选择资源推送 115。")
+                CapsuleChipBar(tabs: MissAVHTML.periods + [("actresses", "女优排行")], selection: $period)
+                    .accessibilityIdentifier("missav-periods")
+                Text("MissAV 提供排序和身份；精确匹配后封面、标题、演员资料替换为 AVDB 数据，不改变排名。")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                 if loading { ProgressView("载入 MissAV 排行…") }
                 if !error.isEmpty {
@@ -45,7 +52,14 @@ struct MissAVRankingView: View {
                     }.buttonStyle(.bordered)
                     Link("在浏览器核对来源（不导入 Cookie）", destination: source.base)
                 }
-                MissAVGrid(videos: videos)
+                if period == "actresses" {
+                    Text(actressTitle).font(.headline)
+                    Text("当前站点月榜；未发现独立日榜 / 周榜或分页，不虚构参数。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    MissAVActressGrid(actors: actresses, metadata: metadata)
+                } else {
+                    MissAVGrid(videos: videos, metadata: metadata)
+                }
                 if next != nil && !loading {
                     Button { loadNext() } label: {
                         if paging { AnyView(ProgressView()) } else { AnyView(Text("加载下一页")) }
@@ -58,10 +72,26 @@ struct MissAVRankingView: View {
     }
     @MainActor private func reload() async {
         pageTask?.cancel(); let token = UUID(); revision = token
-        videos = []; next = nil; visited = []; error = ""; loading = true; paging = false
+        metadata.reset()
+        videos = []; actresses = []; next = nil; visited = []; error = ""; loading = true; paging = false
         let epoch = source.generation
         defer { if revision == token { loading = false } }
         do {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--missav-navigation-fixture") {
+                videos = [JRVideo(path: "/cn/test-101", code: "TEST-101", title: "Synthetic source", image: nil, subtitle: "")]
+                actresses = [MissAVActress(path: "/cn/actresses/Synthetic", name: "Synthetic actor", aliases: ["Synthetic"], rank: 1)]
+                actressTitle = "Synthetic monthly ranking (not live)"
+                return
+            }
+            #endif
+            if period == "actresses" {
+                let page = try await source.actressPage()
+                guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
+                actresses = page.actors; actressTitle = page.title; next = page.next
+                visited.insert(MissAVHTML.actressRanking)
+                return
+            }
             let path = source.routes[period] ?? MissAVHTML.routes[period]!
             let page = try await source.page(path)
             guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
@@ -76,6 +106,16 @@ struct MissAVRankingView: View {
             defer { if revision == token { paging = false } }
             do {
                 guard !visited.contains(path) else { throw JRError.message("来源返回重复分页，请刷新。") }
+                if period == "actresses" {
+                    let page = try await source.actressPage(path)
+                    guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
+                    let ids = Set(actresses.map(\.path))
+                    let fresh = page.actors.filter { !ids.contains($0.path) }
+                    guard !fresh.isEmpty else { throw JRError.message("来源返回重复女优分页，请刷新。") }
+                    actresses.append(contentsOf: fresh); visited.insert(path)
+                    next = page.next.flatMap { visited.contains($0) ? nil : $0 }
+                    return
+                }
                 let page = try await source.page(path)
                 guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
                 let ids = Set(videos.map(\.path))
@@ -89,18 +129,30 @@ struct MissAVRankingView: View {
 }
 private struct MissAVGrid: View {
     let videos: [JRVideo]
+    @ObservedObject var metadata: MissAVMetadata
     @State private var width: CGFloat = 390
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
-            ForEach(videos) { video in
-                NavigationLink { MissAVMovieRoute(video: video) } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        MoviePosterCard(movie: Movie(id: "missav:" + video.path, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
-                        if !video.subtitle.isEmpty { Text(video.subtitle).font(.caption2).foregroundStyle(.secondary) }
-                        Text(video.code.isEmpty ? "番号待核对" : "番号 \(video.code) · 点击核验")
-                            .font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                    }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).clipped()
-                }.buttonStyle(.plain).id(video.path)
+            ForEach(Array(videos.enumerated()), id: \.element.path) { index, video in
+                let result = metadata.value(.movie(video))
+                VStack(alignment: .leading, spacing: 4) {
+                    NavigationLink {
+                        if let movie = result.movie { NativeMovieDetailRoute(movieID: movie.id) }
+                        else { MissAVMovieRoute(video: video) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            // Source covers are intentionally NOT used as AVDB covers.
+                            MoviePosterCard(movie: result.movie ?? Movie(id: "missav:" + video.path, number: video.code, title: video.title))
+                            Text("MissAV 顺序 \(index + 1)").font(.caption2).foregroundStyle(.secondary)
+                            Text(result.message).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+                            if result.loading { ProgressView("匹配 AVDB 封面…").font(.caption2) }
+                        }
+                    }.buttonStyle(.plain).accessibilityIdentifier("missav-movie-\(index + 1)")
+                    if !result.loading && result.movie == nil {
+                        Button("重试 AVDB 匹配") { metadata.enqueue(.movie(video), retry: true) }.font(.caption)
+                    }
+                }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).clipped()
+                    .onAppear { metadata.enqueue(.movie(video)) }.id(video.path)
             }
         }.padding(.horizontal, AdaptiveLayout.gridPadding)
         .background { GeometryReader { g in Color.clear.onAppear { width = g.size.width }.onChange(of: g.size.width) { _, value in width = value } } }
@@ -180,5 +232,57 @@ struct MissAVSettingsView: View {
                 Button("取消请求并重新加载") { source.reset() }
             }.font(.footnote)
         }.navigationTitle("MissAV 来源设置").onAppear { domain = source.base.absoluteString }
+    }
+}
+
+private struct MissAVActressGrid: View {
+    let actors: [MissAVActress]
+    @ObservedObject var metadata: MissAVMetadata
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 20) {
+            ForEach(Array(actors.enumerated()), id: \.element.path) { index, source in
+                let result = metadata.value(.actor(source))
+                VStack(alignment: .leading, spacing: 8) {
+                    if let actor = result.actor {
+                        NavigationLink { ActorDetailView(actorID: actor.id) } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                                    .frame(height: 150).clipped().clipShape(RoundedRectangle(cornerRadius: 16))
+                                Text(actor.displayName).font(.headline)
+                            }
+                        }.buttonStyle(.plain)
+                    } else {
+                        Image(systemName: "person.crop.square")
+                            .font(.system(size: 44)).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity).frame(height: 150)
+                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+                        Text(source.name).font(.headline)
+                    }
+                    Text("MissAV 顺序 \(index + 1)").font(.caption).foregroundStyle(.secondary)
+                    if result.loading { ProgressView("匹配 AVDB…") }
+                    else {
+                        Text(result.message).font(.caption).foregroundStyle(.secondary)
+                        if result.actor == nil {
+                            if !result.candidates.isEmpty {
+                                NavigationLink("核对 AVDB 候选") {
+                                    List(result.candidates) { actor in
+                                        NavigationLink { ActorDetailView(actorID: actor.id) } label: {
+                                            VStack(alignment: .leading) {
+                                                Text(actor.displayName)
+                                                Text(actor.name ?? "").font(.caption).foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }.navigationTitle("请核对女优身份")
+                                }
+                            }
+                            Button("重试匹配") { metadata.enqueue(.actor(source), retry: true) }
+                                .font(.caption).frame(minHeight: 44)
+                        }
+                    }
+                }.frame(maxWidth: .infinity, alignment: .topLeading)
+                    .onAppear { metadata.enqueue(.actor(source)) }
+                    .accessibilityIdentifier("missav-actress-\(index + 1)")
+            }
+        }.padding(.horizontal)
     }
 }

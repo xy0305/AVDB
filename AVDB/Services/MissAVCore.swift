@@ -10,7 +10,7 @@ enum MissAVHTML {
         guard let u = URL(string: JRHTML.text(value), relativeTo: page)?.absoluteURL,
               JRPolicy.sameHost(u, base: base), let c = URLComponents(url: u, resolvingAgainstBaseURL: true), c.fragment == nil,
               !c.path.contains(".."), !c.path.contains("%"),
-              !JRHTML.matches(#"^/(?:dm[0-9]+/)?cn/(?:[a-z0-9][a-z0-9_-]*)$"#, c.path).isEmpty,
+              !JRHTML.matches(#"^/(?:dm[0-9]+/)?cn/(?:[a-z0-9][a-z0-9_-]*|actresses/(?:ranking|[^/]+))$"#, c.path).isEmpty,
               (c.queryItems ?? []).allSatisfy({ $0.name == "page" && Int($0.value ?? "").map { $0 > 0 && $0 <= 10000 } == true }),
               (c.queryItems ?? []).count <= 1 else { return nil }
         return c.percentEncodedPath + (c.percentEncodedQuery.map { "?" + $0 } ?? "")
@@ -124,4 +124,71 @@ struct MissAVPage {
 struct MissAVDetail {
     var video: JRVideo
     var metadata: [String] = []
+}
+
+// Actor paths/names are identity hints, never AVDB actor IDs. Ranking is the
+// site's current monthly list; no invented day/week/sort parameters.
+struct MissAVActress: Identifiable, Hashable {
+    var id: String { path }
+    let path: String
+    let name: String
+    let aliases: [String]
+    let rank: Int?
+}
+struct MissAVActressPage {
+    var actors: [MissAVActress] = []
+    var title = "MissAV 女优排行"
+    var next: String?
+}
+extension MissAVHTML {
+    static let actressRanking = "/cn/actresses/ranking"
+    static func actresses(_ html: String, path: String, base: URL) throws -> MissAVActressPage {
+        let root = try tree(html)
+        guard let pageURL = URL(string: path, relativeTo: base),
+              URLComponents(string: path)?.path.hasSuffix("/actresses/ranking") == true,
+              let heading = root.all({ $0.tag == "h1" }).first,
+              heading.text.contains("女优排行") else { throw JRError.message("MissAV 未返回可识别的女优排行") }
+        var result = MissAVActressPage(); result.title = heading.text
+        var seen = Set<String>()
+        for li in root.all({ $0.tag == "li" }) {
+            guard let name = li.all({ $0.tag == "h4" }).first?.text, !name.isEmpty,
+                  let a = li.all({ $0.tag == "a" }).first,
+                  let href = a.attrs["href"], let p = route(href, page: pageURL, base: base),
+                  let c = URLComponents(string: p), c.query == nil,
+                  c.path.contains("/cn/actresses/"), !c.path.hasSuffix("/ranking"), seen.insert(p).inserted else { continue }
+            let slug = c.path.split(separator: "/").last.map(String.init) ?? ""
+            let ranks = li.all({ $0.tag == "span" }).flatMap { JRHTML.matches(#"第\s*([0-9]+)\s*名"#, $0.text) }
+            let rank = ranks.first.flatMap { $0.count > 1 ? Int($0[1]) : nil }
+            result.actors.append(MissAVActress(path: p, name: name, aliases: Array(Set([name, slug])).sorted(), rank: rank))
+        }
+        guard !result.actors.isEmpty else { throw JRError.message("MissAV 女优排行为空或结构已变更；不显示伪造数据") }
+        for a in root.all({ $0.tag == "a" && ($0.attrs["rel"] ?? "").split(separator: " ").contains("next") }) {
+            guard let href = a.attrs["href"], let p = route(href, page: pageURL, base: base),
+                  let c = URLComponents(string: p), c.path.hasSuffix("/cn/actresses/ranking"),
+                  c.queryItems?.first?.value.flatMap(Int.init) == (URLComponents(string: path)?.queryItems?.first?.value.flatMap(Int.init) ?? 1) + 1 else { continue }
+            result.next = p
+        }
+        return result
+    }
+    static func actressAliases(_ html: String) throws -> [String] {
+        let root = try tree(html)
+        guard let title = root.all({ $0.tag == "h1" }).first?.text, title.hasSuffix("出演的 AV 在线看") else { return [] }
+        let name = String(title.dropLast("出演的 AV 在线看".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? [] : [name]
+    }
+}
+// Exact Unicode/width/case and whitespace normalization only. No romanization,
+// translation, substring, surname or fuzzy-first selection.
+enum MissAVIdentity {
+    static func name(_ value: String) -> String {
+        value.precomposedStringWithCompatibilityMapping.lowercased().split(whereSeparator: { $0.isWhitespace }).joined()
+    }
+    static func aliases(_ values: [String?]) -> Set<String> {
+        Set(values.compactMap { $0 }.flatMap {
+            $0.components(separatedBy: CharacterSet(charactersIn: ",，、;/；|\n"))
+        }.map(name).filter { !$0.isEmpty })
+    }
+    static func exact(_ source: [String], _ candidate: [String?]) -> Bool {
+        !aliases(source.map(Optional.some)).isDisjoint(with: aliases(candidate))
+    }
 }
