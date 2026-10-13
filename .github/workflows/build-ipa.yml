@@ -8,6 +8,8 @@ on:
     paths:
       - "AVDB/**"
       - "AVDB.xcodeproj/**"
+      - "UITests/**"
+      - "scripts/missav-fixtures/**"
       - ".github/workflows/build-ipa.yml"
       - "scripts/test-*.py"
       - "scripts/GestureRegression.swift"

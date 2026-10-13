@@ -52,7 +52,7 @@ final class PosterNavigationTests: XCTestCase {
         ]
         for (name, orientation) in windows {
             XCUIDevice.shared.orientation = orientation
-            let header = app.descendants(matching: .any)["home-latest-header"]
+            let header = app.staticTexts["home-latest-header"].firstMatch
             XCTAssertTrue(header.waitForExistence(timeout: 12), app.debugDescription)
             let window = app.windows.firstMatch
             XCTAssertTrue(window.waitForExistence(timeout: 4))
@@ -91,7 +91,7 @@ final class PosterNavigationTests: XCTestCase {
     }
 
     private func visibleLatestPoster(in app: XCUIApplication, preferSecondRow: Bool) -> XCUIElement {
-        let header = app.descendants(matching: .any)["home-latest-header"]
+        let header = app.staticTexts["home-latest-header"].firstMatch
         let posters = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'poster-fixture-'"))
         for _ in 0..<6 {
             let visible = posters.allElementsBoundByIndex.filter { element in
