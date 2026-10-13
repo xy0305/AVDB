@@ -68,7 +68,8 @@ enum MissAVHTML {
     static func detail(_ html: String, video: JRVideo, base: URL) throws -> MissAVDetail {
         let root = try tree(html)
         var result = MissAVDetail(video: video)
-        guard root.all({ $0.attrs["id"] == "videodetails" }).first != nil || root.all({ $0.tag == "meta" && $0.attrs["property"] == "og:type" && $0.attrs["content"] == "video.movie" }).first != nil else {
+        guard root.all({ $0.tag == "h1" }).first != nil,
+              root.all({ $0.tag == "meta" && $0.attrs["property"] == "og:type" && $0.attrs["content"] == "video.other" }).first != nil else {
             throw JRError.message("MissAV 未返回有效详情页")
         }
         if let title = root.all({ $0.tag == "h1" }).first?.text, !title.isEmpty { result.video.title = title }
