@@ -43,6 +43,7 @@ struct MissAVRankingView: View {
                     Button(videos.isEmpty ? "重试排行" : "重试下一页") {
                         if videos.isEmpty { attempt += 1 } else { loadNext() }
                     }.buttonStyle(.bordered)
+                    Link("在浏览器核对来源（不导入 Cookie）", destination: source.base)
                 }
                 MissAVGrid(videos: videos)
                 if next != nil && !loading {
@@ -168,12 +169,14 @@ struct MissAVSettingsView: View {
                     do { try source.configure(domain); message = "已保存" }
                     catch { message = error.localizedDescription }
                 }
-                Button("恢复 missav.ws") { domain = MissAVHTML.defaultDomain }
+                Button("恢复默认 missav.fans") { domain = MissAVHTML.defaultDomain }
                 Text(message).font(.footnote)
             }
             Section {
                 Text("仅影响新增 MissAV 入口。不改变 AVDB、115 Cookie / 目录或播放器。仅 HTTPS 根域名；跨域跳转拒绝，需要您核对后手动修改。")
                 Text("HTTP 403 / Cloudflare 时显示可重试错误，不绕过验证码、不注入脚本、不导入验证 Cookie。浏览器能访问不代表原生 URLSession 能访问。")
+                Text("使用隔离的内存站点会话，仅接受 HTTP Set-Cookie；切换域名即清空。不读取 AVDB、115 或浏览器 Cookie。默认 missav.fans 已验证列表，网络与地区仍可能影响访问；不会自动切换镜像。")
+                Link("在浏览器核对当前来源", destination: source.base)
                 Button("取消请求并重新加载") { source.reset() }
             }.font(.footnote)
         }.navigationTitle("MissAV 来源设置").onAppear { domain = source.base.absoluteString }

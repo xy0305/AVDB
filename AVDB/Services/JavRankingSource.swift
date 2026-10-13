@@ -4,13 +4,17 @@ import Combine
 final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private struct Transfer {
         var data = Data()
+        var response: HTTPURLResponse?
         let continuation: CheckedContinuation<Data, Error>
     }
     private let lock = NSLock()
     private var transfers: [Int: Transfer] = [:]
-    private let maximum = 12 * 1024 * 1024
+    private let maximum: Int
+    private let responseValidator: ((HTTPURLResponse, Data) -> Error?)?
     let base: URL
-    init(base: URL) { self.base = base }
+    init(base: URL, maximum: Int = 12 * 1024 * 1024, responseValidator: ((HTTPURLResponse, Data) -> Error?)? = nil) {
+        self.base = base; self.maximum = maximum; self.responseValidator = responseValidator
+    }
     func download(_ request: URLRequest, session: URLSession) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             let task = session.dataTask(with: request)
@@ -25,15 +29,18 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         let transfer = transfers.removeValue(forKey: task.taskIdentifier)
         lock.unlock()
         guard let transfer else { return }
-        if let error { transfer.continuation.resume(throwing: error) }
+        let validation = transfer.response.flatMap { responseValidator?($0, transfer.data) }
+        if let error = error ?? validation { transfer.continuation.resume(throwing: error) }
         else { transfer.continuation.resume(returning: transfer.data) }
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+        guard let http = response as? HTTPURLResponse,
+              responseValidator != nil || (200..<300).contains(http.statusCode),
               let url = response.url, JRPolicy.sameHost(url, base: base), response.expectedContentLength <= maximum else {
             finish(dataTask, error: JRError.message("来源请求失败或超过安全大小限制（HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)）"))
             completionHandler(.cancel); return
         }
+        lock.lock(); transfers[dataTask.taskIdentifier]?.response = http; lock.unlock()
         completionHandler(.allow)
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {

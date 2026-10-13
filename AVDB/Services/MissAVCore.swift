@@ -2,7 +2,8 @@ import Foundation
 
 // Inert public metadata only. Source paths are never JavDB identities.
 enum MissAVHTML {
-    static let defaultDomain = "https://missav.ws"
+    // Verified public list source; saved user domain is respected, no automatic mirror fallback.
+    static let defaultDomain = "https://missav.fans"
     static let periods: [(String, String)] = [("today-hot", "今日热门"), ("weekly-hot", "本周热门"), ("monthly-hot", "本月热门")]
     static let routes = ["today-hot": "/dm301/cn/today-hot", "weekly-hot": "/dm170/cn/weekly-hot", "monthly-hot": "/dm273/cn/monthly-hot"]
     static func route(_ value: String, page: URL, base: URL) -> String? {
@@ -30,10 +31,31 @@ enum MissAVHTML {
         if let initial = JRPolicy.catalogueCode(title), let other = JRPolicy.exactCode(initial), other != key { return "" }
         return clean
     }
+    static func isChallenge(_ html: String) -> Bool {
+        let lower = html.lowercased()
+        // Cloudflare also injects challenge-platform/scripts/jsd/main.js into valid lists.
+        // That passive script alone is NOT an interstitial and must never hide real cards.
+        return lower.contains("cf-chl-") || lower.contains("_cf_chl_opt") ||
+            !JRHTML.matches(#"<title[^>]*>\s*(?:just a moment|attention required)[^<]*</title>"#, lower).isEmpty ||
+            lower.contains("id=\"challenge-form\"")
+    }
+    static func responseError(_ response: HTTPURLResponse, _ data: Data) -> Error? {
+        let status = response.statusCode
+        let html = String(data: data, encoding: .utf8) ?? ""
+        if response.value(forHTTPHeaderField: "cf-mitigated")?.lowercased() == "challenge" || isChallenge(html) {
+            return JRError.message("MissAV Cloudflare 验证拦截（HTTP \(status)）。请稍后重试，或在浏览器打开来源核对；浏览器验证不会同步到原生请求，不会绕过验证码或导入浏览器 Cookie。可在来源设置手动核对域名。")
+        }
+        guard (200..<300).contains(status) else {
+            return JRError.message("MissAV 来源返回 HTTP \(status)（未确认是 Cloudflare 验证）。请稍后重试或核对来源设置；跨域跳转不会自动跟随。")
+        }
+        guard response.mimeType?.lowercased() == "text/html" || response.mimeType?.lowercased() == "application/xhtml+xml" else {
+            return JRError.message("MissAV 来源未返回 HTML 页面")
+        }
+        return nil
+    }
     static func tree(_ html: String) throws -> JRNode {
         guard html.utf8.count <= 4 * 1024 * 1024 else { throw JRError.message("MissAV 页面超过安全大小限制") }
-        let lower = html.lowercased()
-        guard !lower.contains("cf-chl-"), !lower.contains("just a moment"), !lower.contains("challenge-platform") else {
+        guard !isChallenge(html) else {
             throw JRError.message("MissAV 需要 Cloudflare 验证。未绕过验证；请稍后重试或检查来源域名。浏览器可访问不代表原生请求已获准。")
         }
         return try JRHTML.tree(html)
@@ -57,7 +79,10 @@ enum MissAVHTML {
             guard let href = a.attrs["href"], let p = route(href, page: pageURL, base: base) else { continue }
             let c = URLComponents(string: p), current = URLComponents(string: path)
             let currentNumber = current?.queryItems?.first?.value.flatMap(Int.init) ?? 1
-            if (a.attrs["rel"] ?? "").split(separator: " ").contains("next"), c?.path == current?.path,
+            // Observed fans/media pages canonicalize /dmNNN/cn/... to /cn/... in links
+            // without HTTP redirection. Compare only those equivalent safe list paths.
+            let canonical: (String?) -> String? = { $0?.replacingOccurrences(of: #"^/dm[0-9]+/"#, with: "/", options: .regularExpression) }
+            if (a.attrs["rel"] ?? "").split(separator: " ").contains("next"), canonical(c?.path) == canonical(current?.path),
                c?.queryItems?.first?.value.flatMap(Int.init) == currentNumber + 1 { result.next = p }
             if let period = periods.first(where: { c?.path.hasSuffix("/" + $0.0) == true }), c?.query == nil {
                 result.routes[period.0] = p

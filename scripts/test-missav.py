@@ -22,6 +22,11 @@ assert 'DownloadLinkDetector.isOfflineResource(url)' in read('AVDB/Views/Detail/
 project = read('AVDB.xcodeproj/project.pbxproj')
 for name in ['MissAVCore.swift','MissAVSource.swift','MissAVRankingView.swift']:
     assert project.count(f'/* {name} in Sources */') == 2
+assert 'httpShouldSetCookies = true' in source and 'httpCookieStorage = cookieStorage' in source
+assert 'HTTPCookieStorage.shared' not in source.replace('// Independent in-memory store: never URLSession.shared, HTTPCookieStorage.shared or WebKit.', '')
+assert 'forHTTPHeaderField: "Referer"' in source and 'Mozilla/5.0' in source
+assert 'AVDB-readonly' not in source and 'responseValidator: MissAVHTML.responseError' in source
+print('PASS isolated HTTP session, browser-compatible headers and bounded response classification contracts')
 print('PASS additional source only, native exact route/search fallback, original ranking entrypoints, ordered pagination/cancellation and 115 preflight source contracts')
 if not shutil.which('swiftc'):
     print('Swift unavailable locally: runtime parser/network/resource tests MUST run on macOS CI; static checks are not runtime evidence')
@@ -71,6 +76,20 @@ for bad in ["https://evil.example/a.jpg", "javascript:x", "http://fourhoi.com/a.
 for bad in [try fixture("blocked"), "<html>empty</html>", "<script>thumbnail</script>", "<div>Just a moment</div>"] {
     do { _ = try MissAVHTML.parse(bad, path: "/dm170/cn/weekly-hot", base: base); fatalError("accepted blocked/empty") } catch { print("PASS blocked/empty page produces recoverable error") }
 }
+let fans = URL(string: "https://missav.fans")!
+let live = try MissAVHTML.parse(fixture("fans-weekly"), path: "/dm170/cn/weekly-hot", base: fans)
+check(live.videos.count == 12 && live.next == "/cn/weekly-hot?page=2", "real fans list with passive CF JS and canonical pagination")
+check(!MissAVHTML.isChallenge(try fixture("fans-weekly")), "passive challenge-platform/jsd script not interstitial")
+for (status, headers, body, expected) in [
+    (403, ["Content-Type":"text/html", "cf-mitigated":"challenge"], "denied", "Cloudflare"),
+    (403, ["Content-Type":"text/html"], "forbidden", "未确认"),
+    (503, ["Content-Type":"text/html"], "<title>Just a moment...</title>", "Cloudflare"),
+    (200, ["Content-Type":"application/json"], "{}", "HTML")
+] {
+    let response = HTTPURLResponse(url:fans, statusCode:status, httpVersion:nil, headerFields:headers)!
+    check(MissAVHTML.responseError(response, Data(body.utf8))?.localizedDescription.contains(expected) == true, "HTTP classification " + String(status) + expected)
+}
+check(MissAVHTML.responseError(HTTPURLResponse(url:fans,statusCode:200,httpVersion:nil,headerFields:["Content-Type":"text/html"])!,Data(try fixture("fans-weekly").utf8)) == nil, "valid HTML response accepted")
 let hex = String(repeating: "a", count: 40)
 for good in ["magnet:?xt=urn:btih:" + hex, "magnet:?xt=urn:btih:" + String(repeating:"A",count:32) + "&dn=fixture", "ed2k://|file|fixture.mp4|100|" + String(repeating:"a",count:32) + "|/"] {
     check(DownloadLinkDetector.isOfflineResource(good), "valid 115 resource pure preflight")
@@ -81,14 +100,17 @@ for bad in ["", "https://missav.ws/cn/ipx-247", "https://example.com/master.m3u8
 final class MockProtocol: URLProtocol, @unchecked Sendable {
     static var status = 200
     static var payload = Data()
+    static var lastRequest: URLRequest?
+    static var responseHeaders = ["Content-Type":"text/html"]
     static var delay = 0.0
     private var stopped = false
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
+        Self.lastRequest = request
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.delay) { [self] in
             guard !stopped else { return }
-            let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type":"text/html"])!
+            let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: Self.responseHeaders)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: Self.payload)
             client?.urlProtocolDidFinishLoading(self)
@@ -102,10 +124,25 @@ Task { @MainActor in
         let defaults = UserDefaults(suiteName: "MissAVFixtureOnly")!
         defaults.removePersistentDomain(forName: "MissAVFixtureOnly")
         let source = MissAVSource(defaults: defaults, protocolClasses: [MockProtocol.self])
+        try source.configure("https://missav.ws")
+        let config = source.configuration()
+        check(config.httpShouldSetCookies && config.httpCookieStorage !== HTTPCookieStorage.shared, "dedicated non-shared cookie jar")
+        let cookie = HTTPCookie(properties: [.domain:"missav.ws", .path:"/", .name:"fixture_session", .value:"local-only", .secure:"TRUE"])!
+        config.httpCookieStorage?.setCookie(cookie)
+        check(source.configuration().httpCookieStorage?.cookies(for: base)?.contains(where: {$0.name == "fixture_session"}) == true, "same-source session cookies reused")
+        check(source.configuration().httpCookieStorage?.cookies(for: URL(string:"https://javdb.com")!)?.isEmpty != false && source.configuration().httpCookieStorage?.cookies(for: URL(string:"https://115.com")!)?.isEmpty != false, "site cookie not eligible for AVDB or 115")
+        try source.configure("https://missav.fans")
+        check(source.configuration().httpCookieStorage?.cookies?.isEmpty != false, "domain switch discards prior cookie jar")
+        try source.configure("https://missav.ws")
         MockProtocol.payload = Data(try fixture("weekly").utf8)
         let page = try await source.page("/dm170/cn/weekly-hot")
         check(page.videos.count == 12, "shipping URLSession read-only transport replay")
+        check(MockProtocol.lastRequest?.value(forHTTPHeaderField:"User-Agent")?.contains("Safari/") == true && MockProtocol.lastRequest?.value(forHTTPHeaderField:"Accept")?.contains("application/xhtml+xml") == true && MockProtocol.lastRequest?.value(forHTTPHeaderField:"Referer") == "https://missav.ws/", "actual outgoing UA Accept Referer")
         MockProtocol.status = 403
+        MockProtocol.responseHeaders["cf-mitigated"] = "challenge"
+        do { _ = try await source.page("/dm170/cn/weekly-hot"); fatalError("403 challenge accepted") }
+        catch { check(error.localizedDescription.contains("Cloudflare") && error.localizedDescription.contains("403"), "403 header challenge distinguished") }
+        MockProtocol.responseHeaders.removeValue(forKey: "cf-mitigated")
         do { _ = try await source.page("/dm170/cn/weekly-hot"); fatalError("403 accepted") }
         catch { check(error.localizedDescription.contains("403"), "native 403 remains visible recoverable error") }
         MockProtocol.status = 200; MockProtocol.payload = Data(try fixture("blocked").utf8)
