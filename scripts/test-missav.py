@@ -101,7 +101,7 @@ Task { @MainActor in
     do {
         let defaults = UserDefaults(suiteName: "MissAVFixtureOnly")!
         defaults.removePersistentDomain(forName: "MissAVFixtureOnly")
-        let source = MissAVSource(defaults: defaults)
+        let source = MissAVSource(defaults: defaults, protocolClasses: [MockProtocol.self])
         MockProtocol.payload = Data(try fixture("weekly").utf8)
         let page = try await source.page("/dm170/cn/weekly-hot")
         check(page.videos.count == 12, "shipping URLSession read-only transport replay")

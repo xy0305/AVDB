@@ -7,7 +7,9 @@ import Combine
     @Published private(set) var generation = 0
     @Published private(set) var routes = MissAVHTML.routes
     private var sessions: [UUID: URLSession] = [:]
-    init(defaults: UserDefaults = .standard) {
+    private let protocolClasses: [AnyClass]?
+    init(defaults: UserDefaults = .standard, protocolClasses: [AnyClass]? = nil) {
+        self.protocolClasses = protocolClasses
         base = (try? JRPolicy.domain(defaults.string(forKey: "missav.baseDomain") ?? MissAVHTML.defaultDomain)) ?? URL(string: MissAVHTML.defaultDomain)!
     }
     func configure(_ input: String) throws {
@@ -25,6 +27,7 @@ import Combine
         guard let url = URL(string: path, relativeTo: origin)?.absoluteURL,
               MissAVHTML.route(path, page: origin, base: origin) != nil else { throw JRError.message("不安全的 MissAV 来源路径") }
         let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = protocolClasses
         config.timeoutIntervalForRequest = 25; config.timeoutIntervalForResource = 40
         config.httpShouldSetCookies = false; config.httpCookieStorage = nil; config.urlCache = nil
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
