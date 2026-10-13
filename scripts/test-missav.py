@@ -178,3 +178,4 @@ with tempfile.TemporaryDirectory() as tmp:
     (tmp / 'main.swift').write_text(swift)
     subprocess.run(['swiftc','-swift-version','5',str(tmp/'main.swift'),'-o',str(tmp/'regression')],check=True)
     subprocess.run([str(tmp/'regression'),str(tmp)],check=True,timeout=60)
+subprocess.run(['python3', str(root/'scripts/test-missav-metadata.py')],check=True)

@@ -137,7 +137,7 @@ private struct MissAVGrid: View {
                 let result = metadata.value(.movie(video))
                 VStack(alignment: .leading, spacing: 4) {
                     NavigationLink {
-                        if let movie = result.movie { NativeMovieDetailRoute(movieID: movie.id) }
+                        if let movie = result.movie { MovieDetailView(movieID: movie.id) }
                         else { MissAVMovieRoute(video: video) }
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
