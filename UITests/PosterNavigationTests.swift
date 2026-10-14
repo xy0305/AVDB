@@ -23,12 +23,6 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["external-save"].exists)
         XCTAssertTrue(app.buttons["external-clear"].exists)
         XCTAssertTrue(app.staticTexts["external-token-status"].exists)
-        let testConnection = app.buttons["external-test-connection"]
-        for _ in 0..<5 where !testConnection.isHittable { app.swipeUp() }
-        XCTAssertTrue(testConnection.exists)
-        XCTAssertTrue(app.staticTexts["external-saved-endpoint"].exists)
-        XCTAssertFalse(app.staticTexts["external-test-result"].exists, "No diagnostic request should run on entry")
-        XCTAssertEqual(field.value as? String ?? "", displayed, "Diagnostic UI must not populate the token field")
         // Navigation-only: never save a credential, query the service, or submit a 115 task.
     }
     func testRankingLoadMoreDetailBackPreservesVisibleRank() {

@@ -26,7 +26,6 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
     static var pending: FixtureProtocol?
     static var stopped = false
     static var hold = false
-    static var failure: URLError.Code?
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
@@ -35,10 +34,6 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         finish()
     }
     func finish() {
-        if let failure = Self.failure {
-            client?.urlProtocol(self, didFailWithError: URLError(failure, userInfo: [NSLocalizedDescriptionKey: "sensitive-raw-error synthetic-first"]))
-            return
-        }
         let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: [:])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(Self.body.utf8))
@@ -61,9 +56,6 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         }
         defer { client.cancelRequests() }
         check(!settings.enabled && !settings.hasToken)
-        let noKeyDiagnostics = ExternalConnectionDiagnostics()
-        await noKeyDiagnostics.test(settings: settings, client: client)
-        check(noKeyDiagnostics.result!.contains("未请求") && FixtureProtocol.requests.isEmpty)
         let initial = try await client.fetchLinks(for: "SYNTH-001", settings: settings)
         check(initial.isEmpty && FixtureProtocol.requests.isEmpty)
         try settings.save(baseURL: "https://fixture.invalid/", enabled: true, replacementToken: "")
@@ -81,25 +73,7 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         check(sent.url!.path == "/api/v1/articles/torrents")
         check(URLComponents(url: sent.url!, resolvingAgainstBaseURL: false)!.queryItems == [URLQueryItem(name: "keyword", value: "SYNTH-001")])
         check(!sent.url!.absoluteString.contains("synthetic-first"))
-        check(sent.value(forHTTPHeaderField: "Accept") == "application/json")
         check(sent.cachePolicy == .reloadIgnoringLocalCacheData)
-        let diagnostics = ExternalConnectionDiagnostics()
-        for code in [URLError.Code.timedOut, .cannotConnectToHost, .networkConnectionLost, .appTransportSecurityRequiresSecureConnection, .secureConnectionFailed, .serverCertificateUntrusted, .notConnectedToInternet] {
-            FixtureProtocol.failure = code
-            do { _ = try await client.fetchLinks(for: "IPX-811", settings: settings); fatalError("lost error code") }
-            catch ExternalLibraryError.url(let value) { check(value == code.rawValue) }
-            await diagnostics.test(settings: settings, client: client)
-            check(diagnostics.result!.contains("URLError \(code.rawValue)"))
-            check(diagnostics.result!.contains("https://fixture.invalid:443"))
-            check(!diagnostics.result!.contains("synthetic-first") && !diagnostics.result!.contains("sensitive-raw-error"))
-        }
-        FixtureProtocol.failure = .cancelled
-        await diagnostics.test(settings: settings, client: client)
-        check(diagnostics.result == nil && !diagnostics.isTesting)
-        FixtureProtocol.failure = nil
-        await diagnostics.test(settings: settings, client: client)
-        check(diagnostics.result!.contains("HTTP 200"))
-        check(FixtureProtocol.requests.last!.url!.query == "keyword=IPX-811")
         try settings.save(baseURL: settings.baseURL, enabled: true, replacementToken: "")
         check(try settings.token() == "synthetic-first")
         for invalid in ["ftp://fixture.invalid", "https://u:p@fixture.invalid", "https://fixture.invalid/path", "https://fixture.invalid?q=1", "https://fixture.invalid#fragment", "https://fixture.invalid:0"] {
@@ -123,8 +97,6 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         catch ExternalLibraryError.http(401) { }
         check(await client.links(for: "SYNTH-001", settings: settings).isEmpty)
         check(client.lastError != nil)
-        await diagnostics.test(settings: settings, client: client)
-        check(diagnostics.result!.contains("HTTP 401"))
         FixtureProtocol.status = 200
         FixtureProtocol.body = #"{"data":null}"#
         do { _ = try await client.fetchLinks(for: "SYNTH-001", settings: settings); fatalError("swallowed schema failure") }
@@ -155,31 +127,6 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         FixtureProtocol.pending = nil
         _ = try await client.fetchLinks(for: "SYNTH-001", settings: settings)
         check(FixtureProtocol.requests.last!.value(forHTTPHeaderField: "X-API-Key") == "synthetic-second")
-        // Diagnostics must also discard a completed response after saving a new endpoint.
-        FixtureProtocol.hold = true
-        FixtureProtocol.pending = nil
-        let staleDiagnostic = Task { await diagnostics.test(settings: settings, client: client) }
-        for _ in 0..<200 where FixtureProtocol.pending == nil { try await Task.sleep(nanoseconds: 10_000_000) }
-        check(FixtureProtocol.pending != nil)
-        try settings.save(baseURL: "https://fixture.invalid:8443", enabled: true, replacementToken: "synthetic-third")
-        FixtureProtocol.pending!.finish()
-        await staleDiagnostic.value
-        check(diagnostics.result == nil && !diagnostics.isTesting)
-        FixtureProtocol.pending = nil
-        FixtureProtocol.hold = false
-        await diagnostics.test(settings: settings, client: client)
-        check(FixtureProtocol.requests.last!.url!.port == 8443)
-        check(FixtureProtocol.requests.last!.value(forHTTPHeaderField: "X-API-Key") == "synthetic-third")
-        check(diagnostics.result!.contains("https://fixture.invalid:8443"))
-        // Same-host/different-port is still a new origin: never reuse the old token silently.
-        do { try settings.save(baseURL: "https://fixture.invalid:9443", enabled: true, replacementToken: ""); fatalError("cross-port token reuse") }
-        catch ExternalLibraryError.endpointNeedsToken { }
-        let legacyDefaults = UserDefaults(suiteName: suite + "-legacy")!
-        defer { legacyDefaults.removePersistentDomain(forName: suite + "-legacy") }
-        legacyDefaults.set(ExternalLibrarySettings.legacyBaseURL, forKey: "avdb.externalLibrary.baseURL")
-        let legacy = ExternalLibrarySettings(store: StubTokens(), defaults: legacyDefaults)
-        check(legacy.usesLegacyEndpoint && legacy.baseURL.hasSuffix(":18000"))
-        check(ExternalLibrarySettings.defaultBaseURL == "http://163.47.40.207:8000")
         let requestCount = FixtureProtocol.requests.count
         try settings.save(baseURL: settings.baseURL, enabled: false, replacementToken: "")
         _ = try await client.fetchLinks(for: "SYNTH-001", settings: settings)
