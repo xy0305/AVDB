@@ -77,6 +77,7 @@ final class ExternalLibraryClient {
         guard let url = parts?.url else { throw ExternalLibraryError.invalidURL }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.setValue(token, forHTTPHeaderField: "X-API-Key")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         do {
             let (data, response) = try await transport().data(for: request)
             try Task.checkCancellation()
@@ -91,7 +92,8 @@ final class ExternalLibraryClient {
                 throw CancellationError()
             }
             if let error = error as? ExternalLibraryError { throw error }
-            // Do not expose localized transport errors: they may contain URLs or server-provided content.
+            // Preserve only the numeric Foundation code, never userInfo, URLs or raw descriptions.
+            if let error = error as? URLError { throw ExternalLibraryError.url(error.code.rawValue) }
             throw ExternalLibraryError.transport
         }
     }
@@ -150,7 +152,19 @@ struct ExternalKeychainStore: ExternalTokenStore {
 
 enum ExternalLibraryError: LocalizedError {
     case keychain(OSStatus), invalidStoredToken, invalidURL, invalidToken, endpointNeedsToken
-    case http(Int), transport, schema
+    case http(Int), url(Int), transport, schema
+    static func networkCategory(_ code: Int) -> String {
+        switch code {
+        case -1001: return "请求超时"
+        case -1003, -1006: return "主机或 DNS 无法解析"
+        case -1004: return "无法连接服务器"
+        case -1005: return "网络连接中断"
+        case -1009: return "设备未连接网络"
+        case -1022: return "系统 ATS 阻止 HTTP"
+        case -1206 ... -1200: return "TLS 或证书验证失败"
+        default: return "网络传输失败"
+        }
+    }
     var errorDescription: String? {
         switch self {
         case .keychain(let status): return "钥匙串操作失败（\(status)），请解锁设备后重试。"
@@ -159,7 +173,8 @@ enum ExternalLibraryError: LocalizedError {
         case .invalidToken: return "令牌不能包含空格、换行或非 ASCII 字符。"
         case .endpointNeedsToken: return "更换服务器时请重新输入令牌，避免将原令牌发送给其他服务器。"
         case .http(let code): return "外部数据库请求失败（HTTP \(code)）；重定向不被允许。"
-        case .transport: return "外部数据库连接失败，请检查网络及服务器地址。"
+        case .url(let code): return "外部数据库：\(Self.networkCategory(code))（URLError \(code)）。"
+        case .transport: return "外部数据库连接失败（非 URLError），请检查网络及服务器地址。"
         case .schema: return "外部数据库响应格式无效。"
         }
     }
@@ -168,7 +183,9 @@ enum ExternalLibraryError: LocalizedError {
 @MainActor
 final class ExternalLibrarySettings: ObservableObject {
     static let shared = ExternalLibrarySettings()
-    static let defaultBaseURL = "http://163.47.40.207:18000"
+    static let defaultBaseURL = "http://163.47.40.207:8000"
+    static let legacyBaseURL = "http://163.47.40.207:18000"
+    var usesLegacyEndpoint: Bool { baseURL == Self.legacyBaseURL }
     @Published private(set) var baseURL: String
     @Published private(set) var enabled: Bool
     @Published private(set) var hasToken = false
@@ -240,5 +257,51 @@ final class ExternalRedirectBlocker: NSObject, URLSessionTaskDelegate, @unchecke
                     completionHandler: @escaping (URLRequest?) -> Void) {
         // Reject ALL redirects, including same-origin ones: credentials never leave the configured endpoint.
         completionHandler(nil)
+    }
+}
+
+// Shared by settings UI and URLProtocol regression; all output is allowlisted.
+@MainActor
+final class ExternalConnectionDiagnostics: ObservableObject {
+    @Published private(set) var result: String?
+    @Published private(set) var isTesting = false
+    private var attempt: UInt = 0
+
+    func reset() {
+        attempt &+= 1
+        isTesting = false
+        result = nil
+    }
+
+    func test(settings: ExternalLibrarySettings, client: ExternalLibraryClient) async {
+        reset()
+        let current = attempt
+        let generation = settings.revision
+        guard let base = try? ExternalLibrarySettings.normalizedURL(settings.baseURL),
+              let parts = URLComponents(string: base), let host = parts.host else {
+            result = ExternalLibraryError.invalidURL.localizedDescription
+            return
+        }
+        let endpoint = "\(parts.scheme ?? "")://\(host):\(parts.port ?? (parts.scheme == "https" ? 443 : 80))"
+        guard settings.enabled, settings.hasToken else {
+            result = "\(endpoint) · 未请求：请先保存启用状态及令牌。"
+            return
+        }
+        isTesting = true
+        var outcome: String?
+        do {
+            let links = try await client.fetchLinks(for: "IPX-811", settings: settings)
+            outcome = "HTTP 200 · 查询成功（\(links.count) 条）"
+        } catch is CancellationError {
+            // Cancellation and superseded settings are never connection failures.
+        } catch let error as ExternalLibraryError {
+            outcome = error.localizedDescription
+        } catch {
+            outcome = ExternalLibraryError.transport.localizedDescription
+        }
+        guard current == attempt else { return }
+        isTesting = false
+        guard !Task.isCancelled, generation == settings.revision else { return }
+        if let outcome { result = "\(endpoint) · \(outcome)" }
     }
 }

@@ -627,6 +627,11 @@ struct ExternalLibrarySettingsView: View {
     @State private var token = ""
     @State private var message: String?
     @State private var confirmClear = false
+    @StateObject private var diagnostics = ExternalConnectionDiagnostics()
+    @State private var connectionTask: Task<Void, Never>?
+    private var hasUnsavedEdits: Bool {
+        baseURL != settings.baseURL || enabled != settings.enabled || !token.isEmpty
+    }
 
     var body: some View {
         Form {
@@ -666,10 +671,40 @@ struct ExternalLibrarySettingsView: View {
             } footer: {
                 Text("令牌仅存于本机钥匙串，不会显示或复制。留空保存不会清除令牌；返回将放弃未保存的编辑。更换服务器须重新填写令牌，或先清除旧令牌。停用后不查询。")
             }
+            if settings.usesLegacyEndpoint {
+                Section("旧端口已停用") {
+                    Text("已保存地址仍是旧默认端口 18000，当前服务端口为 8000。不会自动迁移或将旧令牌发送到新端口。")
+                    Button("填入 8000 地址（须重新输入令牌并保存）") {
+                        baseURL = ExternalLibrarySettings.defaultBaseURL
+                        token = ""
+                        message = "请重新输入新端口使用的令牌，再点击保存；未保存前仍使用旧配置。"
+                    }
+                    .accessibilityIdentifier("external-migrate-port")
+                }
+            }
+            Section("连接诊断（只读）") {
+                Text("已保存服务器：\(settings.baseURL)")
+                    .accessibilityIdentifier("external-saved-endpoint")
+                Text("测试只使用已保存配置，查询番号 IPX-811，不执行写操作。编辑后请先保存。")
+                    .font(.footnote)
+                if hasUnsavedEdits { Text("有未保存编辑，请先保存后测试。  ").foregroundStyle(.orange) }
+                Button(diagnostics.isTesting ? "正在测试…" : "测试连接") {
+                    connectionTask?.cancel()
+                    connectionTask = Task {
+                        await diagnostics.test(settings: settings, client: .shared)
+                    }
+                }
+                .disabled(hasUnsavedEdits || diagnostics.isTesting)
+                .accessibilityIdentifier("external-test-connection")
+                if let result = diagnostics.result {
+                    Text(result).font(.footnote).textSelection(.enabled)
+                        .accessibilityIdentifier("external-test-result")
+                }
+            }
             Section("传输风险") {
                 Text("HTTP 未加密：令牌与查询内容可能被网络中间人读取或篡改。默认服务器使用 HTTP；请仅在知晓风险时启用，建议改用可信的 HTTPS 服务。钥匙串保护本机存储，不会让 HTTP 变安全。")
                     .foregroundStyle(.orange)
-                Text("所有重定向均拒绝。请直接填写最终服务器根地址。未配置令牌时不请求；本页不会自动验证或发送账号数据。")
+                Text("所有重定向均拒绝。请直接填写最终服务器根地址。未配置令牌时不请求；只有点击测试连接才会按已保存配置发送只读诊断查询。")
                     .font(.footnote)
             }
         }
@@ -679,7 +714,15 @@ struct ExternalLibrarySettingsView: View {
             baseURL = settings.baseURL
             enabled = settings.enabled
         }
-        .onDisappear { token = "" }
+        .onChange(of: settings.revision) { _, _ in
+            connectionTask?.cancel()
+            diagnostics.reset()
+        }
+        .onDisappear {
+            token = ""
+            connectionTask?.cancel()
+            diagnostics.reset()
+        }
         .confirmationDialog("清除后外部数据库将停止查询，直到重新保存令牌。", isPresented: $confirmClear, titleVisibility: .visible) {
             Button("清除令牌", role: .destructive) {
                 do {
