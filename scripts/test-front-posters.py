@@ -29,18 +29,23 @@ assert(FrontPosterPolicy.cropRect(width:800,height:538,source:thumb) == nil)
 let box=FrontPosterPolicy.cropRect(width:800,height:538,source:wrap)!
 assert(box == CGRect(x:424,y:0,width:376,height:538))
 // Neutral jacket: red back at left, green front at right. No media downloads.
+// Explicit device-RGB and byte order: avoid implicit sRGB conversion in pixel assertions.
+let flags=CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
 let ctx=CGContext(data:nil,width:800,height:538,bitsPerComponent:8,bytesPerRow:800*4,
-                  space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
-ctx.setFillColor(CGColor(red:1,green:0,blue:0,alpha:1));ctx.fill(CGRect(x:0,y:0,width:800,height:538))
-ctx.setFillColor(CGColor(red:0,green:1,blue:0,alpha:1));ctx.fill(box)
+                  space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:flags)!
+ctx.setShouldAntialias(false)
+ctx.setFillColor(CGColor(colorSpace:ctx.colorSpace!,components:[1,0,0,1])!);ctx.fill(CGRect(x:0,y:0,width:800,height:538))
+ctx.setFillColor(CGColor(colorSpace:ctx.colorSpace!,components:[0,1,0,1])!);ctx.fill(box)
 let original=ctx.makeImage()!
 let front=original.cropping(to:box)!
 assert(front.width == 376 && front.height == 538)
 let check=CGContext(data:nil,width:376,height:538,bitsPerComponent:8,bytesPerRow:376*4,
-                    space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
+                    space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:flags)!
+check.interpolationQuality = .none
+check.setShouldAntialias(false)
 check.draw(front,in:CGRect(x:0,y:0,width:376,height:538))
 let pixels=check.data!.assumingMemoryBound(to:UInt8.self)
-for i in stride(from:0,to:376*538*4,by:4) { assert(pixels[i] == 0 && pixels[i+1] == 255 && pixels[i+2] == 0) }
+for i in stride(from:0,to:376*538*4,by:4) { assert(pixels[i] == 0 && pixels[i+1] == 255 && pixels[i+2] == 0, "neutral pixel at \(i): \(pixels[i]),\(pixels[i+1]),\(pixels[i+2])") }
 assert(original.width == 800 && original.height == 538) // originals unmodified
 // Exercise production ImageIO downsample with EXIF rotation, not swapped math.
 let data=NSMutableData()
