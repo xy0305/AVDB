@@ -46,9 +46,24 @@ final class ExternalLibraryClient {
         session = created
         return created
     }
-    // Compatibility for older callers; shipping detail uses fetchLinks so failures remain visible.
-    @MainActor func links(for number: String) async -> [ExternalLink] {
-        (try? await fetchLinks(for: number)) ?? []
+    // Compatibility for older callers: [] plus lastError distinguishes failure from success.
+    // Shipping detail uses the throwing fetchLinks API directly.
+    @MainActor private(set) var lastError: String?
+    @MainActor func links(for number: String, settings configured: ExternalLibrarySettings? = nil) async -> [ExternalLink] {
+        let settings = configured ?? .shared
+        let generation = settings.revision
+        do {
+            let result = try await fetchLinks(for: number, settings: settings)
+            guard generation == settings.revision else { return [] }
+            lastError = nil
+            return result
+        } catch is CancellationError {
+            return []
+        } catch {
+            guard generation == settings.revision else { return [] }
+            lastError = error.localizedDescription
+            return []
+        }
     }
     @MainActor func fetchLinks(for number: String, settings configured: ExternalLibrarySettings? = nil) async throws -> [ExternalLink] {
         let settings = configured ?? .shared

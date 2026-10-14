@@ -95,12 +95,16 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         FixtureProtocol.status = 401
         do { _ = try await client.fetchLinks(for: "SYNTH-001", settings: settings); fatalError("swallowed HTTP failure") }
         catch ExternalLibraryError.http(401) { }
+        check(await client.links(for: "SYNTH-001", settings: settings).isEmpty)
+        check(client.lastError != nil)
         FixtureProtocol.status = 200
         FixtureProtocol.body = #"{"data":null}"#
         do { _ = try await client.fetchLinks(for: "SYNTH-001", settings: settings); fatalError("swallowed schema failure") }
         catch ExternalLibraryError.schema { }
         FixtureProtocol.body = #"{"data":[]}"#
         check(try await client.fetchLinks(for: "SYNTH-001", settings: settings).isEmpty)
+        check(await client.links(for: "SYNTH-001", settings: settings).isEmpty)
+        check(client.lastError == nil)
         // A response already in flight must not publish after a configuration generation change.
         FixtureProtocol.hold = true
         let stale = Task { try await client.fetchLinks(for: "SYNTH-001", settings: settings) }

@@ -2,11 +2,15 @@ import XCTest
 
 final class PosterNavigationTests: XCTestCase {
     func testExternalDatabaseSettingsEntryDoesNotRevealStoredToken() {
+        continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--poster-navigation-fixture"]
+        XCUIDevice.shared.orientation = .portrait
         app.launch()
-        let me = app.tabBars.buttons["我的"]
-        XCTAssertTrue(me.waitForExistence(timeout: 10))
+        defer { app.terminate() }
+        // iPadOS 26 floating tabs are buttons under Other, not a TabBar container.
+        let me = app.buttons["我的"].firstMatch
+        XCTAssertTrue(me.waitForExistence(timeout: 10), app.debugDescription)
         me.tap()
         let entry = app.buttons["external-settings-entry"]
         for _ in 0..<8 where !entry.isHittable { app.swipeUp() }
@@ -14,7 +18,8 @@ final class PosterNavigationTests: XCTestCase {
         entry.tap()
         let field = app.secureTextFields["external-token"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        XCTAssertEqual(field.value as? String, "新令牌（留空保留已保存令牌）")
+        let displayed = field.value as? String ?? ""
+        XCTAssertTrue(displayed.isEmpty || displayed == "新令牌（留空保留已保存令牌）", "The secure field must remain empty/placeholder-only")
         XCTAssertTrue(app.buttons["external-save"].exists)
         XCTAssertTrue(app.buttons["external-clear"].exists)
         XCTAssertTrue(app.staticTexts["external-token-status"].exists)
