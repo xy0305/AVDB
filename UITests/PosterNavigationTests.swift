@@ -1,6 +1,25 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testExternalDatabaseSettingsEntryDoesNotRevealStoredToken() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture"]
+        app.launch()
+        let me = app.tabBars.buttons["我的"]
+        XCTAssertTrue(me.waitForExistence(timeout: 10))
+        me.tap()
+        let entry = app.buttons["external-settings-entry"]
+        for _ in 0..<8 where !entry.isHittable { app.swipeUp() }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        entry.tap()
+        let field = app.secureTextFields["external-token"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "新令牌（留空保留已保存令牌）")
+        XCTAssertTrue(app.buttons["external-save"].exists)
+        XCTAssertTrue(app.buttons["external-clear"].exists)
+        XCTAssertTrue(app.staticTexts["external-token-status"].exists)
+        // Navigation-only: never save a credential, query the service, or submit a 115 task.
+    }
     func testRankingLoadMoreDetailBackPreservesVisibleRank() {
         continueAfterFailure = false
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {

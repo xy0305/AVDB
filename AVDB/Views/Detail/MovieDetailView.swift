@@ -16,6 +16,7 @@ struct MovieDetailView: View {
     @State private var tenhowCoverURL: String?
     @State private var reviewPanelHeight: CGFloat = 76
     @StateObject private var reviewsVM = ReviewsListViewModel()
+    @ObservedObject private var externalSettings = ExternalLibrarySettings.shared
     @State private var showSearch = false
     @Environment(\.availableLayoutSize) private var layoutSize
     @Environment(\.dismiss) private var dismiss
@@ -153,7 +154,7 @@ struct MovieDetailView: View {
                 if let images = movie.previewImages, !images.isEmpty {
                     deferredSection { previewImagesSection(images) }
                 }
-                if (movie.magnetsCount ?? 0) > 0 {
+                if (movie.magnetsCount ?? 0) > 0 || externalSettings.enabled {
                     deferredSection { magnetsSection(movie) }
                 }
                 if !vm.actorMovies.isEmpty {
@@ -617,9 +618,12 @@ struct MovieDetailView: View {
                     MagnetRow(magnet: magnet, movieID: movie.id, movieNumber: movie.displayNumber)
                 }
             }
+            if let status = vm.externalStatus {
+                Text(status).font(.footnote).foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal)
-        .task { await vm.loadMagnets() }
+        .task(id: externalSettings.revision) { await vm.loadMagnets() }
     }
 
     private func reviewsSection(_ movie: Movie) -> some View {
@@ -750,6 +754,9 @@ final class MovieDetailViewModel: ObservableObject {
     @Published var relatedMovies: [Movie] = []
     @Published var actorMovies: [Movie] = []
     @Published var magnets: [Magnet] = []
+    @Published var externalStatus: String?
+    private var nativeMagnets: [Magnet] = []
+    private var loadedNativeMagnets = false
     @Published var reviews: [Review] = []
     @Published var relatedLists: [MovieList] = []
     @Published var reviewStatus: String?
@@ -786,26 +793,42 @@ final class MovieDetailViewModel: ObservableObject {
     }
 
     func loadMagnets() async {
-        guard !movieID.isEmpty, magnets.isEmpty else { return }
+        guard !movieID.isEmpty else { return }
+        let settings = ExternalLibrarySettings.shared
+        let generation = settings.revision
+        magnets = nativeMagnets // Drop old source results before fetching under a new configuration.
+        externalStatus = nil
         loadingMagnets = true
-        defer { loadingMagnets = false }
-        if let m = try? await sdk.movieMagnets(movieID) {
+        defer { if generation == settings.revision { loadingMagnets = false } }
+        if !loadedNativeMagnets, let m = try? await sdk.movieMagnets(movieID) {
+            guard !Task.isCancelled, generation == settings.revision else { return }
+            nativeMagnets = m
             magnets = m
+            loadedNativeMagnets = true
         }
-        await mergeExternalLinks()
-    }
-
-    private func mergeExternalLinks() async {
+        guard !Task.isCancelled, generation == settings.revision else { return }
+        guard settings.enabled else { externalStatus = "外部数据库已停用"; return }
         let number = movie?.displayNumber ?? movie?.number ?? ""
-        let links = await ExternalLibraryClient.shared.links(for: number)
-        guard !links.isEmpty else { return }
-        let existing = Set(magnets.compactMap(\.magnetURL))
-        let extra = links.compactMap { link -> Magnet? in
-            guard !existing.contains(link.downloadURL) else { return nil }
-            return Magnet(link: link)
+        do {
+            guard let token = try settings.token(), !token.isEmpty else {
+                externalStatus = "外部数据库未配置令牌，请前往「我的 → 外部数据库」保存。"
+                return
+            }
+            let links = try await ExternalLibraryClient.shared.fetchLinks(for: number)
+            guard !Task.isCancelled, generation == settings.revision else { return }
+            var existing = Set(magnets.compactMap(\.magnetURL))
+            let extra = links.compactMap { link -> Magnet? in
+                guard existing.insert(link.downloadURL).inserted else { return nil }
+                return Magnet(link: link)
+            }
+            magnets.append(contentsOf: extra)
+            externalStatus = links.isEmpty ? "外部数据库查询成功，暂无资源" : "外部数据库已加载"
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled, generation == settings.revision else { return }
+            externalStatus = error.localizedDescription
         }
-        guard !extra.isEmpty else { return }
-        magnets.append(contentsOf: extra)
     }
 
     func loadReviews() async {

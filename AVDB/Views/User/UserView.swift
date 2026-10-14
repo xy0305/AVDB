@@ -219,6 +219,12 @@ struct UserView: View {
 
                 Section("来源") {
                     NavigationLink {
+                        ExternalLibrarySettingsView()
+                    } label: {
+                        Label("外部数据库", systemImage: "externaldrive.badge.person.crop")
+                    }
+                    .accessibilityIdentifier("external-settings-entry")
+                    NavigationLink {
                         JavRankingView()
                     } label: {
                         Label("JAV Ranking", systemImage: "list.number")
@@ -609,6 +615,80 @@ struct AboutView: View {
         .liquidGlassPage()
         .task {
             content = try? await JavDBSDK.shared.about()
+        }
+    }
+}
+
+/// Token input is intentionally never populated from Keychain.
+struct ExternalLibrarySettingsView: View {
+    @ObservedObject private var settings = ExternalLibrarySettings.shared
+    @State private var baseURL = ""
+    @State private var enabled = false
+    @State private var token = ""
+    @State private var message: String?
+    @State private var confirmClear = false
+
+    var body: some View {
+        Form {
+            Section("外部数据库") {
+                Toggle("启用外部数据库", isOn: $enabled)
+                    .accessibilityIdentifier("external-enabled")
+                TextField("服务器根地址", text: $baseURL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .accessibilityIdentifier("external-base-url")
+                SecureField("新令牌（留空保留已保存令牌）", text: $token)
+                    .textContentType(.password)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .privacySensitive()
+                    .accessibilityIdentifier("external-token")
+                Text(settings.hasToken ? "令牌已保存（不显示内容）" : "未配置令牌，不会发送请求")
+                    .accessibilityIdentifier("external-token-status")
+                if let error = settings.storageError {
+                    Text(error).foregroundStyle(.red)
+                }
+            }
+            Section {
+                Button("保存设置") {
+                    do {
+                        try settings.save(baseURL: baseURL, enabled: enabled, replacementToken: token)
+                        token = ""
+                        baseURL = settings.baseURL
+                        message = "设置已保存，后续查询立即使用新设置。"
+                    } catch { message = error.localizedDescription }
+                }
+                .accessibilityIdentifier("external-save")
+                Button("清除已保存令牌", role: .destructive) { confirmClear = true }
+                    .accessibilityIdentifier("external-clear")
+                if let message { Text(message).font(.footnote) }
+            } footer: {
+                Text("令牌仅存于本机钥匙串，不会显示或复制。留空保存不会清除令牌；返回将放弃未保存的编辑。更换服务器须重新填写令牌，或先清除旧令牌。停用后不查询。")
+            }
+            Section("传输风险") {
+                Text("HTTP 未加密：令牌与查询内容可能被网络中间人读取或篡改。默认服务器使用 HTTP；请仅在知晓风险时启用，建议改用可信的 HTTPS 服务。钥匙串保护本机存储，不会让 HTTP 变安全。")
+                    .foregroundStyle(.orange)
+                Text("所有重定向均拒绝。请直接填写最终服务器根地址。未配置令牌时不请求；本页不会自动验证或发送账号数据。")
+                    .font(.footnote)
+            }
+        }
+        .navigationTitle("外部数据库")
+        .onAppear {
+            settings.refreshStatus()
+            baseURL = settings.baseURL
+            enabled = settings.enabled
+        }
+        .onDisappear { token = "" }
+        .confirmationDialog("清除后外部数据库将停止查询，直到重新保存令牌。", isPresented: $confirmClear, titleVisibility: .visible) {
+            Button("清除令牌", role: .destructive) {
+                do {
+                    try settings.clearToken()
+                    token = ""
+                    message = "已清除令牌，不再发送外部数据库请求。"
+                } catch { message = error.localizedDescription }
+            }
+            Button("取消", role: .cancel) { }
         }
     }
 }
