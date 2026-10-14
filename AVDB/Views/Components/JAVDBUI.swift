@@ -511,6 +511,7 @@ struct MoviePosterCard: View {
 struct MoviePosterGrid: View {
     let movies: [Movie]
     var showRank: Bool = false
+    var scrollTargets: Bool = false
     var onAppearLast: ((Movie) -> Void)? = nil
 
     @Environment(\.availableLayoutSize) private var layoutSize
@@ -542,6 +543,7 @@ struct MoviePosterGrid: View {
                 .contentShape(Rectangle())
                 .clipped()
                 .contentShape(Rectangle())
+                .id(movie.id)
                 .onAppear {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)
@@ -549,6 +551,7 @@ struct MoviePosterGrid: View {
                 }
             }
         }
+        .scrollTargetLayout(isEnabled: scrollTargets)
         .padding(.horizontal, AdaptiveLayout.gridPadding)
         .background {
             GeometryReader { geometry in

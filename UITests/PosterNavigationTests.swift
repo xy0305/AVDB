@@ -1,6 +1,50 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testRecentMagnetCatalogRealViewReturnWithoutReload() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--catalog-navigation-fixture"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let diagnostics = app.staticTexts["catalog-diagnostics"]
+        XCTAssertTrue(diagnostics.waitForExistence(timeout: 10))
+        let ready = NSPredicate(format: "label == %@", "items=60 requests=1")
+        expectation(for: ready, evaluatedWith: diagnostics)
+        waitForExpectations(timeout: 10)
+        let poster = app.buttons["poster-catalog-14"]
+        let first = app.buttons["poster-catalog-1"]
+        for _ in 0..<18 {
+            if poster.isHittable && !first.isHittable { break }
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60)))
+        }
+        XCTAssertTrue(poster.isHittable, app.debugDescription)
+        XCTAssertFalse(first.isHittable, "Fixture must exercise a scrolled catalog, not initial top")
+        let beforeY = poster.frame.minY
+        let before = XCTAttachment(screenshot: app.screenshot())
+        before.name = "recent-magnet-production-before-rank14"
+        before.lifetime = .keepAlways
+        add(before)
+        poster.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28)).tap()
+        XCTAssertTrue(app.staticTexts["detail-catalog-14"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(poster.waitForExistence(timeout: 5))
+        XCTAssertTrue(poster.isHittable, "Return lost rank14")
+        XCTAssertFalse(first.isHittable, "Return jumped to top")
+        XCTAssertEqual(poster.frame.minY, beforeY, accuracy: 35, "Return shifted row offset")
+        XCTAssertEqual(diagnostics.label, "items=60 requests=1", "Back must issue zero additional requests, not re-cache-fetch")
+        XCTAssertFalse(app.progressIndicators["catalog-loading"].exists)
+        let after = XCTAttachment(screenshot: app.screenshot())
+        after.name = "recent-magnet-production-after-rank14-no-extra-requests"
+        after.lifetime = .keepAlways
+        add(after)
+    }
+
     func testUniformNeutralOriginalAndFrontPosterBounds() {
         continueAfterFailure = false
         let app = XCUIApplication()

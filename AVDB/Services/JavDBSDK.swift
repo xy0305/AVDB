@@ -305,7 +305,9 @@ public final class JavDBSDK {
         if let filterBy { query["filter_by"] = filterBy }
         if let sortBy { query["sort_by"] = sortBy }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/latest", query: query)
-        let movies = (resp.data?.movies ?? []).map { $0.withCatalogType(type) }
+        guard resp.isSuccess else { throw JavDBError.apiError(action: resp.action, message: resp.message) }
+        guard let decoded = resp.data?.movies else { throw JavDBError.decodeError("最新列表响应缺少 movies 列表") }
+        let movies = decoded.map { $0.withCatalogType(type) }
         rememberMovies(movies)
         return movies
     }

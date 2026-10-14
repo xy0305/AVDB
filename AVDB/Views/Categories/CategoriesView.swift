@@ -504,7 +504,14 @@ struct CatalogListView: View {
     @State private var catalog: MovieCatalogType = .all
     @State private var filter: LatestListFilter
     @State private var sort: CatalogSort = .updateDesc
-    @StateObject private var vm = MovieListViewModel { _ in [] }
+    @State private var account = APIClient.shared.token
+    @StateObject private var vm: CatalogListViewModel
+
+    private var query: CatalogQuery {
+        CatalogQuery(source: String(describing: source), type: catalog.rawValue,
+                     filter: filter.rawValue, sort: sort.sortBy,
+                     account: account, backend: JavDBConstants.baseURL)
+    }
 
     private let listSorts: [CatalogSort] = [.updateDesc, .releaseDesc]
 
@@ -513,6 +520,24 @@ struct CatalogListView: View {
         self.source = source
         _catalog = State(initialValue: type == .censored ? .all : type)
         _filter = State(initialValue: source == .magnets ? .magnets : .all)
+        _vm = StateObject(wrappedValue: CatalogListViewModel(fetch: { query, page in
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--catalog-navigation-fixture") {
+                return page == 1 ? (1...60).map {
+                    Movie(id: "catalog-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)")
+                } : []
+            }
+            #endif
+            switch query.source {
+            case "rankings":
+                return try await JavDBSDK.shared.rankings(type: query.type, period: "daily", page: page)
+            default:
+                return try await JavDBSDK.shared.latestMovies(page: page, limit: 21, type: query.type,
+                    filterBy: query.filter.isEmpty ? nil : query.filter, sortBy: query.sort)
+            }
+        }, scopeIsCurrent: { query in
+            query.account == APIClient.shared.token && query.backend == JavDBConstants.baseURL
+        }))
     }
 
     var body: some View {
@@ -527,21 +552,36 @@ struct CatalogListView: View {
             filterSortBar
 
             ScrollView {
-                MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+                MoviePosterGrid(movies: vm.movies, scrollTargets: true, onAppearLast: { movie in
                     vm.loadMoreIfNeeded(current: movie)
                 })
-                if vm.isLoading { ProgressView().padding() }
+                if vm.isLoading { ProgressView().padding().accessibilityIdentifier("catalog-loading") }
+                if let error = vm.errorMessage {
+                    VStack {
+                        Text(error).font(.caption).accessibilityIdentifier("catalog-error")
+                        Button("重試") { Task { await vm.retry() } }
+                    }.padding()
+                } else if vm.movies.isEmpty && !vm.isLoading {
+                    Text("暫無符合條件的作品").padding()
+                }
             }
+            .scrollPosition(id: $vm.scrollID)
+            .refreshable { await vm.refresh() }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--catalog-navigation-fixture") {
+                Text("items=\(vm.movies.count) requests=\(vm.requestCount)")
+                    .font(.caption).accessibilityIdentifier("catalog-diagnostics")
+            }
+            #endif
         }
         .background { LiquidGlassBackground() }
         .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await reload() }
-        .onChange(of: catalog) { _, _ in Task { await reload() } }
-        .onChange(of: filter) { _, _ in Task { await reload() } }
-        .onChange(of: sort) { _, _ in Task { await reload() } }
-        .refreshable { await vm.refresh() }
+        .task(id: query) { await vm.enter(query) }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
+            account = APIClient.shared.token
+        }
     }
 
     private var filterSortBar: some View {
@@ -579,25 +619,4 @@ struct CatalogListView: View {
         .padding(.vertical, 2)
     }
 
-    @MainActor
-    private func reload() async {
-        let type = catalog.rawValue
-        let filterBy = filter.rawValue.isEmpty ? nil : filter.rawValue
-        let sortBy = sort.sortBy
-        vm.replaceFetcher { page in
-            switch source {
-            case .rankings:
-                return try await JavDBSDK.shared.rankings(type: type, period: "daily", page: page)
-            case .latest, .magnets:
-                return try await JavDBSDK.shared.latestMovies(
-                    page: page,
-                    limit: 21,
-                    type: type,
-                    filterBy: filterBy,
-                    sortBy: sortBy
-                )
-            }
-        }
-        await vm.refresh()
-    }
 }

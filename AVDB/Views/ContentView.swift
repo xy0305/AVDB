@@ -38,7 +38,10 @@ struct ContentView: View {
 
     var body: some View {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--poster-size-fixture") {
+        if ProcessInfo.processInfo.arguments.contains("--catalog-navigation-fixture") {
+            NavigationStack { CatalogListView(title: "近期磁鏈更新", source: .magnets) }
+                .modifier(SceneLayoutReader())
+        } else if ProcessInfo.processInfo.arguments.contains("--poster-size-fixture") {
             PosterSizeRegressionGallery()
         } else if ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
             NavigationStack { JAVLibraryRankingView() }

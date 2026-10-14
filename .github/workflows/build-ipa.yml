@@ -43,6 +43,7 @@ jobs:
       - name: Check LUT timeout and sheet lifecycle regressions
         run: |
           set -euo pipefail
+          python3 scripts/test-catalog-lifecycle.py
           python3 scripts/test-front-posters.py
           python3 scripts/test-native-rankings.py
           python3 scripts/test-auth-persistence.py

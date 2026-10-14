@@ -7,6 +7,10 @@
 
 import Foundation
 
+extension Notification.Name {
+    static let avdbCatalogAccountChanged = Notification.Name("avdb.catalog.accountChanged")
+}
+
 /// 统一响应包裹结构
 public struct JavDBResponse<T: Decodable>: Decodable {
     public let success: Int
@@ -77,6 +81,9 @@ public final class APIClient: @unchecked Sendable {
             UserDefaults.standard.set(token, forKey: Self.tokenKey)
         } else {
             UserDefaults.standard.removeObject(forKey: Self.tokenKey)
+        }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .avdbCatalogAccountChanged, object: nil)
         }
     }
 

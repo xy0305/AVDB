@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['UITests/**', 'AVDB/Views/Home/**', 'AVDB/Views/JavRankingView.swift', 'AVDB/Views/JAVLibraryRankingView.swift', 'AVDB/Services/JAVLibrarySource.swift', 'AVDB/Views/MissAVRankingView.swift', 'AVDB/Views/Rankings/**', 'AVDB/Services/MissAV*.swift', 'AVDB/Views/ContentView.swift', 'AVDB/Views/Components/JAVDBUI.swift', 'AVDB/Services/ImageLoader.swift', 'AVDB/Services/JavDBSDK.swift', 'AVDB/Models/**', 'scripts/test-native-rankings.py', 'scripts/RankingsRegression.swift', 'scripts/setup-poster-uitests.rb', 'scripts/test-player-regressions.py', '.github/workflows/poster-navigation.yml']
+    paths: ['AVDB/Views/Categories/**', 'AVDB/Services/MovieListViewModel.swift', 'AVDB/Networking/APIClient.swift', 'scripts/test-catalog-lifecycle.py', 'scripts/CatalogLifecycleRegression.swift', 'UITests/**', 'AVDB/Views/Home/**', 'AVDB/Views/JavRankingView.swift', 'AVDB/Views/JAVLibraryRankingView.swift', 'AVDB/Services/JAVLibrarySource.swift', 'AVDB/Views/MissAVRankingView.swift', 'AVDB/Views/Rankings/**', 'AVDB/Services/MissAV*.swift', 'AVDB/Views/ContentView.swift', 'AVDB/Views/Components/JAVDBUI.swift', 'AVDB/Services/ImageLoader.swift', 'AVDB/Services/JavDBSDK.swift', 'AVDB/Models/**', 'scripts/test-native-rankings.py', 'scripts/RankingsRegression.swift', 'scripts/setup-poster-uitests.rb', 'scripts/test-player-regressions.py', '.github/workflows/poster-navigation.yml']
 jobs:
   navigation:
     runs-on: macos-26
@@ -26,7 +26,14 @@ jobs:
           chosen=next((d for d in pads if '13-inch' in d['name']), pads[0])
           print(chosen)
           with open(os.environ['GITHUB_ENV'],'a') as f: f.write('IPAD_UDID='+chosen['udid']+'\n')
+          phones=[d for ds in devices.values() for d in ds if 'iPhone' in d['name']]
+          assert phones, 'No available iPhone simulator'
+          chosen=phones[0]
+          print(chosen)
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('IPHONE_UDID='+chosen['udid']+'\n')
           PY
+      - name: Execute production catalog lifecycle regression
+        run: python3 scripts/test-catalog-lifecycle.py
       - name: Execute production native ranking regression
         run: python3 scripts/test-native-rankings.py
       - name: Compile simulator Metal resource
@@ -37,11 +44,19 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PosterNavigation.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests 2>&1 | tee "$RUNNER_TEMP/poster-navigation.log"
+      - name: Recent magnet production catalog on iPhone
+        if: success() || failure()
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PhoneCatalog.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testRecentMagnetCatalogRealViewReturnWithoutReload 2>&1 | tee "$RUNNER_TEMP/phone-catalog.log"
       - name: Export neutral screenshots
         if: always()
         run: |
           if test -d "$RUNNER_TEMP/PosterNavigation.xcresult"; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/PosterNavigation.xcresult" --output-path "$RUNNER_TEMP/poster-screenshots"
+          fi
+          if test -d "$RUNNER_TEMP/PhoneCatalog.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/PhoneCatalog.xcresult" --output-path "$RUNNER_TEMP/phone-catalog-screenshots"
           fi
       - name: Upload screenshots hierarchy and results
         if: always()
@@ -52,4 +67,7 @@ jobs:
             ${{ runner.temp }}/PosterNavigation.xcresult
             ${{ runner.temp }}/poster-screenshots
             ${{ runner.temp }}/poster-navigation.log
+            ${{ runner.temp }}/phone-catalog.log
+            ${{ runner.temp }}/phone-catalog-screenshots
+            ${{ runner.temp }}/PhoneCatalog.xcresult
             devices.json
