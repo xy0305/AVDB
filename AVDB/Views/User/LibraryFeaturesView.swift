@@ -179,7 +179,7 @@ struct TripleDrawView: View {
                             GlassHaptic.success()
                         } label: {
                             VStack(spacing: 6) {
-                                JavDBImage(url: movie.coverURL ?? movie.thumbURL, maxPixelSize: 480)
+                                MoviePosterImage(movie: movie, maxPixelSize: 900)
                                     .frame(width: 108, height: 152)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                 Text(savedID == movie.id ? "已想看" : movie.displayNumber)

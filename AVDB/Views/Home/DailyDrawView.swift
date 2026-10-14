@@ -106,7 +106,7 @@ struct DailyDrawView: View {
                     )
                 )
             if showCover, let movie = selectedMovie {
-                JavDBImage(url: movie.coverURL ?? movie.thumbURL, maxPixelSize: 900)
+                MoviePosterImage(movie: movie, maxPixelSize: 900)
                     .frame(width: 230, height: 322)
                     .clipped()
             } else {

@@ -50,6 +50,7 @@ jobs:
           python3 scripts/test-javranking-mapping.py
           python3 scripts/test-missav.py
           python3 scripts/test-javranking-performance.py | tee javranking-performance.txt
+          python3 scripts/test-front-posters.py
           python3 scripts/test-ipad-layout.py
           python3 scripts/test-player-regressions.py
           python3 scripts/test-player-runtime.py

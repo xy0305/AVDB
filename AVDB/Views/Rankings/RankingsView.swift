@@ -248,7 +248,7 @@ struct RankingsView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack(alignment: .topLeading) {
-                    JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+                    MoviePosterImage(movie: movie)
                         .frame(width: coverW, height: coverH)
                         .clipped()
                         .liquidCover(cornerRadius: 12)

@@ -398,7 +398,7 @@ struct MoviePosterCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ClippedAspectFill(aspectRatio: 0.72) {
-                JavDBImage(url: movie.coverURL ?? movie.thumbURL)
+                MoviePosterImage(movie: movie)
                     .overlay {
                         LinearGradient(
                             colors: [.white.opacity(0.10), .clear],

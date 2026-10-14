@@ -181,15 +181,53 @@ extension String {
     }
 }
 
+/// List-only artwork policy, independently implemented after researching Amane.
+/// Metadata is not rewritten: detail screens still request the untouched original.
+public enum FrontPosterPolicy {
+    public static func isKnownWrap(_ value: String) -> Bool {
+        guard let url = URL(string: value), let host = url.host?.lowercased() else { return false }
+        let path = url.path.lowercased()
+        return (host == JavDBConstants.imageCDNHost && path.contains("/covers/"))
+            || (host == JavDBConstants.webCDNHost && path.contains("/covers/"))
+            || (host == "image.mgstage.com" && path.contains("/pb_e_"))
+    }
+
+    public static func sources(thumb: String?, cover: String?) -> [String] {
+        // JAVDB small_covers are genuine portraits, but observed at 147x200;
+        // covers are 800x538 DVD wraps. Prefer the high-resolution front in that pair.
+        let values = cover.map(isKnownWrap) == true ? [cover, thumb] : [thumb, cover]
+        var result: [String] = []
+        for value in values {
+            if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               !result.contains(value) { result.append(value) }
+        }
+        return result
+    }
+
+    public static func cropRect(width: Int, height: Int, source: String) -> CGRect? {
+        guard width > 0, height > 0, isKnownWrap(source) else { return nil }
+        let ratio = Double(width) / Double(height)
+        // Standard DVD jacket only; never blindly slice arbitrary landscape photos.
+        guard (1.35...1.65).contains(ratio) else { return nil }
+        let frontWidth = Int(Double(height) * 0.7)
+        guard frontWidth > 0, frontWidth < width else { return nil }
+        return CGRect(x: width - frontWidth, y: 0, width: frontWidth, height: height)
+    }
+}
+
 /// 图片加载器（单例）：后台解密/降采样、请求合并、按内存压力自动淘汰。
 public actor ImageLoader {
     public static let shared = ImageLoader()
 
     private let cache = NSCache<NSString, UIImage>()
     private var inFlight: [String: Task<UIImage?, Never>] = [:]
+    private let posterCache = NSCache<NSString, UIImage>()
+    private var posterInFlight: [String: Task<UIImage?, Never>] = [:]
     private let userAgent = "Mozilla/5.0 (Linux; Android 13; javdb)"
 
     private init() {
+        posterCache.countLimit = 180
+        posterCache.totalCostLimit = 48 * 1024 * 1024
         cache.countLimit = 240
         cache.totalCostLimit = 192 * 1024 * 1024
     }
@@ -223,6 +261,31 @@ public actor ImageLoader {
             cache.setObject(image, forKey: cacheKey, cost: cost)
         }
         return image
+    }
+
+    /// Decoded source cache stays separate from bounded list-only derivatives.
+    public func loadPoster(_ source: String, maxPixelSize: Int) async -> UIImage? {
+        let key = "front-v1#\(source)#\(maxPixelSize)"
+        if let cached = posterCache.object(forKey: key as NSString) { return cached }
+        if let flight = posterInFlight[key] { return await flight.value }
+        let flight = Task { () -> UIImage? in
+            guard let original = await self.load(source, maxPixelSize: maxPixelSize) else { return nil }
+            return await Task.detached(priority: .utility) {
+                guard let cg = original.cgImage,
+                      let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: source),
+                      let front = cg.cropping(to: rect) else { return original }
+                // ImageIO has already applied EXIF orientation before this operation.
+                return UIImage(cgImage: front)
+            }.value
+        }
+        posterInFlight[key] = flight
+        let result = await flight.value
+        posterInFlight[key] = nil
+        if let result {
+            let cost = result.cgImage.map { $0.bytesPerRow * $0.height } ?? 1
+            posterCache.setObject(result, forKey: key as NSString, cost: cost)
+        }
+        return result
     }
 
     private static func isExternalCover(_ urlString: String) -> Bool {
@@ -291,6 +354,7 @@ public actor ImageLoader {
     /// 清空缓存
     public func clearCache() {
         cache.removeAllObjects()
+        posterCache.removeAllObjects()
     }
 }
 
@@ -301,6 +365,7 @@ public struct JavDBImage: View {
     var secondFallbackURL: String? = nil
     let contentMode: ContentMode
     let maxPixelSize: Int
+    let frontPoster: Bool
 
     @State private var image: UIImage?
 
@@ -309,13 +374,15 @@ public struct JavDBImage: View {
         fallbackURL: String? = nil,
         secondFallbackURL: String? = nil,
         contentMode: ContentMode = .fill,
-        maxPixelSize: Int = 2048
+        maxPixelSize: Int = 2048,
+        frontPoster: Bool = false
     ) {
         self.url = url
         self.fallbackURL = fallbackURL
         self.secondFallbackURL = secondFallbackURL
         self.contentMode = contentMode
         self.maxPixelSize = maxPixelSize
+        self.frontPoster = frontPoster
     }
 
     private var imageURLs: [String] {
@@ -346,27 +413,41 @@ public struct JavDBImage: View {
             .clipped()
             .contentShape(Rectangle())
             .allowsHitTesting(false)
-            .task(id: imageURLs.joined(separator: "|")) {
+            .task(id: imageURLs.joined(separator: "|") + "#\(frontPoster)#\(maxPixelSize)") {
             #if DEBUG
             if let url, url.hasPrefix("fixture://poster/") {
-                let renderer = UIGraphicsImageRenderer(size: CGSize(width: 900, height: 600))
+                let renderer = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 538))
                 image = renderer.image { context in
                     UIColor.systemTeal.setFill()
-                    context.fill(CGRect(x: 0, y: 0, width: 900, height: 600))
+                    context.fill(CGRect(x: 0, y: 0, width: 800, height: 538))
+                    UIColor.systemOrange.setFill()
+                    context.fill(CGRect(x: 424, y: 0, width: 376, height: 538))
                     ("NEUTRAL " + url.components(separatedBy: "/").last!) .draw(at: CGPoint(x: 300, y: 260), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.white])
                 }
+                if frontPoster, let cg = image?.cgImage,
+                   let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: "https://tp.spfcas.com/covers/neutral.jpg"),
+                   let cropped = cg.cropping(to: rect) { image = UIImage(cgImage: cropped) }
                 return
             }
             #endif
             // 不先清空 image。LazyVGrid 滚动时 task 会被取消，先清空会让中间封面变空白。
+            var landscapeFallback: UIImage?
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
-                if let img = await ImageLoader.shared.load(candidate, maxPixelSize: maxPixelSize) {
+                let loaded = frontPoster
+                    ? await ImageLoader.shared.loadPoster(candidate, maxPixelSize: maxPixelSize)
+                    : await ImageLoader.shared.load(candidate, maxPixelSize: maxPixelSize)
+                if let img = loaded {
                     guard !Task.isCancelled else { return }
+                    if frontPoster, img.size.width > img.size.height {
+                        landscapeFallback = landscapeFallback ?? img
+                        continue
+                    }
                     image = img
                     return
                 }
             }
+            if !Task.isCancelled, let landscapeFallback { image = landscapeFallback }
         }
     }
 
@@ -388,6 +469,18 @@ public struct JavDBImage: View {
     }
 }
 
+/// Shared by all movie lists; no gestures or detail fetches.
+public struct MoviePosterImage: View {
+    let movie: Movie
+    var maxPixelSize: Int = 1200
+
+    public var body: some View {
+        let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL)
+        JavDBImage(url: sources.first, fallbackURL: sources.dropFirst().first,
+                   contentMode: .fit, maxPixelSize: maxPixelSize, frontPoster: true)
+    }
+}
+
 /// 封面卡片（带番号 + 评分角标）
 public struct MovieCoverCard: View {
     let movie: Movie
@@ -401,7 +494,7 @@ public struct MovieCoverCard: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .bottomTrailing) {
-                JavDBImage(url: movie.coverURL ?? movie.thumbURL, maxPixelSize: 480)
+                MoviePosterImage(movie: movie, maxPixelSize: 900)
                     .frame(width: width, height: width * 1.4)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

@@ -149,7 +149,7 @@ struct MovieBookFlipView: View {
         ZStack {
             Color(white: 0.10)
 
-            JavDBImage(url: movie.thumbURL ?? movie.coverURL)
+            MoviePosterImage(movie: movie)
                 .frame(width: cardW, height: cardH)
                 .clipped()
 
