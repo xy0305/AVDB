@@ -297,6 +297,7 @@ struct RankingsView: View {
                         .padding(6)
                     }
                 }
+                .frame(width: coverW, height: coverH)
                 RankingPreviewCarousel(movie: movie)
                     .frame(maxWidth: .infinity)
                     .frame(height: coverH)
