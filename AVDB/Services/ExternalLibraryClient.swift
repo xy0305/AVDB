@@ -65,6 +65,31 @@ final class ExternalLibraryClient {
             return []
         }
     }
+    @MainActor func fetchRankingData(kind: String, settings configured: ExternalLibrarySettings? = nil) async throws -> Data {
+        let settings = configured ?? .shared
+        guard settings.enabled, let token = try settings.token(), !token.isEmpty else {
+            throw ExternalLibraryError.rankingNotConfigured
+        }
+        let generation = settings.revision
+        let base = try ExternalLibrarySettings.normalizedURL(settings.baseURL)
+        var parts = URLComponents(string: base + "/api/v1/javlibrary/rankings")
+        parts?.queryItems = [URLQueryItem(name: "kind", value: kind)]
+        guard let url = parts?.url else { throw ExternalLibraryError.invalidURL }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        request.setValue(token, forHTTPHeaderField: "X-API-Key")
+        do {
+            let (data, response) = try await transport().data(for: request)
+            try Task.checkCancellation()
+            guard generation == settings.revision else { throw CancellationError() }
+            guard let http = response as? HTTPURLResponse else { throw ExternalLibraryError.transport }
+            guard http.statusCode == 200 else { throw ExternalLibraryError.http(http.statusCode) }
+            return data
+        } catch {
+            if Task.isCancelled || generation != settings.revision || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+            if let safe = error as? ExternalLibraryError { throw safe }
+            throw ExternalLibraryError.transport
+        }
+    }
     @MainActor func fetchLinks(for number: String, settings configured: ExternalLibrarySettings? = nil) async throws -> [ExternalLink] {
         let settings = configured ?? .shared
         let keyword = number.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -150,6 +175,7 @@ struct ExternalKeychainStore: ExternalTokenStore {
 
 enum ExternalLibraryError: LocalizedError {
     case keychain(OSStatus), invalidStoredToken, invalidURL, invalidToken, endpointNeedsToken
+    case rankingNotConfigured
     case http(Int), transport, schema
     var errorDescription: String? {
         switch self {
@@ -160,6 +186,7 @@ enum ExternalLibraryError: LocalizedError {
         case .endpointNeedsToken: return "更换服务器时请重新输入令牌，避免将原令牌发送给其他服务器。"
         case .http(let code): return "外部数据库请求失败（HTTP \(code)）；重定向不被允许。"
         case .transport: return "外部数据库连接失败，请检查网络及服务器地址。"
+        case .rankingNotConfigured: return "请在外部数据库设置中启用服务并保存现有 API 令牌。"
         case .schema: return "外部数据库响应格式无效。"
         }
     }
@@ -168,7 +195,7 @@ enum ExternalLibraryError: LocalizedError {
 @MainActor
 final class ExternalLibrarySettings: ObservableObject {
     static let shared = ExternalLibrarySettings()
-    static let defaultBaseURL = "http://163.47.40.207:18000"
+    static let defaultBaseURL = "http://163.47.40.207:8000"
     @Published private(set) var baseURL: String
     @Published private(set) var enabled: Bool
     @Published private(set) var hasToken = false

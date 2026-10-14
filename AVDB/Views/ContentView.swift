@@ -38,7 +38,10 @@ struct ContentView: View {
 
     var body: some View {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {
+        if ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
+            NavigationStack { JAVLibraryRankingView() }
+                .modifier(SceneLayoutReader())
+        } else if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {
             NavigationStack { JRPageView(path: "/neutral/ranking/") }
                 .modifier(SceneLayoutReader())
         } else {

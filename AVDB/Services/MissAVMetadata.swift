@@ -30,12 +30,18 @@ import Combine
     private var originGeneration = -1
     // Injection is only for deterministic shipping-queue runtime tests.
     private let resolver: ((Request) async throws -> Result)?
-    init(resolver: ((Request) async throws -> Result)? = nil) { self.resolver = resolver }
+    private let sourceName: String
+    private let generation: () -> Int
+    private let enrichMissAV: Bool
+    init(sourceName: String = "MissAV", generation: (() -> Int)? = nil, enrichMissAV: Bool = true, resolver: ((Request) async throws -> Result)? = nil) {
+        self.sourceName = sourceName; self.generation = generation ?? { MissAVSource.shared.generation }
+        self.enrichMissAV = enrichMissAV; self.resolver = resolver
+    }
     func value(_ request: Request) -> Result { results[request.key] ?? Result() }
     func reset() {
         epoch = UUID(); tasks.values.forEach { $0.cancel() }; tasks.removeAll()
         pending.removeAll(); results.removeAll()
-        account = APIClient.shared.token; originGeneration = MissAVSource.shared.generation
+        account = APIClient.shared.token; originGeneration = generation()
     }
     func suspend() {
         epoch = UUID()
@@ -43,7 +49,7 @@ import Combine
         results = results.filter { !$0.value.loading }
     }
     func enqueue(_ request: Request, retry: Bool = false) {
-        if account != APIClient.shared.token || originGeneration != MissAVSource.shared.generation { reset() }
+        if account != APIClient.shared.token || originGeneration != generation() { reset() }
         guard tasks[request.key] == nil, !pending.contains(where: { $0.key == request.key }), retry || results[request.key] == nil else { return }
         // Bounded lifetime cache. Never evict queued/active entries.
         if results.count >= 256 {
@@ -66,7 +72,7 @@ import Combine
                     result = Result(message: error.localizedDescription, loading: false)
                 }
                 guard !Task.isCancelled, self.epoch == token,
-                      owner == APIClient.shared.token, sourceEpoch == MissAVSource.shared.generation else { return }
+                      owner == APIClient.shared.token, sourceEpoch == self.generation() else { return }
                 result.loading = false
                 self.results[request.key] = result
                 self.tasks[request.key] = nil
@@ -78,14 +84,14 @@ import Combine
         switch request {
         case .movie(let video):
             var code = video.code
-            if code.isEmpty { code = try await MissAVSource.shared.detail(video).video.code }
+            if code.isEmpty && enrichMissAV { code = try await MissAVSource.shared.detail(video).video.code }
             guard JRPolicy.exactCode(code) != nil else { return Result(message: "未匹配：来源没有可信完整番号", loading: false) }
             let match = try await JavDBSDK.shared.exactMovie(code: code, verifyAllPages: true)
-            return Result(movie: match, message: match == nil ? "未匹配：AVDB 前 3 页无唯一完整番号，点击核对 / 重试" : "AVDB 资料 · MissAV 顺序", loading: false)
+            return Result(movie: match, message: match == nil ? "未匹配：AVDB 前 3 页无唯一完整番号，点击核对 / 重试" : "AVDB 资料 · \(sourceName) 顺序", loading: false)
         case .actor(let actor):
             var aliases = actor.aliases
             var result = try await searchActor(aliases)
-            if result.actor == nil && result.candidates.isEmpty {
+            if enrichMissAV && result.actor == nil && result.candidates.isEmpty {
                 let extra = try await MissAVSource.shared.actressAliases(actor)
                 aliases = Array(Set(aliases + extra)).sorted()
                 if !extra.allSatisfy({ actor.aliases.contains($0) }) { result = try await searchActor(aliases) }
@@ -96,7 +102,7 @@ import Combine
     private func searchActor(_ aliases: [String]) async throws -> Result {
         let owner = APIClient.shared.token
         var exact: [String: Actor] = [:], suggestions: [String: Actor] = [:]
-        var complete = true
+        var complete = Set(aliases).count <= 3
         for name in Array(Set(aliases)).sorted().prefix(3) {
             for page in 1...3 {
                 try Task.checkCancellation()
@@ -112,7 +118,7 @@ import Combine
             }
         }
         if exact.count == 1 && complete {
-            return Result(actor: exact.values.first, message: "AVDB 演员资料 · MissAV 顺序", loading: false)
+            return Result(actor: exact.values.first, message: "AVDB 演员资料 · \(sourceName) 顺序", loading: false)
         }
         let choices = (exact.isEmpty ? suggestions : exact).values.sorted { $0.id < $1.id }
         return Result(candidates: choices, message: exact.count > 1 ? "多个精确姓名候选，待手动确认" : (complete ? "未匹配唯一精确别名，待手动核对" : "搜索达到分页上限，待手动核对"), loading: false)

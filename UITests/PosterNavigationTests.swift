@@ -1,6 +1,38 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testJAVLibrarySnapshotPagingNativeCoverAndReturn() {
+        continueAfterFailure = false
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--poster-navigation-fixture", "--javlibrary-navigation-fixture"]
+            XCUIDevice.shared.orientation = orientation
+            app.launch()
+            let consent = app.buttons["我已满 18 岁，继续"]
+            if consent.waitForExistence(timeout: 2) { consent.tap() }
+            let more = app.buttons["javlibrary-load-more"]
+            XCTAssertTrue(more.waitForExistence(timeout: 10), app.debugDescription)
+            for _ in 0..<15 where !more.isHittable { app.swipeUp() }
+            XCTAssertTrue(more.isHittable, app.debugDescription)
+            more.tap()
+            let poster = app.buttons["javlibrary-movie-28"]
+            for _ in 0..<10 where !poster.isHittable { app.swipeUp() }
+            XCTAssertTrue(poster.isHittable, app.debugDescription)
+            let y = poster.frame.minY
+            poster.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28)).tap()
+            XCTAssertTrue(app.staticTexts["javlibrary-detail-28"].waitForExistence(timeout: 5))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(poster.waitForExistence(timeout: 5))
+            XCTAssertTrue(poster.isHittable, "JAVLibrary return lost loaded page")
+            XCTAssertEqual(poster.frame.minY, y, accuracy: 60)
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "javlibrary-native-return-\(orientation.rawValue)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
     func testExternalDatabaseSettingsEntryDoesNotRevealStoredToken() {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -45,6 +45,7 @@ jobs:
           set -euo pipefail
           python3 scripts/test-auth-persistence.py
           python3 scripts/test-external-library.py
+          python3 scripts/test-javlibrary.py
           python3 scripts/test-javranking.py
           python3 scripts/test-javranking-mapping.py
           python3 scripts/test-missav.py

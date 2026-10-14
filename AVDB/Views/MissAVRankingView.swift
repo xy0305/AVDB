@@ -127,9 +127,12 @@ struct MissAVRankingView: View {
         }
     }
 }
-private struct MissAVGrid: View {
+struct MissAVGrid: View {
     let videos: [JRVideo]
     @ObservedObject var metadata: MissAVMetadata
+    var sourceName = "MissAV"
+    var ranks: [String: Int] = [:]
+    var identityPrefix = "missav"
     @State private var width: CGFloat = 390
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
@@ -137,17 +140,27 @@ private struct MissAVGrid: View {
                 let result = metadata.value(.movie(video))
                 VStack(alignment: .leading, spacing: 4) {
                     NavigationLink {
+                        #if DEBUG
+                        if sourceName == "JAVLibrary" && ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
+                            Text("Synthetic detail \(ranks[video.path] ?? (index + 1))")
+                                .accessibilityIdentifier("javlibrary-detail-\(ranks[video.path] ?? (index + 1))")
+                        } else {
+                            if let movie = result.movie { MovieDetailView(movieID: movie.id) }
+                            else { MissAVMovieRoute(video: video, sourceName: sourceName) }
+                        }
+                        #else
                         if let movie = result.movie { MovieDetailView(movieID: movie.id) }
-                        else { MissAVMovieRoute(video: video) }
+                        else { MissAVMovieRoute(video: video, sourceName: sourceName) }
+                        #endif
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             // Source covers are intentionally NOT used as AVDB covers.
-                            MoviePosterCard(movie: result.movie ?? Movie(id: "missav:" + video.path, number: video.code, title: video.title))
-                            Text("MissAV 顺序 \(index + 1)").font(.caption2).foregroundStyle(.secondary)
+                            MoviePosterCard(movie: result.movie ?? Movie(id: identityPrefix + ":" + video.path, number: video.code, title: video.title))
+                            Text("\(sourceName) 顺序 \(ranks[video.path] ?? (index + 1))").font(.caption2).foregroundStyle(.secondary)
                             Text(result.message).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
                             if result.loading { ProgressView("匹配 AVDB 封面…").font(.caption2) }
                         }
-                    }.buttonStyle(.plain).accessibilityIdentifier("missav-movie-\(index + 1)")
+                    }.buttonStyle(.plain).accessibilityIdentifier("\(identityPrefix)-movie-\(ranks[video.path] ?? (index + 1))")
                     if !result.loading && result.movie == nil {
                         Button("重试 AVDB 匹配") { metadata.enqueue(.movie(video), retry: true) }.font(.caption)
                     }
@@ -160,6 +173,8 @@ private struct MissAVGrid: View {
 }
 struct MissAVMovieRoute: View {
     let video: JRVideo
+    var sourceName = "MissAV"
+    @EnvironmentObject private var appState: AppState
     @ObservedObject private var source = MissAVSource.shared
     @State private var code = ""
     @State private var movie: Movie?
@@ -185,26 +200,29 @@ struct MissAVMovieRoute: View {
                             }
                         }
                     }.padding()
-                }.navigationTitle("MissAV 番号核验")
+                }.navigationTitle("\(sourceName) 番号核验")
             }
         }
+        .onChange(of: appState.currentUser?.id) { _, _ in movie = nil; attempt += 1 }
+        .onChange(of: appState.isLoggedIn) { _, _ in movie = nil; attempt += 1 }
         .task(id: "\(source.generation):\(video.path):\(attempt)") {
+            let owner = APIClient.shared.token
             let epoch = source.generation, request = attempt
             loading = true; movie = nil; message = ""; code = video.code
             defer { if request == attempt && epoch == source.generation { loading = false } }
             do {
-                if code.isEmpty {
+                if code.isEmpty && sourceName == "MissAV" {
                     let detail = try await source.detail(video)
-                    guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
+                    guard !Task.isCancelled, epoch == source.generation, request == attempt, owner == APIClient.shared.token else { return }
                     code = detail.video.code
                 }
                 guard JRPolicy.exactCode(code) != nil else { message = "来源未提供可信完整番号，无法自动匹配。"; return }
                 let match = try await JavDBSDK.shared.exactMovie(code: code, refresh: attempt > 0, verifyAllPages: true)
-                guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
+                guard !Task.isCancelled, epoch == source.generation, request == attempt, owner == APIClient.shared.token else { return }
                 movie = match
                 if match == nil { message = "AVDB 数据源搜索前 3 页未找到唯一精确番号结果；不代表影片不存在。" }
             } catch {
-                if !Task.isCancelled, epoch == source.generation, request == attempt { message = error.localizedDescription }
+                if !Task.isCancelled, epoch == source.generation, request == attempt, owner == APIClient.shared.token { message = error.localizedDescription }
             }
         }
     }
@@ -235,9 +253,11 @@ struct MissAVSettingsView: View {
     }
 }
 
-private struct MissAVActressGrid: View {
+struct MissAVActressGrid: View {
     let actors: [MissAVActress]
     @ObservedObject var metadata: MissAVMetadata
+    var sourceName = "MissAV"
+    var identityPrefix = "missav"
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 20) {
             ForEach(Array(actors.enumerated()), id: \.element.path) { index, source in
@@ -258,7 +278,7 @@ private struct MissAVActressGrid: View {
                             .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
                         Text(source.name).font(.headline)
                     }
-                    Text("MissAV 顺序 \(index + 1)").font(.caption).foregroundStyle(.secondary)
+                    Text("\(sourceName) 顺序 \(source.rank ?? (index + 1))").font(.caption).foregroundStyle(.secondary)
                     if result.loading { ProgressView("匹配 AVDB…") }
                     else {
                         Text(result.message).font(.caption).foregroundStyle(.secondary)
@@ -275,13 +295,15 @@ private struct MissAVActressGrid: View {
                                     }.navigationTitle("请核对女优身份")
                                 }
                             }
+                            NavigationLink("搜索 AVDB 演员（手动核对）") { SearchActorResultView(keyword: source.name) }
+                                .font(.caption).frame(minHeight: 44)
                             Button("重试匹配") { metadata.enqueue(.actor(source), retry: true) }
                                 .font(.caption).frame(minHeight: 44)
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .topLeading)
                     .onAppear { metadata.enqueue(.actor(source)) }
-                    .accessibilityIdentifier("missav-actress-\(index + 1)")
+                    .accessibilityIdentifier("\(identityPrefix)-actress-\(source.rank ?? (index + 1))")
             }
         }.padding(.horizontal)
     }

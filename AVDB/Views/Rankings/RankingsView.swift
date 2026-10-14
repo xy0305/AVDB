@@ -74,6 +74,14 @@ struct RankingsView: View {
                         .font(.subheadline)
                 }
             }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
+            HStack {
+                Text("新增来源 · JAVLibrary").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                NavigationLink { JAVLibraryRankingView() } label: {
+                    Label("JAVLibrary 最想要 / 高评价 / 女优收藏", systemImage: "list.number")
+                        .font(.subheadline)
+                }.accessibilityIdentifier("javlibrary-ranking-entry")
+            }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
             UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                 .padding(.top, 4)
 
