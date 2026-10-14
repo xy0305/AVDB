@@ -111,6 +111,21 @@ struct RankingsView: View {
                 }
             }
 
+            if let error = vm.errorMessage {
+                VStack(spacing: 8) {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.callout).multilineTextAlignment(.center)
+                    Button("重试") {
+                        Task {
+                            if vm.movies.isEmpty && vm.actors.isEmpty { await reload(force: true) }
+                            else { await vm.loadMore() }
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+                .accessibilityIdentifier("native-ranking-error")
+            }
             content
         }
         .background {
@@ -176,6 +191,13 @@ struct RankingsView: View {
                 } description: {
                     Text("TOP250 需要 JAVDB 账号登录后才能显示")
                 }
+            } else if vm.movies.isEmpty {
+                ContentUnavailableView(
+                    vm.errorMessage == nil ? "暂无符合条件的作品" : "TOP250 加载失败",
+                    systemImage: vm.errorMessage == nil ? "line.3.horizontal.decrease.circle" : "exclamationmark.triangle",
+                    description: Text(vm.errorMessage == nil ? "请调整筛选条件或下拉刷新" : "请检查登录状态或重试；不会自动退出账号")
+                )
+                .frame(maxHeight: .infinity)
             } else {
                 top250List
             }
@@ -244,7 +266,7 @@ struct RankingsView: View {
 
     private func top250Row(rank: Int, movie: Movie) -> some View {
         let coverW: CGFloat = AdaptiveLayout.isPad ? 180 : 150
-        let coverH: CGFloat = AdaptiveLayout.isPad ? 240 : 200
+        let coverH: CGFloat = coverW / 0.7
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack(alignment: .topLeading) {
@@ -430,141 +452,116 @@ final class RankingsViewModel: ObservableObject {
     @Published var movies: [Movie] = []
     @Published var actors: [Actor] = []
     @Published var isLoading = false
-    @Published var catalog: String = "all"
-    @Published var year: String = ""
-    @Published var startRank: Int = 1
+    @Published var errorMessage: String?
+    @Published var catalog = "all"
+    @Published var year = ""
+    @Published var startRank = 1
     @Published var hideWatched = false
 
-    private var page = 1
+    struct Request: Equatable {
+        var tab: RankingTab
+        var period: String
+        var playback: String
+        var kind: String
+        var catalog: String
+        var year: String
+        var startRank: Int
+        var hideWatched: Bool
+        var page: Int
+    }
+    typealias MovieLoader = (Request) async throws -> [Movie]
+    typealias ActorLoader = (Request) async throws -> [Actor]
+    private let movieLoader: MovieLoader
+    private let actorLoader: ActorLoader
+    private var request: Request?
+    private var generation = 0
     private var hasMore = true
-    private var currentTab: RankingTab = .top250
-    private var currentPeriod: RankPeriod = .daily
-    private var currentPlayback = "high_score"
-    private var currentPlaybackPeriod: RankPeriod = .daily
-    private var currentKind = "movies"
-    private var pool: [Movie] = []
-    private let sdk = JavDBSDK.shared
+    private var page = 0
+
+    init(movieLoader: @escaping MovieLoader = RankingsViewModel.requestMovies,
+         actorLoader: @escaping ActorLoader = { r in
+             try await JavDBSDK.shared.actorRankings(type: "0", period: "monthly", page: r.page)
+         }) {
+        self.movieLoader = movieLoader
+        self.actorLoader = actorLoader
+    }
 
     var displayed: [Movie] { movies }
-    var showingActors: Bool { currentTab == .censored && currentKind == "actors" }
+    var showingActors: Bool { request?.tab == .censored && request?.kind == "actors" }
 
-    func load(
-        tab: RankingTab,
-        period: RankPeriod,
-        playbackFilter: String,
-        playbackPeriod: RankPeriod = .daily,
-        rankingKind: String = "movies",
-        force: Bool = false
-    ) async {
-        if !force,
-           tab == currentTab,
-           period == currentPeriod,
-           playbackFilter == currentPlayback,
-           playbackPeriod == currentPlaybackPeriod,
-           rankingKind == currentKind,
-           (!movies.isEmpty || !actors.isEmpty),
-           tab != .top250 {
-            return
-        }
-        currentTab = tab
-        currentPeriod = period
-        currentPlayback = playbackFilter
-        currentPlaybackPeriod = playbackPeriod
-        currentKind = rankingKind
-        page = 1
+    func load(tab: RankingTab, period: RankPeriod, playbackFilter: String,
+              playbackPeriod: RankPeriod = .daily, rankingKind: String = "movies", force: Bool = false) async {
+        let next = Request(tab: tab, period: tab == .playback ? playbackPeriod.rawValue : period.rawValue,
+                           playback: playbackFilter, kind: rankingKind, catalog: catalog, year: year,
+                           startRank: startRank, hideWatched: hideWatched, page: 1)
+        if !force, request == next, (!movies.isEmpty || !actors.isEmpty) { return }
+        let same = request == next
+        generation += 1
+        request = next
+        page = 0
         hasMore = true
-        movies = []
-        actors = []
-        pool = []
-        await fetch()
+        // Refresh errors retain visible content; a different tab/filter must not show stale rows.
+        if !same { movies = []; actors = [] }
+        await fetch(next, generation: generation)
     }
 
     func loadMore() async {
-        guard hasMore, !isLoading else { return }
-        page += 1
-        await fetch()
+        guard hasMore, !isLoading, var next = request else { return }
+        next.page = page + 1
+        await fetch(next, generation: generation)
     }
 
     func applyTopFilter() async {
-        page = 1
-        hasMore = true
-        movies = []
-        pool = []
-        await fetchTop250()
+        guard var next = request, next.tab == .top250 else { return }
+        next.catalog = catalog; next.year = year
+        next.startRank = startRank; next.hideWatched = hideWatched; next.page = 1
+        generation += 1
+        request = next; page = 0; hasMore = true
+        movies = []; actors = []
+        await fetch(next, generation: generation)
     }
 
-    private func fetch() async {
-        if currentTab == .top250 {
-            await fetchTop250()
-            return
-        }
+    private func fetch(_ next: Request, generation ticket: Int) async {
         isLoading = true
-        defer { isLoading = false }
-        if showingActors {
-            let list = (try? await sdk.actorRankings(type: "0", period: "monthly", page: page)) ?? []
-            if list.isEmpty {
-                hasMore = false
-            } else if page == 1 {
-                actors = list
+        errorMessage = nil
+        defer { if generation == ticket { isLoading = false } }
+        do {
+            if next.tab == .censored && next.kind == "actors" {
+                let list = try await actorLoader(next)
+                guard generation == ticket, !Task.isCancelled else { return }
+                if next.page == 1 { actors = list }
+                else { let ids = Set(actors.map(\.id)); actors += list.filter { !ids.contains($0.id) } }
+                hasMore = !list.isEmpty
             } else {
-                let ids = Set(actors.map(\.id))
-                actors.append(contentsOf: list.filter { !ids.contains($0.id) })
+                let list = try await movieLoader(next)
+                guard generation == ticket, !Task.isCancelled else { return }
+                if next.page == 1 { movies = list }
+                else { let ids = Set(movies.map(\.id)); movies += list.filter { !ids.contains($0.id) } }
+                hasMore = !list.isEmpty
             }
-            return
+            // Advance only after success; retries cannot skip a failed page.
+            page = next.page
+        } catch {
+            guard generation == ticket, !Task.isCancelled else { return }
+            if error is CancellationError { return }
+            errorMessage = error.localizedDescription
         }
-        let list: [Movie]
-        switch currentTab {
+    }
+
+    nonisolated static func requestMovies(_ r: Request) async throws -> [Movie] {
+        let sdk = await JavDBSDK.shared
+        switch r.tab {
         case .top250:
-            list = []
+            let type = !r.year.isEmpty ? "year" : (["0", "1", "2", "3"].contains(r.catalog) ? "video_type" : "all")
+            let value = !r.year.isEmpty ? r.year : (type == "video_type" ? r.catalog : "")
+            return try await sdk.topMovies(startRank: r.startRank, type: type, typeValue: value,
+                                           ignoreWatched: r.hideWatched, page: r.page, limit: 25)
         case .playback:
-            list = (try? await sdk.playbackRankings(
-                filterBy: currentPlayback,
-                period: currentPlaybackPeriod.rawValue,
-                page: page
-            )) ?? []
-        case .censored:
-            list = (try? await sdk.rankings(type: "0", period: currentPeriod.rawValue, page: page)) ?? []
-        case .uncensored:
-            list = (try? await sdk.rankings(type: "1", period: currentPeriod.rawValue, page: page)) ?? []
-        case .western:
-            list = (try? await sdk.rankings(type: "2", period: currentPeriod.rawValue, page: page)) ?? []
-        case .fc2:
-            list = (try? await sdk.rankings(type: "3", period: currentPeriod.rawValue, page: page)) ?? []
-        }
-        append(list)
-    }
-
-    private var topQuery: (type: String, value: String) {
-        if !year.isEmpty { return ("year", year) }
-        switch catalog {
-        case "0", "1", "2", "3": return ("video_type", catalog)
-        default: return ("all", "")
-        }
-    }
-
-    private func fetchTop250() async {
-        isLoading = true
-        defer { isLoading = false }
-        let q = topQuery
-        let list = (try? await sdk.topMovies(
-            startRank: startRank,
-            type: q.type,
-            typeValue: q.value,
-            ignoreWatched: hideWatched,
-            page: page,
-            limit: 25
-        )) ?? []
-        append(list)
-    }
-
-    private func append(_ list: [Movie]) {
-        if list.isEmpty {
-            hasMore = false
-        } else if page == 1 {
-            movies = list
-        } else {
-            let ids = Set(movies.map(\.id))
-            movies.append(contentsOf: list.filter { !ids.contains($0.id) })
+            return try await sdk.playbackRankings(filterBy: r.playback, period: r.period, page: r.page)
+        case .censored, .uncensored, .western, .fc2:
+            let type: String
+            switch r.tab { case .uncensored: type = "1"; case .western: type = "2"; case .fc2: type = "3"; default: type = "0" }
+            return try await sdk.rankings(type: type, period: r.period, page: r.page)
         }
     }
 }

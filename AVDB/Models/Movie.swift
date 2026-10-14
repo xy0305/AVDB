@@ -11,13 +11,14 @@ import Foundation
 public struct Movie: Decodable, Identifiable, Hashable {
     public init(
         id: String,
+        type: String? = nil,
         number: String? = nil,
         title: String? = nil,
         thumbURL: String? = nil,
         coverURL: String? = nil
     ) {
         self.id = id
-        self.type = nil
+        self.type = type
         self.number = number
         self.numberLetter = nil
         self.title = title
@@ -63,7 +64,15 @@ public struct Movie: Decodable, Identifiable, Hashable {
         self.review = nil
     }
     public let id: String
-    public let type: String?
+    public private(set) var type: String?
+
+    /// List endpoints omit `type`; retain the explicit request catalog, never guess from artwork.
+    public func withCatalogType(_ catalog: String?) -> Movie {
+        guard type == nil || type?.isEmpty == true, let catalog, ["0", "1", "2", "3"].contains(catalog) else { return self }
+        var copy = self
+        copy.type = catalog
+        return copy
+    }
     public let number: String?
     public let numberLetter: String?
     public let title: String?

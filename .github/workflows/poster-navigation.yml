@@ -27,6 +27,8 @@ jobs:
           print(chosen)
           with open(os.environ['GITHUB_ENV'],'a') as f: f.write('IPAD_UDID='+chosen['udid']+'\n')
           PY
+      - name: Execute production native ranking regression
+        run: python3 scripts/test-native-rankings.py
       - name: Compile simulator Metal resource
         run: |
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"

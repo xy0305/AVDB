@@ -59,7 +59,8 @@ struct DrawHistoryView: View {
                 MovieDetailView(movieID: record.movieID)
             } label: {
                 HStack {
-                    JavDBImage(url: record.coverURL, contentMode: .fit, maxPixelSize: 480, frontPoster: true)
+                    MoviePosterImage(movie: Movie(id: record.movieID, type: record.type, number: record.number,
+                                                 thumbURL: record.thumbURL ?? record.coverURL, coverURL: record.coverURL), maxPixelSize: 480)
                         .frame(width: 48, height: 68)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     VStack(alignment: .leading, spacing: 4) {

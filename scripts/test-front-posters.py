@@ -16,6 +16,16 @@ enum JavDBConstants { static let imageCDNHost="tp.spfcas.com"; static let webCDN
 let wrap="https://tp.spfcas.com/key/covers/aa/test.jpg"
 let thumb="https://tp.spfcas.com/key/small_covers/aa/test.jpg"
 assert(FrontPosterPolicy.sources(thumb:thumb,cover:wrap) == [wrap,thumb])
+for type in ["1", "2", "3", "uncensored", "western", "fc2"] {
+    assert(FrontPosterPolicy.usesOriginal(type:type,number:"ANY-123"))
+    assert(FrontPosterPolicy.sources(thumb:thumb,cover:wrap,original:true) == [thumb,wrap])
+}
+for code in ["HEYZO-3953", "HEYZO3953", "FC2-PPV-1234567", "FC2-1234567", "Tushy.2026.10.11", "Unknown-42"] {
+    assert(FrontPosterPolicy.usesOriginal(type:nil,number:code))
+}
+assert(!FrontPosterPolicy.usesOriginal(type:"0",number:"IPX-247"))
+assert(!FrontPosterPolicy.usesOriginal(type:nil,number:"SSIS-001"))
+assert(FrontPosterPolicy.sources(thumb:nil,cover:wrap,original:true) == [wrap])
 assert(FrontPosterPolicy.sources(thumb:"https://example.test/portrait.jpg",cover:"https://example.test/wide.jpg").first == "https://example.test/portrait.jpg")
 assert(FrontPosterPolicy.sources(thumb:nil,cover:nil).isEmpty)
 assert(FrontPosterPolicy.sources(thumb:"",cover:wrap) == [wrap])
@@ -67,12 +77,13 @@ else:
 assert 'kCGImageSourceCreateThumbnailWithTransform: true' in source
 assert 'posterCache.totalCostLimit = 48 * 1024 * 1024' in source
 assert 'posterInFlight[key]' in source
-assert 'contentMode: .fit, maxPixelSize: maxPixelSize, frontPoster: true' in source
+assert 'contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original' in source
+assert 'FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)' in source
 assert 'landscapeFallback = landscapeFallback ?? img' in source
 assert '.allowsHitTesting(false)' in source
 for name in ['Components/JAVDBUI','Components/GlassBookFlipView','Home/DailyDrawView','Rankings/RankingsView','User/LibraryFeaturesView']:
     assert 'MoviePosterImage(movie: movie' in (root/f'AVDB/Views/{name}.swift').read_text()
-assert 'record.coverURL, contentMode: .fit, maxPixelSize: 480, frontPoster: true' in (root/'AVDB/Views/User/LibraryFeaturesView.swift').read_text()
+assert 'thumbURL: record.thumbURL ?? record.coverURL' in (root/'AVDB/Views/User/LibraryFeaturesView.swift').read_text()
 detail=(root/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
 assert 'JavDBImage(url: movie.coverURL ?? movie.thumbURL, fallbackURL: movie.hdCoverURL)' in detail
 assert 'FrontPosterPolicy' not in detail

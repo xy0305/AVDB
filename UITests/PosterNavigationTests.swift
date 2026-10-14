@@ -1,6 +1,27 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testUniformNeutralOriginalAndFrontPosterBounds() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-size-fixture"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        for i in 0..<6 {
+            let poster = app.descendants(matching: .any)["uniform-poster-\(i)"].firstMatch
+            XCTAssertTrue(poster.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertEqual(poster.frame.width, 140, accuracy: 1)
+            XCTAssertEqual(poster.frame.height, 200, accuracy: 1)
+        }
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "uniform-neutral-portrait-wrap-uncensored-HEYZO-western-FC2"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.terminate()
+    }
+
     func testJAVLibrarySnapshotPagingNativeCoverAndReturn() {
         continueAfterFailure = false
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {

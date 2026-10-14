@@ -44,6 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/test-front-posters.py
+          python3 scripts/test-native-rankings.py
           python3 scripts/test-auth-persistence.py
           python3 scripts/test-external-library.py
           python3 scripts/test-javlibrary.py

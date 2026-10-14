@@ -397,7 +397,7 @@ struct MoviePosterCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ClippedAspectFill(aspectRatio: 0.72) {
+            ClippedAspectFill(aspectRatio: 0.7) {
                 MoviePosterImage(movie: movie)
                     .overlay {
                         LinearGradient(

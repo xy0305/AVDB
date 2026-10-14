@@ -38,7 +38,9 @@ struct ContentView: View {
 
     var body: some View {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
+        if ProcessInfo.processInfo.arguments.contains("--poster-size-fixture") {
+            PosterSizeRegressionGallery()
+        } else if ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
             NavigationStack { JAVLibraryRankingView() }
                 .modifier(SceneLayoutReader())
         } else if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {

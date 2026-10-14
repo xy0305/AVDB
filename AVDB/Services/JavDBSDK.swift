@@ -138,7 +138,7 @@ public final class JavDBSDK {
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
-        let movies = resp.data?.movies ?? []
+        let movies = (resp.data?.movies ?? []).map { $0.withCatalogType(movieType.rawValue) }
         rememberMovies(movies)
         return movies
     }
@@ -305,7 +305,7 @@ public final class JavDBSDK {
         if let filterBy { query["filter_by"] = filterBy }
         if let sortBy { query["sort_by"] = sortBy }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/latest", query: query)
-        let movies = resp.data?.movies ?? []
+        let movies = (resp.data?.movies ?? []).map { $0.withCatalogType(type) }
         rememberMovies(movies)
         return movies
     }
@@ -330,7 +330,13 @@ public final class JavDBSDK {
         ]
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/movies/top", query: query, useToken: true)
-        let movies = resp.data?.movies ?? []
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
+        guard let decoded = resp.data?.movies else {
+            throw JavDBError.decodeError("TOP250 响应缺少 movies 列表")
+        }
+        let movies = decoded.map { $0.withCatalogType(type == "video_type" ? typeValue : nil) }
         rememberMovies(movies)
         return movies
     }
@@ -356,7 +362,7 @@ public final class JavDBSDK {
         if let type { query["type"] = type }
         if let filterByTags, !filterByTags.isEmpty { query["filter_by_tags"] = filterByTags }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query)
-        let movies = resp.data?.movies ?? []
+        let movies = (resp.data?.movies ?? []).map { $0.withCatalogType(type) }
         rememberMovies(movies)
         return movies
     }
@@ -546,7 +552,8 @@ public final class JavDBSDK {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/rankings",
             query: ["type": type, "period": period, "page": "\(page)"])
-        let movies = resp.data?.movies ?? []
+        guard resp.isSuccess else { throw JavDBError.apiError(action: resp.action, message: resp.message) }
+        let movies = (resp.data?.movies ?? []).map { $0.withCatalogType(type) }
         rememberMovies(movies)
         return movies
     }

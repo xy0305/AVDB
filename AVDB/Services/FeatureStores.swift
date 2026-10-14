@@ -12,6 +12,8 @@ struct DrawRecord: Codable, Identifiable, Hashable {
     let number: String
     let title: String
     let coverURL: String?
+    let thumbURL: String?
+    let type: String?
     let day: String
     var id: String { "\(day)-\(movieID)" }
 }
@@ -21,11 +23,13 @@ struct WatchLaterItem: Codable, Identifiable, Hashable {
     let number: String
     let title: String
     let coverURL: String?
+    let thumbURL: String?
+    let type: String?
     let addedAt: Date
     var id: String { movieID }
 
     var movie: Movie {
-        Movie(id: movieID, number: number, title: title, thumbURL: coverURL, coverURL: coverURL)
+        Movie(id: movieID, type: type, number: number, title: title, thumbURL: thumbURL ?? coverURL, coverURL: coverURL)
     }
 }
 
@@ -43,10 +47,12 @@ struct UpdateNotice: Codable, Identifiable, Hashable {
     let number: String
     let title: String
     let coverURL: String?
+    let thumbURL: String?
+    let type: String?
     var id: String { "\(tagID)-\(movieID)" }
 
     var movie: Movie {
-        Movie(id: movieID, number: number, title: title, thumbURL: coverURL, coverURL: coverURL)
+        Movie(id: movieID, type: type, number: number, title: title, thumbURL: thumbURL ?? coverURL, coverURL: coverURL)
     }
 }
 
@@ -80,6 +86,8 @@ final class DrawHistoryStore: ObservableObject {
             number: movie.displayNumber,
             title: movie.displayTitle,
             coverURL: movie.coverURL ?? movie.thumbURL,
+            thumbURL: movie.thumbURL,
+            type: movie.type,
             day: Self.today
         )
         records.removeAll { $0.movieID == movie.id && $0.day == record.day }
@@ -115,6 +123,8 @@ final class WatchLaterStore: ObservableObject {
                 number: movie.displayNumber,
                 title: movie.displayTitle,
                 coverURL: movie.coverURL ?? movie.thumbURL,
+            thumbURL: movie.thumbURL,
+            type: movie.type,
                 addedAt: Date()
             ), at: 0)
         }
@@ -160,7 +170,9 @@ final class UpdateNoticeStore: ObservableObject {
                     movieID: movie.id,
                     number: movie.displayNumber,
                     title: movie.displayTitle,
-                    coverURL: movie.coverURL ?? movie.thumbURL
+                    coverURL: movie.coverURL ?? movie.thumbURL,
+                    thumbURL: movie.thumbURL,
+                    type: movie.type
                 ))
                 seen.insert(movie.id)
             }

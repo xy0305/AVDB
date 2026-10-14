@@ -192,10 +192,28 @@ public enum FrontPosterPolicy {
             || (host == "image.mgstage.com" && path.contains("/pb_e_"))
     }
 
-    public static func sources(thumb: String?, cover: String?) -> [String] {
+    /// API catalog values: 0 censored, 1 Japanese uncensored, 2 Western, 3 FC2.
+    /// Never infer Western from a horizontal image or an unfamiliar code (e.g. HEYZO).
+    public static func usesOriginal(type: String?, number: String?) -> Bool {
+        let type = type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        if ["1", "2", "3", "uncensored", "western", "fc2"].contains(type) { return true }
+        let number = number?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+        if number.range(of: #"^HEYZO[- _]?\d"#, options: .regularExpression) != nil { return true }
+        if number.range(of: #"^FC2(?:[- _]?PPV)?[- _]?\d"#, options: .regularExpression) != nil { return true }
+        // JavDB Western catalog uses Studio.YYYY.MM.DD; HEYZO-1234 is not Western.
+        if number.range(of: #"^[A-Z][A-Z0-9 _-]*\.\d{4}\.\d{2}\.\d{2}$"#, options: .regularExpression) != nil { return true }
+        // Missing catalog is common in mixed lists. Only positively known censored labels
+        // can opt in to DVD-front derivation; unknown/uncensored (including HEYZO) stay original.
+        let censoredLabels: Set<String> = ["IPX", "IPZZ", "SSIS", "SSNI", "SSIW", "SONE", "MIDV", "MIDE", "MIAA", "MIAB", "JUQ", "JUFE", "JUL", "JUR", "STARS", "START", "STAR", "SODS", "ABP", "ABW", "ABF", "FSDSS", "FCDSS", "FNS", "FTHTD", "FALENO", "FGAN", "FSNF", "FLAV", "PPPD", "PRED", "DASS", "CAWD", "EBOD", "WANZ", "WAAA", "WAVR", "MEYD", "ROE", "HMN", "HND", "RBD", "SHKD"]
+        if type == "0" || type == "censored" { return false }
+        let prefix = String(number.prefix { $0.isLetter })
+        return !censoredLabels.contains(prefix)
+    }
+
+    public static func sources(thumb: String?, cover: String?, original: Bool = false) -> [String] {
         // JAVDB small_covers are genuine portraits, but observed at 147x200;
         // covers are 800x538 DVD wraps. Prefer the high-resolution front in that pair.
-        let values = cover.map(isKnownWrap) == true ? [cover, thumb] : [thumb, cover]
+        let values = !original && cover.map(isKnownWrap) == true ? [cover, thumb] : [thumb, cover]
         var result: [String] = []
         for value in values {
             if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -416,10 +434,15 @@ public struct JavDBImage: View {
             .task(id: imageURLs.joined(separator: "|") + "#\(frontPoster)#\(maxPixelSize)") {
             #if DEBUG
             if let url, url.hasPrefix("fixture://poster/") {
-                let renderer = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 538))
+                let name = url.components(separatedBy: "/").last ?? "neutral"
+                let size: CGSize = name.contains("portrait") ? CGSize(width: 700, height: 1000)
+                    : name.contains("square") ? CGSize(width: 700, height: 700)
+                    : name.contains("wide") ? CGSize(width: 1200, height: 500)
+                    : CGSize(width: 800, height: 538)
+                let renderer = UIGraphicsImageRenderer(size: size)
                 image = renderer.image { context in
                     UIColor.systemTeal.setFill()
-                    context.fill(CGRect(x: 0, y: 0, width: 800, height: 538))
+                    context.fill(CGRect(origin: .zero, size: size))
                     UIColor.systemOrange.setFill()
                     context.fill(CGRect(x: 424, y: 0, width: 376, height: 538))
                     ("NEUTRAL " + url.components(separatedBy: "/").last!) .draw(at: CGPoint(x: 300, y: 260), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.white])
@@ -475,9 +498,10 @@ public struct MoviePosterImage: View {
     var maxPixelSize: Int = 1200
 
     public var body: some View {
-        let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL)
+        let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
+        let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
         JavDBImage(url: sources.first, fallbackURL: sources.dropFirst().first,
-                   contentMode: .fit, maxPixelSize: maxPixelSize, frontPoster: true)
+                   contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original)
     }
 }
 
@@ -495,7 +519,7 @@ public struct MovieCoverCard: View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .bottomTrailing) {
                 MoviePosterImage(movie: movie, maxPixelSize: 900)
-                    .frame(width: width, height: width * 1.4)
+                    .frame(width: width, height: width / 0.7)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .glassMediaFrame(cornerRadius: 10)
@@ -527,3 +551,31 @@ public struct MovieCoverCard: View {
         .contentShape(Rectangle())
     }
 }
+
+#if DEBUG
+/// Neutral image bounds fixture; no network, credentials or adult imagery.
+struct PosterSizeRegressionGallery: View {
+    private let fixtures: [(String, String, String)] = [
+        ("0", "IPX-247", "portrait"), ("0", "SSIS-001", "wrap"),
+        ("1", "HEYZO-3953", "wide"), ("2", "Tushy.2026.10.11", "square"),
+        ("3", "FC2-PPV-1234567", "wrap"), ("1", "NEUTRAL", "portrait")
+    ]
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.fixed(140)), GridItem(.fixed(140))], spacing: 12) {
+            ForEach(fixtures.indices, id: \.self) { i in
+                let f = fixtures[i]
+                ClippedAspectFill(aspectRatio: 0.7) {
+                    MoviePosterImage(movie: Movie(id: "neutral-\(i)", type: f.0, number: f.1,
+                        thumbURL: "fixture://poster/\(f.2)", coverURL: "fixture://poster/wrap"))
+                        .overlay(alignment: .topTrailing) { Text("\(i)").padding(4).background(.orange) }
+                }
+                .frame(width: 140)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Neutral poster \(i)")
+                .accessibilityIdentifier("uniform-poster-\(i)")
+            }
+        }
+        .padding()
+    }
+}
+#endif

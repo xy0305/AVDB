@@ -22,7 +22,7 @@ struct MovieBookFlipView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var cardW: CGFloat { sizeClass == .regular ? 248 : 176 }
-    private var cardH: CGFloat { cardW / 0.72 }
+    private var cardH: CGFloat { cardW / 0.7 }
     private var spacing: CGFloat { cardW * 0.52 }
 
     private var maxIndex: CGFloat {
