@@ -61,6 +61,13 @@
         t.resolve(.success([Movie(id: "d")]))
         await retry.value
         check(vm.nextPage == 3 && vm.movies.count == 4, "retry same page")
+        vm.scrollID = "c"
+        let multiPageRefresh = Task { await vm.refresh() }
+        await drain()
+        check(vm.movies.count == 4 && vm.nextPage == 3 && vm.scrollID == "c", "loaded pages retained during refresh")
+        t.resolve(.failure(NSError(domain: "refresh failure", code: 3)))
+        await multiPageRefresh.value
+        check(vm.movies.count == 4 && vm.nextPage == 3 && vm.scrollID == "c", "loaded pages retained after refresh failure")
         // A cancelled view task must not cancel/reset route work on a push.
         let t2 = Transport(); t2.delayed = true
         let vm2 = CatalogListViewModel(fetch: t2.fetch)
@@ -90,6 +97,21 @@
         t2.delayed = false; t2.response = []
         await vm2.refresh()
         check(vm2.movies.isEmpty && !vm2.hasMore && !vm2.isLoading, "empty state")
-        print("PASS production catalog VM: enter1 back0 filter1 manual1; delayed failure; paging dedup; cancelled view; old generation; account/backend; empty")
+        let t3 = Transport()
+        let vm3 = CatalogListViewModel(fetch: t3.fetch)
+        for type in ["all", "0", "1", "2", "3", "4"] {
+            let before = t3.calls.count
+            await vm3.enter(q(type))
+            await vm3.enter(q(type))
+            check(t3.calls.count == before + 1, "each catalog type loads once and returns without requests")
+        }
+        let latest = CatalogQuery(source: "latest", type: "all", filter: "", sort: "release", account: nil, backend: "fixed")
+        await vm3.enter(latest); await vm3.enter(latest)
+        check(t3.calls.count == 7, "latest uses identical route helper / sort and source identity")
+        t3.fail = true
+        let failed = CatalogQuery(source: "latest", type: "all", filter: "subtitle", sort: "update", account: nil, backend: "fixed")
+        await vm3.enter(failed); await vm3.enter(failed)
+        check(t3.calls.count == 8 && vm3.errorMessage != nil && !vm3.isLoading && vm3.movies.isEmpty, "initial failure bounded; return must not silently retry")
+        print("PASS production catalog VM: enter1 back0 filter1 manual1; delayed failure and loaded pages; paging dedup; cancelled view; old generation; account/backend; all types and latest; empty/error")
     }
 }

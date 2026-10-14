@@ -567,6 +567,19 @@ struct CatalogListView: View {
             }
             .scrollPosition(id: $vm.scrollID)
             .refreshable { await vm.refresh() }
+            .overlay(alignment: .top) {
+                if !vm.movies.isEmpty, let error = vm.errorMessage {
+                    HStack {
+                        Text(error).font(.caption).lineLimit(3)
+                        Spacer(minLength: 8)
+                        Button("重試") { Task { await vm.retry() } }
+                    }
+                    .padding(12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(8)
+                    .accessibilityIdentifier("catalog-error-notice")
+                }
+            }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--catalog-navigation-fixture") {
                 Text("items=\(vm.movies.count) requests=\(vm.requestCount)")
