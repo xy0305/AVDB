@@ -22,7 +22,7 @@
         do { _ = try await JavDBSDK.shared.topMovies(); preconditionFailure("auth failure was silently empty") }
         catch JavDBError.apiError(let action, _) { assert(action == "JWTVerificationError") }
         // Synthetic neutral success exercises the real flexible decoder, not invented live evidence.
-        api.raw = Data(#"{"success":1,"data":{"current_page":1,"movies":[{"id":42,"type":1,"number":"HEYZO-3953"},{"id":"neutral2","number":"FC2-PPV-1234567"}]}}"#.utf8)
+        api.raw = Data(#"{"success":1,"data":{"current_page":"1","movies":[{"id":42,"type":1,"number":"HEYZO-3953"},{"id":"neutral2","number":"FC2-PPV-1234567"}]}}"#.utf8)
         let decoded = try await JavDBSDK.shared.topMovies(startRank:51,type:"video_type",typeValue:"1",ignoreWatched:true,page:2)
         assert(decoded.count == 2 && decoded[0].id == "42" && decoded[0].type == "1")
         assert(decoded[1].type == "1")

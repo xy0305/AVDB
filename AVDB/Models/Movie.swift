@@ -666,6 +666,12 @@ public struct MovieListData: Decodable {
         case movies
         case currentPage = "current_page"
     }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        currentPage = JSONFlex.int(c, .currentPage)
+        movies = try c.decodeIfPresent([Movie].self, forKey: .movies)
+    }
 }
 
 /// 影片详情响应 data

@@ -107,7 +107,7 @@ struct DailyDrawView: View {
                 )
             if showCover, let movie = selectedMovie {
                 MoviePosterImage(movie: movie, maxPixelSize: 900)
-                    .frame(width: 230, height: 322)
+                    .frame(width: 230, height: 230 / 0.7)
                     .clipped()
             } else {
                 VStack(spacing: 10) {
@@ -119,7 +119,7 @@ struct DailyDrawView: View {
                 .foregroundStyle(.white.opacity(0.9))
             }
         }
-        .frame(width: 230, height: 322)
+        .frame(width: 230, height: 230 / 0.7)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.28), radius: 16, y: 8)
     }
