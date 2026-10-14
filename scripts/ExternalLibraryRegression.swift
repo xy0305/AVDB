@@ -120,6 +120,7 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         do { _ = try await client.fetchLinks(for: "SYNTH-001", settings: settings); fatalError("ignored read failure") }
         catch ExternalLibraryError.keychain { }
         store.failure = false
+        settings.refreshStatus()
         FixtureProtocol.status = 401
         do { _ = try await client.fetchLinks(for: "SYNTH-001", settings: settings); fatalError("swallowed HTTP failure") }
         catch ExternalLibraryError.http(401) { }
