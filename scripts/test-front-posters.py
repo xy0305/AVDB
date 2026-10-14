@@ -72,6 +72,7 @@ assert 'landscapeFallback = landscapeFallback ?? img' in source
 assert '.allowsHitTesting(false)' in source
 for name in ['Components/JAVDBUI','Components/GlassBookFlipView','Home/DailyDrawView','Rankings/RankingsView','User/LibraryFeaturesView']:
     assert 'MoviePosterImage(movie: movie' in (root/f'AVDB/Views/{name}.swift').read_text()
+assert 'record.coverURL, contentMode: .fit, maxPixelSize: 480, frontPoster: true' in (root/'AVDB/Views/User/LibraryFeaturesView.swift').read_text()
 detail=(root/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
 assert 'JavDBImage(url: movie.coverURL ?? movie.thumbURL, fallbackURL: movie.hdCoverURL)' in detail
 assert 'FrontPosterPolicy' not in detail
