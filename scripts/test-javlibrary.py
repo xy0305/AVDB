@@ -91,7 +91,7 @@ func fixture(kind: String="mostwanted", ranks: [Int]=[3,8,27]) throws -> Data {
   defer { client.cancelRequests() }
   do { _ = try await client.javlibrary(.mostwanted,settings:settings);fatalError("disabled used network") } catch ExternalLibraryError.rankingNotConfigured {}
   precondition(Replay.sent.isEmpty)
-  try settings.save(baseURL:"https://fixture.invalid",enabled:true,replacementToken:"")
+  try settings.save(baseURL:"https://fixture.invalid",enabled:true,replacementToken:"synthetic-key")
   Replay.payload=bytes
   let page=try await client.javlibrary(.mostwanted,settings:settings)
   precondition(page.items.map(\.rank)==[3,8,27])
