@@ -1,8 +1,6 @@
 import Foundation
 
-func check(_ condition: Bool, file: StaticString = #filePath, line: UInt = #line) {
-    precondition(condition, "Regression assertion failed", file: file, line: line)
-}
+func check(_ condition: Bool) { precondition(condition) }
 
 final class StubTokens: ExternalTokenStore {
     var value: String?
