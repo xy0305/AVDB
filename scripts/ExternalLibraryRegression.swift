@@ -153,6 +153,8 @@ final class FixtureProtocol: URLProtocol, @unchecked Sendable {
         client.cancelRequests()
         do { _ = try await cancelled.value; fatalError("did not cancel in-flight request") }
         catch is CancellationError { }
+        // URLSession can deliver cancellation before URLProtocol.stopLoading on its queue.
+        for _ in 0..<200 where !FixtureProtocol.stopped { try await Task.sleep(nanoseconds: 10_000_000) }
         check(FixtureProtocol.stopped)
         FixtureProtocol.hold = false
         FixtureProtocol.pending = nil
