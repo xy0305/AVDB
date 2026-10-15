@@ -45,10 +45,14 @@ Task { @MainActor in
  precondition(maximum == 2 && calls == 6, "bounded concurrency and dedup")
  precondition(requests.allSatisfy { q.value($0).movie?.id == $0.key }, "identity ordered results")
  q.reset();q.enqueue(requests[0]);q.suspend()
- try! await Task.sleep(nanoseconds: 50_000_000)
+ try! await Task.sleep(nanoseconds: 100_000_000)
  precondition(q.results.isEmpty,"cancelled response discarded")
- q.enqueue(requests[0]);try! await Task.sleep(nanoseconds: 70_000_000)
- precondition(q.value(requests[0]).movie != nil,"return requeues unfinished entries")
+ q.enqueue(requests[0])
+ for _ in 0..<100 {
+  if q.value(requests[0]).movie != nil { break }
+  try! await Task.sleep(nanoseconds: 30_000_000)
+ }
+ precondition(q.value(requests[0]).movie?.id == requests[0].key,"return requeues unfinished entries")
  q.reset();q.enqueue(requests[1]);APIClient.shared.token="synthetic-account-change"
  q.enqueue(requests[2])
  for _ in 0..<100 {
