@@ -46,9 +46,11 @@ enum DetailPosterResolver {
             var attempted = Set<String>()
             for source in sources + rules {
                 guard !Task.isCancelled, Date() < deadline else { return nil }
-                guard attempted.insert(source).inserted, attempted.count <= 4,
-                      let url = URL(string: source), allowed(url),
-                      !url.path.contains("/small_covers/") else { continue }
+                guard let url = URL(string: source), allowed(url),
+                      !url.path.contains("/small_covers/"), !attempted.contains(source) else { continue }
+                guard attempted.count < 4 else { break }
+                attempted.insert(source)
+                // attempted.count <= 4: actual downloads only, not skipped thumbnails.
                 if let image = await download(url: url, timeout: min(5, deadline.timeIntervalSinceNow)),
                    let art = await artwork(image: image, source: source, derive: !original) { return art }
             }

@@ -38,6 +38,7 @@ struct MovieDetailView: View {
     #endif
 
     var body: some View {
+        GeometryReader { geometry in
         ScrollView(.vertical) {
             if let movie = vm.movie {
                 detailContent(movie)
@@ -72,7 +73,7 @@ struct MovieDetailView: View {
         }
         .ignoresSafeArea(edges: posterArtwork == nil ? [] : .top)
         .overlay(alignment: .top) {
-            if posterArtwork != nil { detailChrome }
+            if posterArtwork != nil { detailChrome.padding(.top, geometry.safeAreaInsets.top) }
         }
         .sheet(isPresented: $showPosterResources) {
             if let movie = vm.movie {
@@ -149,6 +150,7 @@ struct MovieDetailView: View {
                 TrailerPlayerView(url: url, onClose: { showTrailer = false })
             }
         }
+        }
     }
 
     private var detailChrome: some View {
@@ -169,6 +171,7 @@ struct MovieDetailView: View {
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
+                .background(.black.opacity(posterArtwork == nil ? 0 : 0.30), in: Circle())
                 .liquidGlassCircle(interactive: false)
         }
         .buttonStyle(.plain)

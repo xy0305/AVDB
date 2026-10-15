@@ -14,6 +14,9 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 10), app.debugDescription)
         let play = app.buttons["portrait-hero-play"]
         XCTAssertTrue(play.isHittable)
+        let back = app.buttons["返回"]
+        XCTAssertTrue(back.isHittable)
+        XCTAssertGreaterThanOrEqual(back.frame.minY, 24, "Back must clear the status bar safe area")
         XCTAssertGreaterThanOrEqual(play.frame.height, 44)
         XCTAssertGreaterThan(title.frame.minY, app.windows.firstMatch.frame.height * 0.3)
         XCTAssertLessThan(title.frame.minY, app.windows.firstMatch.frame.height * 0.65)

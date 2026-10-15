@@ -15,8 +15,14 @@ enum DetailPosterPolicy {
                       "CHN":"prestige", "JUFE":"prestige", "MAAN":"prestige",
                       "PPT":"prestige", "390JAC":"jackson"]
         if let maker = makers[prefix] {
-            let base = "https://image.mgstage.com/images/\(maker)/\(lower)/\(index)"
-            return ["\(base)/pf_e_\(lower)-\(index).jpg", "\(base)/pf_o1_\(lower)-\(index).jpg"]
+            // Jable uses parseInt (1); Pan115 uses number3 (001). Both are
+            // evidenced provider variants, not arbitrary URL/search guesses.
+            let number3 = String(repeating: "0", count: max(0, 3 - String(index).count)) + String(index)
+            let numbers = number3 == String(index) ? [String(index)] : [String(index), number3]
+            return numbers.flatMap { digits in
+                let base = "https://image.mgstage.com/images/\(maker)/\(lower)/\(digits)"
+                return ["\(base)/pf_e_\(lower)-\(digits).jpg", "\(base)/pf_o1_\(lower)-\(digits).jpg"]
+            }
         }
         let mapping = ["WSA":"2", "FSDSS":"1", "FCDSS":"1", "FNS":"1", "FTHTD":"1",
                        "FALENO":"1", "FGAN":"1", "FSNF":"1", "FLAV":"1",

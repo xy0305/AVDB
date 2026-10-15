@@ -17,6 +17,7 @@ actor Count {
         "https://image.mgstage.com/images/prestige/abf/378/pf_e_abf-378.jpg",
         "https://image.mgstage.com/images/prestige/abf/378/pf_o1_abf-378.jpg"])
     assert(DetailPosterPolicy.candidates(number:"390JAC-012").first == "https://image.mgstage.com/images/jackson/390jac/12/pf_e_390jac-12.jpg")
+    assert(DetailPosterPolicy.candidates(number:"ABF-001").contains("https://image.mgstage.com/images/prestige/abf/001/pf_o1_abf-001.jpg"))
     assert(DetailPosterPolicy.candidates(number:"STARS-001").first == "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/1stars00001/1stars00001ps.jpg")
     for number in ["title ABF-378", "ABF-378-U", "FC2-PPV-1234567", "ABF-378 / ABF-379", "../ABF-378", "ABF-000"] {
         assert(DetailPosterPolicy.candidates(number:number).isEmpty,number)
@@ -83,7 +84,7 @@ actor Count {
 '''
 # Ensure the detail-only resolver really keeps auth/session and bounds in production.
 resolver=(root/'AVDB/Services/DetailPosterResolver.swift').read_text()
-for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','attempted.count <= 4','addingTimeInterval(12)','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','cachedDetailPoster']:
+for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','attempted.count < 4','addingTimeInterval(12)','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','cachedDetailPoster']:
     assert literal in resolver,literal
 assert 'Pan115Client' not in resolver and 'Cookie"' not in resolver and 'Authorization"' not in resolver
 if not shutil.which('swiftc'):
