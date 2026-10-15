@@ -351,6 +351,15 @@ public actor ImageLoader {
         return data
     }
 
+    /// Read-only detail reuse: no network, no catalog mutations, original decoding unchanged.
+    func cachedDetailPoster(source: String) -> UIImage? {
+        for size in [2048, 1600, 1200, 1000, 720, 640] {
+            if let image = posterCache.object(forKey: "front-v1#\(source)#\(size)" as NSString) { return image }
+            if let image = cache.object(forKey: "\(source)#\(size)" as NSString) { return image }
+        }
+        return nil
+    }
+
     /// 提前解码并限制纹理尺寸，避免原始大图在滚动期间触发主线程解码和内存峰值。
     private static func downsample(_ data: Data, maxPixelSize: Int) -> UIImage? {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
@@ -367,15 +376,6 @@ public actor ImageLoader {
             return nil
         }
         return UIImage(cgImage: cgImage)
-    }
-
-    /// Read-only detail reuse: no network, no catalog mutations, original decoding unchanged.
-    func cachedDetailPoster(source: String) -> UIImage? {
-        for size in [2048, 1600, 1200, 1000, 720, 640] {
-            if let image = posterCache.object(forKey: "front-v1#\(source)#\(size)" as NSString) { return image }
-            if let image = cache.object(forKey: "\(source)#\(size)" as NSString) { return image }
-        }
-        return nil
     }
 
     /// 清空缓存
