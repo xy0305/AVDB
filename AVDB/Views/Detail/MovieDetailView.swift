@@ -13,7 +13,28 @@ struct MovieDetailView: View {
     @StateObject private var vm: MovieDetailViewModel
     @State private var play115 = false
     @State private var showTrailer = false
-    @State private var posterArtwork: DetailPosterArtwork?
+    @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
+
+    private var posterRequestKey: String {
+        guard let movie = vm.movie else { return "pending#\(movieID)#\(posterAccountEpoch)" }
+        return DetailPosterResolver.identity(movie: movie, account: APIClient.shared.token) + "#\(posterAccountEpoch)"
+    }
+
+    private var posterLayout: DetailPosterLayout<DetailPosterArtwork> {
+        // Never paint a previous movie/account/source while a new task is scheduled.
+        if let presentation = posterPresentation, presentation.key == posterRequestKey { return presentation.layout }
+        guard let movie = vm.movie else { return .resolving }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
+            if movie.id == "neutral-wide" { return .landscape }
+            return DetailPosterResolver.fixtureLayout(movie: movie, account: APIClient.shared.token)
+        }
+        #endif
+        return DetailPosterResolver.initialLayout(movie: movie, account: APIClient.shared.token)
+    }
+
+    private var posterArtwork: DetailPosterArtwork? { posterLayout.artwork }
+    private var usesLandscapeLayout: Bool { posterLayout.isLandscape }
     @State private var showPosterResources = false
     @State private var posterAccountEpoch = UUID()
     @State private var reviewPanelHeight: CGFloat = 76
@@ -68,11 +89,11 @@ struct MovieDetailView: View {
             .allowsHitTesting(false)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if posterArtwork == nil { detailChrome }
+            if usesLandscapeLayout { detailChrome }
         }
-        .ignoresSafeArea(edges: posterArtwork == nil ? [] : .top)
+        .ignoresSafeArea(edges: usesLandscapeLayout ? [] : .top)
         .overlay(alignment: .top) {
-            if posterArtwork != nil { detailChrome }
+            if !usesLandscapeLayout { detailChrome }
         }
         .sheet(isPresented: $showPosterResources) {
             if let movie = vm.movie {
@@ -91,33 +112,49 @@ struct MovieDetailView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
-            posterArtwork = nil
-            posterAccountEpoch = UUID()
+            var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
+            withTransaction(transaction) { posterAccountEpoch = UUID(); posterPresentation = nil }
         }
         .alert("操作未完成", isPresented: Binding(
             get: { vm.movie != nil && vm.errorMessage != nil },
             set: { if !$0 { vm.errorMessage = nil } }
         )) { Button("好", role: .cancel) { vm.errorMessage = nil } }
         message: { Text(vm.errorMessage ?? "") }
-        .task(id: "\(vm.movie?.id ?? "")#\(posterAccountEpoch)") {
-            posterArtwork = nil
+        .task(id: posterRequestKey) {
             guard let movie = vm.movie else { return }
+            let key = posterRequestKey
+            let account = APIClient.shared.token
+            let generation = UUID()
+            let initial = posterLayout
+            setPosterPresentation(.init(key: key, generation: generation, layout: initial))
+            // Warm positive/negative and definite unsupported outcomes are final for
+            // this visit. Metadata changes cannot reprobe or flip the chosen layout.
+            guard case .resolving = initial else { return }
+            let art: DetailPosterArtwork?
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
-                posterArtwork = Self.neutralHeroArtwork(wide: movie.id == "neutral-wide")
-                return
+                art = await DetailPosterResolver.fixtureResolve(movie: movie, account: account) {
+                    if ProcessInfo.processInfo.arguments.contains("--delayed-detail-poster") {
+                        do { try await Task.sleep(nanoseconds: 6_000_000_000) } catch { return nil }
+                    }
+                    return Self.neutralHeroArtwork(wide: false)
+                }
+            } else {
+                art = await DetailPosterResolver.resolve(movie: movie, account: account)
             }
+            #else
+            art = await DetailPosterResolver.resolve(movie: movie, account: account)
             #endif
-            let account = APIClient.shared.token
-            let art = await DetailPosterResolver.resolve(movie: movie, account: account)
-            guard !Task.isCancelled, vm.movie?.id == movie.id, APIClient.shared.token == account else { return }
-            posterArtwork = art
+            guard !Task.isCancelled, posterRequestKey == key, APIClient.shared.token == account,
+                  var presentation = posterPresentation else { return }
+            presentation.complete(art, key: key, generation: generation)
+            setPosterPresentation(presentation)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: posterArtwork == nil ? 76 : 16)
+            Color.clear.frame(height: usesLandscapeLayout ? 76 : 16)
         }
         .overlay(alignment: .bottom) {
-            if let movie = vm.movie, posterArtwork == nil, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
+            if let movie = vm.movie, usesLandscapeLayout, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
                 DraggableReviewsPanel(
                     movieID: movie.id,
                     total: movie.commentsCount ?? 0,
@@ -151,6 +188,11 @@ struct MovieDetailView: View {
         }
     }
 
+    private func setPosterPresentation(_ presentation: DetailPosterPresentation<DetailPosterArtwork>) {
+        var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
+        withTransaction(transaction) { posterPresentation = presentation }
+    }
+
     private var detailChrome: some View {
         HStack {
             chromeButton("chevron.left") { dismiss() }
@@ -169,7 +211,7 @@ struct MovieDetailView: View {
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
-                .background(.black.opacity(posterArtwork == nil ? 0 : 0.30), in: Circle())
+                .background(.black.opacity(usesLandscapeLayout ? 0 : 0.30), in: Circle())
                 .liquidGlassCircle(interactive: false)
         }
         .buttonStyle(.plain)
@@ -213,12 +255,13 @@ struct MovieDetailView: View {
 
     private func detailContent(_ movie: Movie) -> some View {
         VStack(spacing: 0) {
-            if let art = posterArtwork {
-                portraitHero(movie, art: art)
-                // All original sections remain below the cinematic header.
-                movieInfoCard(movie).padding(.horizontal, 20).padding(.top, 24)
+            if usesLandscapeLayout {
+                heroHeader(movie).accessibilityIdentifier("legacy-landscape-header")
             } else {
-                heroHeader(movie)
+                // Resolving has exactly the portrait viewport and real metadata /
+                // actions, but no speculative cover (especially no wide fallback).
+                portraitHero(movie, art: posterArtwork)
+                movieInfoCard(movie).padding(.horizontal, 20).padding(.top, 24)
             }
 
             VStack(alignment: .leading, spacing: 20) {
@@ -247,7 +290,7 @@ struct MovieDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.systemBackground))
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
-            if posterArtwork != nil, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
+            if !usesLandscapeLayout, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
                 // Preserve the original expandable review component underneath all
                 // compatibility sections; never cover the cinematic resource cards.
                 DraggableReviewsPanel(
@@ -261,21 +304,29 @@ struct MovieDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func portraitHero(_ movie: Movie, art: DetailPosterArtwork) -> some View {
+    private func portraitHero(_ movie: Movie, art: DetailPosterArtwork?) -> some View {
+        let tint = art?.tint ?? UIColor(red: 0.16, green: 0.16, blue: 0.18, alpha: 1)
         let width = max(320, min(layoutSize.width, AdaptiveLayout.isPad ? 900 : 600))
         let imageHeight = min(width * 1.58, max(600, layoutSize.height * 0.8))
         let titleTop = min(width * 0.99, max(390, layoutSize.height * 0.47))
         return ZStack(alignment: .top) {
-            Image(uiImage: art.image)
-                .resizable().scaledToFill()
-                .frame(width: width, height: imageHeight, alignment: .top)
-                .clipped()
-                .accessibilityHidden(true)
+            Group {
+                if let art {
+                    Image(uiImage: art.image).resizable().scaledToFill()
+                } else {
+                    Color(tint).overlay(alignment: .top) {
+                        ProgressView().tint(.white.opacity(0.65)).padding(.top, 120)
+                    }
+                }
+            }
+            .frame(width: width, height: imageHeight, alignment: .top)
+            .clipped()
+            .accessibilityHidden(true)
             LinearGradient(stops: [
                 .init(color: .clear, location: 0.36),
-                .init(color: Color(art.tint).opacity(0.24), location: 0.57),
-                .init(color: Color(art.tint).opacity(0.83), location: 0.86),
-                .init(color: Color(art.tint), location: 1)
+                .init(color: Color(tint).opacity(0.24), location: 0.57),
+                .init(color: Color(tint).opacity(0.83), location: 0.86),
+                .init(color: Color(tint), location: 1)
             ], startPoint: .top, endPoint: .bottom)
             .frame(height: imageHeight + 30)
             VStack(alignment: .leading, spacing: 0) {
@@ -285,7 +336,7 @@ struct MovieDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .shadow(color: .black.opacity(0.25), radius: 8)
                     .padding(.horizontal, 40)
-                    .accessibilityIdentifier("portrait-hero-title")
+                    .accessibilityIdentifier(art == nil ? "resolving-hero-title" : "portrait-hero-title")
                 HStack(spacing: 7) {
                     Text(movie.displayNumber).fixedSize()
                         .padding(.horizontal, 4).overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.9)))

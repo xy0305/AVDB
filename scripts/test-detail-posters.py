@@ -78,13 +78,36 @@ actor Count {
     try? await Task.sleep(nanoseconds:30_000_000); first.cancel()
     let result=await second.value; assert(result == 11)
     snap=await survivor.snapshot(); assert(snap.0 == 1 && snap.1 == 0)
-    print("PASS actual Swift detail poster identity, provider candidates, geometry, allowlist, account isolation, dedup, TTL, negative cache, cancellation, latest-flight wins")
+    let generation=UUID()
+    var presentation=DetailPosterPresentation<Int>(key:"new/account",generation:generation,layout:.resolving)
+    presentation.complete(1,key:"old/account",generation:generation)
+    assert(presentation.layout.artwork == nil)
+    presentation.complete(2,key:"new/account",generation:UUID())
+    assert(presentation.layout.artwork == nil)
+    presentation.complete(7,key:"new/account",generation:generation)
+    presentation.complete(9,key:"new/account",generation:generation)
+    assert(presentation.layout.artwork == 7)
+    assert(c.snapshot(key:"unknown").artwork == nil && !c.snapshot(key:"unknown").isLandscape)
+    _=await c.value(key:"fail",operation:fail)
+    assert(c.snapshot(key:"fail").isLandscape)
+    let low=DetailPosterQuality(source:"low",width:376,height:538,originalPortrait:false)
+    let high=DetailPosterQuality(source:"high",width:700,height:1000,originalPortrait:true)
+    let start=ProcessInfo.processInfo.systemUptime
+    let collected: [DetailPosterQuality] = await DetailPosterSelection.collect(sources:["low","high","fail","late"],budget:0.12) { source, _ in
+        do { try await Task.sleep(nanoseconds:source == "late" ? 1_000_000_000 : source == "high" ? 40_000_000 : 5_000_000) }
+        catch { return nil }
+        return source == "low" ? low : source == "high" ? high : nil
+    }
+    assert(ProcessInfo.processInfo.systemUptime-start < 0.5)
+    assert(collected.count == 2 && DetailPosterQuality.winner(collected)?.source == "high")
+    assert(DetailPosterSelection.maxAttempts == 6 && DetailPosterSelection.concurrency == 2 && DetailPosterSelection.totalBudget == 12)
+    print("PASS actual Swift detail poster layout one-shot, stale movie/generation, budget cancellation, low-first high-later, provider rules, account isolation, dedup, TTL and negative cache")
  }
 }
 '''
 # Ensure the detail-only resolver really keeps auth/session and bounds in production.
 resolver=(root/'AVDB/Services/DetailPosterResolver.swift').read_text()
-for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','attempted.count < 4','addingTimeInterval(12)','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','cachedDetailPoster']:
+for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','DetailPosterSelection.collect','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','CGImageSourceCopyPropertiesAtIndex','kCGImageSourceCreateThumbnailWithTransform','rules.contains(source)']:
     assert literal in resolver,literal
 assert 'Pan115Client' not in resolver and 'Cookie"' not in resolver and 'Authorization"' not in resolver
 if not shutil.which('swiftc'):

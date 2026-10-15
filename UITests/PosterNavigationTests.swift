@@ -1,6 +1,50 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testDelayedPosterNeverShowsOldLandscapeAndWarmWinnerIsImmediate() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture", "--delayed-detail-poster"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        app.buttons["neutral-portrait-link"].tap()
+        let pending = app.staticTexts["resolving-hero-title"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["legacy-landscape-header"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["portrait-hero-play"].isHittable)
+        XCTAssertTrue(app.buttons["下载资源"].isHittable)
+        let beforeY = app.buttons["portrait-hero-play"].frame.minY
+        let pendingShot = XCTAttachment(screenshot: app.screenshot())
+        pendingShot.name = "184-neutral-pending-no-old-landscape"
+        pendingShot.lifetime = .keepAlways; add(pendingShot)
+        let title = app.staticTexts["portrait-hero-title"]
+        let deadline = Date().addingTimeInterval(10)
+        while pending.exists && Date() < deadline {
+            XCTAssertFalse(app.descendants(matching: .any)["legacy-landscape-header"].firstMatch.exists)
+            if title.exists { break }
+        }
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["portrait-hero-play"].frame.minY, beforeY, accuracy: 1)
+        let finalShot = XCTAttachment(screenshot: app.screenshot())
+        finalShot.name = "184-neutral-final-single-winner"
+        finalShot.lifetime = .keepAlways; add(finalShot)
+        app.buttons["返回"].tap()
+        app.buttons["neutral-portrait-link"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 2))
+        XCTAssertFalse(pending.exists, "Winner cache must not wait or re-publish a low-quality source")
+        app.buttons["返回"].tap()
+        app.buttons["neutral-wide-link"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["legacy-landscape-header"].firstMatch.waitForExistence(timeout: 3))
+        XCTAssertFalse(pending.exists)
+        XCTAssertFalse(title.exists)
+        let wideShot = XCTAttachment(screenshot: app.screenshot())
+        wideShot.name = "184-neutral-known-wide-immediate-fallback"
+        wideShot.lifetime = .keepAlways; add(wideShot)
+    }
+
     func testConditionalPortraitHeroRealDetailAndWideFallback() {
         continueAfterFailure = false
         let app = XCUIApplication()

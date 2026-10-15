@@ -1,5 +1,75 @@
 import Foundation
 
+/// Scores only the decoded, EXIF-oriented, actually usable portrait (after crop).
+/// Rendering never upscales; resolutions above the 1800-point raster ceiling tie.
+struct DetailPosterQuality: Sendable {
+    let source: String
+    let width: Int
+    let height: Int
+    let originalPortrait: Bool
+    var score: Double { min(Double(width) / 0.7, Double(height), 1800) }
+
+    static func winner(_ values: [Self]) -> Self? {
+        let eligible = values.filter { DetailPosterPolicy.eligible(width: $0.width, height: $0.height) }
+        guard let maximum = eligible.map(\.score).max() else { return nil }
+        // An untouched portrait within 5% of the maximum linear resolution is
+        // preferable to a derived front. Do not accumulate pairwise tolerances.
+        let originals = eligible.filter { $0.originalPortrait && $0.score >= maximum * 0.95 }
+        return (originals.isEmpty ? eligible : originals).sorted {
+            if $0.score != $1.score { return $0.score > $1.score }
+            if $0.originalPortrait != $1.originalPortrait { return $0.originalPortrait }
+            return $0.source < $1.source
+        }.first
+    }
+}
+
+/// Two image jobs, six distinct validated sources, one monotonic total budget.
+/// The timer cancels outstanding I/O; only completed successes are returned.
+/// This is the production scheduler, also exercised with controlled delayed jobs.
+enum DetailPosterSelection {
+    static let maxAttempts = 6
+    static let concurrency = 2
+    static let totalBudget: TimeInterval = 12
+    static func collect<Value: Sendable>(sources: [String], budget: TimeInterval = totalBudget,
+        operation: @escaping @Sendable (String, TimeInterval) async -> Value?) async -> [Value] {
+        guard !Task.isCancelled, budget > 0 else { return [] }
+        var seen = Set<String>()
+        let candidates = Array(sources.filter { seen.insert($0).inserted }.prefix(maxAttempts))
+        guard !candidates.isEmpty else { return [] }
+        let deadline = ProcessInfo.processInfo.systemUptime + budget
+        return await withTaskGroup(of: (Int, Value?).self) { group in
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(budget * 1_000_000_000))
+                return (-1, nil)
+            }
+            var next = 0
+            func enqueue(_ index: Int) {
+                let source = candidates[index]
+                group.addTask {
+                    let remaining = deadline - ProcessInfo.processInfo.systemUptime
+                    guard remaining > 0, !Task.isCancelled else { return (index, nil) }
+                    let value = await operation(source, min(5, remaining))
+                    guard !Task.isCancelled, ProcessInfo.processInfo.systemUptime <= deadline else { return (index, nil) }
+                    return (index, value)
+                }
+            }
+            for _ in 0..<min(concurrency, candidates.count) { enqueue(next); next += 1 }
+            var completed = 0
+            var values: [Value] = []
+            while let (index, value) = await group.next() {
+                if index < 0 || Task.isCancelled { break }
+                completed += 1
+                if let value { values.append(value) }
+                if next < candidates.count, ProcessInfo.processInfo.systemUptime < deadline {
+                    enqueue(next); next += 1
+                } else if completed == candidates.count { break }
+            }
+            group.cancelAll()
+            return Task.isCancelled ? [] : values
+        }
+    }
+}
+
 /// Independently implemented from the public image naming rules in the supplied
 /// jable.js (1582–1655) and Pan115.js. No JavaScript or provider credentials run.
 /// Only COMPLETE catalog numbers are accepted; a filename/title is not an identity.

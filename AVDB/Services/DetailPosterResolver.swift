@@ -29,44 +29,116 @@ private final class PosterRedirectGuard: NSObject, URLSessionTaskDelegate {
 enum DetailPosterResolver {
     private static let cache = DetailPosterCache<DetailPosterArtwork>()
 
-    static func resolve(movie: Movie, account: String?) async -> DetailPosterArtwork? {
-        // Opaque, memory-only namespace. Never log/store the account credential.
+    #if DEBUG
+    private static let fixtureCache = DetailPosterCache<DetailPosterArtwork>()
+    static func fixtureLayout(movie: Movie, account: String?) -> DetailPosterLayout<DetailPosterArtwork> {
+        fixtureCache.snapshot(key: identity(movie: movie, account: account))
+    }
+    static func fixtureResolve(movie: Movie, account: String?,
+        operation: @escaping @Sendable () async -> DetailPosterArtwork?) async -> DetailPosterArtwork? {
+        await fixtureCache.value(key: identity(movie: movie, account: account), operation: operation)
+    }
+    #endif
+
+    static func identity(movie: Movie, account: String?) -> String {
+        // Opaque memory-only account namespace; never log credentials.
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
-        let key = scope + "#" + movie.id + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "")
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "")
+    }
+
+    static func initialLayout(movie: Movie, account: String?) -> DetailPosterLayout<DetailPosterArtwork> {
+        let saved = cache.snapshot(key: identity(movie: movie, account: account))
+        if case .resolving = saved {
+            let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
+            let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
+            let rules = original ? [] : DetailPosterPolicy.candidates(number: movie.number)
+            // Definite unsupported/no eligible candidates: retain legacy immediately.
+            if !(sources + rules).contains(where: { source in
+                guard let url = URL(string: source) else { return false }
+                return allowed(url) && !url.path.contains("/small_covers/")
+                    && (!DetailPosterPolicy.allowedPublicImage(url) || rules.contains(source))
+            }) { return .landscape }
+        }
+        return saved
+    }
+
+    static func resolve(movie: Movie, account: String?) async -> DetailPosterArtwork? {
+        let key = identity(movie: movie, account: account)
         return await cache.value(key: key) {
             let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
             let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
-            // Prefer already-decoded high resolution fronts, avoiding additional requests.
-            for source in sources {
-                if let image = await ImageLoader.shared.cachedDetailPoster(source: source),
-                   let art = await artwork(image: image, source: source, derive: !original) { return art }
-            }
-            let deadline = Date().addingTimeInterval(12)
             let rules = original ? [] : DetailPosterPolicy.candidates(number: movie.number)
-            var attempted = Set<String>()
-            for source in sources + rules {
-                guard !Task.isCancelled, Date() < deadline else { return nil }
-                guard let url = URL(string: source), allowed(url),
-                      !url.path.contains("/small_covers/"), !attempted.contains(source) else { continue }
-                guard attempted.count < 4 else { break }
-                attempted.insert(source)
-                // attempted.count <= 4: actual downloads only, not skipped thumbnails.
-                if let image = await download(url: url, timeout: min(5, deadline.timeIntervalSinceNow)),
-                   let art = await artwork(image: image, source: source, derive: !original) { return art }
+            let validated = (sources + rules).filter { source in
+                guard let url = URL(string: source), allowed(url), !url.path.contains("/small_covers/") else { return false }
+                // Official public paths must be exact code-derived candidates;
+                // metadata cannot smuggle an unrelated provider image into selection.
+                return !DetailPosterPolicy.allowedPublicImage(url) || rules.contains(source)
             }
-            return nil
+            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated) { source, timeout in
+                guard let url = URL(string: source) else { return nil }
+                return await download(url: url, timeout: timeout, derive: !original)
+            }
+            guard !Task.isCancelled,
+                  let winner = DetailPosterQuality.winner(decoded.map(\.quality)),
+                  let selected = decoded.first(where: { $0.quality.source == winner.source }) else { return nil }
+            // No intermediate publication. The winner cache, not ImageLoader's
+            // independently downsampled source cache, is the only warm fast path.
+            return await artwork(image: selected.image, source: winner.source, derive: false)
         }
     }
 
     private static func allowed(_ url: URL) -> Bool {
         if DetailPosterPolicy.allowedPublicImage(url) { return true }
-        guard url.scheme == "https", url.user == nil, url.password == nil, url.port == nil else { return false }
+        guard url.scheme == "https", url.user == nil, url.password == nil, url.port == nil,
+              url.query == nil, url.fragment == nil else { return false }
         let host = url.host?.lowercased()
         return (host == JavDBConstants.imageCDNHost || host == JavDBConstants.webCDNHost)
             && (url.path.contains("/covers/") || url.path.contains("/small_covers/"))
     }
 
-    private static func download(url: URL, timeout: TimeInterval) async -> UIImage? {
+    struct DecodedPoster: @unchecked Sendable {
+        let image: UIImage
+        let quality: DetailPosterQuality
+    }
+
+    static func decode(data: Data, sourceURL: String, derive: Bool) -> DecodedPoster? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetStatus(source) == .statusComplete,
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let rawWidth = properties[kCGImagePropertyPixelWidth] as? Int,
+              let rawHeight = properties[kCGImagePropertyPixelHeight] as? Int,
+              rawWidth > 0, rawHeight > 0, rawWidth <= 10000, rawHeight <= 10000,
+              rawWidth * rawHeight <= 40_000_000,
+              // Full native decode, applying EXIF orientation; never enlarge.
+              var cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceShouldCacheImmediately: true,
+                kCGImageSourceThumbnailMaxPixelSize: max(rawWidth, rawHeight)
+              ] as CFDictionary) else { return nil }
+        var cropped = false
+        if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: sourceURL) {
+            guard let front = cg.cropping(to: rect) else { return nil }
+            cg = front; cropped = true
+        }
+        guard DetailPosterPolicy.eligible(width: cg.width, height: cg.height) else { return nil }
+        let quality = DetailPosterQuality(source: sourceURL, width: cg.width, height: cg.height, originalPortrait: !cropped)
+        // Keep only a bounded rendered raster per successful candidate. Score
+        // above came from its real native front dimensions, not this downsample.
+        if cg.height > 1800 {
+            let scale = 1800 / Double(cg.height)
+            guard let context = CGContext(data: nil, width: max(1, Int(Double(cg.width) * scale)), height: 1800,
+                bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            context.interpolationQuality = .high
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: context.width, height: context.height))
+            guard let resized = context.makeImage() else { return nil }
+            cg = resized
+        }
+        return DecodedPoster(image: UIImage(cgImage: cg), quality: quality)
+    }
+
+    private static func download(url: URL, timeout: TimeInterval, derive: Bool) async -> DecodedPoster? {
         guard timeout > 0, !Task.isCancelled else { return nil }
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil
@@ -93,14 +165,9 @@ enum DetailPosterResolver {
             if url.host?.lowercased() == JavDBConstants.imageCDNHost {
                 data = JavDBSignature.decryptImage(data)
             }
-            guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-                  let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceShouldCacheImmediately: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 1800
-                  ] as CFDictionary) else { return nil }
-            return UIImage(cgImage: image)
+            return await Task.detached(priority: .utility) {
+                decode(data: data, sourceURL: url.absoluteString, derive: derive)
+            }.value
         } catch { return nil }
     }
 
