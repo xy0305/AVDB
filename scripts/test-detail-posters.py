@@ -129,6 +129,8 @@ resolver=(root/'AVDB/Services/DetailPosterResolver.swift').read_text()
 for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','DetailPosterSelection.collect','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','CGImageSourceCopyPropertiesAtIndex','kCGImageSourceCreateThumbnailWithTransform','rules.contains(source)','target.path == path','target.query == nil']:
     assert literal in resolver,literal
 assert 'Pan115Client' not in resolver and 'Cookie"' not in resolver and 'Authorization"' not in resolver
+setup=(root/'scripts/setup-poster-uitests.rb').read_text()
+assert "c.build_settings['OTHER_LDFLAGS'] = '-Wl,-no_warn_duplicate_libraries'" in setup # no duplicate MediaPipe force_load in hosted test
 if not shutil.which('swiftc'):
     print('PASS static safety checks; actual Swift execution requires macOS CI')
 else:

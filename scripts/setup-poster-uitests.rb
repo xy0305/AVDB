@@ -27,6 +27,9 @@ unit.build_configurations.each do |c|
   c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
   c.build_settings['TEST_HOST'] = '$(BUILT_PRODUCTS_DIR)/AVDB.app/AVDB'
   c.build_settings['BUNDLE_LOADER'] = '$(TEST_HOST)'
+  # Search paths are required to import AVDB, but the hosted app already owns
+  # MediaPipe's static graph registry. Never inherit its -force_load linker flags.
+  c.build_settings['OTHER_LDFLAGS'] = '-Wl,-no_warn_duplicate_libraries'
 end
 p.save
 s = Xcodeproj::XCScheme.new
