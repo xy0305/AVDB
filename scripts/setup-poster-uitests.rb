@@ -37,3 +37,8 @@ s.add_build_target(unit)
 s.add_test_target(unit)
 s.set_launch_target(app)
 s.save_as(p.path, 'PosterNavigation', true)
+# A hosted @testable import also imports the app's MediaPipe module. Keep the
+# shipping Podfile unchanged; only this generated simulator test setup inherits it.
+podfile = File.read('Podfile')
+podfile = podfile.sub("  pod 'MediaPipeTasksVision', '0.10.14'", "  pod 'MediaPipeTasksVision', '0.10.14'\n  target 'DetailPosterQualityTests' do\n    inherit! :search_paths\n  end")
+File.write('Podfile', podfile)

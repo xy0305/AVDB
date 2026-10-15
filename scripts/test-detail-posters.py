@@ -126,7 +126,7 @@ actor SelectionProbe {
 '''
 # Ensure the detail-only resolver really keeps auth/session and bounds in production.
 resolver=(root/'AVDB/Services/DetailPosterResolver.swift').read_text()
-for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','DetailPosterSelection.collect','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','CGImageSourceCopyPropertiesAtIndex','kCGImageSourceCreateThumbnailWithTransform','rules.contains(source)']:
+for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','DetailPosterSelection.collect','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','CGImageSourceCopyPropertiesAtIndex','kCGImageSourceCreateThumbnailWithTransform','rules.contains(source)','target.path == path','target.query == nil']:
     assert literal in resolver,literal
 assert 'Pan115Client' not in resolver and 'Cookie"' not in resolver and 'Authorization"' not in resolver
 if not shutil.which('swiftc'):
