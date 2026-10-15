@@ -151,10 +151,10 @@ struct MovieDetailView: View {
             setPosterPresentation(presentation)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: usesLandscapeLayout ? 76 : 16)
+            Color.clear.frame(height: 76)
         }
         .overlay(alignment: .bottom) {
-            if let movie = vm.movie, usesLandscapeLayout, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
+            if let movie = vm.movie, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
                 DraggableReviewsPanel(
                     movieID: movie.id,
                     total: movie.commentsCount ?? 0,
@@ -292,15 +292,6 @@ struct MovieDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.systemBackground))
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
-            if !usesLandscapeLayout, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
-                // Preserve the original expandable review component underneath all
-                // compatibility sections; never cover the cinematic resource cards.
-                DraggableReviewsPanel(
-                    movieID: movie.id, total: movie.commentsCount ?? 0,
-                    panelHeight: $reviewPanelHeight, vm: reviewsVM,
-                    availableHeight: max(280, layoutSize.height)
-                ).frame(height: reviewPanelHeight, alignment: .top)
-            }
         }
         .frame(maxWidth: AdaptiveLayout.isPad ? 900 : AdaptiveLayout.contentMaxWidth)
         .frame(maxWidth: .infinity)
@@ -1560,7 +1551,7 @@ struct DraggableReviewsPanel: View {
             headerSection
                 .frame(height: collapsedHeight)
                 .contentShape(Rectangle())
-                .highPriorityGesture(handleDrag)
+                .gesture(handleDrag, including: .all)
                 .onTapGesture { toggleFromHeader() }
 
             if isContentVisible {
