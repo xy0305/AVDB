@@ -288,19 +288,19 @@ struct MovieDetailView: View {
                     .shadow(color: .black.opacity(0.25), radius: 8)
                     .padding(.horizontal, 40)
                     .accessibilityIdentifier("portrait-hero-title")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Text(movie.displayNumber)
-                            .padding(.horizontal, 4).overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.9)))
-                        if let date = movie.releaseDate { Text(date) }
-                        if let tags = movie.tags, !tags.isEmpty {
-                            Text(tags.compactMap(\.name).joined(separator: ", ")).lineLimit(1)
-                        }
-                        if let minutes = movie.duration { Text("\(minutes / 60) 小时 \(minutes % 60) 分钟") }
-                        if movie.hasCnsub == true { Text("中字") }
-                    }.font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 18)
-                }.padding(.top, 18)
+                HStack(spacing: 7) {
+                    Text(movie.displayNumber).fixedSize()
+                        .padding(.horizontal, 4).overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.9)))
+                    if let date = movie.releaseDate { Text(date).fixedSize() }
+                    if let tags = movie.tags, !tags.isEmpty {
+                        Text(tags.compactMap(\.name).joined(separator: ", "))
+                            .lineLimit(1).truncationMode(.tail).layoutPriority(-1)
+                    }
+                    if let minutes = movie.duration { Text("\(minutes / 60) 小时 \(minutes % 60) 分钟").fixedSize() }
+                    if movie.hasCnsub == true { Text("中字").fixedSize() }
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 18).padding(.top, 18)
                 Button {
                     GlassHaptic.tap()
                     play115 = true
@@ -318,7 +318,7 @@ struct MovieDetailView: View {
                     posterAction("arrow.down.circle", label: "下载资源") { showPosterResources = true }
                     NavigationLink { MyListsView(movieID: movie.id) } label: {
                         Image(systemName: "rectangle.stack.badge.plus")
-                            .font(.system(size: 23, weight: .regular)).frame(width: 44, height: 44)
+                            .font(.system(size: 23, weight: .regular)).frame(width: 44, height: 44).contentShape(Rectangle())
                     }.accessibilityLabel("存入清单")
                     posterAction(vm.reviewStatus == "want_watch" ? "heart.fill" : "heart", label: "想看") {
                         Task { await vm.setReviewStatus("want_watch") }
@@ -380,12 +380,12 @@ struct MovieDetailView: View {
         }
         .foregroundStyle(.white)
         .frame(width: width)
-        .accessibilityIdentifier("portrait-hero")
     }
 
     private func posterAction(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).font(.system(size: 23, weight: .regular)).frame(width: 44, height: 44)
+            Image(systemName: icon).font(.system(size: 23, weight: .regular))
+                .frame(width: 44, height: 44).contentShape(Rectangle())
         }.accessibilityLabel(label)
     }
 
