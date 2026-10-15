@@ -50,8 +50,12 @@ Task { @MainActor in
  q.enqueue(requests[0]);try! await Task.sleep(nanoseconds: 70_000_000)
  precondition(q.value(requests[0]).movie != nil,"return requeues unfinished entries")
  q.reset();q.enqueue(requests[1]);APIClient.shared.token="synthetic-account-change"
- q.enqueue(requests[2]);try! await Task.sleep(nanoseconds: 80_000_000)
- precondition(q.value(requests[1]).movie == nil && q.value(requests[2]).movie != nil,"account reset rejects stale result")
+ q.enqueue(requests[2])
+ for _ in 0..<100 {
+  if q.value(requests[2]).movie != nil { break }
+  try! await Task.sleep(nanoseconds: 30_000_000)
+ }
+ precondition(q.value(requests[1]).movie == nil && q.value(requests[2]).movie?.id == requests[2].key,"account reset rejects stale result")
  print("PASS shipping metadata queue: 2 concurrency, dedup, identity, cancellation, reentry, account isolation")
  exit(0)
 }
