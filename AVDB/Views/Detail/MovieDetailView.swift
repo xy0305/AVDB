@@ -256,7 +256,9 @@ struct MovieDetailView: View {
     private func detailContent(_ movie: Movie) -> some View {
         VStack(spacing: 0) {
             if usesLandscapeLayout {
-                heroHeader(movie).accessibilityIdentifier("legacy-landscape-header")
+                heroHeader(movie)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("legacy-landscape-header")
             } else {
                 // Resolving has exactly the portrait viewport and real metadata /
                 // actions, but no speculative cover (especially no wide fallback).

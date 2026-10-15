@@ -14,12 +14,15 @@ struct DetailPosterArtwork: @unchecked Sendable {
 /// cookie, bearer header, account settings, JavaScript, or public-page scripts.
 private final class PosterRedirectGuard: NSObject, URLSessionTaskDelegate {
     let host: String
-    init(host: String) { self.host = host }
+    let path: String
+    init(url: URL) { self.host = url.host!.lowercased(); self.path = url.path }
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
-        guard request.url?.scheme == "https", request.url?.host?.lowercased() == host else {
+        guard let target = request.url, target.scheme == "https", target.host?.lowercased() == host,
+              target.path == path, target.user == nil, target.password == nil, target.port == nil,
+              target.query == nil, target.fragment == nil else {
             completionHandler(nil); return
         }
         completionHandler(request)
@@ -147,7 +150,7 @@ enum DetailPosterResolver {
         config.timeoutIntervalForRequest = timeout
         config.timeoutIntervalForResource = timeout
         config.urlCache = nil
-        let session = URLSession(configuration: config, delegate: PosterRedirectGuard(host: url.host!.lowercased()), delegateQueue: nil)
+        let session = URLSession(configuration: config, delegate: PosterRedirectGuard(url: url), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         do {
             var request = URLRequest(url: url)
