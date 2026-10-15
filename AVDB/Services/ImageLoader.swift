@@ -369,6 +369,15 @@ public actor ImageLoader {
         return UIImage(cgImage: cgImage)
     }
 
+    /// Read-only detail reuse: no network, no catalog mutations, original decoding unchanged.
+    func cachedDetailPoster(source: String) -> UIImage? {
+        for size in [2048, 1600, 1200, 1000, 720, 640] {
+            if let image = posterCache.object(forKey: "front-v1#\(source)#\(size)" as NSString) { return image }
+            if let image = cache.object(forKey: "\(source)#\(size)" as NSString) { return image }
+        }
+        return nil
+    }
+
     /// 清空缓存
     public func clearCache() {
         cache.removeAllObjects()

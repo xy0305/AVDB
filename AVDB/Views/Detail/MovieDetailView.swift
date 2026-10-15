@@ -13,7 +13,9 @@ struct MovieDetailView: View {
     @StateObject private var vm: MovieDetailViewModel
     @State private var play115 = false
     @State private var showTrailer = false
-    @State private var tenhowCoverURL: String?
+    @State private var posterArtwork: DetailPosterArtwork?
+    @State private var showPosterResources = false
+    @State private var posterAccountEpoch = UUID()
     @State private var reviewPanelHeight: CGFloat = 76
     @StateObject private var reviewsVM = ReviewsListViewModel()
     @ObservedObject private var externalSettings = ExternalLibrarySettings.shared
@@ -25,6 +27,15 @@ struct MovieDetailView: View {
         self.movieID = movieID
         _vm = StateObject(wrappedValue: MovieDetailViewModel(movieID: movieID))
     }
+
+    #if DEBUG
+    init(fixture: Movie) {
+        movieID = fixture.id
+        let model = MovieDetailViewModel(movieID: fixture.id)
+        model.movie = fixture
+        _vm = StateObject(wrappedValue: model)
+    }
+    #endif
 
     var body: some View {
         ScrollView(.vertical) {
@@ -57,13 +68,56 @@ struct MovieDetailView: View {
             .allowsHitTesting(false)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            detailChrome
+            if posterArtwork == nil { detailChrome }
+        }
+        .ignoresSafeArea(edges: posterArtwork == nil ? [] : .top)
+        .overlay(alignment: .top) {
+            if posterArtwork != nil { detailChrome }
+        }
+        .sheet(isPresented: $showPosterResources) {
+            if let movie = vm.movie {
+                NavigationStack {
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            playSection(movie)
+                            magnetsSection(movie)
+                        }.padding(.vertical)
+                    }
+                    .navigationTitle("播放与下载资源")
+                    .toolbar { ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") { showPosterResources = false }
+                    } }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
+            posterArtwork = nil
+            posterAccountEpoch = UUID()
+        }
+        .alert("操作未完成", isPresented: Binding(
+            get: { vm.movie != nil && vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )) { Button("好", role: .cancel) { vm.errorMessage = nil } }
+        message: { Text(vm.errorMessage ?? "") }
+        .task(id: "\(vm.movie?.id ?? "")#\(posterAccountEpoch)") {
+            posterArtwork = nil
+            guard let movie = vm.movie else { return }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
+                posterArtwork = Self.neutralHeroArtwork(wide: movie.id == "neutral-wide")
+                return
+            }
+            #endif
+            let account = APIClient.shared.token
+            let art = await DetailPosterResolver.resolve(movie: movie, account: account)
+            guard !Task.isCancelled, vm.movie?.id == movie.id, APIClient.shared.token == account else { return }
+            posterArtwork = art
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Color.clear.frame(height: 76)
         }
         .overlay(alignment: .bottom) {
-            if let movie = vm.movie {
+            if let movie = vm.movie, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
                 DraggableReviewsPanel(
                     movieID: movie.id,
                     total: movie.commentsCount ?? 0,
@@ -79,6 +133,9 @@ struct MovieDetailView: View {
         .nativeSwipeBackEnabled()
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
+            #endif
             await vm.load()
             if let movie = vm.movie {
                 await reviewsVM.load(movieID: movie.id)
@@ -117,9 +174,22 @@ struct MovieDetailView: View {
         .buttonStyle(.plain)
         .frame(width: 44, height: 44)
         .contentShape(Circle())
+        .accessibilityLabel(icon == "chevron.left" ? "返回" : "搜索")
     }
 
     private func detailBackground(_ movie: Movie) -> some View {
+        // Bitmap blur was pre-rendered once off-main; scrolling does not run a filter.
+        if let art = posterArtwork {
+            return AnyView(ZStack {
+                Color(art.tint)
+                Image(uiImage: art.backdrop).resizable().scaledToFill().opacity(0.22)
+                Color(art.tint).opacity(0.65)
+            }.clipped())
+        }
+        return AnyView(legacyDetailBackground(movie))
+    }
+
+    private func legacyDetailBackground(_ movie: Movie) -> some View {
         // 进详情时不要对整屏封面做实时 blur，否则 push 转场会掉帧。
         ZStack {
             Color(red: 0.12, green: 0.12, blue: 0.14)
@@ -142,7 +212,13 @@ struct MovieDetailView: View {
 
     private func detailContent(_ movie: Movie) -> some View {
         VStack(spacing: 0) {
-            heroHeader(movie)
+            if let art = posterArtwork {
+                portraitHero(movie, art: art)
+                // All original sections remain below the cinematic header.
+                movieInfoCard(movie).padding(.horizontal, 20).padding(.top, 24)
+            } else {
+                heroHeader(movie)
+            }
 
             VStack(alignment: .leading, spacing: 20) {
                 if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
@@ -174,6 +250,147 @@ struct MovieDetailView: View {
         .frame(maxWidth: AdaptiveLayout.isPad ? 900 : AdaptiveLayout.contentMaxWidth)
         .frame(maxWidth: .infinity)
     }
+
+    private func portraitHero(_ movie: Movie, art: DetailPosterArtwork) -> some View {
+        let width = max(320, min(layoutSize.width, AdaptiveLayout.isPad ? 900 : 600))
+        let imageHeight = min(width * 1.58, max(600, layoutSize.height * 0.8))
+        let titleTop = min(width * 0.99, max(390, layoutSize.height * 0.47))
+        return ZStack(alignment: .top) {
+            Image(uiImage: art.image)
+                .resizable().scaledToFill()
+                .frame(width: width, height: imageHeight, alignment: .top)
+                .clipped()
+                .accessibilityHidden(true)
+            LinearGradient(stops: [
+                .init(color: .clear, location: 0.36),
+                .init(color: Color(art.tint).opacity(0.24), location: 0.57),
+                .init(color: Color(art.tint).opacity(0.83), location: 0.86),
+                .init(color: Color(art.tint), location: 1)
+            ], startPoint: .top, endPoint: .bottom)
+            .frame(height: imageHeight + 30)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(movie.displayTitle)
+                    .font(.system(size: AdaptiveLayout.isPad ? 42 : 34, weight: .bold))
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .shadow(color: .black.opacity(0.25), radius: 8)
+                    .padding(.horizontal, 40)
+                    .accessibilityIdentifier("portrait-hero-title")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        Text(movie.displayNumber)
+                            .padding(.horizontal, 4).overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.9)))
+                        if let date = movie.releaseDate { Text(date) }
+                        if let tags = movie.tags, !tags.isEmpty {
+                            Text(tags.compactMap(\.name).joined(separator: ", ")).lineLimit(1)
+                        }
+                        if let minutes = movie.duration { Text("\(minutes / 60) 小时 \(minutes % 60) 分钟") }
+                        if movie.hasCnsub == true { Text("中字") }
+                    }.font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 18)
+                }.padding(.top, 18)
+                Button {
+                    GlassHaptic.tap()
+                    play115 = true
+                } label: {
+                    Label("播放", systemImage: "play.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity).frame(minHeight: 44)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 40).padding(.top, 8)
+                .accessibilityIdentifier("portrait-hero-play")
+                HStack(spacing: 28) {
+                    posterAction("arrow.down.circle", label: "下载资源") { showPosterResources = true }
+                    NavigationLink { MyListsView(movieID: movie.id) } label: {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                            .font(.system(size: 23, weight: .regular)).frame(width: 44, height: 44)
+                    }.accessibilityLabel("存入清单")
+                    posterAction(vm.reviewStatus == "want_watch" ? "heart.fill" : "heart", label: "想看") {
+                        Task { await vm.setReviewStatus("want_watch") }
+                    }
+                    posterAction(vm.reviewStatus == "watched" ? "checkmark.rectangle.fill" : "checkmark.rectangle", label: "看过") {
+                        Task { await vm.setReviewStatus("watched") }
+                    }
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity).padding(.top, 12)
+                .accessibilityIdentifier("portrait-hero-actions")
+                if let summary = movie.summary, !summary.isEmpty {
+                    Text(summary).font(.system(size: 13)).multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity).padding(.horizontal, 32).padding(.top, 22)
+                } else {
+                    Text("「\(movie.displayNumber)」").font(.system(size: 13))
+                        .frame(maxWidth: .infinity).padding(.top, 22)
+                }
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Text("播放资源:").font(.system(size: 17, weight: .bold))
+                        Button("115 原画") { play115 = true }
+                            .font(.system(size: 15, weight: .semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 6)
+                            .overlay(Capsule().stroke(.white.opacity(0.22)))
+                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            Button { play115 = true } label: {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("115 原画").font(.title3.bold())
+                                    Text(Pan115Settings.shared.isConfigured ? "打开 115 匹配资源" : "需先在「我的」配置 115")
+                                        .font(.caption)
+                                    Label("选择播放文件", systemImage: "play.circle")
+                                        .font(.subheadline)
+                                }
+                                .padding(16).frame(minWidth: 220, alignment: .leading)
+                                .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.45)))
+                            }
+                            if (movie.magnetsCount ?? 0) > 0 || externalSettings.enabled {
+                                Button { showPosterResources = true } label: {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("磁力与外部资源").font(.title3.bold())
+                                        Text("查看可用链接后选择推送").font(.caption)
+                                        Label("查看资源", systemImage: "link").font(.subheadline)
+                                    }.padding(16).frame(minWidth: 220, alignment: .leading)
+                                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.22)))
+                                }
+                            }
+                        }.padding(.horizontal, 18)
+                    }.padding(.horizontal, -18)
+                }
+                .padding(.horizontal, 18).padding(.top, 76)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("portrait-hero-resources")
+            }
+            .padding(.top, titleTop)
+            .padding(.bottom, 10)
+        }
+        .foregroundStyle(.white)
+        .frame(width: width)
+        .accessibilityIdentifier("portrait-hero")
+    }
+
+    private func posterAction(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 23, weight: .regular)).frame(width: 44, height: 44)
+        }.accessibilityLabel(label)
+    }
+
+    #if DEBUG
+    private static func neutralHeroArtwork(wide: Bool) -> DetailPosterArtwork? {
+        guard !wide else { return nil }
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 700, height: 1000), format: format).image { ctx in
+            UIColor(red: 0.48, green: 0.36, blue: 0.29, alpha: 1).setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 700, height: 1000))
+            UIColor(red: 0.74, green: 0.60, blue: 0.41, alpha: 1).setFill()
+            ctx.cgContext.fillEllipse(in: CGRect(x: 170, y: 100, width: 360, height: 360))
+            UIColor(red: 0.21, green: 0.27, blue: 0.31, alpha: 1).setFill()
+            ctx.cgContext.fill(CGRect(x: 130, y: 500, width: 440, height: 500))
+        }
+        return DetailPosterArtwork(image: image, backdrop: image, tint: UIColor(red: 0.59, green: 0.50, blue: 0.45, alpha: 1))
+    }
+    #endif
 
     private func heroHeader(_ movie: Movie) -> some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -209,14 +426,6 @@ struct MovieDetailView: View {
                 .padding(12)
             }
             .liquidCover(cornerRadius: 16)
-            .task(id: movie.id) {
-                let names = movie.actors?.compactMap(\.name) ?? movie.actorNames ?? []
-                tenhowCoverURL = await TenhowCoverResolver.shared.coverURL(
-                    number: movie.displayNumber,
-                    releaseDate: movie.releaseDate,
-                    actorNames: names
-                )
-            }
 
             movieInfoCard(movie)
 
@@ -793,6 +1002,9 @@ final class MovieDetailViewModel: ObservableObject {
     }
 
     func loadMagnets() async {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
+        #endif
         guard !movieID.isEmpty else { return }
         let settings = ExternalLibrarySettings.shared
         let generation = settings.revision
@@ -839,6 +1051,9 @@ final class MovieDetailViewModel: ObservableObject {
     }
 
     func setReviewStatus(_ status: String) async {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
+        #endif
         guard !movieID.isEmpty else { return }
         do {
             let review = try await sdk.setMovieReview(movieID, status: status)
@@ -849,6 +1064,9 @@ final class MovieDetailViewModel: ObservableObject {
     }
 
     func loadRelatedLists() async {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
+        #endif
         guard !movieID.isEmpty, relatedLists.isEmpty else { return }
         listsPage = 1
         listsHasMore = true
@@ -1603,3 +1821,28 @@ extension View {
         }
     }
 }
+
+#if DEBUG
+/// Self-authored geometric artwork and fictional catalog metadata (CC0).
+/// Uses MovieDetailView itself, not an HTML recreation or a screenshot mock.
+struct DetailHeroFixtureGallery: View {
+    private func movie(wide: Bool) -> Movie {
+        let json = """
+        {"id":"neutral-\(wide ? "wide" : "portrait")","type":"0","number":"DEMO-123",
+        "title":"静谧之光\\nNeutral Portrait Study","cover_url":"fixture://poster/\(wide ? "wrap" : "portrait")",
+        "release_date":"2026-10-15","duration":134,"magnets_count":0,
+        "summary":"自制几何图形用于验证海报详情层级与安全区域，不含真实影片或人物。",
+        "tags":[{"id":"neutral-tag","name":"几何艺术"}]}
+        """
+        return try! JSONDecoder().decode(Movie.self, from: Data(json.utf8))
+    }
+    var body: some View {
+        List {
+            NavigationLink("Portrait detail") { MovieDetailView(fixture: movie(wide: false)) }
+                .accessibilityIdentifier("neutral-portrait-link")
+            NavigationLink("Wide detail") { MovieDetailView(fixture: movie(wide: true)) }
+                .accessibilityIdentifier("neutral-wide-link")
+        }.navigationTitle("Neutral Detail Fixtures")
+    }
+}
+#endif

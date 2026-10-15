@@ -1,6 +1,40 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testConditionalPortraitHeroRealDetailAndWideFallback() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        app.buttons["neutral-portrait-link"].tap()
+        let title = app.staticTexts["portrait-hero-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10), app.debugDescription)
+        let play = app.buttons["portrait-hero-play"]
+        XCTAssertTrue(play.isHittable)
+        XCTAssertGreaterThanOrEqual(play.frame.height, 44)
+        XCTAssertGreaterThan(title.frame.minY, app.windows.firstMatch.frame.height * 0.3)
+        XCTAssertLessThan(title.frame.minY, app.windows.firstMatch.frame.height * 0.65)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "native-neutral-portrait-hero-phone-or-ipad"
+        shot.lifetime = .keepAlways; add(shot)
+        app.buttons["下载资源"].tap()
+        XCTAssertTrue(app.navigationBars["播放与下载资源"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["完成"].isHittable)
+        app.buttons["完成"].tap()
+        app.buttons["返回"].tap()
+        XCTAssertTrue(app.buttons["neutral-wide-link"].waitForExistence(timeout: 5))
+        app.buttons["neutral-wide-link"].tap()
+        XCTAssertFalse(app.staticTexts["portrait-hero-title"].exists, "Wide/failure must preserve original detail")
+        XCTAssertTrue(app.staticTexts["Neutral Portrait Study"].exists || app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Neutral Portrait Study'")).firstMatch.exists)
+        let wide = XCTAttachment(screenshot: app.screenshot())
+        wide.name = "native-neutral-original-wide-detail-fallback"
+        wide.lifetime = .keepAlways; add(wide)
+        app.terminate()
+    }
+
     func testRecentMagnetCatalogRealViewReturnWithoutReload() {
         continueAfterFailure = false
         let app = XCUIApplication()
