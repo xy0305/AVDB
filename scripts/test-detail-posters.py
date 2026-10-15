@@ -11,6 +11,12 @@ actor Count {
     func cancel() { cancelled += 1 }
     func snapshot() -> (Int,Int) { (calls,cancelled) }
 }
+actor SelectionProbe {
+    var active=0; var peak=0; var calls=0
+    func start() { active += 1; calls += 1; peak=max(peak,active) }
+    func end() { active -= 1 }
+    func snapshot() -> (Int,Int,Int) { (calls,peak,active) }
+}
 @main struct Main {
  static func main() async {
     assert(DetailPosterPolicy.candidates(number:"ABF-378") == [
@@ -101,6 +107,19 @@ actor Count {
     assert(ProcessInfo.processInfo.systemUptime-start < 0.5)
     assert(collected.count == 2 && DetailPosterQuality.winner(collected)?.source == "high")
     assert(DetailPosterSelection.maxAttempts == 6 && DetailPosterSelection.concurrency == 2 && DetailPosterSelection.totalBudget == 12)
+    let probe=SelectionProbe()
+    let bounded: [String] = await DetailPosterSelection.collect(sources:["a","a","b","c","d","e","f","g","h"],budget:0.3) { source, timeout in
+        assert(timeout > 0 && timeout <= 5)
+        await probe.start()
+        try? await Task.sleep(nanoseconds:10_000_000)
+        await probe.end()
+        return source
+    }
+    let limits=await probe.snapshot()
+    assert(bounded.count == 6 && Set(bounded).count == 6)
+    assert(limits.0 == 6 && limits.1 == 2 && limits.2 == 0)
+    let empty: [Int] = await DetailPosterSelection.collect(sources:[]) { _,_ in 1 }
+    assert(empty.isEmpty)
     print("PASS actual Swift detail poster layout one-shot, stale movie/generation, budget cancellation, low-first high-later, provider rules, account isolation, dedup, TTL and negative cache")
  }
 }
