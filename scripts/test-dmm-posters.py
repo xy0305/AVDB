@@ -16,6 +16,11 @@ swift=r'''
   for (raw, expected) in [("118abf295","abf-295"),("1sods098","sods-98"),("d2gvh891","gvh-891"),("h_1059godr1287","godr-1287")] {
    assert(T.cid(raw,storefront:.retail) == expected)
   }
+  for label in ["WSA", "FTHTD", "FALENO", "FGAN", "FSNF", "FLAV", "GSHRB", "STARS", "FSDSS", "SSIS"] {
+   let existing=DetailPosterPolicy.candidates(number:label+"-123")
+   assert(existing.count == 2 && existing.allSatisfy { DetailPosterPolicy.allowedPublicImage(URL(string:$0)!) },label)
+  }
+  assert(T.cid("2wsa00123",storefront:.retail) == nil)
   assert(T.cid("ssis00497",storefront:.digital) == "ssis-497")
   assert(T.cid("13dsvr01968",storefront:.digital) == "13dsvr-1968")
   assert(T.cid("13dsvr01968",storefront:.retail) == nil)

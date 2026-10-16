@@ -59,8 +59,13 @@ enum TenhowPoster {
             "stars":["1"], "star":["1"], "start":["1"], "sods":["1"],
             "fsdss":["1"], "fcdss":["1"], "fns":["1"], "abp":["118"],
             "chn":["118"], "rebd":["h_346"], "rebdb":["h_346"], "ovg":["13"]]
+        // Preserve the established digital/video maker rules in DetailPosterPolicy;
+        // tightening URL admission must not silently drop previously valid sources.
+        let digital: [String: Set<String>] = ["wsa":["2"], "fthtd":["1"], "faleno":["1"],
+            "fgan":["1"], "fsnf":["1"], "flav":["1"], "gshrb":["h_346"]]
         let retail: [String: Set<String>] = ["abf":["118"], "gvh":["d2"], "godr":["h_1059"]]
         guard m[1].isEmpty || common[m[2]]?.contains(m[1]) == true
+                || (storefront == .digital && digital[m[2]]?.contains(m[1]) == true)
                 || (storefront == .retail && retail[m[2]]?.contains(m[1]) == true) else { return nil }
         return m[2] + "-" + String(n)
     }
