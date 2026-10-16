@@ -53,6 +53,32 @@ final class DetailPosterQualityTests: XCTestCase {
         XCTAssertNotEqual(DetailPosterResolver.identity(movie:censored, account:"a"), DetailPosterResolver.identity(movie:censored, account:"b"))
         XCTAssertEqual(DetailPosterResolver.decode(data:jpeg(1055,1500),sourceURL:"https://www.tenhow.net/images/B084SXDZYQ.jpg",derive:true)?.quality.score,1500)
     }
+    func testVerifiedDMMMetadataAndOriginalPolicy() throws {
+        let cover = "https://pics.dmm.co.jp/mono/movie/adult/118abf295/118abf295pl.jpg?w=200#preview"
+        func movie(_ type: String, _ number: String = "ABF-295") throws -> Movie {
+            let json: [String: Any] = ["id":"dmm", "type":type, "number":number, "cover_url":cover]
+            return try JSONDecoder().decode(Movie.self, from: JSONSerialization.data(withJSONObject:json))
+        }
+        let expected = "https://awsimgsrc.dmm.co.jp/pics_dig/mono/movie/118abf295/118abf295ps.jpg"
+        XCTAssertTrue(DetailPosterResolver.validatedSources(try movie("0")).contains(expected))
+        XCTAssertFalse(DetailPosterResolver.validatedSources(try movie("0", "ABF-296")).contains(expected))
+        for type in ["1", "2", "3", "uncensored", "western", "fc2"] {
+            XCTAssertFalse(DetailPosterResolver.validatedSources(try movie(type)).contains(expected))
+        }
+        // Real decoder failure checks, not a synthetic 'placeholder' hash.
+        XCTAssertNil(DetailPosterResolver.decode(data: Data("<html>now_printing</html>".utf8), sourceURL:expected, derive:true))
+        XCTAssertNil(DetailPosterResolver.decode(data: jpeg(147,200), sourceURL:expected, derive:true))
+    }
+    func testClickedSeedDoesNotRequireDetailMetadata() throws {
+        let json: [String: Any] = ["id":"seed", "type":"0", "number":"MEYD-575",
+            "cover_url":"https://tp.spfcas.com/covers/seed.jpg", "actor_names":["蓮実クレア"]]
+        let seed = try JSONDecoder().decode(Movie.self, from: JSONSerialization.data(withJSONObject:json))
+        XCTAssertNotNil(DetailPosterResolver.navigationSeed(seed, movieID:"seed"))
+        XCTAssertNil(DetailPosterResolver.navigationSeed(seed, movieID:"another"))
+        XCTAssertEqual(DetailPosterResolver.tenhowPaths(seed), ["/hasumi_kurea.html"])
+        let incomplete = try JSONDecoder().decode(Movie.self, from: Data("{\"id\":\"seed\",\"type\":\"0\",\"number\":\"MEYD-575\"}".utf8))
+        XCTAssertNil(DetailPosterResolver.navigationSeed(incomplete, movieID:"seed"))
+    }
     func testResolutionPreferenceAndDeterministicTies() {
         let crop = DetailPosterQuality(source: "crop", width: 700, height: 1000, originalPortrait: false)
         let near = DetailPosterQuality(source: "original", width: 672, height: 960, originalPortrait: true)

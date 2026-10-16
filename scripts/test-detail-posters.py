@@ -135,6 +135,7 @@ if not shutil.which('swiftc'):
     print('PASS static safety checks; actual Swift execution requires macOS CI')
 else:
     with tempfile.TemporaryDirectory() as td:
-        p=Path(td); (p/'main.swift').write_text(policy+'\n'+cache+'\n'+tests)
+        dependencies = '\n'.join((root/'AVDB/Services'/f).read_text() for f in ['JavRankingCore.swift','TenhowPoster.swift','TenhowActorLinks.swift'])
+        p=Path(td); (p/'main.swift').write_text(dependencies+'\n'+policy+'\n'+cache+'\n'+tests)
         subprocess.run(['swiftc','-parse-as-library',str(p/'main.swift'),'-o',str(p/'test')],check=True)
         subprocess.run([str(p/'test')],check=True,timeout=30)

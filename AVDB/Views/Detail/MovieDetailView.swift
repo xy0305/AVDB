@@ -14,16 +14,18 @@ struct MovieDetailView: View {
     @State private var play115 = false
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
+    private let posterSeed: Movie?
+    private var posterMovie: Movie? { posterSeed ?? vm.movie }
 
     private var posterRequestKey: String {
-        guard let movie = vm.movie else { return "pending#\(movieID)#\(posterAccountEpoch)" }
+        guard let movie = posterMovie else { return "pending#\(movieID)#\(posterAccountEpoch)" }
         return DetailPosterResolver.identity(movie: movie, account: APIClient.shared.token) + "#\(posterAccountEpoch)"
     }
 
     private var posterLayout: DetailPosterLayout<DetailPosterArtwork> {
         // Never paint a previous movie/account/source while a new task is scheduled.
         if let presentation = posterPresentation, presentation.key == posterRequestKey { return presentation.layout }
-        guard let movie = vm.movie else { return .resolving }
+        guard let movie = posterMovie else { return .resolving }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
             if movie.id == "neutral-wide" { return .landscape }
@@ -44,14 +46,24 @@ struct MovieDetailView: View {
     @Environment(\.availableLayoutSize) private var layoutSize
     @Environment(\.dismiss) private var dismiss
 
-    init(movieID: String) {
+    init(movieID: String, seed: Movie? = nil) {
         self.movieID = movieID
-        _vm = StateObject(wrappedValue: MovieDetailViewModel(movieID: movieID))
+        // A clicked list record with a complete poster identity can start image
+        // discovery immediately, independently of the detail/review requests.
+        // Incomplete records retain the existing metadata-first path.
+        let trusted = seed.flatMap { DetailPosterResolver.navigationSeed($0, movieID: movieID) }
+        posterSeed = trusted
+        let model = MovieDetailViewModel(movieID: movieID)
+        model.movie = trusted
+        _vm = StateObject(wrappedValue: model)
     }
+
+    init(movie: Movie) { self.init(movieID: movie.id, seed: movie) }
 
     #if DEBUG
     init(fixture: Movie) {
         movieID = fixture.id
+        posterSeed = nil
         let model = MovieDetailViewModel(movieID: fixture.id)
         model.movie = fixture
         _vm = StateObject(wrappedValue: model)
@@ -121,7 +133,7 @@ struct MovieDetailView: View {
         )) { Button("好", role: .cancel) { vm.errorMessage = nil } }
         message: { Text(vm.errorMessage ?? "") }
         .task(id: posterRequestKey) {
-            guard let movie = vm.movie else { return }
+            guard let movie = posterMovie else { return }
             let key = posterRequestKey
             let account = APIClient.shared.token
             let generation = UUID()

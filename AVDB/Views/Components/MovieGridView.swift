@@ -26,7 +26,7 @@ struct MovieGridView: View {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(viewModel.movies) { movie in
                     NavigationLink {
-                        MovieDetailView(movieID: movie.id)
+                        MovieDetailView(movie: movie)
                     } label: {
                         MovieCoverCard(movie: movie)
                     }

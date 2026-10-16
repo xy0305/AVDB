@@ -71,6 +71,11 @@ enum DetailPosterSelection {
                 if index == -1 || Task.isCancelled { break }
                 if index == -2 {
                     discovering = false
+                    let issued = Array(candidates.prefix(next))
+                    // The first two discovered entries are Tenhow / exact-ASIN
+                    // Amazon. At most two exact-record DMM entries follow; they
+                    // replace only unissued legacy slots, never those two entries.
+                    candidates = issued
                     for fresh in discovered where candidates.count < maxAttempts {
                         if !candidates.contains(fresh) { candidates.append(fresh) }
                     }
@@ -81,7 +86,7 @@ enum DetailPosterSelection {
                     active -= 1
                     if let value { values.append(value) }
                 }
-                while active < concurrency && next < candidates.count && ProcessInfo.processInfo.systemUptime < deadline {
+                while active < concurrency && next < candidates.count && (!discovering || next < 2) && ProcessInfo.processInfo.systemUptime < deadline {
                     enqueue(next); next += 1; active += 1
                 }
                 if active == 0 && !discovering { break }
@@ -139,8 +144,7 @@ enum DetailPosterPolicy {
         let p = url.path.lowercased()
         switch host {
         case "image.mgstage.com": return p.hasPrefix("/images/") && (p.contains("/pf_e_") || p.contains("/pf_o1_")) && p.hasSuffix(".jpg")
-        case "awsimgsrc.dmm.co.jp": return p.hasPrefix("/pics_dig/digital/video/") && p.hasSuffix("ps.jpg")
-        case "pics.dmm.co.jp": return p.hasPrefix("/digital/video/") && p.hasSuffix("ps.jpg")
+        case "awsimgsrc.dmm.co.jp", "pics.dmm.co.jp": return DMMPoster.allowedImage(url)
         default: return false
         }
     }

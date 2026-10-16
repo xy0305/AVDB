@@ -51,6 +51,14 @@ enum DetailPosterResolver {
     private static let amazonPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
     private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
 
+    static func navigationSeed(_ movie: Movie, movieID: String) -> Movie? {
+        guard movie.id == movieID, movie.type == "0",
+              TenhowPoster.number(movie.number ?? "") != nil,
+              !actorIdentities(movie).flatMap({ $0 }).filter({ !$0.isEmpty }).isEmpty,
+              !validatedSources(movie).isEmpty else { return nil }
+        return movie
+    }
+
     static func actorIdentities(_ movie: Movie) -> [[String]] {
         let structured = (movie.actors ?? []).map { actor in
             ([actor.name, actor.otherName, actor.keyword].compactMap { $0 }).flatMap {
@@ -85,18 +93,34 @@ enum DetailPosterResolver {
         return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors
     }
 
+    static func validatedSources(_ movie: Movie) -> [String] {
+        let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
+        let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
+        let rules = original ? [] : DetailPosterPolicy.candidates(number: movie.number)
+        // Exact official metadata is checked against the movie BEFORE any URL
+        // transform. Only one two-CDN pair, never a Cartesian candidate expansion.
+        let exact: [String] = original ? [] : ([movie.thumbURL, movie.coverURL].compactMap { $0 }.compactMap { source -> [String]? in
+            let values = DMMPoster.candidates(metadata: source, number: movie.number ?? "")
+            return values.isEmpty ? nil : values
+        }.first ?? [])
+        let validated = (exact + sources + rules).filter { source in
+            guard let url = URL(string: source), allowed(url), !url.path.contains("/small_covers/") else { return false }
+            return !DetailPosterPolicy.allowedPublicImage(url) || exact.contains(source) || rules.contains(source)
+        }
+        // Start a JavDB and MGS opportunity where available, not two new DMM
+        // variants that could consume every non-Tenhow/Amazon family slot.
+        let anchors = [validated.first { source in
+            guard let url = URL(string: source) else { return false }
+            return !DetailPosterPolicy.allowedPublicImage(url)
+        }, validated.first { URL(string: $0)?.host == "image.mgstage.com" }].compactMap { $0 }
+        return anchors + validated.filter { !anchors.contains($0) }
+    }
+
     static func initialLayout(movie: Movie, account: String?) -> DetailPosterLayout<DetailPosterArtwork> {
         let saved = cache.snapshot(key: identity(movie: movie, account: account))
         if case .resolving = saved {
-            let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
-            let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
-            let rules = original ? [] : DetailPosterPolicy.candidates(number: movie.number)
             // Definite unsupported/no eligible candidates: retain legacy immediately.
-            if !(sources + rules).contains(where: { source in
-                guard let url = URL(string: source) else { return false }
-                return allowed(url) && !url.path.contains("/small_covers/")
-                    && (!DetailPosterPolicy.allowedPublicImage(url) || rules.contains(source))
-            }) && tenhowPaths(movie).isEmpty { return .landscape }
+            if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty { return .landscape }
         }
         return saved
     }
@@ -105,14 +129,7 @@ enum DetailPosterResolver {
         let key = identity(movie: movie, account: account)
         return await cache.value(key: key) { () async -> DetailPosterArtwork? in
             let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
-            let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
-            let rules = original ? [] : DetailPosterPolicy.candidates(number: movie.number)
-            let validated = (sources + rules).filter { source in
-                guard let url = URL(string: source), allowed(url), !url.path.contains("/small_covers/") else { return false }
-                // Official public paths must be exact code-derived candidates;
-                // metadata cannot smuggle an unrelated provider image into selection.
-                return !DetailPosterPolicy.allowedPublicImage(url) || rules.contains(source)
-            }
+            let validated = validatedSources(movie)
             let paths = tenhowPaths(movie)
             let discover: (@Sendable (TimeInterval) async -> [String])?
             if paths.isEmpty {
@@ -138,6 +155,7 @@ enum DetailPosterResolver {
     private static func discoverTenhow(paths: [String], number: String, namespace: String, timeout: TimeInterval) async -> [String] {
         let deadline = ProcessInfo.processInfo.systemUptime + min(timeout, 4)
         var matches = Set<String>()
+        var official = Set<String>()
         for path in paths.prefix(2) {
             guard !Task.isCancelled, TenhowPoster.allowedPage(path) else { return [] }
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
@@ -145,7 +163,9 @@ enum DetailPosterResolver {
             let html = await tenhowPages.value(key: namespace + path) {
                 await tenhowHTML(path: path, timeout: min(2, remaining))
             }
-            if let html, let images = try? TenhowPoster.images(html: html, number: number) { matches.formUnion(images) }
+            if let html, let match = try? TenhowPoster.match(html: html, number: number) {
+                matches.formUnion(match.images); official.formUnion(match.official)
+            }
         }
         guard !Task.isCancelled, matches.count == 1, let tenhow = matches.first else { return [] }
         var result = [tenhow]
@@ -158,6 +178,9 @@ enum DetailPosterResolver {
             }
             if !Task.isCancelled, let html, let images = try? AmazonPoster.images(html: html, asin: asin) { result += images.prefix(1) }
         }
+        // Tenhow and Amazon always lead. Do not enumerate alternate CIDs, pl
+        // jackets or classifications. Ambiguous cross-page products add nothing.
+        if official.count <= 2 { result += official.sorted() }
         return Task.isCancelled ? [] : result
     }
 

@@ -598,7 +598,7 @@ private struct RecommendCarousel: View {
                     HStack(spacing: 10) {
                         ForEach(movies) { movie in
                             NavigationLink {
-                                MovieDetailView(movieID: movie.id)
+                                MovieDetailView(movie: movie)
                             } label: {
                                 RecommendBannerCard(movie: movie)
                                     .frame(width: cardWidth, height: geo.size.height)

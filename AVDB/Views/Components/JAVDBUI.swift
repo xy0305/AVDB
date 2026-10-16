@@ -533,7 +533,7 @@ struct MoviePosterGrid: View {
                 // then misses or opens the wrong movie. Keep one link outside
                 // the cell and clip every cell to its own card.
                 NavigationLink {
-                    posterDestination(movie.id)
+                    posterDestination(movie)
                 } label: {
                     MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
                 }
@@ -562,7 +562,8 @@ struct MoviePosterGrid: View {
     }
 
     @ViewBuilder
-    private func posterDestination(_ movieID: String) -> some View {
+    private func posterDestination(_ movie: Movie) -> some View {
+        let movieID = movie.id
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
             Text("Neutral detail \(movieID)")
@@ -570,10 +571,10 @@ struct MoviePosterGrid: View {
                 .navigationTitle("Neutral detail")
                 .toolbar(.visible, for: .navigationBar)
         } else {
-            MovieDetailView(movieID: movieID)
+            MovieDetailView(movie: movie)
         }
         #else
-        MovieDetailView(movieID: movieID)
+        MovieDetailView(movie: movie)
         #endif
     }
 }
