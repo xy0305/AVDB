@@ -10,6 +10,7 @@ on:
       - "AVDB.xcodeproj/**"
       - "UITests/**"
       - "scripts/missav-fixtures/**"
+      - "scripts/tenhow-fixtures/**"
       - ".github/workflows/build-ipa.yml"
       - "scripts/test-*.py"
       - "scripts/GestureRegression.swift"
@@ -46,6 +47,7 @@ jobs:
           python3 scripts/test-catalog-lifecycle.py
           python3 scripts/test-front-posters.py
           python3 scripts/test-detail-posters.py
+          python3 scripts/test-tenhow-posters.py
           python3 scripts/test-native-rankings.py
           python3 scripts/test-auth-persistence.py
           python3 scripts/test-external-library.py

@@ -22,7 +22,24 @@ private final class PosterRedirectGuard: NSObject, URLSessionTaskDelegate {
                     completionHandler: @escaping (URLRequest?) -> Void) {
         guard let target = request.url, target.scheme == "https", target.host?.lowercased() == host,
               target.path == path, target.user == nil, target.password == nil, target.port == nil,
-              target.query == nil, target.fragment == nil else {
+              target.query == nil, target.fragment == nil,
+              (host != "www.tenhow.net" || TenhowPoster.permitsRedirect(from: URL(string: "https://" + host + path)!, to: target)) else {
+            completionHandler(nil); return
+        }
+        completionHandler(request)
+    }
+}
+
+private final class AmazonPosterRedirectGuard: NSObject, URLSessionTaskDelegate {
+    let asin: String
+    private var redirects = 0
+    init(asin: String) { self.asin = asin }
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        redirects += 1
+        guard redirects <= 2, let url = request.url, AmazonPoster.allowedPage(url, asin: asin) else {
             completionHandler(nil); return
         }
         completionHandler(request)
@@ -31,6 +48,24 @@ private final class PosterRedirectGuard: NSObject, URLSessionTaskDelegate {
 
 enum DetailPosterResolver {
     private static let cache = DetailPosterCache<DetailPosterArtwork>()
+    private static let amazonPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
+    private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
+
+    static func actorIdentities(_ movie: Movie) -> [[String]] {
+        let structured = (movie.actors ?? []).map { actor in
+            ([actor.name, actor.otherName, actor.keyword].compactMap { $0 }).flatMap {
+                $0.components(separatedBy: CharacterSet(charactersIn: ",，、;/；|\n"))
+            }
+        }
+        // actor_names is the API's original identity fallback, never UI displayName.
+        return structured.isEmpty ? (movie.actorNames ?? []).map { [$0] } : structured
+    }
+
+    static func tenhowPaths(_ movie: Movie) -> [String] {
+        guard !FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number),
+              TenhowPoster.number(movie.number ?? "") != nil else { return [] }
+        return TenhowPoster.pages(identities: actorIdentities(movie))
+    }
 
     #if DEBUG
     private static let fixtureCache = DetailPosterCache<DetailPosterArtwork>()
@@ -46,7 +81,8 @@ enum DetailPosterResolver {
     static func identity(movie: Movie, account: String?) -> String {
         // Opaque memory-only account namespace; never log credentials.
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "")
+        let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors
     }
 
     static func initialLayout(movie: Movie, account: String?) -> DetailPosterLayout<DetailPosterArtwork> {
@@ -60,7 +96,7 @@ enum DetailPosterResolver {
                 guard let url = URL(string: source) else { return false }
                 return allowed(url) && !url.path.contains("/small_covers/")
                     && (!DetailPosterPolicy.allowedPublicImage(url) || rules.contains(source))
-            }) { return .landscape }
+            }) && tenhowPaths(movie).isEmpty { return .landscape }
         }
         return saved
     }
@@ -77,7 +113,11 @@ enum DetailPosterResolver {
                 // metadata cannot smuggle an unrelated provider image into selection.
                 return !DetailPosterPolicy.allowedPublicImage(url) || rules.contains(source)
             }
-            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated) { source, timeout in
+            let paths = tenhowPaths(movie)
+            let discover: (@Sendable (TimeInterval) async -> [String])? = paths.isEmpty ? nil : { timeout in
+                await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
+            }
+            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover) { source, timeout in
                 guard let url = URL(string: source) else { return nil }
                 return await download(url: url, timeout: timeout, derive: !original)
             }
@@ -88,6 +128,82 @@ enum DetailPosterResolver {
             // independently downsampled source cache, is the only warm fast path.
             return await artwork(image: selected.image, source: winner.source, derive: false)
         }
+    }
+
+    private static func discoverTenhow(paths: [String], number: String, namespace: String, timeout: TimeInterval) async -> [String] {
+        let deadline = ProcessInfo.processInfo.systemUptime + min(timeout, 4)
+        var matches = Set<String>()
+        for path in paths.prefix(2) {
+            guard !Task.isCancelled, TenhowPoster.allowedPage(path) else { return [] }
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            guard remaining > 0 else { break }
+            let html = await tenhowPages.value(key: namespace + path) {
+                await tenhowHTML(path: path, timeout: min(2, remaining))
+            }
+            if let html, let images = try? TenhowPoster.images(html: html, number: number) { matches.formUnion(images) }
+        }
+        guard !Task.isCancelled, matches.count == 1, let tenhow = matches.first else { return [] }
+        var result = [tenhow]
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if remaining > 0.1, let url = URL(string: tenhow), let asin = AmazonPoster.asin(url) {
+            // Exactly one record-verified ASIN; no title/keyword search, no year
+            // guess. Both sources receive reserved slots, including 2021–2024.
+            let html = await amazonPages.value(key: namespace + "#amazon#" + asin) {
+                await amazonHTML(asin: asin, timeout: min(1.5, remaining))
+            }
+            if !Task.isCancelled, let html, let images = try? AmazonPoster.images(html: html, asin: asin) { result += images.prefix(1) }
+        }
+        return Task.isCancelled ? [] : result
+    }
+
+    private static func amazonHTML(asin: String, timeout: TimeInterval) async -> String? {
+        guard let url = URL(string: "https://www.amazon.co.jp/dp/" + asin), AmazonPoster.allowedPage(url, asin: asin) else { return nil }
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil; config.httpShouldSetCookies = false
+        config.urlCredentialStorage = nil; config.urlCache = nil
+        config.timeoutIntervalForRequest = timeout; config.timeoutIntervalForResource = timeout
+        let session = URLSession(configuration: config, delegate: AmazonPosterRedirectGuard(asin: asin), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        do {
+            var request = URLRequest(url: url); request.timeoutInterval = timeout
+            request.setValue("text/html", forHTTPHeaderField: "Accept")
+            let (bytes, response) = try await session.bytes(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let final = response.url, AmazonPoster.allowedPage(final, asin: asin),
+                  response.expectedContentLength <= 2 * 1024 * 1024 else { return nil }
+            var data = Data()
+            for try await byte in bytes {
+                try Task.checkCancellation()
+                guard data.count < 2 * 1024 * 1024 else { return nil }
+                data.append(byte)
+            }
+            return String(data: data, encoding: .utf8)
+        } catch { return nil }
+    }
+
+    private static func tenhowHTML(path: String, timeout: TimeInterval) async -> String? {
+        guard TenhowPoster.allowedPage(path), timeout > 0,
+              let url = URL(string: "https://www.tenhow.net" + path) else { return nil }
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil; config.httpShouldSetCookies = false
+        config.urlCredentialStorage = nil; config.urlCache = nil
+        config.timeoutIntervalForRequest = timeout; config.timeoutIntervalForResource = timeout
+        let session = URLSession(configuration: config, delegate: PosterRedirectGuard(url: url), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        do {
+            var request = URLRequest(url: url); request.timeoutInterval = timeout
+            request.setValue("text/html", forHTTPHeaderField: "Accept")
+            let (bytes, response) = try await session.bytes(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  response.expectedContentLength <= 768 * 1024 else { return nil }
+            var data = Data()
+            for try await byte in bytes {
+                try Task.checkCancellation()
+                guard data.count < 768 * 1024 else { return nil }
+                data.append(byte)
+            }
+            return String(data: data, encoding: .utf8)
+        } catch { return nil }
     }
 
     private static func allowed(_ url: URL) -> Bool {

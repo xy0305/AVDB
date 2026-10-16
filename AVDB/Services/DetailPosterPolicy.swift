@@ -31,38 +31,60 @@ enum DetailPosterSelection {
     static let concurrency = 2
     static let totalBudget: TimeInterval = 12
     static func collect<Value: Sendable>(sources: [String], budget: TimeInterval = totalBudget,
+        discover: (@Sendable (TimeInterval) async -> [String])? = nil,
         operation: @escaping @Sendable (String, TimeInterval) async -> Value?) async -> [Value] {
         guard !Task.isCancelled, budget > 0 else { return [] }
         var seen = Set<String>()
-        let candidates = Array(sources.filter { seen.insert($0).inserted }.prefix(maxAttempts))
-        guard !candidates.isEmpty else { return [] }
+        let originals = Array(sources.filter { seen.insert($0).inserted }.prefix(maxAttempts))
+        // Reserve two attempts for Tenhow and optional exact-ASIN Amazon.
+        // These are opportunities, never source score bonuses. Misses release
+        // their slots to old sources; no seventh image attempt is introduced.
+        var candidates = Array(originals.prefix(discover == nil ? maxAttempts : maxAttempts - 2))
+        guard !candidates.isEmpty || discover != nil else { return [] }
         let deadline = ProcessInfo.processInfo.systemUptime + budget
-        return await withTaskGroup(of: (Int, Value?).self) { group in
+        return await withTaskGroup(of: (Int, Value?, [String]).self) { group in
             group.addTask {
                 try? await Task.sleep(nanoseconds: UInt64(budget * 1_000_000_000))
-                return (-1, nil)
+                return (-1, nil, [])
+            }
+            var discovering = discover != nil
+            if let discover {
+                group.addTask { (-2, nil, await discover(min(4, budget))) }
             }
             var next = 0
+            var active = 0
             func enqueue(_ index: Int) {
                 let source = candidates[index]
                 group.addTask {
                     let remaining = deadline - ProcessInfo.processInfo.systemUptime
-                    guard remaining > 0, !Task.isCancelled else { return (index, nil) }
+                    guard remaining > 0, !Task.isCancelled else { return (index, nil, []) }
                     let value = await operation(source, min(5, remaining))
-                    guard !Task.isCancelled, ProcessInfo.processInfo.systemUptime <= deadline else { return (index, nil) }
-                    return (index, value)
+                    guard !Task.isCancelled, ProcessInfo.processInfo.systemUptime <= deadline else { return (index, nil, []) }
+                    return (index, value, [])
                 }
             }
-            for _ in 0..<min(concurrency, candidates.count) { enqueue(next); next += 1 }
-            var completed = 0
+            while active < concurrency && next < candidates.count {
+                enqueue(next); next += 1; active += 1
+            }
             var values: [Value] = []
-            while let (index, value) = await group.next() {
-                if index < 0 || Task.isCancelled { break }
-                completed += 1
-                if let value { values.append(value) }
-                if next < candidates.count, ProcessInfo.processInfo.systemUptime < deadline {
-                    enqueue(next); next += 1
-                } else if completed == candidates.count { break }
+            while let (index, value, discovered) = await group.next() {
+                if index == -1 || Task.isCancelled { break }
+                if index == -2 {
+                    discovering = false
+                    for fresh in discovered where candidates.count < maxAttempts {
+                        if !candidates.contains(fresh) { candidates.append(fresh) }
+                    }
+                    for fallback in originals where candidates.count < maxAttempts {
+                        if !candidates.contains(fallback) { candidates.append(fallback) }
+                    }
+                } else {
+                    active -= 1
+                    if let value { values.append(value) }
+                }
+                while active < concurrency && next < candidates.count && ProcessInfo.processInfo.systemUptime < deadline {
+                    enqueue(next); next += 1; active += 1
+                }
+                if active == 0 && !discovering { break }
             }
             group.cancelAll()
             return Task.isCancelled ? [] : values

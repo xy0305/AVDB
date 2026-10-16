@@ -31,6 +31,28 @@ final class DetailPosterQualityTests: XCTestCase {
         XCTAssertEqual(large.image.cgImage?.height, 1800)
         XCTAssertEqual(large.quality.score, 1800)
     }
+    func testTenhowOriginalIdentityAndOriginalCategoryExclusion() throws {
+        func movie(_ type: String, _ number: String = "MEYD-575") throws -> Movie {
+            let json: [String: Any] = ["id":"tenhow", "type":type, "number":number,
+                "actors":[["id":"actor", "name":"蓮実クレア", "other_name":"蓮見クレア", "name_zht":"not an identity"]]]
+            return try JSONDecoder().decode(Movie.self, from: JSONSerialization.data(withJSONObject:json))
+        }
+        let censored = try movie("0")
+        XCTAssertEqual(DetailPosterResolver.tenhowPaths(censored), ["/hasumi_kurea.html"])
+        for actor in [["id":"actor", "keyword":"蓮実クレア", "name_zht":"JULIA"],
+                      ["id":"actor", "other_name":"蓮見クレア", "name_zht":"JULIA"]] {
+            let data = try JSONSerialization.data(withJSONObject:["id":"raw", "type":"0", "number":"MEYD-575", "actors":[actor]])
+            XCTAssertEqual(DetailPosterResolver.tenhowPaths(try JSONDecoder().decode(Movie.self, from:data)), ["/hasumi_kurea.html"])
+        }
+        let rawNames = try JSONSerialization.data(withJSONObject:["id":"raw", "type":"0", "number":"MEYD-575", "actor_names":["蓮実クレア"]])
+        XCTAssertEqual(DetailPosterResolver.tenhowPaths(try JSONDecoder().decode(Movie.self, from:rawNames)), ["/hasumi_kurea.html"])
+        for type in ["1", "2", "3", "uncensored", "western", "fc2"] {
+            XCTAssertTrue(DetailPosterResolver.tenhowPaths(try movie(type)).isEmpty)
+        }
+        XCTAssertTrue(DetailPosterResolver.tenhowPaths(try movie("0", "FC2-PPV-1234567")).isEmpty)
+        XCTAssertNotEqual(DetailPosterResolver.identity(movie:censored, account:"a"), DetailPosterResolver.identity(movie:censored, account:"b"))
+        XCTAssertEqual(DetailPosterResolver.decode(data:jpeg(1055,1500),sourceURL:"https://www.tenhow.net/images/B084SXDZYQ.jpg",derive:true)?.quality.score,1500)
+    }
     func testResolutionPreferenceAndDeterministicTies() {
         let crop = DetailPosterQuality(source: "crop", width: 700, height: 1000, originalPortrait: false)
         let near = DetailPosterQuality(source: "original", width: 672, height: 960, originalPortrait: true)

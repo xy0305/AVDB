@@ -359,6 +359,8 @@ public struct Actor: Decodable, Identifiable, Hashable {
     public let id: String
     public let name: String?
     public let otherName: String?
+    /// Original API search identity; never a localized display label.
+    public let keyword: String?
     public let avatarURL: String?
     public let coverURL: String?
     public let birthday: String?
@@ -387,7 +389,7 @@ public struct Actor: Decodable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, age, height, cup, hobby, gender, type, birthday, cons
+        case id, name, keyword, age, height, cup, hobby, gender, type, birthday, cons
         case otherName = "other_name"
         case avatarURL = "avatar_url"
         case coverURL = "cover_url"
@@ -405,6 +407,7 @@ public struct Actor: Decodable, Identifiable, Hashable {
         id = JSONFlex.string(c, .id) ?? ""
         name = try? c.decode(String.self, forKey: .name)
         otherName = try? c.decode(String.self, forKey: .otherName)
+        keyword = try? c.decode(String.self, forKey: .keyword)
         avatarURL = try? c.decode(String.self, forKey: .avatarURL)
         coverURL = try? c.decode(String.self, forKey: .coverURL)
         birthday = JSONFlex.string(c, .birthday)

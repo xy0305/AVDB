@@ -60,6 +60,8 @@
 		A115C11E7A7B115C11E7A008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A108 /* Assets.xcassets */; };
 		A115C11E7A7B115C11E7A009 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = A115C11E7A7B115C11E7A109 /* KSPlayer */; };
 		A115C11E7A7B115C11E7A111 /* UserCollectionsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A115C11E7A7B115C11E7A110 /* UserCollectionsViews.swift */; };
+		D1860000000000000000000B /* TenhowPoster.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18600000000000000000001 /* TenhowPoster.swift */; };
+		D1860000000000000000000C /* TenhowActorLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18600000000000000000002 /* TenhowActorLinks.swift */; };
 		D1830000000000000000000B /* DetailPosterPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18300000000000000000001 /* DetailPosterPolicy.swift */; };
 		D1830000000000000000000C /* DetailPosterCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18300000000000000000002 /* DetailPosterCache.swift */; };
 		D1830000000000000000000D /* DetailPosterResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18300000000000000000003 /* DetailPosterResolver.swift */; };
@@ -119,6 +121,8 @@
 		A115C11E7A7B115C11E7A106 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A107 /* Pan115PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pan115PlayerView.swift; sourceTree = "<group>"; };
 		A115C11E7A7B115C11E7A108 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D18600000000000000000001 /* TenhowPoster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TenhowPoster.swift; sourceTree = "<group>"; };
+		D18600000000000000000002 /* TenhowActorLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TenhowActorLinks.swift; sourceTree = "<group>"; };
 		D18300000000000000000001 /* DetailPosterPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPosterPolicy.swift; sourceTree = "<group>"; };
 		D18300000000000000000002 /* DetailPosterCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPosterCache.swift; sourceTree = "<group>"; };
 		D18300000000000000000003 /* DetailPosterResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPosterResolver.swift; sourceTree = "<group>"; };
@@ -188,6 +192,8 @@
 				B17400000000000000000001 /* MissAVSource.swift */,
 				B17600000000000000000001 /* MissAVMetadata.swift */,
 				B17900000000000000000001 /* JAVLibrarySource.swift */,
+				D18600000000000000000001 /* TenhowPoster.swift */,
+				D18600000000000000000002 /* TenhowActorLinks.swift */,
 				D18300000000000000000001 /* DetailPosterPolicy.swift */,
 				D18300000000000000000002 /* DetailPosterCache.swift */,
 				D18300000000000000000003 /* DetailPosterResolver.swift */,
@@ -434,6 +440,8 @@
 				66B329B8B504D1A4ABD66D6A /* User.swift in Sources */,
 				0B917EE3D4B4BFD8A9400C51 /* APIClient.swift in Sources */,
 				26F8C24EF56C128165FFC52A /* JavDBSignature.swift in Sources */,
+				D1860000000000000000000B /* TenhowPoster.swift in Sources */,
+				D1860000000000000000000C /* TenhowActorLinks.swift in Sources */,
 				D1830000000000000000000B /* DetailPosterPolicy.swift in Sources */,
 				D1830000000000000000000C /* DetailPosterCache.swift in Sources */,
 				D1830000000000000000000D /* DetailPosterResolver.swift in Sources */,
@@ -533,7 +541,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 185;
+				CURRENT_PROJECT_VERSION = 186;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -556,7 +564,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 185;
+				CURRENT_PROJECT_VERSION = 186;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
