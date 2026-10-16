@@ -103,7 +103,7 @@ enum DetailPosterResolver {
 
     static func resolve(movie: Movie, account: String?) async -> DetailPosterArtwork? {
         let key = identity(movie: movie, account: account)
-        return await cache.value(key: key) {
+        return await cache.value(key: key) { () async -> DetailPosterArtwork? in
             let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
             let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
             let rules = original ? [] : DetailPosterPolicy.candidates(number: movie.number)
@@ -114,8 +114,13 @@ enum DetailPosterResolver {
                 return !DetailPosterPolicy.allowedPublicImage(url) || rules.contains(source)
             }
             let paths = tenhowPaths(movie)
-            let discover: (@Sendable (TimeInterval) async -> [String])? = paths.isEmpty ? nil : { timeout in
-                await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
+            let discover: (@Sendable (TimeInterval) async -> [String])?
+            if paths.isEmpty {
+                discover = nil
+            } else {
+                discover = { @Sendable (timeout: TimeInterval) async -> [String] in
+                    await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
+                }
             }
             let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover) { source, timeout in
                 guard let url = URL(string: source) else { return nil }
