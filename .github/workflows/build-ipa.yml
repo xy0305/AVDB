@@ -41,7 +41,7 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
-      - name: Check LUT timeout and sheet lifecycle regressions
+      - name: Check poster identity, latency and shared regressions
         run: |
           set -euo pipefail
           python3 scripts/test-catalog-lifecycle.py
