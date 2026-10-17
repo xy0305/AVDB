@@ -294,9 +294,9 @@ import UIKit
 // Independent presentation preferences: clearing a media request never clears style.
 // Reference: KSPlayer SubtitleModel.Size/textColor; no upstream code copied.
 private enum SubtitleStyleDefaults {
-    static let size = 22.0
+    static let size = 18.0
     static let x = 0.5
-    static let y = 0.85
+    static let y = 1.0
 }
 
 struct SubtitleAppearanceControls: View {
@@ -325,7 +325,7 @@ struct SubtitleAppearanceControls: View {
             Button("恢复默认字号与位置") {
                 points = SubtitleStyleDefaults.size; x = SubtitleStyleDefaults.x; y = SubtitleStyleDefaults.y
             }.accessibilityIdentifier("subtitle.appearance.reset")
-            Text("白字与轻微黑色描影，无背景框。14–36 pt 随系统辅助字号适度放大；位置相对播放器安全区域保存。调整模式暂时隔离播放手势；没有对白时仅显示位置预览。")
+            Text("底部居中、正常字重白字与一像素细黑描边，无背景框。14–36 pt 随系统辅助字号适度放大；位置相对播放器安全区域保存。调整模式暂时隔离播放手势；没有对白时仅显示位置预览。")
                 .font(.footnote)
         }
     }
@@ -346,6 +346,7 @@ struct SubtitlePresentationOverlay: View {
     @AppStorage("subtitle.fontPoints") private var points = SubtitleStyleDefaults.size
     @AppStorage("subtitle.positionX") private var x = SubtitleStyleDefaults.x
     @AppStorage("subtitle.positionY") private var y = SubtitleStyleDefaults.y
+    @Environment(\.displayScale) private var displayScale
     @ScaledMetric(relativeTo: .body) private var dynamicScale = 1.0
     @GestureState private var translation = CGSize.zero
     @State private var textSize = CGSize(width: 1, height: 48)
@@ -357,12 +358,13 @@ struct SubtitlePresentationOverlay: View {
             // Reserve controls whether visible or hidden: no caption jumping on tap.
             let left = safeArea.leading + 16
             let top = safeArea.top + 80
+            let bottom = geo.size.width > geo.size.height ? max(24, safeArea.bottom + 12) : safeArea.bottom + 116
             let available = CGSize(width: max(1, geo.size.width - left - safeArea.trailing - 16),
-                                   height: max(1, geo.size.height - top - safeArea.bottom - 116))
+                                   height: max(1, geo.size.height - top - bottom))
             let height = min(available.height, max(1, textSize.height))
             let renderedText = text.isEmpty ? "字幕位置预览\n拖动此处调整" : text
-            let fontSize: CGFloat = min(48, max(14, points.isFinite ? points : 22) * min(1.35, dynamicScale))
-            let measured = (renderedText as NSString).boundingRect(with: CGSize(width: max(1, available.width * 0.86 - 20), height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: UIFont.systemFont(ofSize: fontSize, weight: .medium)], context: nil)
+            let fontSize: CGFloat = min(48, max(14, points.isFinite ? points : 18) * min(1.35, dynamicScale))
+            let measured = (renderedText as NSString).boundingRect(with: CGSize(width: max(1, available.width * 0.86 - 20), height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: UIFont.systemFont(ofSize: fontSize, weight: .regular)], context: nil)
             let width = min(available.width, max(40, ceil(measured.width) + 20))
             let travelX = max(0, available.width - width)
             let travelY = max(0, available.height - height)
@@ -376,13 +378,13 @@ struct SubtitlePresentationOverlay: View {
                 if editing || !text.isEmpty {
                     ScrollView(.vertical) {
                         Text(renderedText)
-                            .font(.system(size: fontSize, weight: .medium))
+                            .font(.system(size: fontSize, weight: .regular))
                             .foregroundStyle(.white).multilineTextAlignment(.center)
-                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: 1, y: 0)
-                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: -1, y: 0)
-                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: 0, y: 1)
-                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: 0, y: -1)
-                            .padding(.horizontal, 10).padding(.vertical, 7)
+                            .shadow(color: .black, radius: 0, x: 1 / displayScale, y: 0)
+                            .shadow(color: .black, radius: 0, x: -1 / displayScale, y: 0)
+                            .shadow(color: .black, radius: 0, x: 0, y: 1 / displayScale)
+                            .shadow(color: .black, radius: 0, x: 0, y: -1 / displayScale)
+                            .padding(.horizontal, 10).padding(.vertical, 2)
                             .frame(width: width)
                             .fixedSize(horizontal: false, vertical: true)
                             .background(GeometryReader { proxy in

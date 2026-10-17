@@ -186,7 +186,7 @@ final class PosterNavigationTests: XCTestCase {
         reveal(reset); reset.tap()
         let increase = app.buttons["增大字号"]
         reveal(increase); increase.tap()
-        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 23 pt")
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 19 pt")
         let edit = app.buttons["subtitle.position.edit"]
         reveal(edit); edit.tap()
         let caption = app.staticTexts["subtitle.rendered"]
@@ -201,10 +201,12 @@ final class PosterNavigationTests: XCTestCase {
         app.buttons["subtitle.position.done"].tap()
         XCTAssertEqual(play.label, "暂停", "Caption drag must not pause/seek via player recognizers")
         XCTAssertFalse(app.otherElements["player.seek.preview"].exists)
+        app.terminate(); app.launch()
+        XCTAssertTrue(entry.waitForExistence(timeout: 10))
         entry.tap(); reveal(app.staticTexts["subtitle.font.value"])
-        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 23 pt")
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 19 pt", "User style persists across application relaunch")
         reveal(reset); reset.tap()
-        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 22 pt")
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 18 pt")
         app.buttons["完成"].tap()
     }
 

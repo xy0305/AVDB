@@ -13,7 +13,14 @@ assert 'currentPlaybackTime' in player and 'OnlineSubtitleParser.display' in pla
 assert 'onlineSubtitles.clear()' in player
 assert 'publicSubtitleQuery: movie.displayNumber' in (root/'AVDB/Views/Player/Pan115PlayerView.swift').read_text()
 assert 'subtitle.search' in source and 'subtitle.disable' in source
-print('PASS subtitle static privacy/wiring contracts (not native runtime claims)')
+caption = source.split('Text(renderedText)')[1].split('.scrollDisabled')[0]
+assert '.foregroundStyle(.white)' in caption and '.shadow(color: .black' in caption
+assert 'RoundedRectangle' not in caption and '.black.opacity(0.65)' not in caption
+assert '@AppStorage("subtitle.fontPoints")' in source and '@AppStorage("subtitle.positionX")' in source
+assert 'in: 14...36' in source and 'subtitle.appearance.reset' in source
+assert '.allowsHitTesting(editing)' in source and '.highPriorityGesture(DragGesture' in source
+assert 'subtitle.position.edit' in source and 'subtitle.position.done' in source
+print('PASS subtitle static privacy/wiring and no-background presentation contracts (not native runtime claims)')
 if platform.system()=='Darwin':
  with tempfile.TemporaryDirectory() as d:
   binary=str(Path(d)/'subtitle-tests')

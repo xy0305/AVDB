@@ -41,6 +41,7 @@ struct ContentView: View {
         if ProcessInfo.processInfo.arguments.contains("--subtitle-controls-fixture"),
            let url = Bundle.main.url(forResource: "neutral-subtitle", withExtension: "mp4") {
             KSChromePlayer(url: url, title: "中性播放器测试", subtitle: "原文件 / 原画", managesOrientation: false, onSelectSource: {})
+                .onAppear { OrientationLock.set(.all) }
         } else if ProcessInfo.processInfo.arguments.contains("--online-subtitle-fixture") {
             OnlineSubtitleFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
