@@ -207,7 +207,7 @@ final class PosterNavigationTests: XCTestCase {
         let play = app.buttons["player.play.toggle"]
         XCTAssertEqual(play.label, "暂停", "Opening/dismissing subtitles must not pause playback")
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "193-neutral-player-white-source-caption"; shot.lifetime = .keepAlways; add(shot)
+        shot.name = "194-neutral-player-white-source-caption"; shot.lifetime = .keepAlways; add(shot)
         entry.tap()
         func reveal(_ element: XCUIElement) {
             for _ in 0..<8 { if element.isHittable { return }; scrollSubtitleForm(app) }
@@ -228,7 +228,7 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertLessThan(after.midY, before.midY - 5)
         XCTAssertTrue(app.windows.firstMatch.frame.contains(after), "Caption must clamp within visible bounds")
         let edited = XCTAttachment(screenshot: app.screenshot())
-        edited.name = "193-neutral-position-edit"; edited.lifetime = .keepAlways; add(edited)
+        edited.name = "194-neutral-position-edit"; edited.lifetime = .keepAlways; add(edited)
         app.buttons["subtitle.position.done"].tap()
         XCTAssertEqual(play.label, "暂停", "Caption drag must not pause/seek via player recognizers")
         XCTAssertFalse(app.otherElements["player.seek.preview"].exists)
@@ -270,7 +270,7 @@ final class PosterNavigationTests: XCTestCase {
         while app.windows.firstMatch.frame.width > app.windows.firstMatch.frame.height && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.2)) }
         XCTAssertTrue(app.windows.firstMatch.frame.contains(caption.frame), app.debugDescription)
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "193-neutral-no-cue-portrait-clamp"; shot.lifetime = .keepAlways; add(shot)
+        shot.name = "194-neutral-no-cue-portrait-clamp"; shot.lifetime = .keepAlways; add(shot)
         app.buttons["subtitle.position.reset"].tap()
         app.buttons["subtitle.position.done"].tap()
         XCTAssertFalse(caption.exists, "No synthetic dialogue in normal playback")

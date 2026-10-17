@@ -316,7 +316,7 @@ struct KSChromePlayer: View {
                     showChrome = true
                     scheduleHide()
                 }
-            }.zIndex(editingSubtitlePosition ? 30 : 5)
+            }.zIndex(editingSubtitlePosition ? 30 : 20) // Captions remain white above the chrome scrim; normal mode is noninteractive.
             if showChrome {
                 chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
                     .padding(.top, safeArea.top)

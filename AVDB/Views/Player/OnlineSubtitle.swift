@@ -358,7 +358,7 @@ struct SubtitlePresentationOverlay: View {
             // Reserve controls whether visible or hidden: no caption jumping on tap.
             let left = safeArea.leading + 16
             let top = safeArea.top + 80
-            let bottom = geo.size.width > geo.size.height ? max(24, safeArea.bottom + 12) : safeArea.bottom + 116
+            let bottom = safeArea.bottom + 116 // Keep captions above progress/source controls in both orientations.
             let available = CGSize(width: max(1, geo.size.width - left - safeArea.trailing - 16),
                                    height: max(1, geo.size.height - top - bottom))
             let height = min(available.height, max(1, textSize.height))
