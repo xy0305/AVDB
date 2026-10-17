@@ -119,7 +119,7 @@ final class PosterNavigationTests: XCTestCase {
             XCTAssertFalse(app.descendants(matching: .any)["legacy-landscape-header"].firstMatch.exists)
             if title.exists { break }
         }
-        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertTrue(title.waitForExistence(timeout: 30))
         XCTAssertEqual(app.buttons["portrait-hero-play"].frame.minY, beforeY, accuracy: 1)
         let finalShot = XCTAttachment(screenshot: app.screenshot())
         finalShot.name = "184-neutral-final-single-winner"

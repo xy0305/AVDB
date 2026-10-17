@@ -143,7 +143,7 @@ struct MovieDetailView: View {
             if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
                 art = await DetailPosterResolver.fixtureResolve(movie: movie, account: account) {
                     if ProcessInfo.processInfo.arguments.contains("--delayed-detail-poster") {
-                        do { try await Task.sleep(nanoseconds: 6_000_000_000) } catch { return nil }
+                        do { try await Task.sleep(nanoseconds: 20_000_000_000) } catch { return nil }
                     }
                     return Self.neutralHeroArtwork(wide: false)
                 }
@@ -349,6 +349,7 @@ struct MovieDetailView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity).frame(minHeight: 50)
                     .modifier(DetailActionGlass(prominent: true))
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("portrait-hero-play")
@@ -376,6 +377,7 @@ struct MovieDetailView: View {
             .padding(.horizontal, 10).padding(.vertical, 8)
             .frame(maxWidth: .infinity).frame(minHeight: 44)
             .modifier(DetailActionGlass())
+            .contentShape(Capsule())
     }
 
     private func posterAction(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
