@@ -41,6 +41,14 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(toggle.isHittable); toggle.tap()
         XCTAssertGreaterThan(title.frame.height, collapsedHeight)
         XCTAssertEqual(toggle.label, "收起标题")
+        let expandedPlay = app.buttons["portrait-hero-play"]
+        for _ in 0..<12 where !expandedPlay.isHittable || expandedPlay.frame.maxY > reviewPanel.frame.minY { app.swipeUp() }
+        XCTAssertTrue(expandedPlay.isHittable)
+        XCTAssertGreaterThanOrEqual(expandedPlay.frame.height, 44)
+        let expanded = XCTAttachment(screenshot: app.screenshot())
+        expanded.name = "192-neutral-expanded-title-controls-reachable"
+        expanded.lifetime = .keepAlways; add(expanded)
+        for _ in 0..<6 where !toggle.isHittable { app.swipeDown() }
         for _ in 0..<12 where !toggle.isHittable || toggle.frame.maxY > reviewPanel.frame.minY { app.swipeUp() }
         XCTAssertTrue(toggle.isHittable); toggle.tap()
         XCTAssertEqual(toggle.label, "展开全文")

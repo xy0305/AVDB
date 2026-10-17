@@ -11,6 +11,13 @@ actor Count {
     func cancel() { cancelled += 1 }
     func snapshot() -> (Int,Int) { (calls,cancelled) }
 }
+actor SelectionHarvestGate {
+    private var lowHarvested = false
+    func signalLowHarvested() { lowHarvested = true }
+    func waitForLowHarvest() async {
+        while !lowHarvested && !Task.isCancelled { await Task.yield() }
+    }
+}
 actor SelectionProbe {
     var active=0; var peak=0; var calls=0
     func start() { active += 1; calls += 1; peak=max(peak,active) }
@@ -98,14 +105,25 @@ actor SelectionProbe {
     assert(c.snapshot(key:"fail").isLandscape)
     let low=DetailPosterQuality(source:"low",width:376,height:538,originalPortrait:false)
     let high=DetailPosterQuality(source:"high",width:700,height:1000,originalPortrait:true)
+    let gate = SelectionHarvestGate()
     let start=ProcessInfo.processInfo.systemUptime
     let collected: [DetailPosterQuality] = await DetailPosterSelection.collect(sources:["low","high","fail","late"],budget:0.12) { source, _ in
-        do { try await Task.sleep(nanoseconds:source == "late" ? 1_000_000_000 : source == "high" ? 40_000_000 : 5_000_000) }
+        if source == "low" { return low }
+        if source == "high" {
+            // "fail" cannot start until the collector has harvested low and
+            // released its concurrency slot. Prove low-first/high-later by
+            // scheduler causality instead of a loaded runner's 5/40ms sleeps.
+            await gate.waitForLowHarvest()
+            return Task.isCancelled ? nil : high
+        }
+        if source == "fail" { await gate.signalLowHarvested(); return nil }
+        do { try await Task.sleep(nanoseconds:1_000_000_000) }
         catch { return nil }
-        return source == "low" ? low : source == "high" ? high : nil
+        return nil
     }
     assert(ProcessInfo.processInfo.systemUptime-start < 0.5)
-    assert(collected.count == 2 && DetailPosterQuality.winner(collected)?.source == "high")
+    assert(collected.count == 2 && DetailPosterQuality.winner(collected)?.source == "high", "collected=\(collected.map(\.source))")
+    assert(collected.first?.source == "low", "High must only complete after low is actually harvested")
     assert(DetailPosterSelection.maxAttempts == 6 && DetailPosterSelection.concurrency == 2 && DetailPosterSelection.totalBudget == 12)
     let probe=SelectionProbe()
     let bounded: [String] = await DetailPosterSelection.collect(sources:["a","a","b","c","d","e","f","g","h"],budget:0.3) { source, timeout in
