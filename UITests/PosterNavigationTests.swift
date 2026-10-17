@@ -181,6 +181,9 @@ final class PosterNavigationTests: XCTestCase {
         if min(window.width, window.height) > 600 {
             XCUIDevice.shared.orientation = .landscapeRight
         } else {
+            // UIDevice and UIInterfaceOrientation landscape names are inverse.
+            // A forced interface .landscapeRight uses device .landscapeLeft.
+            if window.width > window.height { XCUIDevice.shared.orientation = .landscapeLeft }
             // The launch fixture can request landscape before XCTest's device
             // orientation changes. Retain the real production menu transition,
             // then synchronize the event generator as well as AX geometry.
@@ -188,7 +191,7 @@ final class PosterNavigationTests: XCTestCase {
             app.buttons["进入全屏幕"].tap()
             XCTAssertTrue(app.buttons["横屏全屏"].waitForExistence(timeout: 3))
             app.buttons["横屏全屏"].tap()
-            XCUIDevice.shared.orientation = .landscapeRight
+            XCUIDevice.shared.orientation = .landscapeLeft
         }
         waitForInterfaceGeometry(app, portrait: false)
         let geometry = XCTAttachment(string: "App: \(app.frame); real player window: \(app.windows.firstMatch.frame)")

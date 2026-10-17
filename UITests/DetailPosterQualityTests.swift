@@ -4,6 +4,13 @@ import ImageIO
 @testable import AVDB
 
 final class OnlineSubtitleModelTests: XCTestCase {
+    @MainActor private func awaitModelState(_ predicate: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(5)
+        while !predicate() && Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(predicate(), "Expected model state within five seconds")
+    }
     @MainActor func testNoAutomaticRequestAndVideoClearCancelsStaleResult() async throws {
         var calls = 0
         let body = Data(#"{"code":0,"data":[{"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt","name":"self authored","ext":"srt","languages":[] }]}"#.utf8)
@@ -21,7 +28,7 @@ final class OnlineSubtitleModelTests: XCTestCase {
         XCTAssertTrue(model.results.isEmpty); XCTAssertTrue(model.cues.isEmpty)
         XCTAssertNil(model.selected); XCTAssertEqual(model.query, "")
         model.query = "新视频"; model.search()
-        try await Task.sleep(nanoseconds: 150_000_000)
+        try await awaitModelState { !model.busy && model.results.count == 1 }
         XCTAssertEqual(model.results.count, 1); XCTAssertNil(model.selected)
         XCTAssertTrue(model.cues.isEmpty) // never auto-select first result
     }
@@ -33,7 +40,7 @@ final class OnlineSubtitleModelTests: XCTestCase {
         })
         let row = OnlineSubtitleCandidate(id: "one", name: "自创", language: "未知", ext: "srt", url: URL(string: "https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt")!)
         model.offset = 3; model.choose(row)
-        try await Task.sleep(nanoseconds: 150_000_000)
+        try await awaitModelState { !model.busy && model.selected == row && model.cues.count == 1 }
         XCTAssertEqual(downloads, 1); XCTAssertEqual(model.cues.count, 1)
         XCTAssertEqual(model.offset, 0); XCTAssertEqual(model.selected, row)
         model.disable(); XCTAssertTrue(model.cues.isEmpty); XCTAssertNil(model.selected)
@@ -60,7 +67,7 @@ final class OnlineSubtitleModelTests: XCTestCase {
             XCTAssertEqual(OnlineSubtitleParser.display(model.cues, at: time, offset: model.offset), "")
         }
         model.choose(row)
-        try await Task.sleep(nanoseconds: 300_000_000)
+        try await awaitModelState { !model.busy && model.selected == row && !model.cues.isEmpty }
         XCTAssertEqual(model.selected, row); XCTAssertFalse(model.cues.isEmpty)
         XCTAssertEqual(OnlineSubtitleParser.display(model.cues, at: 45, offset: 0), "外置字幕")
     }
