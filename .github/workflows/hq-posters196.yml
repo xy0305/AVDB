@@ -1,0 +1,62 @@
+name: HQ Poster 196 Focused Acceptance
+on:
+  push:
+    branches: [test/hq-posters-196]
+permissions:
+  contents: read
+jobs:
+  posters:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert exact production app and execute Swift source tests
+        run: |
+          test "$(git rev-parse HEAD^)" = "e088360f32ea5ce062646965a7a2a7ceb2766521"
+          test -z "$(git diff HEAD^ HEAD -- AVDB AVDB.xcodeproj UITests scripts)"
+          python3 scripts/test-tenhow-posters.py
+          python3 scripts/test-detail-posters.py
+          python3 scripts/test-dmm-posters.py
+          python3 scripts/test-poster-latency.py
+      - name: Install dependencies and scheme
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          ruby scripts/setup-poster-uitests.rb
+          pod install --repo-update
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/HQ.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/HQ.air" -o AVDB/Resources/Enhancement.metallib
+          xcrun simctl list devices available -j > devices.json
+          python3 - <<'PY'
+          import json,os
+          ds=[d for group in json.load(open('devices.json'))['devices'].values() for d in group]
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+            for key,name in [('PHONE','iPhone'),('PAD','iPad')]:
+              d=next(d for d in ds if name in d['name'])
+              f.write(key+'='+d['udid']+'\n')
+          PY
+      - name: Native actual pixels EXIF raw score memory cap and iPhone portrait noFlash
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$PHONE" -derivedDataPath "$RUNNER_TEMP/HQDerived" -resultBundlePath "$RUNNER_TEMP/HQPhone.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:DetailPosterQualityTests/DetailPosterQualityTests -only-testing:PosterNavigationUITests/PosterNavigationTests/testConditionalPortraitHeroRealDetailAndWideFallback -only-testing:PosterNavigationUITests/PosterNavigationTests/testDelayedPosterNeverShowsOldLandscapeAndWarmWinnerIsImmediate 2>&1 | tee "$RUNNER_TEMP/hq-phone.log"
+      - name: iPad portrait and wide fallback noFlash
+        if: success() || failure()
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$PAD" -derivedDataPath "$RUNNER_TEMP/HQDerived" -resultBundlePath "$RUNNER_TEMP/HQPad.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:DetailPosterQualityTests/DetailPosterQualityTests -only-testing:PosterNavigationUITests/PosterNavigationTests/testConditionalPortraitHeroRealDetailAndWideFallback -only-testing:PosterNavigationUITests/PosterNavigationTests/testDelayedPosterNeverShowsOldLandscapeAndWarmWinnerIsImmediate 2>&1 | tee "$RUNNER_TEMP/hq-pad.log"
+      - name: Export neutral poster screenshots
+        if: always()
+        run: |
+          for pair in HQPhone HQPad; do
+            if test -d "$RUNNER_TEMP/$pair.xcresult"; then
+              xcrun xcresulttool export attachments --path "$RUNNER_TEMP/$pair.xcresult" --output-path "$RUNNER_TEMP/$pair-screenshots"
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hq-posters196-focused
+          path: |
+            ${{ runner.temp }}/hq-*.log
+            ${{ runner.temp }}/HQPhone-screenshots
+            ${{ runner.temp }}/HQPad-screenshots
+            devices.json
