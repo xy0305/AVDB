@@ -1,6 +1,9 @@
 name: Subtitle Controls Acceptance
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['UITests/**', '.github/workflows/subtitle-controls-acceptance.yml']
 jobs:
   navigation:
     runs-on: macos-26
