@@ -148,8 +148,9 @@ final class PosterNavigationTests: XCTestCase {
             waitForExpectations(timeout: 10)
             let poster = app.buttons["missav-movie-28"]
             let first = app.buttons["missav-movie-1"]
-            for _ in 0..<30 where !poster.isHittable {
+            for _ in 0..<40 {
                 let window = app.windows.firstMatch
+                if poster.isHittable && !first.isHittable && poster.frame.minY > 100 && poster.frame.maxY < window.frame.maxY - 40 { break }
                 window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
                     .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60)))
             }
@@ -171,9 +172,16 @@ final class PosterNavigationTests: XCTestCase {
             }
             // Pull-to-refresh is deliberate invalidation: return to page one.
             let weekly = app.buttons["本周热门"]
-            for _ in 0..<24 where !weekly.isHittable { app.swipeDown() }
+            for _ in 0..<40 where !weekly.isHittable {
+                let window = app.windows.firstMatch
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
+                    .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60)))
+            }
             XCTAssertTrue(weekly.isHittable, app.debugDescription)
-            app.swipeDown()
+            XCTAssertEqual(diagnostics.label, "period=weekly-hot items=48 requests=1")
+            let scroll = app.scrollViews.firstMatch
+            scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+                .press(forDuration: 0.1, thenDragTo: scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.90)))
             expectation(for: NSPredicate(format: "label == %@", "period=weekly-hot items=24 requests=2"), evaluatedWith: diagnostics)
             waitForExpectations(timeout: 10)
             XCTAssertTrue(first.isHittable, "Explicit refresh must reset to first page")
