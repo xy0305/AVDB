@@ -39,6 +39,31 @@ final class OnlineSubtitleModelTests: XCTestCase {
         model.disable(); XCTAssertTrue(model.cues.isEmpty); XCTAssertNil(model.selected)
         XCTAssertEqual(model.offset, 0)
     }
+    @MainActor func testDisableDuringDownloadRejectsLateCompletionAndCanReselect() async throws {
+        let row = OnlineSubtitleCandidate(id: "late", name: "自创", language: "未知", ext: "srt", url: URL(string: "https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt")!)
+        let model = OnlineSubtitleModel(fetch: { _, _ in
+            // Ignore Task cancellation on purpose: generation must still reject it.
+            let data = Data("1\n00:00:00,000 --> 00:02:00,000\n外置字幕\n".utf8)
+            return await withCheckedContinuation { continuation in
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { continuation.resume(returning: data) }
+            }
+        })
+        model.choose(row)
+        await Task.yield()
+        XCTAssertTrue(model.busy)
+        model.disable()
+        XCTAssertFalse(model.busy); XCTAssertTrue(model.cues.isEmpty); XCTAssertNil(model.selected)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertTrue(model.cues.isEmpty); XCTAssertNil(model.selected)
+        XCTAssertEqual(model.status, "字幕已关闭")
+        for time in [0.0, 1.0, 7.0, 45.0, 119.0] {
+            XCTAssertEqual(OnlineSubtitleParser.display(model.cues, at: time, offset: model.offset), "")
+        }
+        model.choose(row)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(model.selected, row); XCTAssertFalse(model.cues.isEmpty)
+        XCTAssertEqual(OnlineSubtitleParser.display(model.cues, at: 45, offset: 0), "外置字幕")
+    }
 }
 
 final class DetailPosterQualityTests: XCTestCase {

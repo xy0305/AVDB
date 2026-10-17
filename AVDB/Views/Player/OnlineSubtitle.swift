@@ -239,7 +239,22 @@ import UIKit
     private var work: Task<Void, Never>?
     private var cache: (query: String, date: Date, rows: [OnlineSubtitleCandidate])?
     private let fetch: (URL, Bool) async throws -> Data
-    init(fetch: @escaping (URL, Bool) async throws -> Data = { url, search in try await OnlineSubtitleRequest(search: search).run(url) }) { self.fetch = fetch }
+    init(fetch: @escaping (URL, Bool) async throws -> Data = { url, search in try await OnlineSubtitleRequest(search: search).run(url) }) {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--subtitle-controls-fixture") {
+            // Only substitute transport bytes. Selection, parsing, cancellation,
+            // generation guards, timeline display and dismissal remain production.
+            self.fetch = { _, search in
+                if search {
+                    return Data(#"{"code":0,"data":[{"name":"自创合法测试字幕","ext":"srt","languages":[],"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt"}]}"#.utf8)
+                }
+                return Data("1\n00:00:00,000 --> 00:00:06,000\n自创外置字幕第一段\n\n2\n00:00:06,000 --> 00:02:00,000\n自创外置字幕第二段\n".utf8)
+            }
+            return
+        }
+        #endif
+        self.fetch = fetch
+    }
     func clear() {
         generation += 1; work?.cancel(); work = nil
         cues = []; selected = nil; results = []; offset = 0; busy = false
@@ -455,7 +470,8 @@ struct OnlineSubtitlePanel: View {
                         Text("Big5").tag("big5")
                     }.accessibilityIdentifier("subtitle.encoding")
                     if let selected = model.selected { Text("来源：迅雷 · \(selected.name)") }
-                    Button("关闭字幕 / 取消请求") { model.disable() }.accessibilityIdentifier("subtitle.disable")
+                    Text("关闭字幕只关闭本机加载的外置字幕；视频画面内已烧录的文字无法移除。顶部“关闭字幕”同时取消下载并返回播放；“完成”仅关闭设置面板。")
+                        .font(.footnote)
                     HStack {
                         Button("提前 0.5 秒") { model.offset = max(-120, model.offset - 0.5) }.accessibilityIdentifier("subtitle.earlier")
                         Spacer()
@@ -480,7 +496,17 @@ struct OnlineSubtitlePanel: View {
                 SubtitleAppearanceControls(adjustPosition: adjustPosition)
             }
             .navigationTitle("在线字幕")
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
+            .toolbar {
+                // Pinned outside Form: scrolling must never hide the only off switch.
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭字幕") { model.disable(); dismiss() }
+                        .accessibilityIdentifier("subtitle.disable")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                        .accessibilityIdentifier("subtitle.panel.done")
+                }
+            }
         }
     }
 }

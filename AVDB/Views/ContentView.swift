@@ -42,7 +42,7 @@ struct ContentView: View {
            let url = Bundle.main.url(forResource: "neutral-subtitle", withExtension: "mp4") {
             // Exercise the production route-owned orientation host, not a DEBUG-only
             // .all mask that can leave the iPhone event window portrait.
-            KSChromePlayer(url: url, title: "中性播放器测试", subtitle: "原文件 / 原画", onSelectSource: {})
+            KSChromePlayer(url: url, title: "中性播放器测试", subtitle: "原文件 / 原画", onSelectSource: {}, onSelectEpisode: {}, publicSubtitleQuery: "公开测试片名")
         } else if ProcessInfo.processInfo.arguments.contains("--online-subtitle-fixture") {
             OnlineSubtitleFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {

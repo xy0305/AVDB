@@ -627,8 +627,12 @@ struct KSChromePlayer: View {
 
                 if let onSelectEpisode {
                     Button(action: onSelectEpisode) {
-                        Image(systemName: "rectangle.stack.badge.play").frame(width: 48, height: 48)
-                    }.accessibilityLabel("选择集数")
+                        Image(systemName: "rectangle.stack.badge.play")
+                            .foregroundStyle(.white).frame(width: 48, height: 48)
+                    }.buttonStyle(.plain)
+                        .foregroundStyle(.white).tint(.white)
+                        .accessibilityLabel("选择集数")
+                        .accessibilityIdentifier("player.episode.settings")
                 }
                 if let onSelectSource {
                     Button(action: onSelectSource) {

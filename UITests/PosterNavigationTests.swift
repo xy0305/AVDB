@@ -301,6 +301,69 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertFalse(caption.exists, "No synthetic dialogue in normal playback")
     }
 
+    func testRealPlayerSelectedSubtitleDisableSeekAndReselect() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--subtitle-controls-fixture", "--subtitle-no-cue"]
+        app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        waitForInterfaceGeometry(app, portrait: false)
+        let entry = app.buttons["player.subtitle.settings"]
+        let caption = app.otherElements["subtitle.rendered"]
+        func selectSubtitle() {
+            refreshPlayerChrome(app); entry.tap()
+            XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5))
+            app.buttons["subtitle.search"].tap()
+            let candidate = app.buttons["subtitle.candidate"].firstMatch
+            XCTAssertTrue(candidate.waitForExistence(timeout: 5))
+            for _ in 0..<8 { if candidate.isHittable { break }; scrollSubtitleForm(app) }
+            XCTAssertTrue(candidate.isHittable); candidate.tap()
+            let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                app.staticTexts["subtitle.status"].label.contains("已加载")
+            }, object: app)
+            XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 5), .completed)
+            // Completion stays pinned even after scrolling down to the result.
+            XCTAssertTrue(app.buttons["subtitle.panel.done"].isHittable)
+            app.buttons["subtitle.panel.done"].tap()
+            XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        }
+        selectSubtitle()
+        refreshPlayerChrome(app)
+        XCTAssertEqual(app.buttons["player.play.toggle"].label, "暂停")
+        XCTAssertTrue(app.buttons["player.episode.settings"].isHittable)
+        XCTAssertTrue(app.buttons["player.source.settings"].isHittable)
+        let shown = XCTAttachment(screenshot: app.screenshot())
+        shown.name = "195-neutral-selected-caption-white-episode-source"; shown.lifetime = .keepAlways; add(shown)
+        refreshPlayerChrome(app); entry.tap()
+        XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5))
+        scrollSubtitleForm(app)
+        let off = app.buttons["subtitle.disable"]
+        XCTAssertTrue(off.isHittable, "关闭字幕必须固定可见")
+        off.tap()
+        let removed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in !caption.exists }, object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [removed], timeout: 3), .completed)
+        XCTAssertFalse(app.textFields["subtitle.query"].exists)
+        refreshPlayerChrome(app)
+        XCTAssertEqual(app.buttons["player.play.toggle"].label, "暂停")
+        app.sliders.firstMatch.adjust(toNormalizedSliderPosition: 0.65)
+        let acrossCue = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in !caption.exists }, object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [acrossCue], timeout: 3), .completed)
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertFalse(caption.exists, "关闭后跨字幕段落及seek仍不得重新显示")
+        refreshPlayerChrome(app)
+        let hidden = XCTAttachment(screenshot: app.screenshot())
+        hidden.name = "195-neutral-disabled-after-seek-white-episode-source"; hidden.lifetime = .keepAlways; add(hidden)
+        selectSubtitle()
+        XCTAssertTrue(caption.label.contains("自创外置字幕"))
+        refreshPlayerChrome(app); entry.tap()
+        XCTAssertTrue(app.buttons["subtitle.disable"].waitForExistence(timeout: 5))
+        app.buttons["subtitle.disable"].tap()
+        XCTAssertFalse(caption.exists)
+    }
+
     func testOnlineSubtitleConsentSelectionOffsetAndDisable() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -324,6 +387,9 @@ final class PosterNavigationTests: XCTestCase {
         app.buttons["subtitle.later"].tap()
         app.buttons["subtitle.reset"].tap()
         app.buttons["subtitle.disable"].tap()
+        XCTAssertFalse(app.textFields["subtitle.query"].exists, "关闭字幕同时返回播放")
+        XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
+        XCTAssertTrue(app.staticTexts["subtitle.status"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["subtitle.status"].label.contains("已关闭"))
         app.buttons["完成"].tap()
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
