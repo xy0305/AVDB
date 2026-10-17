@@ -12,6 +12,7 @@ on:
       - "scripts/missav-fixtures/**"
       - "scripts/tenhow-fixtures/**"
       - ".github/workflows/build-ipa.yml"
+      - ".github/workflows/poster-navigation.yml"
       - "scripts/test-*.py"
       - "scripts/GestureRegression.swift"
       - "scripts/SeekPreviewRegression.swift"
