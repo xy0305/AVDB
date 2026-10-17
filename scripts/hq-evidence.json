@@ -1,0 +1,142 @@
+[
+  {
+    "cid": "ure00013",
+    "url": "https://pics.dmm.co.jp/digital/video/ure00013/ure00013ps.jpg",
+    "status": 200,
+    "original": [
+      147,
+      200
+    ],
+    "front": [
+      147,
+      200
+    ],
+    "sha256": "6b4ad168dc0990246998205a7da67b9ca1c92b7546a98ba38bb70d163be42be4"
+  },
+  {
+    "cid": "ure00013",
+    "url": "https://pics.dmm.co.jp/digital/video/ure00013/ure00013pl.jpg",
+    "status": 200,
+    "original": [
+      800,
+      499
+    ],
+    "front": [
+      349,
+      499
+    ],
+    "sha256": "b2646c8b5c425eae0fc8fef32ac1b4d6d2a3ff29d543655e6b0637fa8584eeda"
+  },
+  {
+    "cid": "ssis00001",
+    "url": "https://pics.dmm.co.jp/digital/video/ssis00001/ssis00001ps.jpg",
+    "status": 200,
+    "original": [
+      147,
+      200
+    ],
+    "front": [
+      147,
+      200
+    ],
+    "sha256": "8aea5ee66f9924a6ba7c96fe8bfb0b25626bd7c5b165f92f43c483586794fd95"
+  },
+  {
+    "cid": "ssis00001",
+    "url": "https://pics.dmm.co.jp/digital/video/ssis00001/ssis00001pl.jpg",
+    "status": 200,
+    "original": [
+      800,
+      538
+    ],
+    "front": [
+      376,
+      538
+    ],
+    "sha256": "b89d8620020b74edb7f154e7b66dc9381ce59616588516a632e7ff74aabf6e2d"
+  },
+  {
+    "cid": "ssni00001",
+    "url": "https://pics.dmm.co.jp/digital/video/ssni00001/ssni00001ps.jpg",
+    "status": 200,
+    "original": [
+      147,
+      200
+    ],
+    "front": [
+      147,
+      200
+    ],
+    "sha256": "b9068bff35102df1f6747c9f6c1ef3832e7b5ab6b5b43904054eb67973388e70"
+  },
+  {
+    "cid": "ssni00001",
+    "url": "https://pics.dmm.co.jp/digital/video/ssni00001/ssni00001pl.jpg",
+    "status": 200,
+    "original": [
+      800,
+      538
+    ],
+    "front": [
+      376,
+      538
+    ],
+    "sha256": "975e199ae4d7bbbbe515fd0ef99cd3058ebd3fc91dd4e21be06aa729847d310c"
+  },
+  {
+    "cid": "1stars00001",
+    "url": "https://pics.dmm.co.jp/digital/video/1stars00001/1stars00001ps.jpg",
+    "status": 200,
+    "original": [
+      147,
+      200
+    ],
+    "front": [
+      147,
+      200
+    ],
+    "sha256": "26e8983d8f758f3e9264e48138e0be93b86a5ec3d8f20ac87f7d90456e09a6f6"
+  },
+  {
+    "cid": "1stars00001",
+    "url": "https://pics.dmm.co.jp/digital/video/1stars00001/1stars00001pl.jpg",
+    "status": 200,
+    "original": [
+      800,
+      535
+    ],
+    "front": [
+      374,
+      535
+    ],
+    "sha256": "fd1fdf86b3c3a248ecc648fe3ee4cf6245c8de721dd3df56b57f3b14f73c84d4"
+  },
+  {
+    "cid": "ssis00497",
+    "url": "https://pics.dmm.co.jp/digital/video/ssis00497/ssis00497ps.jpg",
+    "status": 200,
+    "original": [
+      147,
+      200
+    ],
+    "front": [
+      147,
+      200
+    ],
+    "sha256": "8ac8d8d81aab168d8187d7115ca1026d1483d8f684c95edf453fd675b5cb79fa"
+  },
+  {
+    "cid": "ssis00497",
+    "url": "https://pics.dmm.co.jp/digital/video/ssis00497/ssis00497pl.jpg",
+    "status": 200,
+    "original": [
+      800,
+      538
+    ],
+    "front": [
+      376,
+      538
+    ],
+    "sha256": "39065f8ca35c16846e844cc24b2cf269f5e00b0a3f09158d85181645904ecd66"
+  }
+]

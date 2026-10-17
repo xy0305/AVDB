@@ -94,7 +94,7 @@ tests += r'''
   }) { source,_ in source } }
   try? await Task.sleep(nanoseconds:10_000_000); cancelled.cancel()
   let cancelledValues=await cancelled.value; assert(cancelledValues.isEmpty)
-  for (asin, expected) in [("B09HS8HBR7", "https://m.media-amazon.com/images/I/91ktf3uskCL._AC_SL1500_.jpg"), ("B0B92LKJT8", "https://m.media-amazon.com/images/I/81N2rlJarrL._AC_SL1500_.jpg")] {
+  for (asin, expected) in [("B09HS8HBR7", "https://m.media-amazon.com/images/I/91ktf3uskCL.jpg"), ("B0B92LKJT8", "https://m.media-amazon.com/images/I/81N2rlJarrL.jpg")] {
     let html=try String(contentsOf:fixtures.appendingPathComponent("amazon-"+asin+".html"),encoding:.utf8)
     assert(try AmazonPoster.images(html:html,asin:asin) == [expected])
     assert(try AmazonPoster.images(html:html,asin:"B000000000").isEmpty)
@@ -105,6 +105,19 @@ tests += r'''
   assert(try AmazonPoster.images(html:amazon.replacingOccurrences(of:"/dp/B09HS8HBR7",with:"/dp/B000000000"),asin:"B09HS8HBR7").isEmpty)
   for bad in ["https://www.amazon.co.jp/ap/signin", "https://www.amazon.co.jp/dp/B000000000", "https://www.amazon.co.jp.evil.test/dp/B09HS8HBR7", "https://www.amazon.co.jp/dp/B09HS8HBR7?x=1"] { assert(!AmazonPoster.allowedPage(URL(string:bad)!,asin:"B09HS8HBR7")) }
   for bad in ["https://m.media-amazon.com.evil.test/images/I/x.jpg", "https://m.media-amazon.com/images/I/x.jpg?q=1", "http://m.media-amazon.com/images/I/x.jpg", "https://m.media-amazon.com/other/x.jpg"] { assert(!AmazonPoster.allowedImage(URL(string:bad)!)) }
+  let media = "https://m.media-amazon.com/images/I/91ktf3uskCL"
+  for suffix in ["._AC_SL1500_", "._SL2560_"] {
+    assert(AmazonPoster.originalImage(URL(string:media+suffix+".jpg")!)?.absoluteString == media+".jpg")
+  }
+  for suffix in ["._AC_SX500_", "._SL0_", "._SL99999_", "._AC_SL1500_CR0,0,1,1_"] {
+    let url=URL(string:media+suffix+".jpg")!
+    assert(AmazonPoster.originalImage(url) == (AmazonPoster.allowedImage(url) ? url : nil))
+  }
+  assert(AmazonPoster.originalImage(URL(string:media+"._SL1500_.jpg?token=x")!) == nil)
+  assert(AmazonPoster.originalImage(URL(string:media.replacingOccurrences(of:"m.media-amazon.com",with:"evil.test")+".jpg")!) == nil)
+  let native=DetailPosterQuality(source:"native2530",width:1778,height:2530,originalPortrait:true)
+  let capped=DetailPosterQuality(source:"native1800",width:1260,height:1800,originalPortrait:true)
+  assert(native.score > capped.score && DetailPosterQuality.winner([capped,native])?.source == native.source)
   let both: [String] = await DetailPosterSelection.collect(sources:["a","b","c","d","e","f"],budget:0.2,discover:{ _ in ["tenhow","amazon"] }) { source,_ in source }
   assert(both.count == 6 && both.contains("tenhow") && both.contains("amazon") && !both.contains("e") && !both.contains("f"))
   print("PASS production Tenhow: 9 live-record fixtures, 1740 explicit actor paths, exact CID/ASIN, adversarial records, aliases, HTTPS/redirects, late high-resolution winner, six images/two jobs, shared budget/cancellation, one publication; Amazon exact main ASIN, canonical, primary image, captcha, CDN, two reserved opportunities")

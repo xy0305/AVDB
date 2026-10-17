@@ -1,13 +1,14 @@
 import Foundation
 
 /// Scores only the decoded, EXIF-oriented, actually usable portrait (after crop).
-/// Rendering never upscales; resolutions above the 1800-point raster ceiling tie.
+/// Rendering never upscales. Score keeps native effective pixels even though
+/// the retained display raster is capped at 1800 pixels to bound cache memory.
 struct DetailPosterQuality: Sendable {
     let source: String
     let width: Int
     let height: Int
     let originalPortrait: Bool
-    var score: Double { min(Double(width) / 0.7, Double(height), 1800) }
+    var score: Double { min(Double(width) / 0.7, Double(height)) }
 
     static func winner(_ values: [Self]) -> Self? {
         let eligible = values.filter { DetailPosterPolicy.eligible(width: $0.width, height: $0.height) }

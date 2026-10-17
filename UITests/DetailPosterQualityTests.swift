@@ -99,7 +99,13 @@ final class DetailPosterQualityTests: XCTestCase {
         let large = DetailPosterResolver.decode(data: jpeg(1400, 2000), sourceURL: "large", derive: false)!
         XCTAssertEqual(large.quality.height, 2000)
         XCTAssertEqual(large.image.cgImage?.height, 1800)
-        XCTAssertEqual(large.quality.score, 1800)
+        XCTAssertEqual(large.quality.score, 2000)
+        let original = DetailPosterResolver.decode(data: jpeg(1778, 2530), sourceURL: "amazon-original", derive: false)!
+        XCTAssertEqual(original.quality.width, 1778)
+        XCTAssertEqual(original.quality.height, 2530)
+        XCTAssertEqual(original.image.cgImage?.height, 1800)
+        XCTAssertTrue(original.quality.originalPortrait)
+        XCTAssertEqual(DetailPosterQuality.winner([large.quality, original.quality])?.source, "amazon-original")
     }
     func testTenhowOriginalIdentityAndOriginalCategoryExclusion() throws {
         func movie(_ type: String, _ number: String = "MEYD-575") throws -> Movie {

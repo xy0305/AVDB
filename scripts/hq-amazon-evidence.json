@@ -1,0 +1,98 @@
+[
+  {
+    "number": "WAAA-113",
+    "asin": "B09HS8HBR7",
+    "identity_page": "https://www.tenhow.net/hasumi_kurea.html",
+    "amazon_page": "https://www.amazon.co.jp/dp/B09HS8HBR7",
+    "tenhow": {
+      "url": "https://www.tenhow.net/images/B09HS8HBR7.jpg",
+      "original_pixels": [
+        1054,
+        1500
+      ],
+      "front_pixels": [
+        1054,
+        1500
+      ],
+      "sha256": "c1d98c00054db4bb6a68680c958370bc2529aa159020081c2f30fb978c9d79e4",
+      "bytes": 286433,
+      "decode": "Pillow complete load + EXIF transpose"
+    },
+    "previous": {
+      "url": "https://m.media-amazon.com/images/I/91ktf3uskCL._AC_SL1500_.jpg",
+      "original_pixels": [
+        1054,
+        1500
+      ],
+      "front_pixels": [
+        1054,
+        1500
+      ],
+      "sha256": "903d55a727c09765771363d6cfe64e3fbae9722fedc675538c1851e699e89603",
+      "bytes": 270314,
+      "decode": "Pillow complete load + EXIF transpose"
+    },
+    "original": {
+      "url": "https://m.media-amazon.com/images/I/91ktf3uskCL.jpg",
+      "original_pixels": [
+        1778,
+        2530
+      ],
+      "front_pixels": [
+        1778,
+        2530
+      ],
+      "sha256": "2f82486bde5f7a4033f84b3d234a5709608689fa9ab24dfab39d2d98d4c0f827",
+      "bytes": 658679,
+      "decode": "Pillow complete load + EXIF transpose"
+    }
+  },
+  {
+    "number": "MLMM-014",
+    "asin": "B0B92LKJT8",
+    "identity_page": "https://www.tenhow.net/hasumi_kurea.html",
+    "amazon_page": "https://www.amazon.co.jp/dp/B0B92LKJT8",
+    "tenhow": {
+      "url": "https://www.tenhow.net/images/B0B92LKJT8.jpg",
+      "original_pixels": [
+        1063,
+        1500
+      ],
+      "front_pixels": [
+        1063,
+        1500
+      ],
+      "sha256": "1552d62345657f2e035c6cfb9ee822a7be66a513fc8cf6fcc49dcbf00997d40d",
+      "bytes": 175366,
+      "decode": "Pillow complete load + EXIF transpose"
+    },
+    "previous": {
+      "url": "https://m.media-amazon.com/images/I/81N2rlJarrL._AC_SL1500_.jpg",
+      "original_pixels": [
+        1063,
+        1500
+      ],
+      "front_pixels": [
+        1063,
+        1500
+      ],
+      "sha256": "e693c26434736854b72f710d64918d0c7ccc5ee7acbe33ddaf72e4304424cde9",
+      "bytes": 172456,
+      "decode": "Pillow complete load + EXIF transpose"
+    },
+    "original": {
+      "url": "https://m.media-amazon.com/images/I/81N2rlJarrL.jpg",
+      "original_pixels": [
+        1778,
+        2529
+      ],
+      "front_pixels": [
+        1778,
+        2529
+      ],
+      "sha256": "53729fefab3adb10dd06f2b2950b95955b4ea266bcfdb51d1f0ffe1c937104ab",
+      "bytes": 333488,
+      "decode": "Pillow complete load + EXIF transpose"
+    }
+  }
+]

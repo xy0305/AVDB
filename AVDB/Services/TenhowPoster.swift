@@ -146,6 +146,20 @@ enum AmazonPoster {
               !url.absoluteString.contains("%") else { return false }
         return url.path.range(of: #"^/images/I/[A-Za-z0-9+_.-]{1,150}\.jpg$"#, options: .regularExpression) != nil
     }
+    /// Strip only a proven size-only Amazon rendition from the exact ASIN's
+    /// primary image. Preserve image ID and host; never request synthetic upscale.
+    /// Public naming reference: sqzw-x/mdcx 58e3f930 mdcx/base/web.py
+    /// (Amazon AC rendition removal). Independently implemented; no code copied.
+    /// Unknown transformations are left untouched; actual decoded pixels decide.
+    static func originalImage(_ url: URL) -> URL? {
+        guard allowedImage(url) else { return nil }
+        let pattern = #"^(/images/I/[A-Za-z0-9+-]{1,100})\._(?:AC_)?SL[1-9][0-9]{1,3}_\.jpg$"#
+        guard let m = JRHTML.matches(pattern, url.path).first else { return url }
+        guard let host = url.host,
+              let original = URL(string: "https://" + host + m[1] + ".jpg"),
+              allowedImage(original) else { return nil }
+        return original
+    }
     static func images(html: String, asin: String) throws -> [String] {
         guard html.utf8.count <= 2 * 1024 * 1024, !html.contains("validateCaptcha"), !html.contains("/errors/validateCaptcha") else { return [] }
         let tree = try JRHTML.tree(html)
@@ -155,7 +169,7 @@ enum AmazonPoster {
         guard canonical.count == 1, allowedPage(canonical[0], asin: asin) else { return [] }
         let main = tree.all { $0.tag == "img" && $0.attrs["id"] == "landingImage" }
         guard main.count == 1 else { return [] }
-        if let raw = main[0].attrs["data-old-hires"], let url = URL(string: raw), allowedImage(url) { return [url.absoluteString] }
+        if let raw = main[0].attrs["data-old-hires"], let url = URL(string: raw), let original = originalImage(url) { return [original.absoluteString] }
         // Only the main product image's actual metadata; never recommendations.
         guard let raw = main[0].attrs["data-a-dynamic-image"], let data = raw.data(using:.utf8),
               let sizes = try? JSONSerialization.jsonObject(with:data) as? [String: [Int]] else { return [] }
@@ -165,7 +179,7 @@ enum AmazonPoster {
             let x=a.value[0]*a.value[1], y=b.value[0]*b.value[1]
             return x == y ? a.key < b.key : x > y
         }
-        return candidates.first.map { [$0.key] } ?? []
+        return candidates.first.flatMap { URL(string: $0.key).flatMap(originalImage) }.map { [$0.absoluteString] } ?? []
     }
 }
 
