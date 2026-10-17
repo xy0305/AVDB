@@ -21,6 +21,24 @@ final class PosterNavigationTests: XCTestCase {
             .withOffset(CGVector(dx: -25, dy: 0)).tap()
     }
 
+    // Rotation notifications precede the AX root snapshot update. In run
+    // 39010810783 the return tap used a 1376x1032 root snapshot with a
+    // 1032x1376 event window and landed outside the 44pt back button.
+    // Synchronize the observable app/window geometry, not another gesture.
+    private func waitForInterfaceGeometry(_ app: XCUIApplication, portrait: Bool) {
+        let geometry = NSPredicate { _, _ in
+            let root = app.frame
+            let window = app.windows.firstMatch.frame
+            return root.width > 0 && window.width > 0
+                && (root.width < root.height) == portrait
+                && (window.width < window.height) == portrait
+                && abs(root.width - window.width) < 1
+                && abs(root.height - window.height) < 1
+        }
+        expectation(for: geometry, evaluatedWith: app)
+        waitForExpectations(timeout: 10)
+    }
+
     private func verifyReadableDetail(accessibilitySize: Bool) {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -85,11 +103,13 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["播放与下载资源"].waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
         XCUIDevice.shared.orientation = .landscapeLeft
+        waitForInterfaceGeometry(app, portrait: false)
         let landscape = XCTAttachment(screenshot: app.screenshot())
         landscape.name = "192-neutral-original-hero-landscape"
         landscape.lifetime = .keepAlways; add(landscape)
         XCTAssertTrue(app.buttons["返回"].isHittable)
         XCUIDevice.shared.orientation = .portrait
+        waitForInterfaceGeometry(app, portrait: true)
         app.buttons["返回"].tap()
         XCTAssertTrue(visibility.waitForExistence(timeout: 5)); tapCoverTitleSwitch(visibility)
         XCTAssertEqual(visibility.value as? String, "0")
