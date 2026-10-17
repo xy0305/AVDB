@@ -126,6 +126,95 @@ final class PosterNavigationTests: XCTestCase {
         add(after)
     }
 
+    // Runs the shipping MissAVRankingView, real LazyVGrid, pagination and
+    // NavigationStack. Only network/metadata and destination text are neutral
+    // fixtures; this is executable UI coverage, not a source-string assertion.
+    func testMissAVPagedReturnPreservesMovieOffsetAndQuery() {
+        continueAfterFailure = false
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--poster-navigation-fixture", "--missav-scroll-fixture"]
+            XCUIDevice.shared.orientation = orientation
+            app.launch()
+            let consent = app.buttons["我已满 18 岁，继续"]
+            if consent.waitForExistence(timeout: 2) { consent.tap() }
+            let diagnostics = app.staticTexts["missav-diagnostics"]
+            XCTAssertTrue(diagnostics.waitForExistence(timeout: 10))
+            let more = app.buttons["missav-load-more"]
+            for _ in 0..<24 where !more.isHittable { app.swipeUp() }
+            XCTAssertTrue(more.isHittable, app.debugDescription)
+            more.tap()
+            expectation(for: NSPredicate(format: "label == %@", "period=weekly-hot items=48 requests=1"), evaluatedWith: diagnostics)
+            waitForExpectations(timeout: 10)
+            let poster = app.buttons["missav-movie-28"]
+            let first = app.buttons["missav-movie-1"]
+            for _ in 0..<30 where !poster.isHittable {
+                let window = app.windows.firstMatch
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+                    .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60)))
+            }
+            XCTAssertTrue(poster.isHittable, app.debugDescription)
+            XCTAssertFalse(first.isHittable)
+            for round in 1...3 {
+                let beforeY = poster.frame.minY
+                poster.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28)).tap()
+                XCTAssertTrue(app.staticTexts["missav-detail-28"].waitForExistence(timeout: 5))
+                app.navigationBars.buttons.element(boundBy: 0).tap()
+                XCTAssertTrue(poster.waitForExistence(timeout: 5))
+                XCTAssertTrue(poster.isHittable, "Return lost page-2 rank28")
+                XCTAssertFalse(first.isHittable, "Detail return jumped to top")
+                XCTAssertEqual(poster.frame.minY, beforeY, accuracy: 35, "Return changed intra-row offset")
+                XCTAssertEqual(diagnostics.label, "period=weekly-hot items=48 requests=1", "Back must not request/replace the ranking")
+                let shot = XCTAttachment(screenshot: app.screenshot())
+                shot.name = "missav-page2-return-\(round)-\(orientation.rawValue)"
+                shot.lifetime = .keepAlways; add(shot)
+            }
+            // Pull-to-refresh is deliberate invalidation: return to page one.
+            let weekly = app.buttons["本周热门"]
+            for _ in 0..<24 where !weekly.isHittable { app.swipeDown() }
+            XCTAssertTrue(weekly.isHittable, app.debugDescription)
+            app.swipeDown()
+            expectation(for: NSPredicate(format: "label == %@", "period=weekly-hot items=24 requests=2"), evaluatedWith: diagnostics)
+            waitForExpectations(timeout: 10)
+            XCTAssertTrue(first.isHittable, "Explicit refresh must reset to first page")
+            app.buttons["今日热门"].tap()
+            expectation(for: NSPredicate(format: "label == %@", "period=today-hot items=24 requests=3"), evaluatedWith: diagnostics)
+            waitForExpectations(timeout: 10)
+            XCTAssertTrue(first.isHittable)
+            app.terminate()
+        }
+    }
+
+    func testMissAVSwitchCancelsOldPagination() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--missav-scroll-fixture", "--missav-slow-page"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let more = app.buttons["missav-load-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        for _ in 0..<24 where !more.isHittable { app.swipeUp() }
+        XCTAssertTrue(more.isHittable)
+        more.tap()
+        let today = app.buttons["今日热门"]
+        for _ in 0..<24 where !today.isHittable { app.swipeDown() }
+        XCTAssertTrue(today.isHittable)
+        today.tap()
+        let diagnostics = app.staticTexts["missav-diagnostics"]
+        expectation(for: NSPredicate(format: "label == %@", "period=today-hot items=24 requests=2"), evaluatedWith: diagnostics)
+        waitForExpectations(timeout: 10)
+        // Hold beyond the cancelled task's nominal delay; it must never append
+        // old query rows or mutate the new query's next-page/loading state.
+        let polluted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS 'items=48'"), object: diagnostics)
+        polluted.isInverted = true
+        wait(for: [polluted], timeout: 21)
+        XCTAssertEqual(diagnostics.label, "period=today-hot items=24 requests=2")
+        XCTAssertTrue(app.buttons["missav-movie-1"].isHittable)
+    }
+
     func testUniformNeutralOriginalAndFrontPosterBounds() {
         continueAfterFailure = false
         let app = XCUIApplication()

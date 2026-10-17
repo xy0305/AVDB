@@ -1,23 +1,45 @@
 import SwiftUI
 
+// Route-owned lifetime: no shared URL cache or account metadata is persisted.
+private final class MissAVRankingState: ObservableObject {
+    @Published var actresses: [MissAVActress] = []
+    @Published var actressTitle = "MissAV 女优排行"
+    @Published var period = "weekly-hot"
+    @Published var attempt = 0
+    @Published var videos: [JRVideo] = []
+    @Published var next: String?
+    @Published var visited = Set<String>()
+    @Published var error = ""
+    @Published var loading = false
+    @Published var paging = false
+    var pageTask: Task<Void, Never>?
+    var revision = UUID()
+    @Published var anchor: String?
+    var loadedKey: String?
+    var requests = 0
+}
+
 // Additional source only: never changes JavDB ranking/search/playback state.
 struct MissAVRankingView: View {
     @ObservedObject private var source = MissAVSource.shared
     @AppStorage("missav.adultConfirmed") private var adultConfirmed = false
-    @StateObject private var metadata = MissAVMetadata()
+    @StateObject private var metadata = MissAVMetadata(resolver: Self.fixtureResolver)
+    private static var fixtureResolver: ((MissAVMetadata.Request) async throws -> MissAVMetadata.Result)? {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--missav-scroll-fixture") {
+            return { request in
+                if case .movie(let video) = request {
+                    return MissAVMetadata.Result(movie: Movie(id: video.path, number: video.code, title: video.title, coverURL: "fixture://poster/1"), loading: false)
+                }
+                return MissAVMetadata.Result(loading: false)
+            }
+        }
+        #endif
+        return nil
+    }
     @EnvironmentObject private var appState: AppState
-    @State private var actresses: [MissAVActress] = []
-    @State private var actressTitle = "MissAV 女优排行"
-    @State private var period = "weekly-hot"
-    @State private var attempt = 0
-    @State private var videos: [JRVideo] = []
-    @State private var next: String?
-    @State private var visited = Set<String>()
-    @State private var error = ""
-    @State private var loading = false
-    @State private var paging = false
-    @State private var pageTask: Task<Void, Never>?
-    @State private var revision = UUID()
+    @StateObject private var state = MissAVRankingState()
+    private var requestKey: String { "\(source.generation):\(state.period):\(state.attempt)" }
     var body: some View {
         Group {
             if adultConfirmed { content }
@@ -28,9 +50,9 @@ struct MissAVRankingView: View {
                 actions: { Button("我已满 18 岁，继续") { adultConfirmed = true } }
             }
         }
-        .onDisappear { pageTask?.cancel(); revision = UUID(); metadata.suspend() }
-        .onChange(of: appState.currentUser?.id) { _, _ in metadata.reset(); attempt += 1 }
-        .onChange(of: appState.isLoggedIn) { _, _ in metadata.reset(); attempt += 1 }
+        .onDisappear { state.pageTask?.cancel(); state.revision = UUID(); state.paging = false; metadata.suspend() }
+        .onChange(of: appState.currentUser?.id) { _, _ in metadata.reset(); state.attempt += 1 }
+        .onChange(of: appState.isLoggedIn) { _, _ in metadata.reset(); state.attempt += 1 }
     }
     private var content: some View {
         ScrollView {
@@ -40,90 +62,128 @@ struct MissAVRankingView: View {
                     Spacer()
                     NavigationLink { MissAVSettingsView() } label: { Image(systemName: "gearshape") }
                 }.padding(.horizontal)
-                CapsuleChipBar(tabs: MissAVHTML.periods + [("actresses", "女优排行")], selection: $period)
+                CapsuleChipBar(tabs: MissAVHTML.periods + [("actresses", "女优排行")], selection: $state.period)
                     .accessibilityIdentifier("missav-periods")
                 Text("MissAV 提供排序和身份；精确匹配后封面、标题、演员资料替换为 AVDB 数据，不改变排名。")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                if loading { ProgressView("载入 MissAV 排行…") }
-                if !error.isEmpty {
-                    Text(error).font(.callout).padding(.horizontal)
-                    Button(videos.isEmpty ? "重试排行" : "重试下一页") {
-                        if videos.isEmpty { attempt += 1 } else { loadNext() }
+                if state.loading { ProgressView("载入 MissAV 排行…") }
+                if !state.error.isEmpty {
+                    Text(state.error).font(.callout).padding(.horizontal)
+                    Button(state.videos.isEmpty ? "重试排行" : "重试下一页") {
+                        if state.videos.isEmpty { state.attempt += 1 } else { loadNext() }
                     }.buttonStyle(.bordered)
                     Link("在浏览器核对来源（不导入 Cookie）", destination: source.base)
                 }
-                if period == "actresses" {
-                    Text(actressTitle).font(.headline)
+                if state.period == "actresses" {
+                    Text(state.actressTitle).font(.headline)
                     Text("当前站点月榜；未发现独立日榜 / 周榜或分页，不虚构参数。")
                         .font(.caption).foregroundStyle(.secondary)
-                    MissAVActressGrid(actors: actresses, metadata: metadata)
+                    MissAVActressGrid(actors: state.actresses, metadata: metadata)
                 } else {
-                    MissAVGrid(videos: videos, metadata: metadata)
+                    MissAVGrid(videos: state.videos, metadata: metadata, scrollTargets: true)
                 }
-                if next != nil && !loading {
+                if state.next != nil && !state.loading {
                     Button { loadNext() } label: {
-                        if paging { AnyView(ProgressView()) } else { AnyView(Text("加载下一页")) }
-                    }.disabled(paging).buttonStyle(.bordered)
+                        if state.paging { AnyView(ProgressView()) } else { AnyView(Text("加载下一页")) }
+                    }.disabled(state.paging).buttonStyle(.bordered).accessibilityIdentifier("missav-load-more")
                 }
             }.padding(.vertical, 8)
         }
-        .refreshable { attempt += 1 }
-        .task(id: "\(source.generation):\(period):\(attempt)") { await reload() }
+        .scrollPosition(id: $state.anchor, anchor: .top)
+        .refreshable { await reload() }
+        .task(id: requestKey) {
+            // A pushed detail changes visibility, not the list query. SwiftUI
+            // restarts tasks on pop; retain the same data and scroll container.
+            if state.loadedKey != requestKey { await reload() }
+        }
+        .overlay(alignment: .topTrailing) {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--missav-scroll-fixture") {
+                Text("period=\(state.period) items=\(state.videos.count) requests=\(state.requests)")
+                    .font(.caption2).accessibilityIdentifier("missav-diagnostics")
+            }
+            #endif
+        }
     }
     @MainActor private func reload() async {
-        pageTask?.cancel(); let token = UUID(); revision = token
+        state.pageTask?.cancel(); let token = UUID(); state.revision = token
+        let key = requestKey
+        state.loadedKey = nil; state.anchor = nil; state.requests += 1
         metadata.reset()
-        videos = []; actresses = []; next = nil; visited = []; error = ""; loading = true; paging = false
+        state.videos = []; state.actresses = []; state.next = nil; state.visited = []; state.error = ""; state.loading = true; state.paging = false
         let epoch = source.generation
-        defer { if revision == token { loading = false } }
+        defer { if state.revision == token { state.loading = false } }
         do {
             #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--missav-scroll-fixture") {
+                state.videos = fixtureVideos(1...24)
+                state.next = "fixture-page-2"
+                state.loadedKey = key
+                return
+            }
             if ProcessInfo.processInfo.arguments.contains("--missav-navigation-fixture") {
-                videos = [JRVideo(path: "/cn/test-101", code: "TEST-101", title: "Synthetic source", image: nil, subtitle: "")]
-                actresses = [MissAVActress(path: "/cn/actresses/Synthetic", name: "Synthetic actor", aliases: ["Synthetic"], rank: 1)]
-                actressTitle = "Synthetic monthly ranking (not live)"
+                state.videos = [JRVideo(path: "/cn/test-101", code: "TEST-101", title: "Synthetic source", image: nil, subtitle: "")]
+                state.actresses = [MissAVActress(path: "/cn/actresses/Synthetic", name: "Synthetic actor", aliases: ["Synthetic"], rank: 1)]
+                state.actressTitle = "Synthetic monthly ranking (not live)"
+                state.loadedKey = key
                 return
             }
             #endif
-            if period == "actresses" {
+            if state.period == "actresses" {
                 let page = try await source.actressPage()
-                guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
-                actresses = page.actors; actressTitle = page.title; next = page.next
-                visited.insert(MissAVHTML.actressRanking)
+                guard !Task.isCancelled, state.revision == token, epoch == source.generation, key == requestKey else { return }
+                state.actresses = page.actors; state.actressTitle = page.title; state.next = page.next
+                state.visited.insert(MissAVHTML.actressRanking); state.loadedKey = key
                 return
             }
-            let path = source.routes[period] ?? MissAVHTML.routes[period]!
+            let path = source.routes[state.period] ?? MissAVHTML.routes[state.period]!
             let page = try await source.page(path)
-            guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
-            videos = page.videos; next = page.next; visited.insert(path)
-        } catch { if !Task.isCancelled && revision == token && epoch == source.generation { self.error = error.localizedDescription } }
+            guard !Task.isCancelled, state.revision == token, epoch == source.generation, key == requestKey else { return }
+            state.videos = page.videos; state.next = page.next; state.visited.insert(path); state.loadedKey = key
+        } catch { if !Task.isCancelled && state.revision == token && epoch == source.generation && key == requestKey { state.error = error.localizedDescription } }
     }
+    #if DEBUG
+    private func fixtureVideos(_ range: ClosedRange<Int>) -> [JRVideo] {
+        range.map { JRVideo(path: "/\(state.period)/neutral/\($0)", code: "TEST-\($0)", title: "Neutral film \($0)", image: nil, subtitle: "") }
+    }
+    #endif
     @MainActor private func loadNext() {
-        guard !loading, !paging, let path = next else { return }
-        let token = revision, epoch = source.generation
-        paging = true; error = ""
-        pageTask = Task { @MainActor in
-            defer { if revision == token { paging = false } }
+        guard !state.loading, !state.paging, let path = state.next else { return }
+        let token = state.revision, epoch = source.generation, key = requestKey
+        state.paging = true; state.error = ""
+        state.pageTask = Task { @MainActor in
+            defer { if state.revision == token { state.paging = false } }
             do {
-                guard !visited.contains(path) else { throw JRError.message("来源返回重复分页，请刷新。") }
-                if period == "actresses" {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--missav-scroll-fixture") {
+                    // Deliberately slow and cancellation-resistant, so switching
+                    // query while paging tests the production revision guard.
+                    try? await Task.sleep(for: .seconds(ProcessInfo.processInfo.arguments.contains("--missav-slow-page") ? 20 : 2))
+                    guard !Task.isCancelled, state.revision == token, epoch == source.generation, key == requestKey else { return }
+                    state.videos.append(contentsOf: fixtureVideos(25...48))
+                    state.next = nil; state.visited.insert(path)
+                    return
+                }
+                #endif
+                guard !state.visited.contains(path) else { throw JRError.message("来源返回重复分页，请刷新。") }
+                if state.period == "actresses" {
                     let page = try await source.actressPage(path)
-                    guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
-                    let ids = Set(actresses.map(\.path))
+                    guard !Task.isCancelled, state.revision == token, epoch == source.generation, key == requestKey else { return }
+                    let ids = Set(state.actresses.map(\.path))
                     let fresh = page.actors.filter { !ids.contains($0.path) }
                     guard !fresh.isEmpty else { throw JRError.message("来源返回重复女优分页，请刷新。") }
-                    actresses.append(contentsOf: fresh); visited.insert(path)
-                    next = page.next.flatMap { visited.contains($0) ? nil : $0 }
+                    state.actresses.append(contentsOf: fresh); state.visited.insert(path)
+                    state.next = page.next.flatMap { state.visited.contains($0) ? nil : $0 }
                     return
                 }
                 let page = try await source.page(path)
-                guard !Task.isCancelled, revision == token, epoch == source.generation else { return }
-                let ids = Set(videos.map(\.path))
+                guard !Task.isCancelled, state.revision == token, epoch == source.generation, key == requestKey else { return }
+                let ids = Set(state.videos.map(\.path))
                 let fresh = page.videos.filter { !ids.contains($0.path) }
                 guard !fresh.isEmpty else { throw JRError.message("来源下一页没有新条目；保留已载入列表，请重试或刷新。") }
-                videos.append(contentsOf: fresh); visited.insert(path)
-                next = page.next.flatMap { visited.contains($0) ? nil : $0 }
-            } catch { if !Task.isCancelled && revision == token && epoch == source.generation { self.error = error.localizedDescription } }
+                state.videos.append(contentsOf: fresh); state.visited.insert(path)
+                state.next = page.next.flatMap { state.visited.contains($0) ? nil : $0 }
+            } catch { if !Task.isCancelled && state.revision == token && epoch == source.generation && key == requestKey { state.error = error.localizedDescription } }
         }
     }
 }
@@ -133,6 +193,7 @@ struct MissAVGrid: View {
     var sourceName = "MissAV"
     var ranks: [String: Int] = [:]
     var identityPrefix = "missav"
+    var scrollTargets = false
     @State private var width: CGFloat = 390
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
@@ -141,7 +202,9 @@ struct MissAVGrid: View {
                 VStack(alignment: .leading, spacing: 4) {
                     NavigationLink {
                         #if DEBUG
-                        if sourceName == "JAVLibrary" && ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
+                        if sourceName == "MissAV" && ProcessInfo.processInfo.arguments.contains("--missav-scroll-fixture") {
+                            Text("Neutral detail \(index + 1)").accessibilityIdentifier("missav-detail-\(index + 1)")
+                        } else if sourceName == "JAVLibrary" && ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
                             Text("Synthetic detail \(ranks[video.path] ?? (index + 1))")
                                 .accessibilityIdentifier("javlibrary-detail-\(ranks[video.path] ?? (index + 1))")
                         } else {
@@ -167,7 +230,7 @@ struct MissAVGrid: View {
                 }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).clipped()
                     .onAppear { metadata.enqueue(.movie(video)) }.id(video.path)
             }
-        }.padding(.horizontal, AdaptiveLayout.gridPadding)
+        }.scrollTargetLayout(isEnabled: scrollTargets).padding(.horizontal, AdaptiveLayout.gridPadding)
         .background { GeometryReader { g in Color.clear.onAppear { width = g.size.width }.onChange(of: g.size.width) { _, value in width = value } } }
     }
 }

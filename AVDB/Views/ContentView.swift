@@ -48,6 +48,9 @@ struct ContentView: View {
         } else if ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
             NavigationStack { JAVLibraryRankingView() }
                 .modifier(SceneLayoutReader())
+        } else if ProcessInfo.processInfo.arguments.contains("--missav-scroll-fixture") {
+            NavigationStack { MissAVRankingView() }
+                .modifier(SceneLayoutReader())
         } else if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {
             NavigationStack { JRPageView(path: "/neutral/ranking/") }
                 .modifier(SceneLayoutReader())

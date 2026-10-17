@@ -34,6 +34,10 @@ jobs:
           PY
       - name: Execute production catalog lifecycle regression
         run: python3 scripts/test-catalog-lifecycle.py
+      - name: Execute MissAV parser and account metadata regression
+        run: |
+          python3 scripts/test-missav.py
+          python3 scripts/test-missav-metadata.py
       - name: Execute production native ranking regression
         run: python3 scripts/test-native-rankings.py
       - name: Execute production detail poster regression
@@ -53,7 +57,7 @@ jobs:
         if: success() || failure()
         run: |
           set -o pipefail
-          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PhoneCatalog.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testRecentMagnetCatalogRealViewReturnWithoutReload -only-testing:PosterNavigationUITests/PosterNavigationTests/testConditionalPortraitHeroRealDetailAndWideFallback -only-testing:PosterNavigationUITests/PosterNavigationTests/testDelayedPosterNeverShowsOldLandscapeAndWarmWinnerIsImmediate -only-testing:DetailPosterQualityTests 2>&1 | tee "$RUNNER_TEMP/phone-catalog.log"
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PhoneCatalog.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testMissAVPagedReturnPreservesMovieOffsetAndQuery -only-testing:PosterNavigationUITests/PosterNavigationTests/testMissAVSwitchCancelsOldPagination -only-testing:PosterNavigationUITests/PosterNavigationTests/testRecentMagnetCatalogRealViewReturnWithoutReload -only-testing:PosterNavigationUITests/PosterNavigationTests/testConditionalPortraitHeroRealDetailAndWideFallback -only-testing:PosterNavigationUITests/PosterNavigationTests/testDelayedPosterNeverShowsOldLandscapeAndWarmWinnerIsImmediate -only-testing:DetailPosterQualityTests 2>&1 | tee "$RUNNER_TEMP/phone-catalog.log"
       - name: Export neutral screenshots
         if: always()
         run: |

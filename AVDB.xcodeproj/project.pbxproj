@@ -541,7 +541,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 187;
+				CURRENT_PROJECT_VERSION = 188;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -564,7 +564,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 187;
+				CURRENT_PROJECT_VERSION = 188;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
