@@ -176,18 +176,19 @@ final class PosterNavigationTests: XCTestCase {
     }
 
     private func enterSubtitleLandscape(_ app: XCUIApplication) {
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
         let window = app.windows.firstMatch.frame
-        // Evidence: startup route requests can precede the foreground window in
-        // a launch fixture. Use one real user transition after it is live.
-        if window.width < window.height {
-            if min(window.width, window.height) > 600 {
-                XCUIDevice.shared.orientation = .landscapeRight
-            } else {
-                refreshPlayerChrome(app)
-                app.buttons["进入全屏幕"].tap()
-                XCTAssertTrue(app.buttons["横屏全屏"].waitForExistence(timeout: 3))
-                app.buttons["横屏全屏"].tap()
-            }
+        if min(window.width, window.height) > 600 {
+            XCUIDevice.shared.orientation = .landscapeRight
+        } else {
+            // The launch fixture can request landscape before XCTest's device
+            // orientation changes. Retain the real production menu transition,
+            // then synchronize the event generator as well as AX geometry.
+            refreshPlayerChrome(app)
+            app.buttons["进入全屏幕"].tap()
+            XCTAssertTrue(app.buttons["横屏全屏"].waitForExistence(timeout: 3))
+            app.buttons["横屏全屏"].tap()
+            XCUIDevice.shared.orientation = .landscapeRight
         }
         waitForInterfaceGeometry(app, portrait: false)
         let geometry = XCTAttachment(string: "App: \(app.frame); real player window: \(app.windows.firstMatch.frame)")
@@ -302,6 +303,7 @@ final class PosterNavigationTests: XCTestCase {
             app.buttons["进入全屏幕"].tap()
             XCTAssertTrue(app.buttons["竖屏播放"].waitForExistence(timeout: 3))
             app.buttons["竖屏播放"].tap()
+            XCUIDevice.shared.orientation = .portrait
             waitForInterfaceGeometry(app, portrait: true)
             refreshPlayerChrome(app)
             entry.tap()
@@ -337,8 +339,14 @@ final class PosterNavigationTests: XCTestCase {
             XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5))
             app.buttons["subtitle.search"].tap()
             let candidate = app.buttons["subtitle.candidate"].firstMatch
-            XCTAssertTrue(candidate.waitForExistence(timeout: 5))
+            let searched = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                app.staticTexts["subtitle.status"].label == "请选择字幕；名称匹配不代表时间轴匹配"
+            }, object: app)
+            XCTAssertEqual(XCTWaiter.wait(for: [searched], timeout: 5), .completed)
+            // SwiftUI Form virtualizes off-screen result rows in short landscape
+            // windows. Scroll the real form before asserting row existence.
             for _ in 0..<8 { if candidate.isHittable { break }; scrollSubtitleForm(app) }
+            XCTAssertTrue(candidate.waitForExistence(timeout: 5))
             XCTAssertTrue(candidate.isHittable); candidate.tap()
             let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
                 app.staticTexts["subtitle.status"].label.contains("已加载")
@@ -404,7 +412,10 @@ final class PosterNavigationTests: XCTestCase {
         app.buttons["subtitle.earlier"].tap()
         XCTAssertTrue(app.staticTexts["-0.5 秒"].exists)
         app.buttons["subtitle.later"].tap()
-        app.buttons["subtitle.reset"].tap()
+        let offsetReset = app.buttons["subtitle.reset"]
+        for _ in 0..<8 { if offsetReset.isHittable { break }; scrollSubtitleForm(app) }
+        XCTAssertTrue(offsetReset.isHittable); offsetReset.tap()
+        XCTAssertTrue(app.staticTexts["+0.0 秒"].exists)
         app.buttons["subtitle.disable"].tap()
         XCTAssertFalse(app.textFields["subtitle.query"].exists, "关闭字幕同时返回播放")
         XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
