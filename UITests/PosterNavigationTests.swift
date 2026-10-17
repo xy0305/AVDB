@@ -1,6 +1,66 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testLongDetailTitleNeverCoversArtworkAndExpands() {
+        verifyReadableDetail(accessibilitySize: false)
+    }
+
+    func testAccessibleDetailTitleAndLandscapeActions() {
+        verifyReadableDetail(accessibilitySize: true)
+    }
+
+    private func verifyReadableDetail(accessibilitySize: Bool) {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture", "--long-detail-title"]
+        if accessibilitySize {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        app.buttons["neutral-portrait-link"].tap()
+        let title = app.staticTexts["portrait-hero-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        let artwork = app.descendants(matching: .any)["detail-hero-artwork"].firstMatch
+        XCTAssertTrue(artwork.exists)
+        XCTAssertGreaterThanOrEqual(title.frame.minY, artwork.frame.maxY)
+        let toggle = app.buttons["detail-title-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        let collapsedHeight = title.frame.height
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = accessibilitySize ? "191-neutral-accessibility-detail" : "191-neutral-readable-detail"
+        shot.lifetime = .keepAlways; add(shot)
+        for _ in 0..<5 where !toggle.isHittable { app.swipeUp() }
+        XCTAssertTrue(toggle.isHittable); toggle.tap()
+        XCTAssertGreaterThan(title.frame.height, collapsedHeight)
+        XCTAssertEqual(toggle.label, "收起标题")
+        for _ in 0..<12 where !toggle.isHittable { app.swipeUp() }
+        XCTAssertTrue(toggle.isHittable); toggle.tap()
+        XCTAssertEqual(toggle.label, "展开全文")
+        let play = app.buttons["portrait-hero-play"]
+        for _ in 0..<8 where !play.isHittable { app.swipeDown() }
+        if !play.isHittable { app.swipeUp() }
+        XCTAssertTrue(play.isHittable)
+        XCTAssertGreaterThanOrEqual(play.frame.height, 44)
+        for name in ["下载资源", "存入清单", "想看", "看过"] {
+            let action = app.buttons[name]
+            for _ in 0..<6 where !action.isHittable { app.swipeUp() }
+            XCTAssertTrue(action.isHittable, name)
+            XCTAssertGreaterThanOrEqual(action.frame.height, 44)
+        }
+        app.buttons["下载资源"].tap()
+        XCTAssertTrue(app.navigationBars["播放与下载资源"].waitForExistence(timeout: 5))
+        app.buttons["完成"].tap()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let landscape = XCTAttachment(screenshot: app.screenshot())
+        landscape.name = "191-neutral-readable-landscape"
+        landscape.lifetime = .keepAlways; add(landscape)
+        XCTAssertTrue(app.buttons["返回"].isHittable)
+    }
+
     func testOnlineSubtitleConsentSelectionOffsetAndDisable() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -90,8 +150,10 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(back.isHittable)
         XCTAssertGreaterThanOrEqual(back.frame.minY, 24, "Back must clear the status bar safe area")
         XCTAssertGreaterThanOrEqual(play.frame.height, 44)
-        XCTAssertGreaterThan(title.frame.minY, app.windows.firstMatch.frame.height * 0.3)
-        XCTAssertLessThan(title.frame.minY, app.windows.firstMatch.frame.height * 0.65)
+        let artwork = app.descendants(matching: .any)["detail-hero-artwork"].firstMatch
+        XCTAssertTrue(artwork.exists)
+        XCTAssertGreaterThanOrEqual(title.frame.minY, artwork.frame.maxY, "Readable title must never overlay the cover")
+        XCTAssertFalse(app.buttons["detail-title-toggle"].exists, "Short titles need no expansion control")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "native-neutral-portrait-hero-phone-or-ipad"
         shot.lifetime = .keepAlways; add(shot)
