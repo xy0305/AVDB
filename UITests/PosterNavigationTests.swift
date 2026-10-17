@@ -185,10 +185,11 @@ final class PosterNavigationTests: XCTestCase {
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
         XCUIDevice.shared.orientation = .landscapeLeft
-        waitForInterfaceGeometry(app, portrait: false)
         refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
+        // The player view itself must be landscape; the app root snapshot can lag.
+        XCTAssertGreaterThan(entry.frame.maxX, entry.frame.maxY, app.debugDescription)
         XCTAssertGreaterThanOrEqual(entry.frame.width, 48)
         XCTAssertGreaterThanOrEqual(entry.frame.height, 48)
         let originalOrientation = XCUIDevice.shared.orientation
@@ -252,10 +253,11 @@ final class PosterNavigationTests: XCTestCase {
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
         XCUIDevice.shared.orientation = .landscapeLeft
-        waitForInterfaceGeometry(app, portrait: false)
         refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
-        XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertGreaterThan(entry.frame.maxX, entry.frame.maxY, app.debugDescription)
+        entry.tap()
         XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5), app.debugDescription)
         let edit = app.buttons["subtitle.position.edit"]
         for _ in 0..<8 { if edit.isHittable { break }; scrollSubtitleForm(app) }
