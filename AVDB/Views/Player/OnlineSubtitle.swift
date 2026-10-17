@@ -169,6 +169,10 @@ enum OnlineSubtitleParser {
         guard !lower.contains("<!doctype"), !lower.contains("<html"), !lower.contains("<script"), !lower.contains("<?xml"), !lower.contains("<error"),
               !text.unicodeScalars.contains(where: { $0.value < 32 && ![9, 10, 13].contains($0.value) }),
               ["srt", "vtt", "ass"].contains(ext) else { throw OnlineSubtitleError.invalid("不是支持的文本字幕") }
+        // Reject newline bombs before components creates an unbounded array of tiny strings.
+        guard text.utf8.lazy.filter({ $0 == 10 }).prefix(150001).count < 150000 else {
+            throw OnlineSubtitleError.invalid("字幕行数过多")
+        }
         let lines = text.components(separatedBy: "\n")
         guard lines.count <= 150000, !lines.contains(where: { $0.utf8.count > 16384 }) else { throw OnlineSubtitleError.invalid("字幕行数或单行长度过大") }
         let deadline = Date().addingTimeInterval(2)

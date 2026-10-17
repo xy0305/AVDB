@@ -58,6 +58,26 @@ final class FixtureProtocol: URLProtocol {
         for bad in [Data("<html>error</html>".utf8), Data("<?xml version='1.0'?><Error>NoSuchKey</Error>".utf8), Data([0,1,2]), Data("1\n00:00:01,000 --> 00:00:00,000\n错误\n".utf8), Data((String(repeating: "x", count: 17000)).utf8)] {
             reject { _ = try OnlineSubtitleParser.parse(bad, ext: "srt") }
         }
+        for newlineCount in [150000, 150001] {
+            do {
+                _ = try OnlineSubtitleParser.parse(Data(repeating: 10, count: newlineCount), ext: "srt")
+                fatalError("Newline bomb accepted")
+            } catch {
+                precondition(error.localizedDescription == "字幕行数过多", "Must reject before allocating line components")
+            }
+        }
+        let boundary = "1\n00:00:01,000 --> 00:00:02,000\nx\n\n" + String(repeating: "\n", count: 149995)
+        let boundaryCues = try OnlineSubtitleParser.parse(Data(boundary.utf8), ext: "srt")
+        precondition(boundaryCues.count == 1) // 149,999 newlines / 150,000 lines remain allowed.
+        let tooMany = Data(String(repeating: "1\n00:00:01,000 --> 00:00:02,000\nx\n\n", count: 20001).utf8)
+        reject { _ = try OnlineSubtitleParser.parse(tooMany, ext: "srt") }
+        let manyRows = (0..<90).map { i -> [String: Any] in
+            var item = row
+            item["url"] = "https://subtitle.v.geilijiasu.com/AA/BB/" + String(format: "%040X", i) + ".srt"
+            return item
+        }
+        let capped = try OnlineSubtitlePolicy.candidates(JSONSerialization.data(withJSONObject: ["code": 0, "data": manyRows]))
+        precondition(capped.count == 80)
         #if canImport(Darwin)
         for (hint, cf) in [("gb18030", CFStringEncodings.GB_18030_2000), ("big5", CFStringEncodings.big5)] {
             let e = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(cf.rawValue)))
@@ -75,6 +95,8 @@ final class FixtureProtocol: URLProtocol {
         }
         FixtureProtocol.payload = Data(repeating: 32, count: OnlineSubtitlePolicy.searchLimit + 1)
         do { _ = try await OnlineSubtitleRequest(search: true, protocolClasses: [FixtureProtocol.self]).run(u); fatalError("Oversize accepted") } catch {}
+        FixtureProtocol.payload = Data(repeating: 32, count: OnlineSubtitlePolicy.downloadLimit + 1); FixtureProtocol.mime = "text/plain"
+        do { _ = try await OnlineSubtitleRequest(search: false, protocolClasses: [FixtureProtocol.self]).run(URL(string: cdn)!); fatalError("Oversize download accepted") } catch {}
         FixtureProtocol.payload = srt; FixtureProtocol.mime = "text/html"
         do { _ = try await OnlineSubtitleRequest(search: false, protocolClasses: [FixtureProtocol.self]).run(URL(string: cdn)!); fatalError("HTML accepted") } catch {}
         let delegate = OnlineSubtitleRequest(search: false)
