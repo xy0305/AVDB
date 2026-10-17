@@ -162,7 +162,7 @@ struct MovieDetailView: View {
             Color.clear.frame(height: 76)
         }
         .overlay(alignment: .bottom) {
-            if let movie = vm.movie, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
+            if let movie = vm.movie, !ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") || ProcessInfo.processInfo.arguments.contains("--long-detail-title") {
                 DraggableReviewsPanel(
                     movieID: movie.id,
                     total: movie.commentsCount ?? 0,
@@ -171,6 +171,7 @@ struct MovieDetailView: View {
                     availableHeight: max(280, layoutSize.height)
                 )
                 .frame(height: reviewPanelHeight, alignment: .top)
+                .accessibilityIdentifier("detail-reviews-panel")
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -234,7 +235,7 @@ struct MovieDetailView: View {
             return AnyView(ZStack {
                 Color(art.tint)
                 Image(uiImage: art.backdrop).resizable().scaledToFill().opacity(0.22)
-                Color(art.tint).opacity(0.65)
+                Color.black.opacity(0.45)
             }.clipped())
         }
         return AnyView(legacyDetailBackground(movie))

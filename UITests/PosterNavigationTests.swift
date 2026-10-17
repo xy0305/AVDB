@@ -47,11 +47,16 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(play.frame.height, 44)
         for name in ["下载资源", "存入清单", "想看", "看过"] {
             let action = app.buttons[name]
-            for _ in 0..<6 where !action.isHittable { app.swipeUp() }
+            let panel = app.descendants(matching: .any)["detail-reviews-panel"].firstMatch
+            XCTAssertTrue(panel.exists)
+            for _ in 0..<6 where !action.isHittable || action.frame.maxY > panel.frame.minY { app.swipeUp() }
             XCTAssertTrue(action.isHittable, name)
             XCTAssertGreaterThanOrEqual(action.frame.height, 44)
+            XCTAssertLessThanOrEqual(action.frame.maxY, panel.frame.minY + 1, "Comments must not cover reachable actions")
         }
-        app.buttons["下载资源"].tap()
+        let download = app.buttons["下载资源"]
+        for _ in 0..<6 where !download.isHittable { app.swipeDown() }
+        download.tap()
         XCTAssertTrue(app.navigationBars["播放与下载资源"].waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
         XCUIDevice.shared.orientation = .landscapeLeft
