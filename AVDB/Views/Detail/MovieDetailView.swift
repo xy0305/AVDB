@@ -367,6 +367,10 @@ struct MovieDetailView: View {
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity).frame(minHeight: 44)
                         .background(.white, in: RoundedRectangle(cornerRadius: 17))
+                        // Transparent hit slop avoids sub-pixel AX frames below 44pt.
+                        // Keep the original visible white button height and styling.
+                        .padding(.vertical, 1)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 40).padding(.top, 8)

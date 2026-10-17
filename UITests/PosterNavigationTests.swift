@@ -9,6 +9,18 @@ final class PosterNavigationTests: XCTestCase {
         verifyReadableDetail(accessibilitySize: true)
     }
 
+    // SwiftUI exposes the whole labelled row as a Switch. Its midpoint is the
+    // label, not the trailing native thumb (notably after iPad rotation).
+    // Tap the actual control and keep the value/persistence assertions intact.
+    private func tapCoverTitleSwitch(_ control: XCUIElement) {
+        XCTAssertTrue(control.isHittable)
+        let diagnostic = XCTAttachment(string: "Cover-title switch frame: \(control.frame), value: \(String(describing: control.value))")
+        diagnostic.name = "192-title-switch-hit-target"
+        diagnostic.lifetime = .keepAlways; add(diagnostic)
+        control.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: -25, dy: 0)).tap()
+    }
+
     private func verifyReadableDetail(accessibilitySize: Bool) {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -22,7 +34,7 @@ final class PosterNavigationTests: XCTestCase {
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
         let visibility = app.switches["detail-cover-title-setting"]
-        if visibility.exists && visibility.value as? String == "0" { visibility.tap() }
+        if visibility.exists && visibility.value as? String == "0" { tapCoverTitleSwitch(visibility) }
         app.buttons["neutral-portrait-link"].tap()
         let title = app.staticTexts["portrait-hero-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 15))
@@ -79,7 +91,7 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["返回"].isHittable)
         XCUIDevice.shared.orientation = .portrait
         app.buttons["返回"].tap()
-        XCTAssertTrue(visibility.waitForExistence(timeout: 5)); visibility.tap()
+        XCTAssertTrue(visibility.waitForExistence(timeout: 5)); tapCoverTitleSwitch(visibility)
         XCTAssertEqual(visibility.value as? String, "0")
         app.buttons["neutral-portrait-link"].tap()
         let hiddenPlay = app.buttons["portrait-hero-play"]
@@ -112,7 +124,7 @@ final class PosterNavigationTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(action.frame.height, 44)
         }
         app.buttons["返回"].tap()
-        visibility.tap()
+        tapCoverTitleSwitch(visibility)
         XCTAssertEqual(visibility.value as? String, "1")
     }
 
