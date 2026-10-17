@@ -146,6 +146,9 @@ struct KSChromePlayer: View {
     @StateObject private var audio = PlaybackAudioLease()
     @StateObject private var lut = NativeLUTController()
     @StateObject private var seekPreview = SeekPreviewController()
+    var publicSubtitleQuery: String = "" // Explicit public metadata only; never infer from URL/title/path.
+    @StateObject private var onlineSubtitles = OnlineSubtitleModel()
+    @State private var showOnlineSubtitles = false
     @State private var showLUT = false
     @State private var playbackActive = false
     @State private var isPlaying = false
@@ -201,6 +204,14 @@ struct KSChromePlayer: View {
         .ignoresSafeArea()
         .statusBarHidden(true)
         .background { if managesOrientation { PlaybackOrientationHost().allowsHitTesting(false) } }
+        .sheet(isPresented: $showOnlineSubtitles, onDismiss: {
+            showChrome = true
+            startTicker()
+            scheduleHide()
+        }) { OnlineSubtitlePanel(model: onlineSubtitles) }
+        .onChange(of: showOnlineSubtitles) { _, presented in
+            if presented { cancelPlayerDrag(); hideTask?.cancel(); showChrome = true }
+        }
         .sheet(isPresented: $showLUT, onDismiss: {
             // Sheet dismissal is not a playback-route exit. Preserve item, LUT and orientation.
             lut.setPanelCovered(false)
@@ -227,7 +238,10 @@ struct KSChromePlayer: View {
             startTicker()
             scheduleHide()
         }
+        .onChange(of: progressID) { _, _ in onlineSubtitles.clear() }
+        .onChange(of: publicSubtitleQuery) { _, _ in onlineSubtitles.clear() }
         .onChange(of: url) { _, _ in
+            onlineSubtitles.clear()
             seekGeneration += 1
             seekPending = false
             cancelPlayerDrag()
@@ -246,6 +260,7 @@ struct KSChromePlayer: View {
             // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
             // They must not tear down playback or force the whole app to portrait.
             guard !showLUT else { return }
+            guard !showOnlineSubtitles else { return }
             // Visibility is not lifetime: background/PiP/covering presentations must keep playing.
             cancelPlayerDrag()
             hideTask?.cancel()
@@ -258,6 +273,7 @@ struct KSChromePlayer: View {
     }
 
     private func stopPlayback() {
+        onlineSubtitles.clear()
         seekPreview.close()
         playbackActive = false
         seekGeneration += 1
@@ -275,6 +291,21 @@ struct KSChromePlayer: View {
             Color.black
             AudioOwnedKSVideoPlayer(player: coordinator, audio: audio, url: url, options: playerOptions, onStop: stopPlayback)
                 .onAppear { applyFillMode() }
+            if !onlineSubtitles.cues.isEmpty {
+                TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                    let clock = coordinator.playerLayer?.player.currentPlaybackTime ?? 0
+                    let text = OnlineSubtitleParser.display(onlineSubtitles.cues, at: clock, offset: onlineSubtitles.offset)
+                    VStack {
+                        Spacer()
+                        if !text.isEmpty {
+                            Text(text).font(.system(size: min(26, max(16, width / 35)), weight: .medium))
+                                .multilineTextAlignment(.center).foregroundStyle(.white)
+                                .padding(8).background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 6))
+                                .padding(.horizontal, 24)
+                        }
+                    }.padding(.bottom, max(safeArea.bottom + 30, showChrome ? 130 : 40))
+                }.allowsHitTesting(false).zIndex(5)
+            }
             if showChrome {
                 chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
                     .padding(.top, safeArea.top)
@@ -285,7 +316,7 @@ struct KSChromePlayer: View {
             // KSVideoPlayer renders only the underlying player view (no official pan).
             // This transparent sibling owns the only pan output; chrome stays above it.
             PlayerGestureLayer(
-                blocked: showLUT || seekPending || (isSeeking && !horizontalDrag),
+                blocked: showOnlineSubtitles || showLUT || seekPending || (isSeeking && !horizontalDrag),
                 sourceID: url,
                 onDoubleTap: { x, width in skip(by: x < width * 0.5 ? -10 : 10) },
                 onSingleTap: { toggleChrome() },
@@ -477,6 +508,14 @@ struct KSChromePlayer: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)
+                Button {
+                    if onlineSubtitles.query.isEmpty { onlineSubtitles.query = String(publicSubtitleQuery.prefix(200)) }
+                    showOnlineSubtitles = true
+                } label: {
+                    Image(systemName: "captions.bubble")
+                        .foregroundStyle(.white).frame(width: 44, height: 48)
+                }.buttonStyle(.plain)
+                    .accessibilityLabel("在线字幕").accessibilityIdentifier("player.subtitle.settings")
                 Button { showLUT = true } label: {
                     Image(systemName: "camera.filters")
                         .font(.system(size: 20, weight: .medium))

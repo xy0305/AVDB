@@ -1,6 +1,34 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testOnlineSubtitleConsentSelectionOffsetAndDisable() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--online-subtitle-fixture"]
+        app.launch()
+        defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let entry = app.buttons["player.subtitle.settings"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+        XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["subtitle.candidate"].exists)
+        app.buttons["subtitle.search"].tap()
+        let candidate = app.buttons["subtitle.candidate"].firstMatch
+        if !candidate.isHittable { app.swipeUp() }
+        XCTAssertTrue(candidate.waitForExistence(timeout: 5)); candidate.tap()
+        app.swipeDown()
+        XCTAssertTrue(app.staticTexts["来源：迅雷 · 自创合法测试字幕"].waitForExistence(timeout: 5))
+        app.buttons["subtitle.earlier"].tap()
+        XCTAssertTrue(app.staticTexts["-0.5 秒"].exists)
+        app.buttons["subtitle.later"].tap()
+        app.buttons["subtitle.reset"].tap()
+        app.buttons["subtitle.disable"].tap()
+        XCTAssertTrue(app.staticTexts["subtitle.status"].label.contains("已关闭"))
+        app.buttons["完成"].tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+    }
+
     func testDelayedPosterNeverShowsOldLandscapeAndWarmWinnerIsImmediate() {
         continueAfterFailure = false
         let app = XCUIApplication()

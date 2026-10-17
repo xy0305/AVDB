@@ -59,6 +59,7 @@ jobs:
           python3 scripts/test-missav.py
           python3 scripts/test-javranking-performance.py | tee javranking-performance.txt
           python3 scripts/test-ipad-layout.py
+          python3 scripts/test-online-subtitles.py
           python3 scripts/test-player-regressions.py
           python3 scripts/test-player-runtime.py
           python3 scripts/test-player-gestures.py
@@ -104,6 +105,10 @@ jobs:
             clean build \
             | tee "$RUNNER_TEMP/xcodebuild.log"
 
+      - name: Probe optional third-party with system URLSession TLS
+        continue-on-error: true
+        run: SUBTITLE_LIVE_PROBE=1 python3 scripts/test-online-subtitles.py
+
       - name: Package IPA
         run: |
           set -euo pipefail
@@ -119,6 +124,18 @@ jobs:
           cd "$RUNNER_TEMP/ipa"
           zip -qry "$GITHUB_WORKSPACE/$ipa_name" Payload
           echo "IPA_NAME=$ipa_name" >> "$GITHUB_ENV"
+
+      - name: Record actual resolved dependency versions
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          paths = [Path('AVDB.xcworkspace/xcshareddata/swiftpm/Package.resolved'), Path('AVDB.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'), Path(os.environ['RUNNER_TEMP'])/'DerivedData/SourcePackages/workspace-state.json']
+          for p in paths:
+              if p.exists():
+                  print(str(p)); print(p.read_text())
+          PY
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4

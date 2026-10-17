@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        A18900000000000000000001 /* OnlineSubtitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18900000000000000000002; };
 		A17900000000000000000002 /* JAVLibraryRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17900000000000000000002; };
 		A17900000000000000000001 /* JAVLibrarySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17900000000000000000001; };
 		A17600000000000000000001 /* MissAVMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17600000000000000000001; };
@@ -68,6 +69,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        A18900000000000000000002 /* OnlineSubtitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineSubtitle.swift; sourceTree = "<group>"; };
 		B17900000000000000000002 /* JAVLibraryRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVLibraryRankingView.swift; sourceTree = "<group>"; };
 		B17900000000000000000001 /* JAVLibrarySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVLibrarySource.swift; sourceTree = "<group>"; };
 		B17600000000000000000001 /* MissAVMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissAVMetadata.swift; sourceTree = "<group>"; };
@@ -263,6 +265,7 @@
 		B4BA6A446DE35F5AFE9E6A1F /* Player */ = {
 			isa = PBXGroup;
 			children = (
+                A18900000000000000000002 /* OnlineSubtitle.swift */,
 				B08C58091094C960D502C7F8 /* PlayerView.swift */,
 				A16600000000000000000002 /* SeekPreview.swift */,
                 AB1620000000000000000002 /* PlaybackAudioSession.swift */,
@@ -457,6 +460,7 @@
 				LIBFEAT00000000000000001 /* LibraryFeaturesView.swift in Sources */,
 				FEATSTORE000000000000001 /* FeatureStores.swift in Sources */,
 				BC9852482E251643D9E18203 /* ListsView.swift in Sources */,
+                A18900000000000000000001 /* OnlineSubtitle.swift in Sources */,
 				74B43A483CB7C582A66D2A2D /* PlayerView.swift in Sources */,
 				A16600000000000000000001 /* SeekPreview.swift in Sources */,
                 AB1620000000000000000001 /* PlaybackAudioSession.swift in Sources */,
@@ -541,7 +545,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 188;
+				CURRENT_PROJECT_VERSION = 189;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -564,7 +568,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 188;
+				CURRENT_PROJECT_VERSION = 189;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

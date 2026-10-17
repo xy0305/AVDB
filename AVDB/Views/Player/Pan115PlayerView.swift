@@ -30,7 +30,8 @@ struct Pan115PlayerView: View {
                     onPlaybackFailure: { Task { await vm.failed() } },
                     managesOrientation: false,
                     onSelectSource: { showQuality = true },
-                    onSelectEpisode: vm.episodes.count > 1 ? { showEpisodes = true } : nil
+                    onSelectEpisode: vm.episodes.count > 1 ? { showEpisodes = true } : nil,
+                    publicSubtitleQuery: movie.displayNumber
                 )
                 .id(url)
             } else if let err = vm.errorMessage {

@@ -3,6 +3,44 @@ import UIKit
 import ImageIO
 @testable import AVDB
 
+final class OnlineSubtitleModelTests: XCTestCase {
+    @MainActor func testNoAutomaticRequestAndVideoClearCancelsStaleResult() async throws {
+        var calls = 0
+        let body = Data(#"{"code":0,"data":[{"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt","name":"self authored","ext":"srt","languages":[] }]}"#.utf8)
+        let model = OnlineSubtitleModel(fetch: { _, _ in
+            calls += 1
+            try? await Task.sleep(nanoseconds: 80_000_000) // deliberately ignore cancellation to test generation guard
+            return body
+        })
+        model.query = "公开查询"
+        XCTAssertEqual(calls, 0); XCTAssertTrue(model.results.isEmpty)
+        model.search()
+        await Task.yield()
+        model.clear()
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertTrue(model.results.isEmpty); XCTAssertTrue(model.cues.isEmpty)
+        XCTAssertNil(model.selected); XCTAssertEqual(model.query, "")
+        model.query = "新视频"; model.search()
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(model.results.count, 1); XCTAssertNil(model.selected)
+        XCTAssertTrue(model.cues.isEmpty) // never auto-select first result
+    }
+    @MainActor func testManualSelectionCloseAndOffsetReset() async throws {
+        var downloads = 0
+        let model = OnlineSubtitleModel(fetch: { _, search in
+            XCTAssertFalse(search); downloads += 1
+            return Data("1\n00:00:01,000 --> 00:00:02,000\n自创\n".utf8)
+        })
+        let row = OnlineSubtitleCandidate(id: "one", name: "自创", language: "未知", ext: "srt", url: URL(string: "https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt")!)
+        model.offset = 3; model.choose(row)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(downloads, 1); XCTAssertEqual(model.cues.count, 1)
+        XCTAssertEqual(model.offset, 0); XCTAssertEqual(model.selected, row)
+        model.disable(); XCTAssertTrue(model.cues.isEmpty); XCTAssertNil(model.selected)
+        XCTAssertEqual(model.offset, 0)
+    }
+}
+
 final class DetailPosterQualityTests: XCTestCase {
     private func jpeg(_ width: Int, _ height: Int, orientation: Int = 1) -> Data {
         let format = UIGraphicsImageRendererFormat(); format.scale = 1
