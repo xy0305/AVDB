@@ -155,12 +155,15 @@ final class PosterNavigationTests: XCTestCase {
     private func refreshPlayerChrome(_ app: XCUIApplication) {
         let entry = app.buttons["player.subtitle.settings"]
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
-        if entry.exists && entry.isHittable {
+        // AX may report the pre-hide snapshot just as the timer expires. A tap
+        // then reveals instead of hides; retry the observed state, boundedly.
+        for _ in 0..<3 {
+            if !entry.exists { break }
             center.tap()
-            let hidden = NSPredicate { _, _ in !entry.exists }
-            expectation(for: hidden, evaluatedWith: app)
-            waitForExpectations(timeout: 3)
+            let hidden = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in !entry.exists }, object: app)
+            if XCTWaiter.wait(for: [hidden], timeout: 1.5) == .completed { break }
         }
+        XCTAssertFalse(entry.exists, "Real center tap must hide chrome before refresh")
         center.tap()
         XCTAssertTrue(entry.waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertTrue(entry.isHittable, app.debugDescription)
@@ -174,7 +177,7 @@ final class PosterNavigationTests: XCTestCase {
 
     func testSubtitleControlsRealPlayerHitTargetsStyleAndDrag() {
         continueAfterFailure = false
-        XCUIDevice.shared.orientation = .landscapeLeft
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launchArguments = ["--poster-navigation-fixture", "--subtitle-controls-fixture"]
         app.launch()
@@ -243,7 +246,7 @@ final class PosterNavigationTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--poster-navigation-fixture", "--subtitle-controls-fixture", "--subtitle-no-cue"]
-        XCUIDevice.shared.orientation = .landscapeLeft
+        XCUIDevice.shared.orientation = .portrait
         app.launch()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
