@@ -1,7 +1,7 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
-    func testLongDetailTitleNeverCoversArtworkAndExpands() {
+    func testLongDetailTitleThreeLinesExpandsAndPersistsVisibility() {
         verifyReadableDetail(accessibilitySize: false)
     }
 
@@ -21,19 +21,21 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let visibility = app.switches["detail-cover-title-setting"]
+        if visibility.exists && visibility.value as? String == "0" { visibility.tap() }
         app.buttons["neutral-portrait-link"].tap()
         let title = app.staticTexts["portrait-hero-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 15))
-        let artwork = app.descendants(matching: .any)["detail-hero-artwork"].firstMatch
-        XCTAssertTrue(artwork.exists)
-        XCTAssertGreaterThanOrEqual(title.frame.minY, artwork.frame.maxY)
+        XCTAssertLessThanOrEqual(title.frame.height, 180, "Default is at most three old-size lines")
+        XCTAssertGreaterThan(title.frame.minY, app.buttons["返回"].frame.maxY, "Title stays over the original lower hero")
         let toggle = app.buttons["detail-title-toggle"]
         let reviewPanel = app.descendants(matching: .any)["detail-reviews-panel"].firstMatch
         XCTAssertTrue(reviewPanel.exists)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         let collapsedHeight = title.frame.height
+        let shownPlayY = app.buttons["portrait-hero-play"].frame.minY
         let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = accessibilitySize ? "191-neutral-accessibility-detail" : "191-neutral-readable-detail"
+        shot.name = accessibilitySize ? "192-neutral-three-lines-accessibility" : "192-neutral-three-lines-shown"
         shot.lifetime = .keepAlways; add(shot)
         for _ in 0..<5 where !toggle.isHittable || toggle.frame.maxY > reviewPanel.frame.minY { app.swipeUp() }
         XCTAssertTrue(toggle.isHittable); toggle.tap()
@@ -42,6 +44,7 @@ final class PosterNavigationTests: XCTestCase {
         for _ in 0..<12 where !toggle.isHittable || toggle.frame.maxY > reviewPanel.frame.minY { app.swipeUp() }
         XCTAssertTrue(toggle.isHittable); toggle.tap()
         XCTAssertEqual(toggle.label, "展开全文")
+        XCTAssertEqual(title.frame.height, collapsedHeight, accuracy: 1)
         let play = app.buttons["portrait-hero-play"]
         for _ in 0..<8 where !play.isHittable { app.swipeDown() }
         if !play.isHittable { app.swipeUp() }
@@ -63,9 +66,37 @@ final class PosterNavigationTests: XCTestCase {
         app.buttons["完成"].tap()
         XCUIDevice.shared.orientation = .landscapeLeft
         let landscape = XCTAttachment(screenshot: app.screenshot())
-        landscape.name = "191-neutral-readable-landscape"
+        landscape.name = "192-neutral-original-hero-landscape"
         landscape.lifetime = .keepAlways; add(landscape)
         XCTAssertTrue(app.buttons["返回"].isHittable)
+        XCUIDevice.shared.orientation = .portrait
+        app.buttons["返回"].tap()
+        XCTAssertTrue(visibility.waitForExistence(timeout: 5)); visibility.tap()
+        XCTAssertEqual(visibility.value as? String, "0")
+        app.buttons["neutral-portrait-link"].tap()
+        let hiddenPlay = app.buttons["portrait-hero-play"]
+        XCTAssertTrue(hiddenPlay.waitForExistence(timeout: 10))
+        XCTAssertFalse(title.exists, "Hidden title must not remain in accessibility tree")
+        XCTAssertFalse(toggle.exists, "Hidden title must remove disclosure too")
+        XCTAssertLessThan(hiddenPlay.frame.minY, shownPlayY - collapsedHeight + 4, "No reserved title/disclosure height")
+        XCTAssertTrue(app.staticTexts["DEMO-123"].exists)
+        let hidden = XCTAttachment(screenshot: app.screenshot())
+        hidden.name = "192-neutral-original-hero-title-hidden"
+        hidden.lifetime = .keepAlways; add(hidden)
+        app.buttons["返回"].tap()
+        app.terminate(); app.launch()
+        XCTAssertTrue(visibility.waitForExistence(timeout: 10))
+        XCTAssertEqual(visibility.value as? String, "0", "UserDefaults must survive app relaunch")
+        app.buttons["neutral-portrait-link"].tap()
+        XCTAssertTrue(hiddenPlay.waitForExistence(timeout: 10))
+        XCTAssertFalse(title.exists); XCTAssertFalse(toggle.exists)
+        app.buttons["返回"].tap()
+        app.buttons["neutral-wide-link"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["legacy-landscape-header"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["landscape-detail-title"].exists)
+        app.buttons["返回"].tap()
+        visibility.tap()
+        XCTAssertEqual(visibility.value as? String, "1")
     }
 
     func testOnlineSubtitleConsentSelectionOffsetAndDisable() {
@@ -157,9 +188,8 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(back.isHittable)
         XCTAssertGreaterThanOrEqual(back.frame.minY, 24, "Back must clear the status bar safe area")
         XCTAssertGreaterThanOrEqual(play.frame.height, 44)
-        let artwork = app.descendants(matching: .any)["detail-hero-artwork"].firstMatch
-        XCTAssertTrue(artwork.exists)
-        XCTAssertGreaterThanOrEqual(title.frame.minY, artwork.frame.maxY, "Readable title must never overlay the cover")
+        XCTAssertGreaterThan(title.frame.minY, back.frame.maxY)
+        XCTAssertLessThan(title.frame.maxY, play.frame.minY, "Original overlay title precedes old white play button")
         XCTAssertFalse(app.buttons["detail-title-toggle"].exists, "Short titles need no expansion control")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "native-neutral-portrait-hero-phone-or-ipad"
@@ -172,7 +202,7 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["neutral-wide-link"].waitForExistence(timeout: 5))
         app.buttons["neutral-wide-link"].tap()
         XCTAssertFalse(app.staticTexts["portrait-hero-title"].exists, "Wide/failure must preserve original detail")
-        XCTAssertTrue(app.staticTexts["Neutral Portrait Study"].exists || app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Neutral Portrait Study'")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["landscape-detail-title"].exists)
         let wide = XCTAttachment(screenshot: app.screenshot())
         wide.name = "native-neutral-original-wide-detail-fallback"
         wide.lifetime = .keepAlways; add(wide)

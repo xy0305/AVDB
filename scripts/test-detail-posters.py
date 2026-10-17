@@ -124,6 +124,22 @@ actor SelectionProbe {
  }
 }
 '''
+# User-requested recovery: original fill hero and original action strip, not build191.
+detail=(root/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
+settings=(root/'AVDB/Views/User/UserView.swift').read_text()
+portrait=detail.split('private func portraitHero',1)[1].split('private func posterAction',1)[0]
+for literal in ['scaledToFill()', 'width * 1.58', 'width * 0.99', 'location: 0.36', 'location: 0.86', 'HStack(spacing: 28)', '.background(.white, in: RoundedRectangle(cornerRadius: 17))', '.frame(width: 44, height: 44)', 'if showCoverTitle', 'DetailReadableTitle']:
+    assert literal in portrait,literal
+assert 'LazyVGrid' not in portrait  # The unrelated screenshots gallery remains a grid.
+for forbidden in ['DetailActionGlass', 'detailActions(movie)', 'glassEffect(']:
+    assert forbidden not in detail,forbidden
+assert 'lineLimit(expanded ? nil : 3)' in detail
+assert 'truncated = (heights["full"] ?? 0) > (heights["three"] ?? 0) + 1' in detail
+assert '.hidden().accessibilityHidden(true).allowsHitTesting(false)' in detail
+assert '@AppStorage("detail.showCoverTitle") private var showCoverTitle = true' in detail
+assert '@AppStorage("detail.showCoverTitle") private var showCoverTitle = true' in settings
+assert 'Toggle("显示封面标题", isOn: $showCoverTitle)' in settings
+print('PASS restored fill hero, white play, original 44pt action strip, three-line disclosure and persistent visibility wiring')
 # Ensure the detail-only resolver really keeps auth/session and bounds in production.
 resolver=(root/'AVDB/Services/DetailPosterResolver.swift').read_text()
 for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','DetailPosterSelection.collect','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','CGImageSourceCopyPropertiesAtIndex','kCGImageSourceCreateThumbnailWithTransform','rules.contains(source)','target.path == path','target.query == nil']:

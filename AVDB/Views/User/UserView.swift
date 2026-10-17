@@ -198,6 +198,8 @@ struct UserView: View {
                     }
                 }
 
+                CoverTitleSettingsSection()
+
                 Section("下载") {
                     NavigationLink {
                         Pan115SettingsView()
@@ -689,6 +691,22 @@ struct ExternalLibrarySettingsView: View {
                 } catch { message = error.localizedDescription }
             }
             Button("取消", role: .cancel) { }
+        }
+    }
+}
+
+/// Shared by the production settings page and neutral UI fixture.
+struct CoverTitleSettingsSection: View {
+    @AppStorage("detail.showCoverTitle") private var showCoverTitle = true
+
+    var body: some View {
+        Section {
+            Toggle("显示封面标题", isOn: $showCoverTitle)
+                .accessibilityIdentifier("detail-cover-title-setting")
+        } header: {
+            Text("详情显示")
+        } footer: {
+            Text("仅控制 App 叠加的影片标题；海报图片本身印刷的文字无法通过此开关隐藏。")
         }
     }
 }

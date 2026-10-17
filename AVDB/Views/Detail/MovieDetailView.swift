@@ -11,6 +11,7 @@ import AVKit
 struct MovieDetailView: View {
     let movieID: String
     @StateObject private var vm: MovieDetailViewModel
+    @AppStorage("detail.showCoverTitle") private var showCoverTitle = true
     @State private var play115 = false
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
@@ -101,7 +102,11 @@ struct MovieDetailView: View {
             .allowsHitTesting(false)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            detailChrome
+            if usesLandscapeLayout { detailChrome }
+        }
+        .ignoresSafeArea(edges: usesLandscapeLayout ? [] : .top)
+        .overlay(alignment: .top) {
+            if !usesLandscapeLayout { detailChrome }
         }
         .sheet(isPresented: $showPosterResources) {
             if let movie = vm.movie {
@@ -235,7 +240,7 @@ struct MovieDetailView: View {
             return AnyView(ZStack {
                 Color(art.tint)
                 Image(uiImage: art.backdrop).resizable().scaledToFill().opacity(0.22)
-                Color.black.opacity(0.45)
+                Color(art.tint).opacity(0.65)
             }.clipped())
         }
         return AnyView(legacyDetailBackground(movie))
@@ -307,82 +312,138 @@ struct MovieDetailView: View {
     }
 
     private func portraitHero(_ movie: Movie, art: DetailPosterArtwork?) -> some View {
-        let width = max(1, min(layoutSize.width, AdaptiveLayout.isPad ? 900 : 600))
-        let imageHeight = min(520, max(180, layoutSize.height * 0.43))
-        return VStack(alignment: .leading, spacing: 20) {
-            // Fixed viewport for pending and resolved states. Fit preserves the entire
-            // selected artwork; resolution must not move the title or play button.
+        let tint = art?.tint ?? UIColor(red: 0.16, green: 0.16, blue: 0.18, alpha: 1)
+        let width = max(320, min(layoutSize.width, AdaptiveLayout.isPad ? 900 : 600))
+        let imageHeight = min(width * 1.58, max(600, layoutSize.height * 0.8))
+        let titleTop = min(width * 0.99, max(390, layoutSize.height * 0.47))
+        return ZStack(alignment: .top) {
             Group {
                 if let art {
-                    Image(uiImage: art.image).resizable().scaledToFit()
+                    Image(uiImage: art.image).resizable().scaledToFill()
                 } else {
-                    Color.clear.overlay { ProgressView().tint(.white) }
+                    Color(tint).overlay(alignment: .top) {
+                        ProgressView().tint(.white.opacity(0.65)).padding(.top, 120)
+                    }
                 }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: imageHeight)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("封面")
+            .frame(width: width, height: imageHeight, alignment: .top)
+            .clipped()
+            .accessibilityHidden(true)
             .accessibilityIdentifier("detail-hero-artwork")
-
-            VStack(alignment: .leading, spacing: 16) {
-                DetailReadableTitle(title: movie.displayTitle,
-                    identifier: art == nil ? "resolving-hero-title" : "portrait-hero-title")
-                Text(movie.displayNumber)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-                detailActions(movie)
+            LinearGradient(stops: [
+                .init(color: .clear, location: 0.36),
+                .init(color: Color(tint).opacity(0.24), location: 0.57),
+                .init(color: Color(tint).opacity(0.83), location: 0.86),
+                .init(color: Color(tint), location: 1)
+            ], startPoint: .top, endPoint: .bottom)
+            .frame(height: imageHeight + 30)
+            VStack(alignment: .leading, spacing: 0) {
+                if showCoverTitle {
+                    DetailReadableTitle(title: movie.displayTitle,
+                                        identifier: art == nil ? "resolving-hero-title" : "portrait-hero-title",
+                                        font: .system(size: AdaptiveLayout.isPad ? 42 : 34, weight: .bold))
+                        .shadow(color: .black.opacity(0.25), radius: 8)
+                        .padding(.horizontal, 40)
+                }
+                HStack(spacing: 7) {
+                    Text(movie.displayNumber).fixedSize()
+                        .padding(.horizontal, 4).overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.9)))
+                    if let date = movie.releaseDate { Text(date).fixedSize() }
+                    if let tags = movie.tags, !tags.isEmpty {
+                        Text(tags.compactMap(\.name).joined(separator: ", "))
+                            .lineLimit(1).truncationMode(.tail).layoutPriority(-1)
+                    }
+                    if let minutes = movie.duration { Text("\(minutes / 60) 小时 \(minutes % 60) 分钟").fixedSize() }
+                    if movie.hasCnsub == true { Text("中字").fixedSize() }
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 18).padding(.top, 18)
+                Button {
+                    GlassHaptic.tap()
+                    play115 = true
+                } label: {
+                    Label("播放", systemImage: "play.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity).frame(minHeight: 44)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 40).padding(.top, 8)
+                .accessibilityIdentifier("portrait-hero-play")
+                HStack(spacing: 28) {
+                    posterAction("arrow.down.circle", label: "下载资源") { showPosterResources = true }
+                    NavigationLink { MyListsView(movieID: movie.id) } label: {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                            .font(.system(size: 23, weight: .regular)).frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.accessibilityLabel("存入清单")
+                    posterAction(vm.reviewStatus == "want_watch" ? "heart.fill" : "heart", label: "想看") {
+                        Task { await vm.setReviewStatus("want_watch") }
+                    }
+                    posterAction(vm.reviewStatus == "watched" ? "checkmark.rectangle.fill" : "checkmark.rectangle", label: "看过") {
+                        Task { await vm.setReviewStatus("watched") }
+                    }
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity).padding(.top, 12)
+                .accessibilityIdentifier("portrait-hero-actions")
+                if let summary = movie.summary, !summary.isEmpty {
+                    Text(summary).font(.system(size: 13)).multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity).padding(.horizontal, 32).padding(.top, 22)
+                } else {
+                    Text("「\(movie.displayNumber)」").font(.system(size: 13))
+                        .frame(maxWidth: .infinity).padding(.top, 22)
+                }
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Text("播放资源:").font(.system(size: 17, weight: .bold))
+                        Button("115 原画") { play115 = true }
+                            .font(.system(size: 15, weight: .semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 6)
+                            .overlay(Capsule().stroke(.white.opacity(0.22)))
+                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            Button { play115 = true } label: {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("115 原画").font(.title3.bold())
+                                    Text(Pan115Settings.shared.isConfigured ? "打开 115 匹配资源" : "需先在「我的」配置 115")
+                                        .font(.caption)
+                                    Label("选择播放文件", systemImage: "play.circle")
+                                        .font(.subheadline)
+                                }
+                                .padding(16).frame(minWidth: 220, alignment: .leading)
+                                .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.45)))
+                            }
+                            if (movie.magnetsCount ?? 0) > 0 || externalSettings.enabled {
+                                Button { showPosterResources = true } label: {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("磁力与外部资源").font(.title3.bold())
+                                        Text("查看可用链接后选择推送").font(.caption)
+                                        Label("查看资源", systemImage: "link").font(.subheadline)
+                                    }.padding(16).frame(minWidth: 220, alignment: .leading)
+                                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.22)))
+                                }
+                            }
+                        }.padding(.horizontal, 18)
+                    }.padding(.horizontal, -18)
+                }
+                .padding(.horizontal, 18).padding(.top, 76)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("portrait-hero-resources")
             }
-            .padding(.horizontal, 20)
+            .padding(.top, titleTop)
+            .padding(.bottom, 10)
         }
         .foregroundStyle(.white)
         .frame(width: width)
     }
 
-    private func detailActions(_ movie: Movie) -> some View {
-        VStack(spacing: 12) {
-            Button {
-                GlassHaptic.tap()
-                play115 = true
-            } label: {
-                Label("播放", systemImage: "play.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity).frame(minHeight: 50)
-                    .modifier(DetailActionGlass(prominent: true))
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("portrait-hero-play")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
-                posterAction("arrow.down.circle", label: "下载资源") { showPosterResources = true }
-                NavigationLink { MyListsView(movieID: movie.id) } label: {
-                    detailActionLabel("rectangle.stack.badge.plus", label: "存入清单")
-                }.accessibilityLabel("存入清单")
-                posterAction(vm.reviewStatus == "want_watch" ? "heart.fill" : "heart", label: "想看") {
-                    Task { await vm.setReviewStatus("want_watch") }
-                }
-                posterAction(vm.reviewStatus == "watched" ? "checkmark.rectangle.fill" : "checkmark.rectangle", label: "看过") {
-                    Task { await vm.setReviewStatus("watched") }
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("portrait-hero-actions")
-        }
-    }
-
-    private func detailActionLabel(_ icon: String, label: String) -> some View {
-        Label(label, systemImage: icon)
-            .font(.subheadline.weight(.semibold))
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .frame(maxWidth: .infinity).frame(minHeight: 44)
-            .modifier(DetailActionGlass())
-            .contentShape(Capsule())
-    }
-
     private func posterAction(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { detailActionLabel(icon, label: label) }
-            .accessibilityLabel(label)
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 23, weight: .regular))
+                .frame(width: 44, height: 44).contentShape(Rectangle())
+        }.accessibilityLabel(label)
     }
 
     #if DEBUG
@@ -401,22 +462,79 @@ struct MovieDetailView: View {
     #endif
 
     private func heroHeader(_ movie: Movie) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            JavDBImage(
-                url: movie.coverURL,
-                fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
-                secondFallbackURL: movie.hdBackdropURL,
-                contentMode: .fit
-            )
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1.47, contentMode: .fit)
+        VStack(alignment: .leading, spacing: 22) {
+            if showCoverTitle {
+                DetailReadableTitle(title: movie.displayTitle, identifier: "landscape-detail-title",
+                                    font: .system(size: 28, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            ZStack(alignment: .bottomTrailing) {
+                JavDBImage(
+                    // 优先顺序：JAVDB cover_url 无水印 → 首张剧照 → DMM 横版 → Tenhow 竖版
+                    url: movie.coverURL,
+                    fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
+                    secondFallbackURL: movie.hdBackdropURL,
+                    contentMode: .fill
+                )
+                .frame(maxWidth: .infinity)
+                .aspectRatio(1.47, contentMode: .fit)
+                .clipped()
+
+                Button {
+                    GlassHaptic.tap()
+                    play115 = true
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .frame(width: 56, height: 56)
+                        .liquidGlassCircle()
+                }
+                .pressableGlass(scale: 0.9)
+                .padding(12)
+            }
             .liquidCover(cornerRadius: 16)
-            .accessibilityIdentifier("detail-hero-artwork")
-            DetailReadableTitle(title: movie.displayTitle, identifier: "landscape-detail-title")
-            detailActions(movie)
+
             movieInfoCard(movie)
+
+            HStack(spacing: 10) {
+                GlassActionPill(
+                    title: vm.reviewStatus == "want_watch" ? "已想看" : "想看",
+                    icon: vm.reviewStatus == "want_watch" ? "heart.fill" : "heart",
+                    isSelected: vm.reviewStatus == "want_watch",
+                    tint: .pink
+                ) {
+                    Task { await vm.setReviewStatus("want_watch") }
+                }
+                GlassActionPill(
+                    title: vm.reviewStatus == "watched" ? "已看過" : "看過",
+                    icon: vm.reviewStatus == "watched" ? "checkmark.circle.fill" : "checkmark.circle",
+                    isSelected: vm.reviewStatus == "watched",
+                    tint: .green
+                ) {
+                    Task { await vm.setReviewStatus("watched") }
+                }
+                NavigationLink {
+                    MyListsView(movieID: movie.id)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bookmark")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("存入清單")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .contentShape(Capsule())
+                    .liquidGlass(interactive: false)
+                }
+                .pressableGlass(scale: 0.94)
+            }
+            .font(.caption)
+            .padding(.bottom, 4)
         }
-        .foregroundStyle(.white)
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1792,6 +1910,7 @@ struct DetailHeroFixtureGallery: View {
     }
     var body: some View {
         List {
+            CoverTitleSettingsSection()
             NavigationLink("Portrait detail") { MovieDetailView(fixture: movie(wide: false)) }
                 .accessibilityIdentifier("neutral-portrait-link")
             NavigationLink("Wide detail") { MovieDetailView(fixture: movie(wide: true)) }
@@ -1813,6 +1932,7 @@ private struct DetailTitleHeights: PreferenceKey {
 private struct DetailReadableTitle: View {
     let title: String
     let identifier: String
+    var font: Font = .title2.weight(.bold)
     @State private var expanded = false
     @State private var truncated = false
 
@@ -1850,31 +1970,6 @@ private struct DetailReadableTitle: View {
         }
     }
     private var titleText: some View {
-        Text(title).font(.title2.weight(.bold)).multilineTextAlignment(.leading)
-    }
-}
-
-private struct DetailActionGlass: ViewModifier {
-    var prominent = false
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    @ViewBuilder func body(content: Content) -> some View {
-        if reduceTransparency {
-            content.foregroundStyle(prominent ? Color.black : Color.white)
-                .background(prominent ? Color.white : Color(white: 0.22), in: Capsule())
-        } else if #available(iOS 26.0, *) {
-            content.foregroundStyle(.primary)
-                .glassEffect(.regular.tint(prominent ? .white.opacity(0.24) : .clear), in: Capsule())
-        } else {
-            content.foregroundStyle(.primary)
-                .background(.ultraThinMaterial, in: Capsule())
-                .background(Color.white.opacity(prominent ? 0.18 : 0.06), in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(LinearGradient(colors: [.white.opacity(0.6), .white.opacity(0.08)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.7)
-                        .allowsHitTesting(false)
-                }
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-        }
+        Text(title).font(font).lineSpacing(4).multilineTextAlignment(.leading)
     }
 }
