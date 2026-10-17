@@ -10,7 +10,10 @@ assert 'SystemVolume' not in player and 'HiddenVolumeView' not in player
 assert 'if gestureRecognizer === recognizer { dragStart = point }' in player
 should_begin = player.split('func gestureRecognizerShouldBegin')[1].split('func gestureRecognizer(')[0]
 assert 'velocity(' not in should_begin and 'translation(' not in should_begin
-assert 'node is UIControl' in player and 'point.y >= 72' in player and 'bounds.height - 108' in player
+assert 'node is UIControl' in player and 'point.y >= parent.excludedTop' in player and 'view.bounds.height - parent.excludedBottom' in player
+assert 'excludedTop: safeArea.top + 80' in player and 'excludedBottom: safeArea.bottom + 116' in player
+assert 'return !blocked && point.y >= excludedTop' in player
+assert 'blocked: editingSubtitlePosition || showOnlineSubtitles' in player
 assert 'slider.window === window, slider.isEnabled' in player
 assert '!isHidden, alpha == 1' in player
 assert 'AVAudioSession.sharedInstance().outputVolume' in player

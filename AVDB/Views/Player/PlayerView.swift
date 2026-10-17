@@ -149,6 +149,8 @@ struct KSChromePlayer: View {
     var publicSubtitleQuery: String = "" // Explicit public metadata only; never infer from URL/title/path.
     @StateObject private var onlineSubtitles = OnlineSubtitleModel()
     @State private var showOnlineSubtitles = false
+    @State private var editingSubtitlePosition = false
+    @State private var adjustSubtitleAfterDismiss = false
     @State private var showLUT = false
     @State private var playbackActive = false
     @State private var isPlaying = false
@@ -208,7 +210,16 @@ struct KSChromePlayer: View {
             showChrome = true
             startTicker()
             scheduleHide()
-        }) { OnlineSubtitlePanel(model: onlineSubtitles) }
+            if adjustSubtitleAfterDismiss {
+                adjustSubtitleAfterDismiss = false
+                editingSubtitlePosition = true
+                showChrome = false
+                hideTask?.cancel()
+            }
+        }) { OnlineSubtitlePanel(model: onlineSubtitles, adjustPosition: {
+            adjustSubtitleAfterDismiss = true
+            showOnlineSubtitles = false
+        }) }
         .onChange(of: showOnlineSubtitles) { _, presented in
             if presented { cancelPlayerDrag(); hideTask?.cancel(); showChrome = true }
         }
@@ -226,6 +237,11 @@ struct KSChromePlayer: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             configureSeekPreview()
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--subtitle-controls-fixture"), !ProcessInfo.processInfo.arguments.contains("--subtitle-no-cue") {
+                onlineSubtitles.cues = [.init(start: 0, end: 120, text: "中性字幕样式测试\n第二行保留完整文本")]
+            }
+            #endif
             guard !playbackActive else {
                 showChrome = true
                 startTicker()
@@ -241,6 +257,7 @@ struct KSChromePlayer: View {
         .onChange(of: progressID) { _, _ in onlineSubtitles.clear() }
         .onChange(of: publicSubtitleQuery) { _, _ in onlineSubtitles.clear() }
         .onChange(of: url) { _, _ in
+            editingSubtitlePosition = false
             onlineSubtitles.clear()
             seekGeneration += 1
             seekPending = false
@@ -291,21 +308,15 @@ struct KSChromePlayer: View {
             Color.black
             AudioOwnedKSVideoPlayer(player: coordinator, audio: audio, url: url, options: playerOptions, onStop: stopPlayback)
                 .onAppear { applyFillMode() }
-            if !onlineSubtitles.cues.isEmpty {
-                TimelineView(.periodic(from: .now, by: 0.1)) { _ in
-                    let clock = coordinator.playerLayer?.player.currentPlaybackTime ?? 0
-                    let text = OnlineSubtitleParser.display(onlineSubtitles.cues, at: clock, offset: onlineSubtitles.offset)
-                    VStack {
-                        Spacer()
-                        if !text.isEmpty {
-                            Text(text).font(.system(size: min(26, max(16, width / 35)), weight: .medium))
-                                .multilineTextAlignment(.center).foregroundStyle(.white)
-                                .padding(8).background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 6))
-                                .padding(.horizontal, 24)
-                        }
-                    }.padding(.bottom, max(safeArea.bottom + 30, showChrome ? 130 : 40))
-                }.allowsHitTesting(false).zIndex(5)
-            }
+            TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                let clock = coordinator.playerLayer?.player.currentPlaybackTime ?? 0
+                let text = OnlineSubtitleParser.display(onlineSubtitles.cues, at: clock, offset: onlineSubtitles.offset)
+                SubtitlePresentationOverlay(text: text, safeArea: safeArea, editing: editingSubtitlePosition) {
+                    editingSubtitlePosition = false
+                    showChrome = true
+                    scheduleHide()
+                }
+            }.zIndex(editingSubtitlePosition ? 30 : 5)
             if showChrome {
                 chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
                     .padding(.top, safeArea.top)
@@ -316,7 +327,9 @@ struct KSChromePlayer: View {
             // KSVideoPlayer renders only the underlying player view (no official pan).
             // This transparent sibling owns the only pan output; chrome stays above it.
             PlayerGestureLayer(
-                blocked: showOnlineSubtitles || showLUT || seekPending || (isSeeking && !horizontalDrag),
+                excludedTop: safeArea.top + 80,
+                excludedBottom: safeArea.bottom + 116,
+                blocked: editingSubtitlePosition || showOnlineSubtitles || showLUT || seekPending || (isSeeking && !horizontalDrag),
                 sourceID: url,
                 onDoubleTap: { x, width in skip(by: x < width * 0.5 ? -10 : 10) },
                 onSingleTap: { toggleChrome() },
@@ -513,8 +526,12 @@ struct KSChromePlayer: View {
                     showOnlineSubtitles = true
                 } label: {
                     Image(systemName: "captions.bubble")
-                        .foregroundStyle(.white).frame(width: 44, height: 48)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white).frame(width: 48, height: 48)
+                        .background(.black.opacity(0.35), in: Capsule())
+                        .contentShape(Rectangle())
                 }.buttonStyle(.plain)
+                    .fixedSize().layoutPriority(2).zIndex(20)
                     .accessibilityLabel("在线字幕").accessibilityIdentifier("player.subtitle.settings")
                 Button { showLUT = true } label: {
                     Image(systemName: "camera.filters")
@@ -593,6 +610,8 @@ struct KSChromePlayer: View {
                     .frame(width: 48, height: 48)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(isPlaying ? "暂停" : "播放")
+                .accessibilityIdentifier("player.play.toggle")
 
                 Button {
                     seek(to: min((isSeeking ? seekValue : currentTime) + 10, max(duration, 0)))
@@ -617,7 +636,10 @@ struct KSChromePlayer: View {
                             .font(.caption.weight(.medium)).lineLimit(1)
                             .frame(maxWidth: 180)
                             .frame(minHeight: 48)
-                    }.accessibilityLabel("选择播放源")
+                    }.buttonStyle(.plain)
+                        .foregroundStyle(.white)
+                        .accessibilityLabel("选择播放源")
+                        .accessibilityIdentifier("player.source.settings")
                 } else if !subtitle.isEmpty {
                     Text(subtitle).font(.caption).foregroundStyle(.white.opacity(0.8))
                 }
@@ -943,6 +965,9 @@ struct PlayerGestureLayer: UIViewRepresentable {
     final class GestureView: UIView {
         fileprivate let volume = PlayerVolumeView()
         var cancelPan: (() -> Void)?
+        var excludedTop: CGFloat = 80
+        var excludedBottom: CGFloat = 116
+        var blocked = false
         private var previousBounds = CGRect.zero
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -964,9 +989,11 @@ struct PlayerGestureLayer: UIViewRepresentable {
         }
         override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             guard bounds.contains(point) else { return false }
-            return point.y >= 72 && point.y <= bounds.height - 108
+            return !blocked && point.y >= excludedTop && point.y <= bounds.height - excludedBottom
         }
     }
+    var excludedTop: CGFloat
+    var excludedBottom: CGFloat
     var blocked: Bool
     var sourceID: URL
     var onDoubleTap: (CGFloat, CGFloat) -> Void
@@ -999,6 +1026,9 @@ struct PlayerGestureLayer: UIViewRepresentable {
         let c = context.coordinator
         if sourceID != c.parent.sourceID || (blocked && !c.parent.blocked) { c.cancel() }
         c.parent = self
+        uiView.excludedTop = excludedTop
+        uiView.excludedBottom = excludedBottom
+        uiView.blocked = blocked
     }
     static func dismantleUIView(_ uiView: GestureView, coordinator: Coordinator) {
         coordinator.cancel()
@@ -1033,7 +1063,7 @@ struct PlayerGestureLayer: UIViewRepresentable {
                 target = node.superview
             }
             let point = touch.location(in: view)
-            guard point.y >= 72, point.y <= view.bounds.height - 108 else { return false }
+            guard point.y >= parent.excludedTop, point.y <= view.bounds.height - parent.excludedBottom else { return false }
             if gestureRecognizer === recognizer { dragStart = point } // original touchdown half
             return true
         }

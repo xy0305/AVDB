@@ -1,6 +1,8 @@
 require 'xcodeproj'
 p = Xcodeproj::Project.open('AVDB.xcodeproj')
 app = p.targets.find { |t| t.name == 'AVDB' }
+# Synthetic clip is included only in the simulator test setup, never Release IPA.
+app.resources_build_phase.add_file_reference(p.main_group.new_file('scripts/subtitle-fixtures/neutral-subtitle.mp4'))
 t = p.new_target(:ui_test_bundle, 'PosterNavigationUITests', :ios, '17.0')
 t.add_dependency(app)
 f = p.main_group.new_group('UITests').new_file('UITests/PosterNavigationTests.swift')

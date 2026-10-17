@@ -148,6 +148,96 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(visibility.value as? String, "1")
     }
 
+    func testSubtitleControlsRealPlayerHitTargetsStyleAndDrag() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--subtitle-controls-fixture"]
+        app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let entry = app.buttons["player.subtitle.settings"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertGreaterThanOrEqual(entry.frame.width, 48)
+        XCTAssertGreaterThanOrEqual(entry.frame.height, 48)
+        let originalOrientation = XCUIDevice.shared.orientation
+        // Both center and near-edge points must reach the actual player button,
+        // not a parallel fixture button or a transparent tap recognizer.
+        for point in [CGVector(dx: 0.5, dy: 0.5), CGVector(dx: 0.06, dy: 0.06), CGVector(dx: 0.94, dy: 0.94)] {
+            if !entry.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)).tap() }
+            entry.coordinate(withNormalizedOffset: point).tap()
+            XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5), app.debugDescription)
+            app.buttons["完成"].tap()
+            XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        }
+        XCTAssertEqual(XCUIDevice.shared.orientation, originalOrientation)
+        XCTAssertTrue(app.buttons["player.source.settings"].isHittable)
+        let play = app.buttons["player.play.toggle"]
+        XCTAssertEqual(play.label, "暂停", "Opening/dismissing subtitles must not pause playback")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "193-neutral-player-white-source-caption"; shot.lifetime = .keepAlways; add(shot)
+        entry.tap()
+        func reveal(_ element: XCUIElement) {
+            for _ in 0..<8 { if element.isHittable { return }; app.swipeUp() }
+            XCTAssertTrue(element.isHittable, app.debugDescription)
+        }
+        let reset = app.buttons["subtitle.appearance.reset"]
+        reveal(reset); reset.tap()
+        let increase = app.buttons["增大字号"]
+        reveal(increase); increase.tap()
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 23 pt")
+        let edit = app.buttons["subtitle.position.edit"]
+        reveal(edit); edit.tap()
+        let caption = app.staticTexts["subtitle.rendered"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5), app.debugDescription)
+        let before = caption.frame
+        caption.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.34)))
+        let after = caption.frame
+        XCTAssertLessThan(after.midY, before.midY - 5)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(after), "Caption must clamp within visible bounds")
+        let edited = XCTAttachment(screenshot: app.screenshot())
+        edited.name = "193-neutral-position-edit"; edited.lifetime = .keepAlways; add(edited)
+        app.buttons["subtitle.position.done"].tap()
+        XCTAssertEqual(play.label, "暂停", "Caption drag must not pause/seek via player recognizers")
+        XCTAssertFalse(app.otherElements["player.seek.preview"].exists)
+        entry.tap(); reveal(app.staticTexts["subtitle.font.value"])
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 23 pt")
+        reveal(reset); reset.tap()
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 22 pt")
+        app.buttons["完成"].tap()
+    }
+
+    func testSubtitleNoCuePreviewClampsAndRotates() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--subtitle-controls-fixture", "--subtitle-no-cue"]
+        XCUIDevice.shared.orientation = .landscapeLeft
+        app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let entry = app.buttons["player.subtitle.settings"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+        let edit = app.buttons["subtitle.position.edit"]
+        for _ in 0..<8 { if edit.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(edit.isHittable); edit.tap()
+        let caption = app.staticTexts["subtitle.rendered"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        XCTAssertEqual(caption.label, "字幕位置预览")
+        caption.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.99)))
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(caption.frame))
+        XCUIDevice.shared.orientation = .portrait
+        let deadline = Date().addingTimeInterval(8)
+        while app.windows.firstMatch.frame.width > app.windows.firstMatch.frame.height && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.2)) }
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(caption.frame), app.debugDescription)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "193-neutral-no-cue-portrait-clamp"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["subtitle.position.reset"].tap()
+        app.buttons["subtitle.position.done"].tap()
+        XCTAssertFalse(caption.exists, "No synthetic dialogue in normal playback")
+    }
+
     func testOnlineSubtitleConsentSelectionOffsetAndDisable() {
         continueAfterFailure = false
         let app = XCUIApplication()

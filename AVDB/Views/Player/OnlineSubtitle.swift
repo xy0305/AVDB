@@ -225,6 +225,7 @@ enum OnlineSubtitleParser {
 
 #if os(iOS) && canImport(SwiftUI) && !SUBTITLE_CORE_TEST
 import SwiftUI
+import UIKit
 @MainActor final class OnlineSubtitleModel: ObservableObject {
     @Published var query = ""
     @Published var results: [OnlineSubtitleCandidate] = []
@@ -290,8 +291,145 @@ import SwiftUI
         }
     }
 }
+// Independent presentation preferences: clearing a media request never clears style.
+// Reference: KSPlayer SubtitleModel.Size/textColor; no upstream code copied.
+private enum SubtitleStyleDefaults {
+    static let size = 22.0
+    static let x = 0.5
+    static let y = 0.85
+}
+
+struct SubtitleAppearanceControls: View {
+    @AppStorage("subtitle.fontPoints") private var points = SubtitleStyleDefaults.size
+    @AppStorage("subtitle.positionX") private var x = SubtitleStyleDefaults.x
+    @AppStorage("subtitle.positionY") private var y = SubtitleStyleDefaults.y
+    var adjustPosition: () -> Void
+    var body: some View {
+        Section("字幕外观 · 保留到下次播放") {
+            Text("字号 \(Int(points)) pt").accessibilityIdentifier("subtitle.font.value")
+            Slider(value: $points, in: 14...36, step: 1) { Text("字幕字号") }
+                .accessibilityIdentifier("subtitle.font.slider")
+            HStack {
+                Button("减小字号") { points = max(14, points - 1) }
+                Spacer()
+                Button("增大字号") { points = min(36, points + 1) }
+            }.buttonStyle(.borderless)
+            Button("调整位置（拖动字幕）", action: adjustPosition)
+                .accessibilityIdentifier("subtitle.position.edit")
+            HStack {
+                Button("向左") { x = max(0, x - 0.05) }
+                Button("向右") { x = min(1, x + 0.05) }
+                Button("向上") { y = max(0, y - 0.05) }
+                Button("向下") { y = min(1, y + 0.05) }
+            }.buttonStyle(.borderless)
+            Button("恢复默认字号与位置") {
+                points = SubtitleStyleDefaults.size; x = SubtitleStyleDefaults.x; y = SubtitleStyleDefaults.y
+            }.accessibilityIdentifier("subtitle.appearance.reset")
+            Text("白字、阴影与半透明黑色圆角背景。14–36 pt 随系统辅助字号适度放大；位置相对播放器安全区域保存。调整模式暂时隔离播放手势；没有对白时仅显示位置预览。")
+                .font(.footnote)
+        }
+    }
+}
+
+private struct SubtitleTextSizeKey: PreferenceKey {
+    static var defaultValue = CGSize(width: 1, height: 1)
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
+}
+
+/// Normal watching is entirely non-interactive. In edit mode the full overlay shields
+/// the underlying UIKit recognizers; only the caption itself owns the drag gesture.
+struct SubtitlePresentationOverlay: View {
+    var text: String
+    var safeArea: EdgeInsets
+    var editing: Bool
+    var finish: () -> Void
+    @AppStorage("subtitle.fontPoints") private var points = SubtitleStyleDefaults.size
+    @AppStorage("subtitle.positionX") private var x = SubtitleStyleDefaults.x
+    @AppStorage("subtitle.positionY") private var y = SubtitleStyleDefaults.y
+    @ScaledMetric(relativeTo: .body) private var dynamicScale = 1.0
+    @GestureState private var translation = CGSize.zero
+    @State private var textSize = CGSize(width: 1, height: 48)
+    private func bounded(_ value: Double) -> CGFloat {
+        CGFloat(value.isFinite ? min(1, max(0, value)) : 0.5)
+    }
+    var body: some View {
+        GeometryReader { geo in
+            // Reserve controls whether visible or hidden: no caption jumping on tap.
+            let left = safeArea.leading + 16
+            let top = safeArea.top + 80
+            let available = CGSize(width: max(1, geo.size.width - left - safeArea.trailing - 16),
+                                   height: max(1, geo.size.height - top - safeArea.bottom - 116))
+            let height = min(available.height, max(1, textSize.height))
+            let renderedText = text.isEmpty ? "字幕位置预览\n拖动此处调整" : text
+            let fontSize: CGFloat = min(48, max(14, points.isFinite ? points : 22) * min(1.35, dynamicScale))
+            let measured = (renderedText as NSString).boundingRect(with: CGSize(width: max(1, available.width * 0.86 - 20), height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: UIFont.systemFont(ofSize: fontSize, weight: .medium)], context: nil)
+            let width = min(available.width, max(40, ceil(measured.width) + 20))
+            let travelX = max(0, available.width - width)
+            let travelY = max(0, available.height - height)
+            let px = min(travelX, max(0, bounded(x) * travelX + translation.width))
+            let py = min(travelY, max(0, bounded(y) * travelY + translation.height))
+            ZStack(alignment: .topLeading) {
+                if editing {
+                    Color.black.opacity(0.001).contentShape(Rectangle())
+                        .onTapGesture { } // absorb taps; never toggle chrome/playback
+                }
+                if editing || !text.isEmpty {
+                    ScrollView(.vertical) {
+                        Text(renderedText)
+                            .font(.system(size: fontSize, weight: .medium))
+                            .foregroundStyle(.white).multilineTextAlignment(.center)
+                            .shadow(color: .black, radius: 1, x: 1, y: 1)
+                            .padding(.horizontal, 10).padding(.vertical, 7)
+                            .frame(width: width)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 7))
+                            .background(GeometryReader { proxy in
+                                Color.clear.preference(key: SubtitleTextSizeKey.self, value: proxy.size)
+                            })
+                    }
+                    .scrollDisabled(!editing || textSize.height <= available.height)
+                    .frame(width: width, height: height)
+                    .onPreferenceChange(SubtitleTextSizeKey.self) { textSize = $0 }
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(DragGesture(minimumDistance: 2)
+                        .updating($translation) { value, state, _ in if editing { state = value.translation } }
+                        .onEnded { value in
+                            guard editing else { return }
+                            if travelX > 0 { x = Double(min(travelX, max(0, bounded(x) * travelX + value.translation.width)) / travelX) }
+                            if travelY > 0 { y = Double(min(travelY, max(0, bounded(y) * travelY + value.translation.height)) / travelY) }
+                        })
+                    .position(x: left + width / 2 + px, y: top + height / 2 + py)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(text.isEmpty ? "字幕位置预览" : text)
+                    .accessibilityHint(editing ? "上下轻扫调整垂直位置，更多方向可在字幕设置中调整" : "")
+                    .accessibilityAdjustableAction { direction in
+                        guard editing else { return }
+                        y = min(1, max(0, y + (direction == .increment ? -0.05 : 0.05)))
+                    }
+                    .accessibilityIdentifier("subtitle.rendered")
+                }
+                if editing {
+                    HStack {
+                        Text("拖动字幕调整位置").font(.callout)
+                        Spacer()
+                        Button("重置位置") { x = SubtitleStyleDefaults.x; y = SubtitleStyleDefaults.y }
+                            .accessibilityIdentifier("subtitle.position.reset")
+                        Button("完成", action: finish).accessibilityIdentifier("subtitle.position.done")
+                    }
+                    .foregroundStyle(.white).buttonStyle(.bordered)
+                    .padding(12).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.leading, safeArea.leading + 12).padding(.trailing, safeArea.trailing + 12)
+                    .padding(.top, safeArea.top + 8)
+                }
+            }
+        }
+        .allowsHitTesting(editing)
+    }
+}
+
 struct OnlineSubtitlePanel: View {
     @ObservedObject var model: OnlineSubtitleModel
+    var adjustPosition: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
@@ -335,6 +473,7 @@ struct OnlineSubtitlePanel: View {
                         }.accessibilityIdentifier("subtitle.candidate")
                     }
                 }
+                SubtitleAppearanceControls(adjustPosition: adjustPosition)
             }
             .navigationTitle("在线字幕")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
