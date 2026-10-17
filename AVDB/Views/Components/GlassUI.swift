@@ -718,6 +718,7 @@ struct GlassActionPill: View {
     let icon: String
     var isSelected: Bool = false
     var tint: Color = .blue
+    var minimumHitHeight: CGFloat? = nil
     let action: () -> Void
 
     var body: some View {
@@ -736,6 +737,7 @@ struct GlassActionPill: View {
             .shadow(color: .black.opacity(0.12), radius: 1, y: 0.5)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            .frame(minHeight: minimumHitHeight)
             .contentShape(Capsule())
         }
         .pressableGlass(scale: 0.94)

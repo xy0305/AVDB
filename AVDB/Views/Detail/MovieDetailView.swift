@@ -493,6 +493,8 @@ struct MovieDetailView: View {
                 }
                 .pressableGlass(scale: 0.9)
                 .padding(12)
+                .accessibilityLabel("播放")
+                .accessibilityIdentifier("landscape-hero-play")
             }
             .liquidCover(cornerRadius: 16)
 
@@ -503,7 +505,8 @@ struct MovieDetailView: View {
                     title: vm.reviewStatus == "want_watch" ? "已想看" : "想看",
                     icon: vm.reviewStatus == "want_watch" ? "heart.fill" : "heart",
                     isSelected: vm.reviewStatus == "want_watch",
-                    tint: .pink
+                    tint: .pink,
+                    minimumHitHeight: 44
                 ) {
                     Task { await vm.setReviewStatus("want_watch") }
                 }
@@ -511,7 +514,8 @@ struct MovieDetailView: View {
                     title: vm.reviewStatus == "watched" ? "已看過" : "看過",
                     icon: vm.reviewStatus == "watched" ? "checkmark.circle.fill" : "checkmark.circle",
                     isSelected: vm.reviewStatus == "watched",
-                    tint: .green
+                    tint: .green,
+                    minimumHitHeight: 44
                 ) {
                     Task { await vm.setReviewStatus("watched") }
                 }
@@ -527,6 +531,7 @@ struct MovieDetailView: View {
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
+                    .frame(minHeight: 44)
                     .contentShape(Capsule())
                     .liquidGlass(interactive: false)
                 }

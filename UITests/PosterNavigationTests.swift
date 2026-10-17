@@ -94,6 +94,15 @@ final class PosterNavigationTests: XCTestCase {
         app.buttons["neutral-wide-link"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["legacy-landscape-header"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["landscape-detail-title"].exists)
+        let widePlay = app.buttons["landscape-hero-play"]
+        XCTAssertTrue(widePlay.isHittable)
+        XCTAssertGreaterThanOrEqual(widePlay.frame.height, 44)
+        for name in ["想看", "看過", "存入清單"] {
+            let action = app.buttons[name]
+            for _ in 0..<8 where !action.isHittable { app.swipeUp() }
+            XCTAssertTrue(action.isHittable, name)
+            XCTAssertGreaterThanOrEqual(action.frame.height, 44)
+        }
         app.buttons["返回"].tap()
         visibility.tap()
         XCTAssertEqual(visibility.value as? String, "1")

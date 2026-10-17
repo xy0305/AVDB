@@ -46,10 +46,12 @@ jobs:
           python3 scripts/test-dmm-posters.py
           python3 scripts/test-poster-latency.py
       - name: Compile simulator Metal resource
+        if: success() || failure()
         run: |
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
           xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
       - name: Tap visible Home latest covers in narrow and wide windows
+        if: success() || failure()
         run: |
           set -o pipefail
           xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PosterNavigation.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests -only-testing:DetailPosterQualityTests/DetailPosterQualityTests -only-testing:DetailPosterQualityTests/OnlineSubtitleModelTests 2>&1 | tee "$RUNNER_TEMP/poster-navigation.log"
