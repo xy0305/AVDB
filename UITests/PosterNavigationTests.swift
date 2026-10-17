@@ -168,6 +168,9 @@ final class PosterNavigationTests: XCTestCase {
             if consent.waitForExistence(timeout: 2) { consent.tap() }
             let diagnostics = app.staticTexts["missav-diagnostics"]
             XCTAssertTrue(diagnostics.waitForExistence(timeout: 10))
+            let header = app.staticTexts["MissAV · 原站顺序"]
+            XCTAssertTrue(header.isHittable)
+            let initialHeaderY = header.frame.minY
             let more = app.buttons["missav-load-more"]
             for _ in 0..<24 where !more.isHittable { app.swipeUp() }
             XCTAssertTrue(more.isHittable, app.debugDescription)
@@ -200,11 +203,20 @@ final class PosterNavigationTests: XCTestCase {
             }
             // Pull-to-refresh is deliberate invalidation: return to page one.
             let weekly = app.buttons["本周热门"]
-            for _ in 0..<40 where !weekly.isHittable {
-                let window = app.windows.firstMatch
-                window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
-                    .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.60)))
+            // The chip bar exposes an accessibility proxy that can report hittable
+            // before the vertical list reaches its top (reproducible on wide iPad).
+            // Position by the original header geometry; do not spend the refresh
+            // gesture merely scrolling the remaining rows into view.
+            let window = app.windows.firstMatch
+            for _ in 0..<40 {
+                let remaining = initialHeaderY - header.frame.minY
+                if remaining <= 2 { break }
+                let distance = min(window.frame.height * 0.20, remaining)
+                let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.40))
+                start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: distance)))
             }
+            XCTAssertTrue(header.isHittable, app.debugDescription)
+            XCTAssertEqual(header.frame.minY, initialHeaderY, accuracy: 6, "Reach the true list top before pulling to refresh")
             XCTAssertTrue(weekly.isHittable, app.debugDescription)
             XCTAssertEqual(diagnostics.label, "period=weekly-hot items=48 requests=1")
             let scroll = app.scrollViews.firstMatch
