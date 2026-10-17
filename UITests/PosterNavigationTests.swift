@@ -148,6 +148,30 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(visibility.value as? String, "1")
     }
 
+    // The real chrome auto-hides after five seconds. AX inspection/launch on CI
+    // can consume that interval: run 39018850097 lost the button between frame
+    // inspection and coordinate resolution. Refresh through the real single-tap
+    // path, then target the real button; do not disable the production timer.
+    private func refreshPlayerChrome(_ app: XCUIApplication) {
+        let entry = app.buttons["player.subtitle.settings"]
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+        if entry.exists && entry.isHittable {
+            center.tap()
+            let hidden = NSPredicate { _, _ in !entry.exists }
+            expectation(for: hidden, evaluatedWith: app)
+            waitForExpectations(timeout: 3)
+        }
+        center.tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(entry.isHittable, app.debugDescription)
+    }
+
+    private func scrollSubtitleForm(_ app: XCUIApplication) {
+        if app.collectionViews.firstMatch.exists { app.collectionViews.firstMatch.swipeUp() }
+        else if app.tables.firstMatch.exists { app.tables.firstMatch.swipeUp() }
+        else { app.swipeUp() }
+    }
+
     func testSubtitleControlsRealPlayerHitTargetsStyleAndDrag() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -157,6 +181,9 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        waitForInterfaceGeometry(app, portrait: false)
+        refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertGreaterThanOrEqual(entry.frame.width, 48)
@@ -165,13 +192,14 @@ final class PosterNavigationTests: XCTestCase {
         // Both center and near-edge points must reach the actual player button,
         // not a parallel fixture button or a transparent tap recognizer.
         for point in [CGVector(dx: 0.5, dy: 0.5), CGVector(dx: 0.06, dy: 0.06), CGVector(dx: 0.94, dy: 0.94)] {
-            if !entry.isHittable { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)).tap() }
+            refreshPlayerChrome(app)
             entry.coordinate(withNormalizedOffset: point).tap()
             XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5), app.debugDescription)
             app.buttons["完成"].tap()
             XCTAssertTrue(entry.waitForExistence(timeout: 5))
         }
         XCTAssertEqual(XCUIDevice.shared.orientation, originalOrientation)
+        refreshPlayerChrome(app)
         XCTAssertTrue(app.buttons["player.source.settings"].isHittable)
         let play = app.buttons["player.play.toggle"]
         XCTAssertEqual(play.label, "暂停", "Opening/dismissing subtitles must not pause playback")
@@ -179,7 +207,7 @@ final class PosterNavigationTests: XCTestCase {
         shot.name = "193-neutral-player-white-source-caption"; shot.lifetime = .keepAlways; add(shot)
         entry.tap()
         func reveal(_ element: XCUIElement) {
-            for _ in 0..<8 { if element.isHittable { return }; app.swipeUp() }
+            for _ in 0..<8 { if element.isHittable { return }; scrollSubtitleForm(app) }
             XCTAssertTrue(element.isHittable, app.debugDescription)
         }
         let reset = app.buttons["subtitle.appearance.reset"]
@@ -189,7 +217,7 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 19 pt")
         let edit = app.buttons["subtitle.position.edit"]
         reveal(edit); edit.tap()
-        let caption = app.staticTexts["subtitle.rendered"]
+        let caption = app.otherElements["subtitle.rendered"]
         XCTAssertTrue(caption.waitForExistence(timeout: 5), app.debugDescription)
         let before = caption.frame
         caption.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.34)))
@@ -202,6 +230,7 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(play.label, "暂停", "Caption drag must not pause/seek via player recognizers")
         XCTAssertFalse(app.otherElements["player.seek.preview"].exists)
         app.terminate(); app.launch()
+        refreshPlayerChrome(app)
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
         entry.tap(); reveal(app.staticTexts["subtitle.font.value"])
         XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 19 pt", "User style persists across application relaunch")
@@ -219,12 +248,16 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        waitForInterfaceGeometry(app, portrait: false)
+        refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+        XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5), app.debugDescription)
         let edit = app.buttons["subtitle.position.edit"]
-        for _ in 0..<8 { if edit.isHittable { break }; app.swipeUp() }
+        for _ in 0..<8 { if edit.isHittable { break }; scrollSubtitleForm(app) }
         XCTAssertTrue(edit.isHittable); edit.tap()
-        let caption = app.staticTexts["subtitle.rendered"]
+        let caption = app.otherElements["subtitle.rendered"]
         XCTAssertTrue(caption.waitForExistence(timeout: 5))
         XCTAssertEqual(caption.label, "字幕位置预览")
         caption.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.99)))
