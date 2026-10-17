@@ -1863,10 +1863,10 @@ private struct DetailActionGlass: ViewModifier {
             content.foregroundStyle(prominent ? Color.black : Color.white)
                 .background(prominent ? Color.white : Color(white: 0.22), in: Capsule())
         } else if #available(iOS 26.0, *) {
-            content.foregroundStyle(.white)
+            content.foregroundStyle(.primary)
                 .glassEffect(.regular.tint(prominent ? .white.opacity(0.24) : .clear), in: Capsule())
         } else {
-            content.foregroundStyle(.white)
+            content.foregroundStyle(.primary)
                 .background(.ultraThinMaterial, in: Capsule())
                 .background(Color.white.opacity(prominent ? 0.18 : 0.06), in: Capsule())
                 .overlay {
