@@ -1834,9 +1834,13 @@ private struct DetailReadableTitle: View {
                     }.hidden().accessibilityHidden(true).allowsHitTesting(false)
                 }
             if truncated {
-                Button(expanded ? "收起标题" : "展开全文") { expanded.toggle() }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(minHeight: 44, alignment: .leading)
+                Button { expanded.toggle() } label: {
+                    Text(expanded ? "收起标题" : "展开全文")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("detail-title-toggle")
                     .accessibilityValue(expanded ? "已展开" : "已收起")
             }

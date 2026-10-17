@@ -28,16 +28,18 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(artwork.exists)
         XCTAssertGreaterThanOrEqual(title.frame.minY, artwork.frame.maxY)
         let toggle = app.buttons["detail-title-toggle"]
+        let reviewPanel = app.descendants(matching: .any)["detail-reviews-panel"].firstMatch
+        XCTAssertTrue(reviewPanel.exists)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         let collapsedHeight = title.frame.height
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = accessibilitySize ? "191-neutral-accessibility-detail" : "191-neutral-readable-detail"
         shot.lifetime = .keepAlways; add(shot)
-        for _ in 0..<5 where !toggle.isHittable { app.swipeUp() }
+        for _ in 0..<5 where !toggle.isHittable || toggle.frame.maxY > reviewPanel.frame.minY { app.swipeUp() }
         XCTAssertTrue(toggle.isHittable); toggle.tap()
         XCTAssertGreaterThan(title.frame.height, collapsedHeight)
         XCTAssertEqual(toggle.label, "收起标题")
-        for _ in 0..<12 where !toggle.isHittable { app.swipeUp() }
+        for _ in 0..<12 where !toggle.isHittable || toggle.frame.maxY > reviewPanel.frame.minY { app.swipeUp() }
         XCTAssertTrue(toggle.isHittable); toggle.tap()
         XCTAssertEqual(toggle.label, "展开全文")
         let play = app.buttons["portrait-hero-play"]
