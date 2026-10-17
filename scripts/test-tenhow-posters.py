@@ -14,6 +14,9 @@ actor Probe {
  func start() { active += 1; calls += 1; peak=max(peak,active) }
  func end() { active -= 1 }
  func snapshot() -> (Int,Int,Int) { (active,peak,calls) }
+ func waitForInitialCompletions() async {
+  while (calls < 2 || active > 0) && !Task.isCancelled { await Task.yield() }
+ }
 }
 @main struct Main {
  static func main() async throws {
@@ -61,13 +64,17 @@ tests += r'''
   let low=DetailPosterQuality(source:"old",width:376,height:538,originalPortrait:false)
   let high=DetailPosterQuality(source:"tenhow",width:1055,height:1500,originalPortrait:true)
   let result: [DetailPosterQuality] = await DetailPosterSelection.collect(sources:["a","b","c","d","e","f"],budget:0.25,discover:{ timeout in
-    assert(timeout <= 4); try? await Task.sleep(nanoseconds:50_000_000); return ["tenhow"]
+    assert(timeout <= 4)
+    // Discover only after initial low-quality jobs really completed, rather
+    // than assuming a loaded CI host wakes 10ms/50ms sleeps in that order.
+    await probe.waitForInitialCompletions(); return ["tenhow"]
   }) { source, timeout in
     assert(timeout > 0 && timeout <= 5)
-    await probe.start(); try? await Task.sleep(nanoseconds:10_000_000); await probe.end()
+    await probe.start(); await Task.yield(); await probe.end()
     return source == "tenhow" ? high : low
   }
-  assert(result.count == 6 && DetailPosterQuality.winner(result)?.source == "tenhow")
+  assert(result.count == 6 && DetailPosterQuality.winner(result)?.source == "tenhow", "sources=\(result.map(\.source))")
+  assert(result.first?.source == "old", "Original low-quality completion precedes discovered winner")
   let stats=await probe.snapshot(); assert(stats.0 == 0 && stats.1 <= 2 && stats.2 == 6)
   var presentation=DetailPosterPresentation<Int>(key:"k",generation:UUID(),layout:.resolving)
   let generation=presentation.generation
