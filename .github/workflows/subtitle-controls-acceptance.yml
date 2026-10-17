@@ -7,7 +7,11 @@ on:
 jobs:
   navigation:
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [ipad, iphone]
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies and test scheme
@@ -37,13 +41,13 @@ jobs:
         run: |
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
           xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
-      - name: Tap visible Home latest covers in narrow and wide windows
-        if: success() || failure()
+      - name: Real iPad subtitle controls and model acceptance
+        if: matrix.device == 'ipad' && (success() || failure())
         run: |
           set -o pipefail
           xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PosterNavigation.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testSubtitleControlsRealPlayerHitTargetsStyleAndDrag -only-testing:PosterNavigationUITests/PosterNavigationTests/testSubtitleNoCuePreviewClampsAndRotates -only-testing:PosterNavigationUITests/PosterNavigationTests/testOnlineSubtitleConsentSelectionOffsetAndDisable -only-testing:DetailPosterQualityTests/OnlineSubtitleModelTests 2>&1 | tee "$RUNNER_TEMP/poster-navigation.log"
-      - name: Recent magnet production catalog on iPhone
-        if: success() || failure()
+      - name: Real iPhone subtitle controls and model acceptance
+        if: matrix.device == 'iphone' && (success() || failure())
         run: |
           set -o pipefail
           xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/PosterDerived" -resultBundlePath "$RUNNER_TEMP/PhoneCatalog.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testSubtitleControlsRealPlayerHitTargetsStyleAndDrag -only-testing:PosterNavigationUITests/PosterNavigationTests/testSubtitleNoCuePreviewClampsAndRotates -only-testing:PosterNavigationUITests/PosterNavigationTests/testOnlineSubtitleConsentSelectionOffsetAndDisable -only-testing:DetailPosterQualityTests/OnlineSubtitleModelTests 2>&1 | tee "$RUNNER_TEMP/phone-catalog.log"
@@ -60,7 +64,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ipad-poster-navigation-subtitle-${{ github.run_number }}
+          name: ipad-poster-navigation-subtitle-${{ github.run_number }}-${{ matrix.device }}
           path: |
             ${{ runner.temp }}/PosterNavigation.xcresult
             ${{ runner.temp }}/poster-screenshots

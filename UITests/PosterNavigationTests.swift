@@ -184,12 +184,14 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
-        XCUIDevice.shared.orientation = .landscapeLeft
+        // The fixture now uses the production route orientation host. Await the
+        // actual UIWindow and matching AX root before sending any coordinates.
+        waitForInterfaceGeometry(app, portrait: false)
         refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
         // The player view itself must be landscape; the app root snapshot can lag.
-        XCTAssertGreaterThan(entry.frame.maxX, entry.frame.maxY, app.debugDescription)
+        XCTAssertGreaterThan(app.windows.firstMatch.frame.width, app.windows.firstMatch.frame.height, app.debugDescription)
         XCTAssertGreaterThanOrEqual(entry.frame.width, 48)
         XCTAssertGreaterThanOrEqual(entry.frame.height, 48)
         let originalOrientation = XCUIDevice.shared.orientation
@@ -252,11 +254,13 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
-        XCUIDevice.shared.orientation = .landscapeLeft
+        // The fixture now uses the production route orientation host. Await the
+        // actual UIWindow and matching AX root before sending any coordinates.
+        waitForInterfaceGeometry(app, portrait: false)
         refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertGreaterThan(entry.frame.maxX, entry.frame.maxY, app.debugDescription)
+        XCTAssertGreaterThan(app.windows.firstMatch.frame.width, app.windows.firstMatch.frame.height, app.debugDescription)
         entry.tap()
         XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5), app.debugDescription)
         let edit = app.buttons["subtitle.position.edit"]
@@ -267,9 +271,28 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(caption.label, "字幕位置预览")
         caption.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.99)))
         XCTAssertTrue(app.windows.firstMatch.frame.contains(caption.frame))
-        XCUIDevice.shared.orientation = .portrait
-        let deadline = Date().addingTimeInterval(8)
-        while app.windows.firstMatch.frame.width > app.windows.firstMatch.frame.height && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.2)) }
+        let isPadWindow = min(app.windows.firstMatch.frame.width, app.windows.firstMatch.frame.height) > 600
+        if isPadWindow {
+            XCUIDevice.shared.orientation = .portrait
+            waitForInterfaceGeometry(app, portrait: true)
+        } else {
+            // iPhone production playback deliberately locks orientation. Exercise
+            // its real portrait menu rather than expecting a sensor to unlock it.
+            app.buttons["subtitle.position.done"].tap()
+            refreshPlayerChrome(app)
+            app.buttons["进入全屏幕"].tap()
+            XCTAssertTrue(app.buttons["竖屏播放"].waitForExistence(timeout: 3))
+            app.buttons["竖屏播放"].tap()
+            waitForInterfaceGeometry(app, portrait: true)
+            refreshPlayerChrome(app)
+            entry.tap()
+            XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5))
+            for _ in 0..<8 { if edit.isHittable { break }; scrollSubtitleForm(app) }
+            XCTAssertTrue(edit.isHittable); edit.tap()
+            XCTAssertTrue(caption.waitForExistence(timeout: 5))
+            XCTAssertEqual(caption.label, "字幕位置预览")
+        }
+        XCTAssertLessThan(app.windows.firstMatch.frame.width, app.windows.firstMatch.frame.height)
         XCTAssertTrue(app.windows.firstMatch.frame.contains(caption.frame), app.debugDescription)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "194-neutral-no-cue-portrait-clamp"; shot.lifetime = .keepAlways; add(shot)
