@@ -325,7 +325,7 @@ struct SubtitleAppearanceControls: View {
             Button("恢复默认字号与位置") {
                 points = SubtitleStyleDefaults.size; x = SubtitleStyleDefaults.x; y = SubtitleStyleDefaults.y
             }.accessibilityIdentifier("subtitle.appearance.reset")
-            Text("白字、阴影与半透明黑色圆角背景。14–36 pt 随系统辅助字号适度放大；位置相对播放器安全区域保存。调整模式暂时隔离播放手势；没有对白时仅显示位置预览。")
+            Text("白字与轻微黑色描影，无背景框。14–36 pt 随系统辅助字号适度放大；位置相对播放器安全区域保存。调整模式暂时隔离播放手势；没有对白时仅显示位置预览。")
                 .font(.footnote)
         }
     }
@@ -378,11 +378,13 @@ struct SubtitlePresentationOverlay: View {
                         Text(renderedText)
                             .font(.system(size: fontSize, weight: .medium))
                             .foregroundStyle(.white).multilineTextAlignment(.center)
-                            .shadow(color: .black, radius: 1, x: 1, y: 1)
+                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: 1, y: 0)
+                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: -1, y: 0)
+                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: 0, y: 1)
+                            .shadow(color: .black.opacity(0.9), radius: 0.6, x: 0, y: -1)
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .frame(width: width)
                             .fixedSize(horizontal: false, vertical: true)
-                            .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 7))
                             .background(GeometryReader { proxy in
                                 Color.clear.preference(key: SubtitleTextSizeKey.self, value: proxy.size)
                             })
