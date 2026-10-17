@@ -175,6 +175,25 @@ final class PosterNavigationTests: XCTestCase {
         else { app.swipeUp() }
     }
 
+    private func enterSubtitleLandscape(_ app: XCUIApplication) {
+        let window = app.windows.firstMatch.frame
+        // Evidence: startup route requests can precede the foreground window in
+        // a launch fixture. Use one real user transition after it is live.
+        if window.width < window.height {
+            if min(window.width, window.height) > 600 {
+                XCUIDevice.shared.orientation = .landscapeRight
+            } else {
+                refreshPlayerChrome(app)
+                app.buttons["进入全屏幕"].tap()
+                XCTAssertTrue(app.buttons["横屏全屏"].waitForExistence(timeout: 3))
+                app.buttons["横屏全屏"].tap()
+            }
+        }
+        waitForInterfaceGeometry(app, portrait: false)
+        let geometry = XCTAttachment(string: "App: \(app.frame); real player window: \(app.windows.firstMatch.frame)")
+        geometry.name = "195-real-player-landscape-geometry"; geometry.lifetime = .keepAlways; add(geometry)
+    }
+
     func testSubtitleControlsRealPlayerHitTargetsStyleAndDrag() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
@@ -184,16 +203,17 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
-        // The fixture now uses the production route orientation host. Await the
-        // actual UIWindow and matching AX root before sending any coordinates.
-        waitForInterfaceGeometry(app, portrait: false)
+        // Await actual production window geometry, not a button coordinate.
+        enterSubtitleLandscape(app)
         refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
         // The player view itself must be landscape; the app root snapshot can lag.
         XCTAssertGreaterThan(app.windows.firstMatch.frame.width, app.windows.firstMatch.frame.height, app.debugDescription)
-        XCTAssertGreaterThanOrEqual(entry.frame.width, 48)
-        XCTAssertGreaterThanOrEqual(entry.frame.height, 48)
+        // IEEE-754 AX coordinates may subtract to 47.99999999999997 for 48pt.
+        // This epsilon is sub-pixel numerical precision, not a smaller hit target.
+        XCTAssertGreaterThanOrEqual(entry.frame.width + 0.000001, 48)
+        XCTAssertGreaterThanOrEqual(entry.frame.height + 0.000001, 48)
         let originalOrientation = XCUIDevice.shared.orientation
         // Both center and near-edge points must reach the actual player button,
         // not a parallel fixture button or a transparent tap recognizer.
@@ -254,9 +274,8 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
-        // The fixture now uses the production route orientation host. Await the
-        // actual UIWindow and matching AX root before sending any coordinates.
-        waitForInterfaceGeometry(app, portrait: false)
+        // Await actual production window geometry, not a button coordinate.
+        enterSubtitleLandscape(app)
         refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
@@ -310,7 +329,7 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
-        waitForInterfaceGeometry(app, portrait: false)
+        enterSubtitleLandscape(app)
         let entry = app.buttons["player.subtitle.settings"]
         let caption = app.otherElements["subtitle.rendered"]
         func selectSubtitle() {
