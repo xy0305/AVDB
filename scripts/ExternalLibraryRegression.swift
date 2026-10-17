@@ -1,6 +1,6 @@
 import Foundation
 
-func check(_ condition: Bool) { precondition(condition) }
+func check(_ condition: Bool, line: UInt = #line) { precondition(condition, "External library regression failed at line \(line)") }
 
 final class StubTokens: ExternalTokenStore {
     var value: String?
