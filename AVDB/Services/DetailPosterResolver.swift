@@ -213,7 +213,7 @@ enum DetailPosterResolver {
                 // Verified MGStage fronts must already be usable portraits;
                 // never manufacture one by cropping an enlarged horizontal image.
                 // Western landscapes are likewise never cropped into portraits.
-                let nativeMGS = mgsID != nil && url.flatMap(MGStagePoster.imageIdentity) == mgsID
+                let nativeMGS = mgsID != nil && MGStagePoster.imageIdentity(url) == mgsID
                 return await download(url: url, timeout: timeout, derive: !original && !nativeMGS, native: movie.type == "2", western: movie.type == "2")
             }
             guard !Task.isCancelled,
