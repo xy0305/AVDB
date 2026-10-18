@@ -68,7 +68,7 @@ enum DetailPosterResolver {
             // already verified by the detail generation, still inside the same
             // six-image / two-concurrency budget, and never crop a landscape.
             let discovered = westernDiscoveries.snapshot(key: key).artwork ?? []
-            let decoded = await DetailPosterSelection.collect(sources: validatedSources(movie), budget: 6, discover: discovered.isEmpty ? nil : { _ in discovered }, reservedDiscoveries: discovered.isEmpty ? 0 : min(2, discovered.count)) { source, timeout in
+            let decoded = await DetailPosterSelection.collect(sources: validatedSources(movie), budget: 6, discover: discovered.isEmpty ? nil : { _ in discovered }, reservedDiscoveries: discovered.isEmpty ? 0 : min(2, discovered.count)) { source, timeout -> DecodedPoster? in
                 guard let url = URL(string: source) else { return nil as DecodedPoster? }
                 return await download(url: url, timeout: timeout, derive: false, native: true)
             }
@@ -208,7 +208,7 @@ enum DetailPosterResolver {
                     return priority + official + existing.filter { !priority.contains($0) }
                 }
             }
-            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover, reservedDiscoveries: 2) { source, timeout in
+            let decoded = await DetailPosterSelection.collect(sources: validated, discover: discover, reservedDiscoveries: 2) { source, timeout -> DecodedPoster? in
                 guard let url = URL(string: source) else { return nil as DecodedPoster? }
                 // Verified MGStage fronts must already be usable portraits;
                 // never manufacture one by cropping an enlarged horizontal image.
