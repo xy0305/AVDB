@@ -8,6 +8,15 @@ struct DetailPosterArtwork: @unchecked Sendable {
     let image: UIImage
     let backdrop: UIImage
     let tint: UIColor
+    /// Final compared source URL. Display-only; never a new download input.
+    let sourceURL: String?
+
+    init(image: UIImage, backdrop: UIImage, tint: UIColor, sourceURL: String? = nil) {
+        self.image = image
+        self.backdrop = backdrop
+        self.tint = tint
+        self.sourceURL = sourceURL
+    }
 }
 
 /// A separate cookie-free session is essential: this resolver never sees a 115
@@ -430,7 +439,7 @@ enum DetailPosterResolver {
             let input = CIImage(cgImage: cg).transformed(by: CGAffineTransform(scaleX: 0.08, y: 0.08))
             let blurred = input.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 12]).cropped(to: input.extent)
             let backdrop = CIContext(options: [.cacheIntermediates: false]).createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) } ?? UIImage(cgImage: cg)
-            return DetailPosterArtwork(image: UIImage(cgImage: cg), backdrop: backdrop, tint: tint)
+            return DetailPosterArtwork(image: UIImage(cgImage: cg), backdrop: backdrop, tint: tint, sourceURL: source)
         }.value
     }
 }

@@ -418,3 +418,51 @@ final class WesternCoverRegressionTests: XCTestCase {
         XCTAssertThrowsError(try WesternCoverSettings(store: Store(), defaults: .standard).save(enabled: true, replacement: "contains space"))
     }
 }
+
+final class CoverSourceDisplayTests: XCTestCase {
+    func testHostMappingStripsQueryAndHidesUnknownCredentials() {
+        let cases: [(String, String)] = [
+            ("https://tp.spfcas.com/covers/demo.jpg?token=secret", "JavDB"),
+            ("https://c0.jdbstatic.com/covers/demo.jpg", "JavDB"),
+            ("https://cdn.theporndb.net/scene/1/background/full.jpg?api_key=secret", "ThePornDB"),
+            ("https://cdn.blackedraw.com/scene/videoimages/mainlandscape/a.jpg", "片商主图"),
+            ("https://cdn.dt18.com/media/scenes/1/2/a.jpg", "Data18"),
+            ("https://bdn.dt18.com/1/2/3/0.jpg", "Data18"),
+            ("https://www.tenhow.net/images/B084SXDZYQ.jpg", "Tenhow"),
+            ("https://m.media-amazon.com/images/I/neutral.jpg?token=secret", "日亚"),
+            ("https://pics.dmm.co.jp/digital/video/demo/demops.jpg", "DMM"),
+            ("https://image.mgstage.com/images/maker/demo/pf_o1_demo.jpg", "MGStage"),
+            ("https://image.mgstage.com/images/maker/demo/pf_e_demo.jpg", "MGS"),
+            ("https://images.example.test/covers/neutral.jpg?access_token=secret#frag", "其他 images.example.test"),
+        ]
+        for (raw, name) in cases {
+            let label = CoverSourceDisplay.label(sourceURL: raw)
+            XCTAssertEqual(label?.name, name, raw)
+            XCTAssertFalse(label?.copyText.contains("token") ?? true, raw)
+            XCTAssertFalse(label?.copyText.contains("?") ?? true, raw)
+            XCTAssertFalse(label?.copyText.contains("#") ?? true, raw)
+            XCTAssertFalse(label?.copyText.contains("secret") ?? true, raw)
+            XCTAssertEqual(label?.line, "封面来源：" + name)
+        }
+        let long = CoverSourceDisplay.label(sourceURL: "https://user:pass@images.example.test/covers/" + String(repeating: "neutral-", count: 12) + "a.jpg?sig=secret")
+        XCTAssertEqual(long?.name, "其他 images.example.test")
+        XCTAssertFalse(long?.copyText.contains("user:pass") ?? true)
+        XCTAssertFalse(long?.copyText.contains("secret") ?? true)
+        XCTAssertGreaterThan(long?.copyText.count ?? 0, 48)
+        XCTAssertNil(CoverSourceDisplay.label(sourceURL: nil))
+        XCTAssertNil(CoverSourceDisplay.label(sourceURL: ""))
+        XCTAssertNil(CoverSourceDisplay.label(sourceURL: "not a url"))
+        XCTAssertEqual(CoverSourceDisplay.pending, "封面来源：正在选择")
+        XCTAssertEqual(CoverSourceDisplay.unavailable, "封面来源：未找到更优封面")
+    }
+
+    func testSwitchingMoviesDoesNotRetainPreviousWinnerSource() {
+        let first = CoverSourceDisplay.label(sourceURL: "https://cdn.theporndb.net/scene/1/background/full.jpg?token=one")
+        let second = CoverSourceDisplay.label(sourceURL: "https://tp.spfcas.com/covers/other.jpg?token=two")
+        XCTAssertEqual(first?.name, "ThePornDB")
+        XCTAssertEqual(second?.name, "JavDB")
+        XCTAssertNotEqual(first?.copyText, second?.copyText)
+        XCTAssertFalse(second?.copyText.contains("theporndb") ?? true)
+        XCTAssertNil(CoverSourceDisplay.label(sourceURL: nil), "A movie without a winner must not reuse another movie's source")
+    }
+}
