@@ -156,6 +156,7 @@ struct MovieDetailView: View {
         )) { Button("好", role: .cancel) { vm.errorMessage = nil } }
         message: { Text(vm.errorMessage ?? "") }
         .onReceive(NotificationCenter.default.publisher(for: .westernCoverChanged)) { _ in
+            guard vm.movie?.type == "2" else { return }
             posterPresentation = nil; fallbackProvenance = nil; posterAccountEpoch = UUID()
         }
         .task(id: posterRequestKey) {
@@ -486,7 +487,7 @@ struct MovieDetailView: View {
             UIColor(red: 0.21, green: 0.27, blue: 0.31, alpha: 1).setFill()
             ctx.cgContext.fill(CGRect(x: 130, y: 500, width: 440, height: 500))
         }
-        return DetailPosterArtwork(image: image, backdrop: image, tint: UIColor(red: 0.59, green: 0.50, blue: 0.45, alpha: 1))
+        return DetailPosterArtwork(image: image, backdrop: image, tint: UIColor(red: 0.59, green: 0.50, blue: 0.45, alpha: 1), provenance: CoverProvenance(url:"https://tp.spfcas.com/covers/neutral-fixture.jpg", rawWidth:700, rawHeight:1000, effectiveWidth:700, effectiveHeight:1000))
     }
     #endif
 

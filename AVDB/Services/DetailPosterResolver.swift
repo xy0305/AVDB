@@ -50,11 +50,12 @@ private final class AmazonPosterRedirectGuard: NSObject, URLSessionTaskDelegate 
 
 enum DetailPosterResolver {
     private static let cache = DetailPosterCache<DetailPosterArtwork>()
+    private static let westernCache = DetailPosterCache<DetailPosterArtwork>()
     private static let westernWinners = DetailPosterCache<DetailPosterArtwork>()
     private static let amazonPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
     private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
 
-    static func clearWesternCaches() { cache.invalidate(); westernWinners.invalidate() }
+    static func clearWesternCaches() { westernCache.invalidate(); westernWinners.invalidate() }
     static func cachedWinner(movie: Movie, account: String?) -> DetailPosterArtwork? {
         westernWinners.snapshot(key: reuseKey(movie: movie, account: account)).artwork
     }
@@ -137,7 +138,8 @@ enum DetailPosterResolver {
     }
 
     static func initialLayout(movie: Movie, account: String?) -> DetailPosterLayout<DetailPosterArtwork> {
-        let saved = cache.snapshot(key: identity(movie: movie, account: account))
+        let selectedCache = movie.type == "2" ? westernCache : cache
+        let saved = selectedCache.snapshot(key: identity(movie: movie, account: account))
         if case .resolving = saved {
             // Definite unsupported/no eligible candidates: retain legacy immediately.
             if movie.type != "2" && validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty { return .landscape }
@@ -148,7 +150,8 @@ enum DetailPosterResolver {
     static func resolve(movie: Movie, account: String?) async -> DetailPosterArtwork? {
         let key = identity(movie: movie, account: account)
         let epoch = WesternCoverSettings.shared.namespace
-        return await cache.value(key: key) { () async -> DetailPosterArtwork? in
+        let selectedCache = movie.type == "2" ? westernCache : cache
+        return await selectedCache.value(key: key) { () async -> DetailPosterArtwork? in
             let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
             let validated = validatedSources(movie)
             let paths = tenhowPaths(movie)
@@ -177,8 +180,11 @@ enum DetailPosterResolver {
             art.provenance = CoverProvenance(url: CoverSourceDisplay.safeURL(winner.source), rawWidth: selected.rawWidth, rawHeight: selected.rawHeight, effectiveWidth: winner.width, effectiveHeight: winner.height)
             if movie.type == "2" {
                 art.diagnostic = WesternCoverService.diagnostic(movie: movie, namespace: key)
-                let external = decoded.filter { URL(string: $0.quality.source).map(WesternCoverPolicy.imageAllowed) == true }
-                if !external.isEmpty && !external.contains(where: { $0.quality.source == winner.source }) { art.diagnostic += "；外源已解码可用但未胜出" }
+                let winnerName = CoverSourceDisplay.name(host: URL(string: winner.source)?.host ?? "")
+                for family in ["ThePornDB", "片商", "Data18"] {
+                    let available = decoded.contains { CoverSourceDisplay.name(host: URL(string: $0.quality.source)?.host ?? "") == family }
+                    if available && winnerName != family { art.diagnostic += "；" + family + "：已解码可用未胜出" }
+                }
             }
             guard !Task.isCancelled, movie.type != "2" || epoch == WesternCoverSettings.shared.namespace else { return nil }
             if movie.type == "2" { westernWinners.store(key: reuseKey(movie: movie, account: account), value: art) }
