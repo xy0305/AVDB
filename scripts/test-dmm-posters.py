@@ -7,7 +7,8 @@ core='\n'.join((services/f).read_text() for f in ['JavRankingCore.swift','Tenhow
 resolver=(services/'DetailPosterResolver.swift').read_text()
 for literal in ['DMMPoster.candidates(metadata:', 'validatedSources(movie)', 'official.count <= 2', 'matches.formUnion(match.images)', 'result += images.prefix(1)', 'target.path == path']:
     assert literal in resolver,literal
-assert 'HEAD' not in resolver and 'Referer' not in resolver
+assert 'HEAD' not in resolver
+assert resolver.count('Referer') == 1 and 'cdn.dt18.com' in resolver and 'movie.type == "2"' in resolver
 assert 'maxAttempts = 6' in core and 'concurrency = 2' in core and 'totalBudget: TimeInterval = 12' in core
 swift=r'''
 @main struct DMMRegression {

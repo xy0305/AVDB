@@ -37,7 +37,7 @@ struct MovieDetailView: View {
     }
 
     private var posterArtwork: DetailPosterArtwork? { posterLayout.artwork }
-    private var usesLandscapeLayout: Bool { posterLayout.isLandscape }
+    private var usesLandscapeLayout: Bool { posterMovie?.type == "2" || posterLayout.isLandscape }
     @State private var showPosterResources = false
     @State private var posterAccountEpoch = UUID()
     @State private var reviewPanelHeight: CGFloat = 76
@@ -128,6 +128,10 @@ struct MovieDetailView: View {
             var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
             withTransaction(transaction) { posterAccountEpoch = UUID(); posterPresentation = nil }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .westernCoverChanged)) { _ in
+            var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
+            withTransaction(transaction) { posterAccountEpoch = UUID(); posterPresentation = nil }
+        }
         .alert("操作未完成", isPresented: Binding(
             get: { vm.movie != nil && vm.errorMessage != nil },
             set: { if !$0 { vm.errorMessage = nil } }
@@ -149,6 +153,14 @@ struct MovieDetailView: View {
                 art = await DetailPosterResolver.fixtureResolve(movie: movie, account: account) {
                     if ProcessInfo.processInfo.arguments.contains("--delayed-detail-poster") {
                         do { try await Task.sleep(nanoseconds: 20_000_000_000) } catch { return nil }
+                    }
+                    if ProcessInfo.processInfo.arguments.contains("--western-native-fixture") {
+                        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+                        let image = UIGraphicsImageRenderer(size: CGSize(width: 1920, height: 1080), format: format).image { context in
+                            UIColor.systemTeal.setFill(); context.fill(CGRect(x: 0, y: 0, width: 1920, height: 1080))
+                            UIColor.systemOrange.setFill(); context.fill(CGRect(x: 0, y: 0, width: 120, height: 1080)); context.fill(CGRect(x: 1800, y: 0, width: 120, height: 1080))
+                        }
+                        return DetailPosterArtwork(image: image, backdrop: image, tint: .darkGray)
                     }
                     return Self.neutralHeroArtwork(wide: false)
                 }
@@ -474,6 +486,19 @@ struct MovieDetailView: View {
             }
 
             ZStack(alignment: .bottomTrailing) {
+                if movie.type == "2" {
+                    Group {
+                        if let art = posterArtwork {
+                            Image(uiImage: art.image).resizable().scaledToFit()
+                                .accessibilityIdentifier("western-native-artwork")
+                        } else if case .resolving = posterLayout {
+                            ProgressView().frame(maxWidth: .infinity).aspectRatio(16.0 / 9.0, contentMode: .fit)
+                        } else {
+                            JavDBImage(url: movie.coverURL, fallbackURL: movie.thumbURL, contentMode: .fit)
+                                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                        }
+                    }.frame(maxWidth: .infinity)
+                } else {
                 JavDBImage(
                     // 优先顺序：JAVDB cover_url 无水印 → 首张剧照 → DMM 横版 → Tenhow 竖版
                     url: movie.coverURL,
@@ -484,6 +509,7 @@ struct MovieDetailView: View {
                 .frame(maxWidth: .infinity)
                 .aspectRatio(1.47, contentMode: .fit)
                 .clipped()
+                }
 
                 Button {
                     GlassHaptic.tap()

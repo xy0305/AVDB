@@ -532,8 +532,12 @@ public struct MoviePosterImage: View {
     public var body: some View {
         let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
         let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
-        JavDBImage(url: sources.first, fallbackURL: sources.dropFirst().first,
-                   contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original)
+        if movie.type == "2" && !sources.contains(where: { $0.hasPrefix("fixture://") }) {
+            WesternListPoster(movie: movie)
+        } else {
+            JavDBImage(url: sources.first, fallbackURL: sources.dropFirst().first,
+                       contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original)
+        }
     }
 }
 
@@ -611,3 +615,31 @@ struct PosterSizeRegressionGallery: View {
     }
 }
 #endif
+
+
+private struct WesternListPoster: View {
+    let movie: Movie
+    @State private var art: DetailPosterArtwork?
+    @State private var finished = false
+    @State private var epoch = UUID()
+    private var key: String { DetailPosterResolver.westernListKey(movie: movie, account: APIClient.shared.token) + epoch.uuidString }
+    var body: some View {
+        let winner = DetailPosterResolver.westernListSnapshot(movie: movie, account: APIClient.shared.token)
+        Group {
+            if let value = winner ?? art {
+                Image(uiImage: value.image).resizable().scaledToFit()
+            } else if finished {
+                JavDBImage(url: movie.coverURL, fallbackURL: movie.thumbURL, contentMode: .fit)
+            } else { Color(.systemGray6).overlay { ProgressView() } }
+        }
+        .task(id: key) {
+            let expected = key
+            art = winner; finished = false
+            let value = await DetailPosterResolver.resolveWesternList(movie: movie, account: APIClient.shared.token)
+            guard !Task.isCancelled, expected == key else { return }
+            art = value; finished = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .westernCoverChanged)) { _ in art = nil; finished = false; epoch = UUID() }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in art = nil; finished = false; epoch = UUID() }
+    }
+}

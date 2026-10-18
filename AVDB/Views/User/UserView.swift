@@ -220,6 +220,9 @@ struct UserView: View {
                 }
 
                 Section("来源") {
+                    NavigationLink { WesternCoverSettingsView() } label: {
+                        Label("欧美封面 / ThePornDB", systemImage: "photo.on.rectangle")
+                    }.accessibilityIdentifier("western-settings-entry")
                     NavigationLink {
                         ExternalLibrarySettingsView()
                     } label: {

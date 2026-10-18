@@ -48,8 +48,44 @@ private final class AmazonPosterRedirectGuard: NSObject, URLSessionTaskDelegate 
 
 enum DetailPosterResolver {
     private static let cache = DetailPosterCache<DetailPosterArtwork>()
+    private static let westernLists = DetailPosterCache<DetailPosterArtwork>()
+    private static let westernWinners = DetailPosterCache<DetailPosterArtwork>()
+    private static let westernDiscoveries = DetailPosterCache<[String]>()
+    static func clearWesternCaches() { cache.invalidate(); westernLists.invalidate(); westernWinners.invalidate(); westernDiscoveries.invalidate() }
+    static func westernListKey(movie: Movie, account: String?) -> String {
+        let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + WesternCoverSettings.shared.namespace.uuidString
+    }
+    static func westernListSnapshot(movie: Movie, account: String?) -> DetailPosterArtwork? {
+        let key = westernListKey(movie: movie, account: account)
+        return westernWinners.snapshot(key: key).artwork ?? westernLists.snapshot(key: key).artwork
+    }
+    static func resolveWesternList(movie: Movie, account: String?) async -> DetailPosterArtwork? {
+        let key = westernListKey(movie: movie, account: account)
+        if let winner = westernWinners.snapshot(key: key).artwork { return winner }
+        let art = await westernLists.value(key: key) {
+            // Lists do not open a second discovery. They only compare images
+            // already verified by the detail generation, still inside the same
+            // six-image / two-concurrency budget, and never crop a landscape.
+            let discovered = westernDiscoveries.snapshot(key: key).artwork ?? []
+            let decoded = await DetailPosterSelection.collect(sources: validatedSources(movie), budget: 6, discover: discovered.isEmpty ? nil : { _ in discovered }, reservedDiscoveries: discovered.isEmpty ? 0 : min(2, discovered.count)) { source, timeout in
+                guard let url = URL(string: source) else { return nil as DecodedPoster? }
+                return await download(url: url, timeout: timeout, derive: false, native: true)
+            }
+            guard let q = WesternCoverPolicy.winner(decoded.map(\.quality)), let selected = decoded.first(where: { $0.quality.source == q.source }) else { return nil }
+            return await artwork(image: selected.image, source: q.source, derive: false, native: true)
+        }
+        guard !Task.isCancelled, key == westernListKey(movie: movie, account: account) else { return nil }
+        return westernWinners.snapshot(key: key).artwork ?? art
+    }
     private static let amazonPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
+    private static let mgstagePages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
     private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
+
+    static func mgstageID(_ movie: Movie) -> String? {
+        guard movie.type == "0", !FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number) else { return nil }
+        return MGStagePoster.evidencedID(number: movie.number ?? "", metadata: [movie.coverURL, movie.thumbURL].compactMap { $0 })
+    }
 
     static func navigationSeed(_ movie: Movie, movieID: String) -> Movie? {
         guard movie.id == movieID, movie.type == "0",
@@ -90,7 +126,8 @@ enum DetailPosterResolver {
         // Opaque memory-only account namespace; never log credentials.
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
         let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors
+        let western = movie.type == "2" ? "#western#" + WesternCoverSettings.shared.namespace.uuidString + "#" + (movie.originTitle ?? movie.title ?? "") + "#" + (movie.releaseDate ?? "") + "#" + String(movie.duration ?? 0) + "#" + (movie.originalURL ?? "") : ""
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + western
     }
 
     static func validatedSources(_ movie: Movie) -> [String] {
@@ -104,7 +141,7 @@ enum DetailPosterResolver {
             return values.isEmpty ? nil : values
         }.first ?? [])
         let validated = (exact + sources + rules).filter { source in
-            guard let url = URL(string: source), allowed(url), !url.path.contains("/small_covers/") else { return false }
+            guard let url = URL(string: source), allowed(url), (movie.type == "2" || !url.path.contains("/small_covers/")) else { return false }
             return !DetailPosterPolicy.allowedPublicImage(url) || exact.contains(source) || rules.contains(source)
         }
         // Start a JavDB and MGS opportunity where available, not two new DMM
@@ -120,7 +157,7 @@ enum DetailPosterResolver {
         let saved = cache.snapshot(key: identity(movie: movie, account: account))
         if case .resolving = saved {
             // Definite unsupported/no eligible candidates: retain legacy immediately.
-            if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty { return .landscape }
+            if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty && mgstageID(movie) == nil { return .landscape }
         }
         return saved
     }
@@ -131,25 +168,67 @@ enum DetailPosterResolver {
             let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
             let validated = validatedSources(movie)
             let paths = tenhowPaths(movie)
+            let mgsID = mgstageID(movie)
             let discover: (@Sendable (TimeInterval) async -> [String])?
-            if paths.isEmpty {
+            let western = movie.type == "2" && WesternCoverSettings.shared.enabled && WesternCoverService.identity(movie) != nil
+            if western {
+                discover = { @Sendable timeout in
+                    let found = await WesternCoverService.discover(movie: movie, namespace: key, timeout: timeout)
+                    // Remember only after this generation is still current. A
+                    // token/account change invalidates this cache before reuse.
+                    if !found.isEmpty, key == identity(movie: movie, account: account) {
+                        westernDiscoveries.remember(key: westernListKey(movie: movie, account: account), value: found)
+                    }
+                    // Verified western images must be the reserved opportunities.
+                    // JavDB remains the fallback, never an equal preferred source.
+                    return found
+                }
+            } else if paths.isEmpty && mgsID == nil {
                 discover = nil
             } else {
                 discover = { @Sendable (timeout: TimeInterval) async -> [String] in
-                    await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
+                    // Both discoveries share the existing four-second allowance
+                    // and run alongside the first two legacy image downloads.
+                    async let tenhow = discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
+                    async let mgs = discoverMGStage(id: mgsID, namespace: key, timeout: timeout)
+                    let (existing, official) = await (tenhow, mgs)
+                    // Existing Tenhow / Amazon priority is unchanged. The new
+                    // exact source replaces only an unissued legacy/DMM slot.
+                    let priority = existing.filter { source in
+                        guard let url = URL(string: source) else { return false }
+                        return !DetailPosterPolicy.allowedPublicImage(url)
+                    }
+                    return priority + official + existing.filter { !priority.contains($0) }
                 }
             }
-            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover) { source, timeout in
+            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover, reservedDiscoveries: 2) { source, timeout in
                 guard let url = URL(string: source) else { return nil }
-                return await download(url: url, timeout: timeout, derive: !original)
+                // Verified MGStage fronts must already be usable portraits;
+                // never manufacture one by cropping an enlarged horizontal image.
+                // Western landscapes are likewise never cropped into portraits.
+                let nativeMGS = mgsID != nil && url.flatMap(MGStagePoster.imageIdentity) == mgsID
+                return await download(url: url, timeout: timeout, derive: !original && !nativeMGS, native: movie.type == "2")
             }
             guard !Task.isCancelled,
-                  let winner = DetailPosterQuality.winner(decoded.map(\.quality)),
+                  let winner = (movie.type == "2" ? WesternCoverPolicy.winner(decoded.map(\.quality)) : DetailPosterQuality.winner(decoded.map(\.quality))),
                   let selected = decoded.first(where: { $0.quality.source == winner.source }) else { return nil }
             // No intermediate publication. The winner cache, not ImageLoader's
             // independently downsampled source cache, is the only warm fast path.
-            return await artwork(image: selected.image, source: winner.source, derive: false)
+            let art = await artwork(image: selected.image, source: winner.source, derive: false, native: movie.type == "2")
+            guard !Task.isCancelled, key == identity(movie: movie, account: account) else { return nil }
+            if movie.type == "2", let art { westernWinners.remember(key: westernListKey(movie: movie, account: account), value: art) }
+            return art
         }
+    }
+
+    private static func discoverMGStage(id: String?, namespace: String, timeout: TimeInterval) async -> [String] {
+        guard let id, !Task.isCancelled else { return [] }
+        let match = await mgstagePages.value(key: namespace + "#mgstage#" + id) {
+            let matches = await MGStagePoster.discover(id: id, timeout: min(timeout, 4))
+            return matches.first
+        }
+        guard !Task.isCancelled, let match else { return [] }
+        return [match]
     }
 
     private static func discoverTenhow(paths: [String], number: String, namespace: String, timeout: TimeInterval) async -> [String] {
@@ -248,7 +327,7 @@ enum DetailPosterResolver {
         let quality: DetailPosterQuality
     }
 
-    static func decode(data: Data, sourceURL: String, derive: Bool) -> DecodedPoster? {
+    static func decode(data: Data, sourceURL: String, derive: Bool, native: Bool = false) -> DecodedPoster? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               CGImageSourceGetStatus(source) == .statusComplete,
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -268,7 +347,7 @@ enum DetailPosterResolver {
             guard let front = cg.cropping(to: rect) else { return nil }
             cg = front; cropped = true
         }
-        guard DetailPosterPolicy.eligible(width: cg.width, height: cg.height) else { return nil }
+        guard native ? WesternCoverPolicy.eligible(width: cg.width, height: cg.height) : DetailPosterPolicy.eligible(width: cg.width, height: cg.height) else { return nil }
         let quality = DetailPosterQuality(source: sourceURL, width: cg.width, height: cg.height, originalPortrait: !cropped)
         // Keep only a bounded rendered raster per successful candidate. Score
         // above came from its real native front dimensions, not this downsample.
@@ -285,8 +364,8 @@ enum DetailPosterResolver {
         return DecodedPoster(image: UIImage(cgImage: cg), quality: quality)
     }
 
-    private static func download(url: URL, timeout: TimeInterval, derive: Bool) async -> DecodedPoster? {
-        guard timeout > 0, !Task.isCancelled else { return nil }
+    private static func download(url: URL, timeout: TimeInterval, derive: Bool, native: Bool = false) async -> DecodedPoster? {
+        guard timeout > 0, !Task.isCancelled, allowed(url) || (native && WesternCoverPolicy.imageAllowed(url)) else { return nil }
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false
@@ -300,11 +379,15 @@ enum DetailPosterResolver {
             var request = URLRequest(url: url)
             request.timeoutInterval = timeout
             request.setValue("image/*", forHTTPHeaderField: "Accept")
+            if movie.type == "2", ["cdn.dt18.com", "bdn.dt18.com"].contains(url.host ?? "") {
+                request.setValue("https://www.data18.com/", forHTTPHeaderField: "Referer")
+            }
             let (bytes, response) = try await session.bytes(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200,
                   response.expectedContentLength <= 12 * 1024 * 1024 else { return nil }
             var data = Data()
             for try await byte in bytes {
+                try Task.checkCancellation()
                 if data.count >= 12 * 1024 * 1024 { return nil }
                 data.append(byte)
             }
@@ -313,18 +396,18 @@ enum DetailPosterResolver {
                 data = JavDBSignature.decryptImage(data)
             }
             return await Task.detached(priority: .utility) {
-                decode(data: data, sourceURL: url.absoluteString, derive: derive)
+                decode(data: data, sourceURL: url.absoluteString, derive: derive, native: native)
             }.value
         } catch { return nil }
     }
 
-    private static func artwork(image: UIImage, source: String, derive: Bool) async -> DetailPosterArtwork? {
+    private static func artwork(image: UIImage, source: String, derive: Bool, native: Bool = false) async -> DetailPosterArtwork? {
         guard !Task.isCancelled else { return nil }
         return await Task.detached(priority: .utility) { () -> DetailPosterArtwork? in
             guard var cg = image.cgImage else { return nil }
             if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: source),
                let front = cg.cropping(to: rect) { cg = front }
-            guard DetailPosterPolicy.eligible(width: cg.width, height: cg.height) else { return nil }
+            guard native ? WesternCoverPolicy.eligible(width: cg.width, height: cg.height) : DetailPosterPolicy.eligible(width: cg.width, height: cg.height) else { return nil }
             let space = CGColorSpaceCreateDeviceRGB()
             var pixel = [UInt8](repeating: 0, count: 4)
             pixel.withUnsafeMutableBytes { bytes in

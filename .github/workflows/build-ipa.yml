@@ -50,6 +50,7 @@ jobs:
           python3 scripts/test-detail-posters.py
           python3 scripts/test-tenhow-posters.py
           python3 scripts/test-dmm-posters.py
+          python3 scripts/test-mgstage-posters.py
           python3 scripts/test-poster-latency.py
           python3 scripts/test-native-rankings.py
           python3 scripts/test-auth-persistence.py
