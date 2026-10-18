@@ -78,22 +78,6 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
         }
     }
 
-    func invalidate() {
-        let tasks = locked { () -> [Task<Value?, Never>] in
-            let tasks = flights.values.map(\.task)
-            entries.removeAll(); flights.removeAll()
-            return tasks
-        }
-        tasks.forEach { $0.cancel() }
-    }
-
-    func remember(key: String, value: Value) {
-        locked {
-            if entries.count >= 24, let oldest = entries.min(by: { $0.value.expires < $1.value.expires })?.key { entries[oldest] = nil }
-            entries[key] = Entry(value: value, expires: Date().addingTimeInterval(positiveTTL))
-        }
-    }
-
     private func cancel(key: String, id: UUID, user: UUID) {
         let abandoned: Task<Value?, Never>? = locked {
             guard var flight = flights[key], flight.id == id else { return nil }

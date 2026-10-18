@@ -850,44 +850,4 @@ final class PosterNavigationTests: XCTestCase {
         }
         return posters.firstMatch
     }
-
-    func testCoverSourceLabelMapsSwitchesAndCopiesWithoutImage() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture", "--cover-source-fixture"]
-        XCUIDevice.shared.orientation = .portrait
-        app.launch()
-        defer { app.terminate() }
-        let consent = app.buttons["我已满 18 岁，继续"]
-        if consent.waitForExistence(timeout: 2) { consent.tap() }
-        app.buttons["neutral-portrait-link"].tap()
-        let javdb = app.buttons["cover-source-value"]
-        XCTAssertTrue(javdb.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(javdb.label.contains("JavDB"))
-        XCTAssertFalse(javdb.label.contains("token"))
-        XCTAssertFalse(javdb.label.contains("secret"))
-        XCTAssertTrue(javdb.label.contains("https://tp.spfcas.com/covers/neutral.jpg"))
-        XCTAssertTrue(app.buttons["portrait-hero-play"].isHittable)
-        XCTAssertFalse(app.descendants(matching: .any)["legacy-landscape-header"].firstMatch.exists)
-        javdb.tap()
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "199-cover-source-javdb"
-        shot.lifetime = .keepAlways
-        add(shot)
-        app.buttons["返回"].tap()
-        app.buttons["neutral-wide-link"].tap()
-        let tpdb = app.buttons["cover-source-value"]
-        XCTAssertTrue(tpdb.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(tpdb.label.contains("ThePornDB"))
-        XCTAssertFalse(tpdb.label.contains("JavDB"))
-        XCTAssertFalse(tpdb.label.contains("tp.spfcas.com"))
-        XCTAssertFalse(tpdb.label.contains("token"))
-        XCTAssertTrue(tpdb.label.contains("https://cdn.theporndb.net/scene/1/background/full.jpg"))
-        XCTAssertTrue(app.buttons["landscape-hero-play"].isHittable)
-        XCTAssertFalse(app.images["detail-hero-artwork"].exists)
-        let switched = XCTAttachment(screenshot: app.screenshot())
-        switched.name = "199-cover-source-switched-theporndb"
-        switched.lifetime = .keepAlways
-        add(switched)
-    }
 }

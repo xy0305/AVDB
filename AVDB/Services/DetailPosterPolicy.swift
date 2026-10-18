@@ -33,17 +33,14 @@ enum DetailPosterSelection {
     static let totalBudget: TimeInterval = 12
     static func collect<Value: Sendable>(sources: [String], budget: TimeInterval = totalBudget,
         discover: (@Sendable (TimeInterval) async -> [String])? = nil,
-        reservedDiscoveries: Int = 2,
         operation: @escaping @Sendable (String, TimeInterval) async -> Value?) async -> [Value] {
-        guard !Task.isCancelled, budget > 0, (0...2).contains(reservedDiscoveries) else { return [] }
+        guard !Task.isCancelled, budget > 0 else { return [] }
         var seen = Set<String>()
         let originals = Array(sources.filter { seen.insert($0).inserted }.prefix(maxAttempts))
-        // Reserve up to two attempts for exact discoveries (Tenhow/Amazon, or a
-        // Western comparison). These are opportunities, never source score
-        // bonuses. Misses release their slots to old sources; no seventh image
-        // attempt is introduced. The default of two preserves the Japanese path.
-        let reserved = discover == nil ? 0 : reservedDiscoveries
-        var candidates = Array(originals.prefix(maxAttempts - reserved))
+        // Reserve two attempts for Tenhow and optional exact-ASIN Amazon.
+        // These are opportunities, never source score bonuses. Misses release
+        // their slots to old sources; no seventh image attempt is introduced.
+        var candidates = Array(originals.prefix(discover == nil ? maxAttempts : maxAttempts - 2))
         guard !candidates.isEmpty || discover != nil else { return [] }
         let deadline = ProcessInfo.processInfo.systemUptime + budget
         return await withTaskGroup(of: (Int, Value?, [String]).self) { group in
@@ -80,10 +77,6 @@ enum DetailPosterSelection {
                     // Amazon. At most two exact-record DMM entries follow; they
                     // replace only unissued legacy slots, never those two entries.
                     candidates = issued
-                    // Callers order discoveries: Japanese exact pages stay ahead
-                    // of legacy slots; Western callers put the verified higher
-                    // candidates ahead of the JavDB baseline. Nothing already
-                    // issued is replaced, and six remains the hard cap.
                     for fresh in discovered where candidates.count < maxAttempts {
                         if !candidates.contains(fresh) { candidates.append(fresh) }
                     }

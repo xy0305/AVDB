@@ -38,9 +38,7 @@ struct ContentView: View {
 
     var body: some View {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--western-settings-fixture") {
-            NavigationStack { WesternCoverSettingsView() }
-        } else if ProcessInfo.processInfo.arguments.contains("--subtitle-controls-fixture"),
+        if ProcessInfo.processInfo.arguments.contains("--subtitle-controls-fixture"),
            let url = Bundle.main.url(forResource: "neutral-subtitle", withExtension: "mp4") {
             // Exercise the production route-owned orientation host, not a DEBUG-only
             // .all mask that can leave the iPhone event window portrait.
