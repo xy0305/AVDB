@@ -122,12 +122,19 @@ enum DetailPosterResolver {
     }
     #endif
 
+    static func westernIdentitySuffix(_ movie: Movie) -> String {
+        guard movie.type == "2" else { return "" }
+        let title = movie.originTitle ?? movie.title ?? ""
+        let minutes = String(movie.duration ?? 0)
+        return "#western#" + WesternCoverSettings.shared.namespace.uuidString + "#" + title + "#" + (movie.releaseDate ?? "") + "#" + minutes + "#" + (movie.originalURL ?? "")
+    }
+
     static func identity(movie: Movie, account: String?) -> String {
         // Opaque memory-only account namespace; never log credentials.
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
         let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
-        let western = movie.type == "2" ? "#western#" + WesternCoverSettings.shared.namespace.uuidString + "#" + (movie.originTitle ?? movie.title ?? "") + "#" + (movie.releaseDate ?? "") + "#" + String(movie.duration ?? 0) + "#" + (movie.originalURL ?? "") : ""
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + western
+        let westernSuffix = westernIdentitySuffix(movie)
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + westernSuffix
     }
 
     static func validatedSources(_ movie: Movie) -> [String] {
@@ -207,7 +214,7 @@ enum DetailPosterResolver {
                 // never manufacture one by cropping an enlarged horizontal image.
                 // Western landscapes are likewise never cropped into portraits.
                 let nativeMGS = mgsID != nil && url.flatMap(MGStagePoster.imageIdentity) == mgsID
-                return await download(url: url, timeout: timeout, derive: !original && !nativeMGS, native: movie.type == "2")
+                return await download(url: url, timeout: timeout, derive: !original && !nativeMGS, native: movie.type == "2", western: movie.type == "2")
             }
             guard !Task.isCancelled,
                   let winner = (movie.type == "2" ? WesternCoverPolicy.winner(decoded.map(\.quality)) : DetailPosterQuality.winner(decoded.map(\.quality))),
@@ -364,7 +371,7 @@ enum DetailPosterResolver {
         return DecodedPoster(image: UIImage(cgImage: cg), quality: quality)
     }
 
-    private static func download(url: URL, timeout: TimeInterval, derive: Bool, native: Bool = false) async -> DecodedPoster? {
+    private static func download(url: URL, timeout: TimeInterval, derive: Bool, native: Bool = false, western: Bool = false) async -> DecodedPoster? {
         guard timeout > 0, !Task.isCancelled, allowed(url) || (native && WesternCoverPolicy.imageAllowed(url)) else { return nil }
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil
@@ -379,7 +386,7 @@ enum DetailPosterResolver {
             var request = URLRequest(url: url)
             request.timeoutInterval = timeout
             request.setValue("image/*", forHTTPHeaderField: "Accept")
-            if movie.type == "2", ["cdn.dt18.com", "bdn.dt18.com"].contains(url.host ?? "") {
+            if western, ["cdn.dt18.com", "bdn.dt18.com"].contains(url.host ?? "") {
                 request.setValue("https://www.data18.com/", forHTTPHeaderField: "Referer")
             }
             let (bytes, response) = try await session.bytes(for: request)
