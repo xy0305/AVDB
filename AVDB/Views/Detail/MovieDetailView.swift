@@ -16,7 +16,7 @@ struct MovieDetailView: View {
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
     private let posterSeed: Movie?
-    private var posterMovie: Movie? { posterSeed ?? vm.movie }
+    private var posterMovie: Movie? { DetailPosterResolver.posterMovie(seed: posterSeed, detail: vm.movie) }
 
     private var posterRequestKey: String {
         guard let movie = posterMovie else { return "pending#\(movieID)#\(posterAccountEpoch)" }
@@ -54,6 +54,10 @@ struct MovieDetailView: View {
         } else {
             Text(posterLayout.isLandscape ? "封面来源：等待图片加载" : CoverSourceDisplay.pending)
                 .font(.caption2).foregroundStyle(.secondary).accessibilityIdentifier("detail-cover-source")
+        }
+        if posterLayout.isLandscape, let movie = posterMovie, movie.type != "2" {
+            Text(DetailPosterResolver.fallbackReason(movie: movie, account: APIClient.shared.token))
+                .font(.caption2).foregroundStyle(.secondary).accessibilityIdentifier("detail-cover-fallback-reason")
         }
         if let movie = vm.movie, movie.type == "2" {
             Text(posterArtwork?.diagnostic.isEmpty == false ? posterArtwork!.diagnostic : WesternCoverService.diagnostic(movie: movie, namespace: DetailPosterResolver.identity(movie: movie, account: APIClient.shared.token)))

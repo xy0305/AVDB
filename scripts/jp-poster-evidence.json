@@ -1,0 +1,70 @@
+{
+  "base": "c175242d126e46fb0dc3cc7a1b7b5e493d762295",
+  "record": {
+    "id": "MmemxP",
+    "type": 0,
+    "number": "SSIS-794",
+    "release_date": "2023-07-12",
+    "cover_url": "https://tp.spfcas.com/rhe951l4q/covers/mm/MmemxP.jpg",
+    "thumb_url": "https://tp.spfcas.com/rhe951l4q/small_covers/mm/MmemxP.jpg"
+  },
+  "actorIdentity": {
+    "id": "O2qxB",
+    "name": "清原みゆう",
+    "tenhowPath": "/kiyohara_miyuu.html"
+  },
+  "exactRecord": {
+    "retailCID": "ssis794",
+    "digitalCID": "ssis00794",
+    "asin": "B0C7TQ7DJR"
+  },
+  "liveTLS": "System browser trusted TLS for API; curl verified TLS for Tenhow and DMM. No certificate bypass.",
+  "pixels": [
+    {
+      "url": "https://www.tenhow.net/images/B0C7TQ7DJR.jpg",
+      "exit": 0,
+      "pixels": [
+        1055,
+        1500
+      ]
+    },
+    {
+      "url": "https://www.amazon.co.jp/dp/B0C7TQ7DJR",
+      "exit": 22,
+      "failure": "curl: (22) The requested URL returned error: 500\n"
+    },
+    {
+      "url": "https://awsimgsrc.dmm.co.jp/pics_dig/mono/movie/ssis794/ssis794ps.jpg",
+      "exit": 0,
+      "pixels": [
+        147,
+        200
+      ]
+    },
+    {
+      "url": "https://pics.dmm.co.jp/mono/movie/adult/ssis794/ssis794ps.jpg",
+      "exit": 0,
+      "pixels": [
+        147,
+        200
+      ]
+    },
+    {
+      "url": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ssis00794/ssis00794ps.jpg",
+      "exit": 0,
+      "pixels": [
+        147,
+        200
+      ]
+    },
+    {
+      "url": "https://pics.dmm.co.jp/digital/video/ssis00794/ssis00794ps.jpg",
+      "exit": 0,
+      "pixels": [
+        147,
+        200
+      ]
+    }
+  ],
+  "comparison": "197 and 200 share Japanese eligibility, crop, source selection and discovery deadlines. Screenshot alone is not proof of a 200 logic regression."
+}

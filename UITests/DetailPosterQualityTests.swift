@@ -86,6 +86,46 @@ final class DetailPosterQualityTests: XCTestCase {
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         return data as Data
     }
+    func testSSIS794SparseSeedUsesVerifiedDetailDiscoveryWithoutLoweringPixels() throws {
+        let cover = "https://tp.spfcas.com/rhe951l4q/covers/mm/MmemxP.jpg"
+        func movie(_ names: [String], type: Any = 0) throws -> Movie {
+            let data = try JSONSerialization.data(withJSONObject: ["id":"MmemxP", "number":"SSIS-794", "type":type,
+                "cover_url":cover, "actor_names":names])
+            return try JSONDecoder().decode(Movie.self, from:data)
+        }
+        let sparse = try movie(["unmapped fixture identity"])
+        let detail = try movie(["清原みゆう"])
+        XCTAssertEqual(detail.type, "0")
+        XCTAssertFalse(FrontPosterPolicy.usesOriginal(type:detail.type, number:detail.number))
+        XCTAssertNotNil(DetailPosterResolver.navigationSeed(sparse, movieID:"MmemxP"))
+        XCTAssertTrue(DetailPosterResolver.tenhowPaths(sparse).isEmpty)
+        XCTAssertEqual(DetailPosterResolver.tenhowPaths(detail), ["/kiyohara_miyuu.html"])
+        let selected = DetailPosterResolver.posterMovie(seed:sparse, detail:detail)!
+        XCTAssertEqual(DetailPosterResolver.tenhowPaths(selected), ["/kiyohara_miyuu.html"])
+        // Complete seeds retain their identity; review/title refreshes do not flash.
+        XCTAssertEqual(DetailPosterResolver.identity(movie:DetailPosterResolver.posterMovie(seed:detail, detail:detail)!, account:nil),
+                       DetailPosterResolver.identity(movie:detail, account:nil))
+        // Screenshot raster is not eligible. Do not synthesize a 360x500 front.
+        XCTAssertNil(DetailPosterResolver.decode(data:jpeg(800,438), sourceURL:cover, derive:true))
+        XCTAssertFalse(DetailPosterPolicy.eligible(width:306,height:438))
+        let record = #"<div class="um_image_a um_popup"><a title="拡大表示" href="images/B0C7TQ7DJR.jpg">neutral</a><a href="https://al.fanza.co.jp/?lurl=https%3A%2F%2Fwww.dmm.co.jp%2Fmono%2Fdvd%2F-%2Fdetail%2F%3D%2Fcid%3Dssis794%2F&amp;af_id=fixture">retail</a><a href="https://al.fanza.co.jp/?lurl=https%3A%2F%2Fvideo.dmm.co.jp%2Fav%2Fcontent%2F%3Fid%3Dssis00794&amp;af_id=fixture">digital</a></div>"#
+        let match = try TenhowPoster.match(html:record, number:"SSIS-794")
+        XCTAssertEqual(match?.images,["https://www.tenhow.net/images/B0C7TQ7DJR.jpg"])
+        XCTAssertEqual(match?.official.count,2)
+        let exact = DetailPosterResolver.decode(data:jpeg(1055,1500), sourceURL:"https://www.tenhow.net/images/B0C7TQ7DJR.jpg", derive:true)!
+        XCTAssertEqual(exact.quality.width,1055); XCTAssertEqual(exact.quality.height,1500)
+        XCTAssertEqual(exact.rawWidth,1055); XCTAssertEqual(exact.rawHeight,1500)
+        let unknown = try JSONDecoder().decode(Movie.self, from:Data("{\"id\":\"MmemxP\",\"number\":\"SSIS-794\"}".utf8))
+        XCTAssertNil(DetailPosterResolver.navigationSeed(unknown, movieID:"MmemxP"))
+        XCTAssertFalse(FrontPosterPolicy.usesOriginal(type:unknown.type, number:unknown.number))
+        for type in ["1","2","3"] {
+            let original = try movie(["清原みゆう"],type:type)
+            XCTAssertEqual(DetailPosterResolver.posterMovie(seed:sparse, detail:original)?.type,type)
+            XCTAssertTrue(DetailPosterResolver.tenhowPaths(original).isEmpty)
+            XCTAssertTrue(FrontPosterPolicy.usesOriginal(type:original.type, number:original.number))
+        }
+    }
+
     func testActualDecodedNativeFrontEXIFAndInvalidImages() {
         let wrap = DetailPosterResolver.decode(data: jpeg(800, 538), sourceURL: "https://tp.spfcas.com/covers/test.jpg", derive: true)!
         XCTAssertEqual(wrap.quality.width, 376); XCTAssertEqual(wrap.quality.height, 538)

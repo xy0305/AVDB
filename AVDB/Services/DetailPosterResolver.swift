@@ -54,6 +54,16 @@ enum DetailPosterResolver {
     private static let westernWinners = DetailPosterCache<DetailPosterArtwork>()
     private static let amazonPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
     private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
+    private static let fallbackReasons = DetailPosterCache<String>(positiveTTL: 30)
+
+    static func fallbackReason(movie: Movie, account: String?) -> String {
+        if FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number) {
+            return "保留原图：无码、FC2或未确认有码类别，不裁切"
+        }
+        if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty { return "正封回退：不支持的来源" }
+        return fallbackReasons.snapshot(key: identity(movie: movie, account: account)).artwork
+            ?? "正封回退：未取得合格候选（网络或尺寸限制）"
+    }
 
     static func clearWesternCaches() { westernCache.invalidate(); westernWinners.invalidate() }
     static func cachedWinner(movie: Movie, account: String?) -> DetailPosterArtwork? {
@@ -70,6 +80,18 @@ enum DetailPosterResolver {
               !actorIdentities(movie).flatMap({ $0 }).filter({ !$0.isEmpty }).isEmpty,
               !validatedSources(movie).isEmpty else { return nil }
         return movie
+    }
+
+    // Navigation metadata is only a head start. A sparse seed must not suppress
+    // exact-actor discovery supplied by the subsequently loaded detail record.
+    static func posterMovie(seed: Movie?, detail: Movie?) -> Movie? {
+        guard let seed else { return detail }
+        guard let detail, detail.id == seed.id else { return seed }
+        if let type = detail.type, !type.isEmpty,
+           FrontPosterPolicy.usesOriginal(type: type, number: detail.number)
+            != FrontPosterPolicy.usesOriginal(type: seed.type, number: seed.number) { return detail }
+        if tenhowPaths(seed).isEmpty && !tenhowPaths(detail).isEmpty { return detail }
+        return seed
     }
 
     static func actorIdentities(_ movie: Movie) -> [[String]] {
@@ -167,13 +189,22 @@ enum DetailPosterResolver {
                     await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
                 }
             }
+            let started = ProcessInfo.processInfo.systemUptime
             let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover) { source, timeout in
                 guard let url = URL(string: source) else { return nil }
                 return await download(url: url, timeout: timeout, derive: !original, western: movie.type == "2")
             }
             guard !Task.isCancelled,
                   let winner = (movie.type == "2" ? WesternCoverPolicy.winner(decoded.map(\.quality)) : DetailPosterQuality.winner(decoded.map(\.quality))),
-                  let selected = decoded.first(where: { $0.quality.source == winner.source }) else { return nil }
+                  let selected = decoded.first(where: { $0.quality.source == winner.source }) else {
+                if !Task.isCancelled, movie.type != "2" {
+                    let exhausted = ProcessInfo.processInfo.systemUptime - started >= DetailPosterSelection.totalBudget
+                    fallbackReasons.store(key: key, value: exhausted
+                        ? "正封回退：12 秒预算耗尽，未取得合格候选"
+                        : "正封回退：未取得合格候选（网络或尺寸限制）")
+                }
+                return nil
+            }
             // No intermediate publication. The winner cache, not ImageLoader's
             // independently downsampled source cache, is the only warm fast path.
             guard var art = await artwork(image: selected.image, source: winner.source, derive: false, western: movie.type == "2") else { return nil }
