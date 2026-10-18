@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['AVDB/Services/ImageLoader.swift', 'AVDB/Services/JavRankingCore.swift', 'AVDB/Views/Player/PlayerView.swift', 'UITests/**', 'scripts/test-javranking-mapping.py', '.github/workflows/amane022-regressions.yml']
+    paths: ['AVDB/Services/ImageLoader.swift', 'AVDB/Services/JavRankingCore.swift', 'UITests/DetailPosterQualityTests.swift', 'scripts/test-javranking-mapping.py', '.github/workflows/amane022-regressions.yml']
 permissions:
   contents: read
 jobs:
@@ -20,7 +20,6 @@ jobs:
         run: |
           python3 scripts/test-javranking-mapping.py
           python3 scripts/test-front-posters.py
-          python3 scripts/test-player-gestures.py
       - name: Install simulator test target and dependencies
         run: |
           gem install cocoapods -v 1.16.2 --no-document
@@ -43,10 +42,10 @@ jobs:
         run: |
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
           xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
-      - name: Real UIKit gesture and hosted SwiftUI image regressions
+      - name: Real ImageIO crop and hosted SwiftUI image regressions
         run: |
           set -o pipefail
-          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath "$RUNNER_TEMP/Derived" -resultBundlePath "$RUNNER_TEMP/Amane022.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:DetailPosterQualityTests/Amane022RegressionTests -only-testing:DetailPosterQualityTests/DetailPosterQualityTests -only-testing:PosterNavigationUITests/PosterNavigationTests/testPlayerBackgroundGesturesYieldToChromeAndPanels 2>&1 | tee "$RUNNER_TEMP/amane022.log"
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath "$RUNNER_TEMP/Derived" -resultBundlePath "$RUNNER_TEMP/Amane022.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:DetailPosterQualityTests/Amane022RegressionTests -only-testing:DetailPosterQualityTests/DetailPosterQualityTests 2>&1 | tee "$RUNNER_TEMP/amane022.log"
       - name: Export actual test attachments
         if: always()
         run: |

@@ -452,6 +452,13 @@ public struct JavDBImage: View {
                 }
             }
             .clipped()
+            // Identity replacement must also ignore a parent's animation. Merely
+            // disabling animation in publish() leaves an old Image fading out
+            // when the new source fails and no publication ever occurs.
+            .transaction { transaction in
+                transaction.animation = nil
+                transaction.disablesAnimations = true
+            }
             .contentShape(Rectangle())
             .allowsHitTesting(false)
             .task(id: requestIdentity) {

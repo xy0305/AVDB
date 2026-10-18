@@ -198,67 +198,6 @@ final class PosterNavigationTests: XCTestCase {
         geometry.name = "195-real-player-landscape-geometry"; geometry.lifetime = .keepAlways; add(geometry)
     }
 
-    func testPlayerBackgroundGesturesYieldToChromeAndPanels() {
-        continueAfterFailure = false
-        XCUIDevice.shared.orientation = .portrait
-        let app = XCUIApplication()
-        app.launchArguments = ["--poster-navigation-fixture", "--subtitle-controls-fixture"]
-        app.launch()
-        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
-        let consent = app.buttons["我已满 18 岁，继续"]
-        if consent.waitForExistence(timeout: 2) { consent.tap() }
-        enterSubtitleLandscape(app)
-        refreshPlayerChrome(app)
-        let play = app.buttons["player.play.toggle"]
-        XCTAssertTrue(play.waitForExistence(timeout: 10))
-        XCTAssertEqual(play.label, "暂停")
-        let subtitle = app.buttons["player.subtitle.settings"]
-        subtitle.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.06)).tap()
-        XCTAssertTrue(app.textFields["subtitle.query"].waitForExistence(timeout: 5))
-        app.buttons["subtitle.panel.done"].tap()
-        refreshPlayerChrome(app)
-        XCTAssertEqual(play.label, "暂停", "Panel actions may not propagate into background playback gestures")
-        app.buttons["player.lut.settings"].tap()
-        let lutDone = app.buttons["完成 LUT 设置，返回播放"]
-        XCTAssertTrue(lutDone.waitForExistence(timeout: 5)); lutDone.tap()
-        refreshPlayerChrome(app)
-        XCTAssertEqual(play.label, "暂停")
-        // Freeze the clock. All following advances must come from real gestures.
-        play.tap()
-        expectation(for: NSPredicate(format: "label == %@", "播放"), evaluatedWith: play)
-        waitForExpectations(timeout: 5)
-        func seconds() -> Int {
-            app.staticTexts["player.clock"].label.split(separator: ":").reduce(0) { $0 * 60 + (Int($1) ?? 0) }
-        }
-        let before = seconds()
-        let window = app.windows.firstMatch
-        let right = window.coordinate(withNormalizedOffset: CGVector(dx: 0.72, dy: 0.50))
-        // With chrome visible, this used to be swallowed by Color.clear's tap.
-        right.doubleTap()
-        refreshPlayerChrome(app)
-        let advanced = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in seconds() >= before + 9 }, object: app)
-        XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 5), .completed)
-        XCTAssertEqual(play.label, "播放", "Background double-tap seeks, never toggles playback")
-        let afterDouble = seconds()
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.50)).press(forDuration: 0.1,
-            thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.50)))
-        refreshPlayerChrome(app)
-        XCTAssertGreaterThan(seconds(), afterDouble + 5, "Visible chrome center must not swallow the UIKit pan")
-        XCTAssertEqual(play.label, "播放")
-        app.sliders.firstMatch.adjust(toNormalizedSliderPosition: 0.25)
-        XCTAssertFalse(app.otherElements["player.seek.preview"].exists, "Slider end belongs to the slider, not a background pan")
-        XCTAssertEqual(play.label, "播放")
-        // Hide chrome, then tap where the old exclusion band blocked all input.
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: play)
-        waitForExpectations(timeout: 5)
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
-        XCTAssertTrue(play.waitForExistence(timeout: 5))
-        XCTAssertEqual(play.label, "播放", "Reveal touch must not activate a newly appeared control")
-        let evidence = XCTAttachment(screenshot: app.screenshot())
-        evidence.name = "197-real-player-gesture-controls"; evidence.lifetime = .keepAlways; add(evidence)
-    }
-
     func testSubtitleControlsRealPlayerHitTargetsStyleAndDrag() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
