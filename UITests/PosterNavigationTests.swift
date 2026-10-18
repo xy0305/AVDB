@@ -259,6 +259,7 @@ final class PosterNavigationTests: XCTestCase {
         app.buttons["subtitle.position.done"].tap()
         XCTAssertEqual(play.label, "暂停", "Caption drag must not pause/seek via player recognizers")
         XCTAssertFalse(app.otherElements["player.seek.preview"].exists)
+        verifySubtitleMovementAndSize(app)
         app.terminate(); app.launch()
         refreshPlayerChrome(app)
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
@@ -392,6 +393,41 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["subtitle.disable"].waitForExistence(timeout: 5))
         app.buttons["subtitle.disable"].tap()
         XCTAssertFalse(caption.exists)
+    }
+
+    private func verifySubtitleMovementAndSize(_ app: XCUIApplication) {
+        refreshPlayerChrome(app)
+        app.buttons["player.subtitle.settings"].tap()
+        let edit = app.buttons["subtitle.position.edit"]
+        for _ in 0..<8 { if edit.isHittable { break }; scrollSubtitleForm(app) }
+        XCTAssertTrue(edit.isHittable); edit.tap()
+        let caption = app.otherElements["subtitle.rendered"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        let window = app.windows.firstMatch.frame
+        func drag(_ start: CGVector, _ end: CGVector, check: (CGRect, CGRect) -> Bool) {
+            let before = caption.frame
+            caption.coordinate(withNormalizedOffset: start).press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: end))
+            let after = caption.frame
+            XCTAssertTrue(window.insetBy(dx: -1, dy: -1).contains(after), app.debugDescription)
+            XCTAssertTrue(check(before, after), "before \(before), after \(after), window \(window)")
+        }
+        drag(CGVector(dx: 0.5, dy: 0.5), CGVector(dx: 0.5, dy: 0.98)) { before, after in after.midY > before.midY + 8 && after.maxY > window.maxY - 28 }
+        drag(CGVector(dx: 0.5, dy: 0.5), CGVector(dx: 0.5, dy: 0.02)) { before, after in after.midY < before.midY - 8 && after.minY < window.minY + 28 }
+        drag(CGVector(dx: 0.5, dy: 0.5), CGVector(dx: 0.02, dy: 0.5)) { before, after in after.midX < before.midX - 8 && after.minX < window.minX + 28 }
+        drag(CGVector(dx: 0.5, dy: 0.5), CGVector(dx: 0.98, dy: 0.5)) { before, after in after.midX > before.midX + 8 && after.maxX > window.maxX - 28 }
+        app.buttons["subtitle.position.done"].tap()
+        refreshPlayerChrome(app)
+        app.buttons["player.subtitle.settings"].tap()
+        let increase = app.buttons["增大字号"]
+        for _ in 0..<8 { if increase.isHittable { break }; scrollSubtitleForm(app) }
+        for _ in 0..<8 { increase.tap() }
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 27 pt")
+        let decrease = app.buttons["减小字号"]
+        for _ in 0..<4 { decrease.tap() }
+        XCTAssertEqual(app.staticTexts["subtitle.font.value"].label, "字号 23 pt")
+        app.buttons["完成"].tap()
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(caption.frame), "Resized caption must remain inside the player")
     }
 
     func testOnlineSubtitleConsentSelectionOffsetAndDisable() {

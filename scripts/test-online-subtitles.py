@@ -19,7 +19,8 @@ assert 'RoundedRectangle' not in caption and '.black.opacity(0.65)' not in capti
 assert '@AppStorage("subtitle.fontPoints")' in source and '@AppStorage("subtitle.positionX")' in source
 assert 'in: 14...36' in source and 'subtitle.appearance.reset' in source
 assert '.allowsHitTesting(editing)' in source and '.highPriorityGesture(DragGesture' in source
-assert 'subtitle.position.edit' in source and 'subtitle.position.done' in source
+assert 'safeArea.bottom + 12' in source and 'safeArea.bottom + 116' not in source
+assert 'subtitle.nudge.left' in source and 'subtitle.nudge.down' in source
 print('PASS subtitle static privacy/wiring and no-background presentation contracts (not native runtime claims)')
 if platform.system()=='Darwin':
  with tempfile.TemporaryDirectory() as d:

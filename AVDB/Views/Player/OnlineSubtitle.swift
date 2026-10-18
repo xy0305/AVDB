@@ -332,10 +332,10 @@ struct SubtitleAppearanceControls: View {
             Button("调整位置（拖动字幕）", action: adjustPosition)
                 .accessibilityIdentifier("subtitle.position.edit")
             HStack {
-                Button("向左") { x = max(0, x - 0.05) }
-                Button("向右") { x = min(1, x + 0.05) }
-                Button("向上") { y = max(0, y - 0.05) }
-                Button("向下") { y = min(1, y + 0.05) }
+                Button("向左") { x = max(0, x - 0.05) }.accessibilityIdentifier("subtitle.nudge.left")
+                Button("向右") { x = min(1, x + 0.05) }.accessibilityIdentifier("subtitle.nudge.right")
+                Button("向上") { y = max(0, y - 0.05) }.accessibilityIdentifier("subtitle.nudge.up")
+                Button("向下") { y = min(1, y + 0.05) }.accessibilityIdentifier("subtitle.nudge.down")
             }.buttonStyle(.borderless)
             Button("恢复默认字号与位置") {
                 points = SubtitleStyleDefaults.size; x = SubtitleStyleDefaults.x; y = SubtitleStyleDefaults.y
@@ -370,11 +370,12 @@ struct SubtitlePresentationOverlay: View {
     }
     var body: some View {
         GeometryReader { geo in
-            // Reserve controls whether visible or hidden: no caption jumping on tap.
-            let left = safeArea.leading + 16
-            let top = safeArea.top + 80
-            let bottom = safeArea.bottom + 116 // Keep captions above progress/source controls in both orientations.
-            let available = CGSize(width: max(1, geo.size.width - left - safeArea.trailing - 16),
+            // Use identical bounds whether controls are visible or hidden, so toggling chrome never jumps captions.
+            // Only a small device-edge margin is reserved; a fixed 116-point control reservation blocked downward movement.
+            let left = safeArea.leading + 12
+            let top = safeArea.top + 12
+            let bottom = safeArea.bottom + 12
+            let available = CGSize(width: max(1, geo.size.width - left - safeArea.trailing - 12),
                                    height: max(1, geo.size.height - top - bottom))
             let height = min(available.height, max(1, textSize.height))
             let renderedText = text.isEmpty ? "字幕位置预览\n拖动此处调整" : text
@@ -409,6 +410,7 @@ struct SubtitlePresentationOverlay: View {
                     .scrollDisabled(!editing || textSize.height <= available.height)
                     .frame(width: width, height: height)
                     .onPreferenceChange(SubtitleTextSizeKey.self) { textSize = $0 }
+                    .onChange(of: points) { _, _ in textSize = CGSize(width: 1, height: 1) }
                     .contentShape(Rectangle())
                     .highPriorityGesture(DragGesture(minimumDistance: 2)
                         .updating($translation) { value, state, _ in if editing { state = value.translation } }
