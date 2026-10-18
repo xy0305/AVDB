@@ -209,7 +209,7 @@ enum DetailPosterResolver {
                 }
             }
             let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover, reservedDiscoveries: 2) { source, timeout in
-                guard let url = URL(string: source) else { return nil }
+                guard let url = URL(string: source) else { return nil as DecodedPoster? }
                 // Verified MGStage fronts must already be usable portraits;
                 // never manufacture one by cropping an enlarged horizontal image.
                 // Western landscapes are likewise never cropped into portraits.
