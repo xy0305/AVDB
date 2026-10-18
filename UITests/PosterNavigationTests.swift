@@ -356,6 +356,8 @@ final class PosterNavigationTests: XCTestCase {
                 app.staticTexts["subtitle.status"].label.contains("已加载")
             }, object: app)
             XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 5), .completed)
+            XCTAssertTrue(app.staticTexts["subtitle.selection.feedback"].waitForExistence(timeout: 3), "选中字幕后必须在结果处显示反馈")
+            XCTAssertTrue(app.staticTexts["subtitle.selection.feedback"].label.contains("已加载"))
             // Completion stays pinned even after scrolling down to the result.
             XCTAssertTrue(app.buttons["subtitle.panel.done"].isHittable)
             app.buttons["subtitle.panel.done"].tap()

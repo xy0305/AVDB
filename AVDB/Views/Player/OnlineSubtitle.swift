@@ -299,6 +299,7 @@ import UIKit
                 let cues = try await Task.detached(priority: .userInitiated) { try OnlineSubtitleParser.parse(data, ext: row.ext, encodingHint: hint) }.value
                 guard let self, self.generation == token, !Task.isCancelled else { return }
                 self.cues = cues; self.selected = row; self.busy = false; self.status = "已加载（来源：迅雷第三方服务）"
+                GlassHaptic.tap()
             } catch {
                 guard let self, self.generation == token, !Task.isCancelled else { return }
                 self.status = "加载失败：\(error.localizedDescription)"; self.busy = false
@@ -487,12 +488,24 @@ struct OnlineSubtitlePanel: View {
                 }
                 Section("搜索结果（不会自动选择）") {
                     ForEach(model.results) { row in
+                        let isSelected = model.selected?.id == row.id
                         Button { model.choose(row) } label: {
-                            VStack(alignment: .leading) {
-                                Text(row.name).lineLimit(3)
-                                Text("\(row.language) · \(row.ext.uppercased())").font(.caption)
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(row.name).lineLimit(3)
+                                    Text("\(row.language) · \(row.ext.uppercased())").font(.caption)
+                                    if isSelected {
+                                        Text(model.status).font(.caption.weight(.semibold)).foregroundStyle(.green)
+                                            .accessibilityIdentifier("subtitle.selection.feedback")
+                                    }
+                                }
+                                Spacer(minLength: 8)
+                                if isSelected {
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityHidden(true)
+                                }
                             }
                         }.accessibilityIdentifier("subtitle.candidate")
+                            .accessibilityValue(isSelected ? model.status : "")
                     }
                 }
                 SubtitleAppearanceControls(adjustPosition: adjustPosition)
