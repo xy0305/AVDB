@@ -146,7 +146,7 @@ actor SelectionProbe {
 detail=(root/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
 settings=(root/'AVDB/Views/User/UserView.swift').read_text()
 portrait=detail.split('private func portraitHero',1)[1].split('private func posterAction',1)[0]
-for literal in ['scaledToFill()', 'width * 1.58', 'width * 0.99', 'location: 0.36', 'location: 0.86', 'HStack(spacing: 28)', '.background(.white, in: RoundedRectangle(cornerRadius: 17))', '.frame(width: 44, height: 44)', 'if showCoverTitle', 'DetailReadableTitle']:
+for literal in ['scaledToFill()', 'width * 1.58', 'width * 0.99', 'location: 0.36', 'location: 0.86', 'HStack(spacing: 28)', '.background(.clear, in: RoundedRectangle(cornerRadius: 17))', '.frame(width: 44, height: 44)', 'if showCoverTitle', 'DetailReadableTitle']:
     assert literal in portrait,literal
 assert 'LazyVGrid' not in portrait  # The unrelated screenshots gallery remains a grid.
 for forbidden in ['DetailActionGlass', 'detailActions(movie)', 'glassEffect(']:

@@ -364,11 +364,12 @@ struct MovieDetailView: View {
                 } label: {
                     Label("播放", systemImage: "play.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.65), radius: 2, y: 1)
                         .frame(maxWidth: .infinity).frame(minHeight: 44)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 17))
-                        // Transparent hit slop avoids sub-pixel AX frames below 44pt.
-                        // Keep the original visible white button height and styling.
+                        .background(.clear, in: RoundedRectangle(cornerRadius: 17))
+                        .overlay(RoundedRectangle(cornerRadius: 17).stroke(.white.opacity(0.72), lineWidth: 1.5))
+                        // Keep the original 44-point hit area without covering the poster.
                         .padding(.vertical, 1)
                         .contentShape(Rectangle())
                 }
