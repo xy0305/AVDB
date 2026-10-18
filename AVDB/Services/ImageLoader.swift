@@ -395,6 +395,20 @@ public struct JavDBImage: View {
     let frontPoster: Bool
 
     @State private var image: UIImage?
+    @State private var imageIdentity: String?
+
+    private var requestIdentity: String {
+        imageURLs.joined(separator: "|") + "#\(frontPoster)#\(maxPixelSize)"
+    }
+
+    private func publish(_ value: UIImage, identity: String) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            image = value
+            imageIdentity = identity
+        }
+    }
 
     public init(
         url: String?,
@@ -428,7 +442,7 @@ public struct JavDBImage: View {
         // 把 LazyVGrid 格子撑爆（.clipped() 只裁绘制、不改布局）。
         Color.clear
             .overlay {
-                if let image {
+                if let image, imageIdentity == requestIdentity {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: contentMode)
@@ -440,7 +454,8 @@ public struct JavDBImage: View {
             .clipped()
             .contentShape(Rectangle())
             .allowsHitTesting(false)
-            .task(id: imageURLs.joined(separator: "|") + "#\(frontPoster)#\(maxPixelSize)") {
+            .task(id: requestIdentity) {
+            let identity = requestIdentity
             #if DEBUG
             if let url, url.hasPrefix("fixture://poster/") {
                 let name = url.components(separatedBy: "/").last ?? "neutral"
@@ -449,16 +464,17 @@ public struct JavDBImage: View {
                     : name.contains("wide") ? CGSize(width: 1200, height: 500)
                     : CGSize(width: 800, height: 538)
                 let renderer = UIGraphicsImageRenderer(size: size)
-                image = renderer.image { context in
+                var fixtureImage = renderer.image { context in
                     UIColor.systemTeal.setFill()
                     context.fill(CGRect(origin: .zero, size: size))
                     UIColor.systemOrange.setFill()
                     context.fill(CGRect(x: 424, y: 0, width: 376, height: 538))
                     ("NEUTRAL " + url.components(separatedBy: "/").last!) .draw(at: CGPoint(x: 300, y: 260), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.white])
                 }
-                if frontPoster, let cg = image?.cgImage,
+                if frontPoster, let cg = fixtureImage.cgImage,
                    let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: "https://tp.spfcas.com/covers/neutral.jpg"),
-                   let cropped = cg.cropping(to: rect) { image = UIImage(cgImage: cropped) }
+                   let cropped = cg.cropping(to: rect) { fixtureImage = UIImage(cgImage: cropped) }
+                publish(fixtureImage, identity: identity)
                 return
             }
             #endif
@@ -475,11 +491,11 @@ public struct JavDBImage: View {
                         landscapeFallback = landscapeFallback ?? img
                         continue
                     }
-                    image = img
+                    publish(img, identity: identity)
                     return
                 }
             }
-            if !Task.isCancelled, let landscapeFallback { image = landscapeFallback }
+            if !Task.isCancelled, let landscapeFallback { publish(landscapeFallback, identity: identity) }
         }
     }
 

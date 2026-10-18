@@ -1,0 +1,386 @@
+{
+  "release_url": "https://github.com/sqzw-x/amane/releases/tag/v0.22.0",
+  "prs": [
+    {
+      "number": 463,
+      "merge": "fbf713cfb41150cf7b4a651df57f1481fbb3edfb",
+      "head": "387a2458536a34fcbe08ea6094702500b3b82b43",
+      "files": [
+        {
+          "path": "src/amane/media/images.py",
+          "blob_sha": "d7aa09c55d2f0d6dc3dd29ca4ba6ae7f1e0941de",
+          "url": "https://github.com/sqzw-x/amane/blob/387a2458536a34fcbe08ea6094702500b3b82b43/src%2Famane%2Fmedia%2Fimages.py"
+        },
+        {
+          "path": "tests/media/test_images.py",
+          "blob_sha": "8b00bc55d900467f861a78ebee42f52106d3f35a",
+          "url": "https://github.com/sqzw-x/amane/blob/387a2458536a34fcbe08ea6094702500b3b82b43/tests%2Fmedia%2Ftest_images.py"
+        }
+      ]
+    },
+    {
+      "number": 467,
+      "merge": "6883878218691bb6b62219333f3e60f0d2f7fd06",
+      "head": "0e7d855e048bc5600bbd8e4030b70841fe027966",
+      "files": [
+        {
+          "path": "web/src/components/media/actor-grid.tsx",
+          "blob_sha": "8d8bcbfeab8804172573b6ced88e81f61adddb19",
+          "url": "https://github.com/sqzw-x/amane/blob/0e7d855e048bc5600bbd8e4030b70841fe027966/web%2Fsrc%2Fcomponents%2Fmedia%2Factor-grid.tsx"
+        }
+      ]
+    },
+    {
+      "number": 470,
+      "merge": "c88e3f1b160b37e7d25d5d8c5685a2e34aa5c8ef",
+      "head": "5e4d3b85d9de65ab5996e0659924204f3c68e0bf",
+      "files": [
+        {
+          "path": "docs/dev/content-routes.md",
+          "blob_sha": "383ed49ce8c944f573f7900327c1bf28c2bc3f5b",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/docs%2Fdev%2Fcontent-routes.md"
+        },
+        {
+          "path": "docs/dev/crawler-testing.md",
+          "blob_sha": "50b611139ddae2c5ef5869b173adc56b8ba21333",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/docs%2Fdev%2Fcrawler-testing.md"
+        },
+        {
+          "path": "docs/dev/crawlers.md",
+          "blob_sha": "f09708961d084190b7be2d73dfa645996ac18740",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/docs%2Fdev%2Fcrawlers.md"
+        },
+        {
+          "path": "src/amane/config/manager.py",
+          "blob_sha": "72d2da59876bf2c7d6525509c9c310229273110b",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/src%2Famane%2Fconfig%2Fmanager.py"
+        },
+        {
+          "path": "src/amane/crawlers/parsing.py",
+          "blob_sha": "8f10d40b537fadadba1926cc47f61d1678be5e84",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/src%2Famane%2Fcrawlers%2Fparsing.py"
+        },
+        {
+          "path": "src/amane/crawlers/sites/airav.py",
+          "blob_sha": "5496142660f99d233a1884e708834198e5cce218",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/src%2Famane%2Fcrawlers%2Fsites%2Fairav.py"
+        },
+        {
+          "path": "src/amane/crawlers/sites/fc2.py",
+          "blob_sha": "194e271b5d6254548fdf51226595cd5779a2fc73",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/src%2Famane%2Fcrawlers%2Fsites%2Ffc2.py"
+        },
+        {
+          "path": "src/amane/crawlers/sites/freejavbt.py",
+          "blob_sha": "1471f17166b7f346f0c03127074d9499dceb6d9b",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/src%2Famane%2Fcrawlers%2Fsites%2Ffreejavbt.py"
+        },
+        {
+          "path": "tests/.fixtures-rev",
+          "blob_sha": "17250c4131143358ebc77ddb0887a91e047c6e89",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/tests%2F.fixtures-rev"
+        },
+        {
+          "path": "tests/config/test_config_manager.py",
+          "blob_sha": "02479f4477ffd37f7fc1c8658534ce1b68ac013f",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/tests%2Fconfig%2Ftest_config_manager.py"
+        },
+        {
+          "path": "tests/crawlers/test_airav.py",
+          "blob_sha": "153d7bd53a5212d5e18cf968a7ea5f31ad780f80",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/tests%2Fcrawlers%2Ftest_airav.py"
+        },
+        {
+          "path": "tests/crawlers/test_parsing.py",
+          "blob_sha": "572c5b768134ac9b3ae0c58c871e7334f8fa40e4",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/tests%2Fcrawlers%2Ftest_parsing.py"
+        },
+        {
+          "path": "web/openapi.json",
+          "blob_sha": "ffcdb8a702bf2e9b242fea60d0a28e3868bec3f0",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/web%2Fopenapi.json"
+        },
+        {
+          "path": "web/src/client/schemas.gen.ts",
+          "blob_sha": "10fa4a76992ef47b193164e91f1fa316c001cd2c",
+          "url": "https://github.com/sqzw-x/amane/blob/5e4d3b85d9de65ab5996e0659924204f3c68e0bf/web%2Fsrc%2Fclient%2Fschemas.gen.ts"
+        }
+      ]
+    },
+    {
+      "number": 490,
+      "merge": "27825d1bb642f9eb6c46f4635d5e7f52752a4ee4",
+      "head": "68ac5ae83442a1006323505a53595fb6418d127b",
+      "files": [
+        {
+          "path": "web/src/components/media/playback-panel.tsx",
+          "blob_sha": "fd9b5f2fc21383a261c50dc50c6f4884b79a8568",
+          "url": "https://github.com/sqzw-x/amane/blob/68ac5ae83442a1006323505a53595fb6418d127b/web%2Fsrc%2Fcomponents%2Fmedia%2Fplayback-panel.tsx"
+        },
+        {
+          "path": "web/src/components/media/playback-player-lazy.ts",
+          "blob_sha": "655bb7a185b4cc4274b8ad8889fd94874fe0b7b4",
+          "url": "https://github.com/sqzw-x/amane/blob/68ac5ae83442a1006323505a53595fb6418d127b/web%2Fsrc%2Fcomponents%2Fmedia%2Fplayback-player-lazy.ts"
+        },
+        {
+          "path": "web/src/components/media/playback-player.module.css",
+          "blob_sha": "d772772587bef3906454f9e983311fe5deca1dc1",
+          "url": "https://github.com/sqzw-x/amane/blob/68ac5ae83442a1006323505a53595fb6418d127b/web%2Fsrc%2Fcomponents%2Fmedia%2Fplayback-player.module.css"
+        },
+        {
+          "path": "web/src/components/media/playback-player.tsx",
+          "blob_sha": "191076cccde004f0a2c45d3f8b017c21a4bd086c",
+          "url": "https://github.com/sqzw-x/amane/blob/68ac5ae83442a1006323505a53595fb6418d127b/web%2Fsrc%2Fcomponents%2Fmedia%2Fplayback-player.tsx"
+        }
+      ]
+    },
+    {
+      "number": 495,
+      "merge": "c89a4e185e15cc53554fdde01c78154ba00dc93d",
+      "head": "a666a8a2f1d6d2695bd43dda156b866bc061af81",
+      "files": [
+        {
+          "path": "docs/dev/content-routes.md",
+          "blob_sha": "56e0fd38a7679602fd43d0e3535b7b077c7bcdca",
+          "url": "https://github.com/sqzw-x/amane/blob/a666a8a2f1d6d2695bd43dda156b866bc061af81/docs%2Fdev%2Fcontent-routes.md"
+        },
+        {
+          "path": "src/amane/crawlers/sites/mgstage.py",
+          "blob_sha": "505a14e8aa703b143a096f0212fd189e715f24e4",
+          "url": "https://github.com/sqzw-x/amane/blob/a666a8a2f1d6d2695bd43dda156b866bc061af81/src%2Famane%2Fcrawlers%2Fsites%2Fmgstage.py"
+        },
+        {
+          "path": "tests/.fixtures-rev",
+          "blob_sha": "cc7c5a1d530648177472ef0cfb4bc8a7608c577a",
+          "url": "https://github.com/sqzw-x/amane/blob/a666a8a2f1d6d2695bd43dda156b866bc061af81/tests%2F.fixtures-rev"
+        },
+        {
+          "path": "tests/crawlers/test_mgstage.py",
+          "blob_sha": "add69392dd92ab7ae3521c7c6e2827d6491b3e6a",
+          "url": "https://github.com/sqzw-x/amane/blob/a666a8a2f1d6d2695bd43dda156b866bc061af81/tests%2Fcrawlers%2Ftest_mgstage.py"
+        }
+      ]
+    },
+    {
+      "number": 464,
+      "merge": "1bab0097705e9fbfe9486cabddecdc82d2a26865",
+      "head": "7515f4f944fcd92fb9c386215af6246079d7a49e",
+      "files": [
+        {
+          "path": "docs/dev/database.md",
+          "blob_sha": "06418a49e8ce5a12403f293d95e9114edb0c826a",
+          "url": "https://github.com/sqzw-x/amane/blob/7515f4f944fcd92fb9c386215af6246079d7a49e/docs%2Fdev%2Fdatabase.md"
+        },
+        {
+          "path": "docs/dev/task-system.md",
+          "blob_sha": "cd1825cf2fdf384c0ade6be2b2e4cc042cad2ced",
+          "url": "https://github.com/sqzw-x/amane/blob/7515f4f944fcd92fb9c386215af6246079d7a49e/docs%2Fdev%2Ftask-system.md"
+        },
+        {
+          "path": "src/amane/db/engine.py",
+          "blob_sha": "199904f8877f1808d91b3d1da787cf2f0f3328b8",
+          "url": "https://github.com/sqzw-x/amane/blob/7515f4f944fcd92fb9c386215af6246079d7a49e/src%2Famane%2Fdb%2Fengine.py"
+        },
+        {
+          "path": "src/amane/scheduler/worker.py",
+          "blob_sha": "97cb3c65bb955e5079b897ea44f21a45ccb20cdd",
+          "url": "https://github.com/sqzw-x/amane/blob/7515f4f944fcd92fb9c386215af6246079d7a49e/src%2Famane%2Fscheduler%2Fworker.py"
+        },
+        {
+          "path": "tests/db/test_engine.py",
+          "blob_sha": "e9dec28de3d2117de212673627a165e6e5433f28",
+          "url": "https://github.com/sqzw-x/amane/blob/7515f4f944fcd92fb9c386215af6246079d7a49e/tests%2Fdb%2Ftest_engine.py"
+        },
+        {
+          "path": "tests/scheduler/test_worker.py",
+          "blob_sha": "037aaffbcca9aa1c407243bba7d5e5dd7063a647",
+          "url": "https://github.com/sqzw-x/amane/blob/7515f4f944fcd92fb9c386215af6246079d7a49e/tests%2Fscheduler%2Ftest_worker.py"
+        }
+      ]
+    },
+    {
+      "number": 465,
+      "merge": "b2d7956e5b73fa0d65fc037d7e030bc34feaec9c",
+      "head": "936a4b368d102e608b75427981599d0c4e5e6e34",
+      "files": [
+        {
+          "path": "docs/dev/api.md",
+          "blob_sha": "3da5c83b37268170e2c375275aba80f5f1013587",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fdev%2Fapi.md"
+        },
+        {
+          "path": "docs/dev/content-routes.md",
+          "blob_sha": "1b4a44d66fadc1402f0ad9957ce620514408bcac",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fdev%2Fcontent-routes.md"
+        },
+        {
+          "path": "docs/dev/data-model.md",
+          "blob_sha": "5a080ef87ce61df6929c531b21a395ddd8549e8e",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fdev%2Fdata-model.md"
+        },
+        {
+          "path": "docs/dev/database.md",
+          "blob_sha": "e5446c1754fcf97acb9d27e91d8991b743818a53",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fdev%2Fdatabase.md"
+        },
+        {
+          "path": "docs/dev/plugins.md",
+          "blob_sha": "87d761b1568540d95161cb1c0e2dd1436e95e23f",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fdev%2Fplugins.md"
+        },
+        {
+          "path": "docs/dev/task-system.md",
+          "blob_sha": "4c7cbfc11c90d3c174c3cecc935f51d60644c22b",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fdev%2Ftask-system.md"
+        },
+        {
+          "path": "docs/dev/terms.md",
+          "blob_sha": "db5b1af120c8a3ef57b0e51211c78b2b7bef3bfd",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fdev%2Fterms.md"
+        },
+        {
+          "path": "docs/user/libraries.md",
+          "blob_sha": "c4d017cd5ac5fd54434deb4d97d16d9ebd03aaf4",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fuser%2Flibraries.md"
+        },
+        {
+          "path": "docs/user/scraping.md",
+          "blob_sha": "77cf73964a0ab4d79f15274f1a2700709b1fb0a7",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/docs%2Fuser%2Fscraping.md"
+        },
+        {
+          "path": "src/amane/agent/metadata_ops.py",
+          "blob_sha": "166f63a3a098c4a22ade6c6256b2613539893944",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fagent%2Fmetadata_ops.py"
+        },
+        {
+          "path": "src/amane/api/models/__init__.py",
+          "blob_sha": "3c03f23af3707c8ae8e64637f7c0e35976799750",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fapi%2Fmodels%2F__init__.py"
+        },
+        {
+          "path": "src/amane/api/models/media.py",
+          "blob_sha": "bdd0531a52220ff628a147344146f860598947f9",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fapi%2Fmodels%2Fmedia.py"
+        },
+        {
+          "path": "src/amane/api/models/metadata.py",
+          "blob_sha": "0d66ac8ac3eef94d8564fcdd2fc04f694748e5ab",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fapi%2Fmodels%2Fmetadata.py"
+        },
+        {
+          "path": "src/amane/api/routes/media.py",
+          "blob_sha": "6b488a1ce7de5c687bd97f3940459f7e16f7a260",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fapi%2Froutes%2Fmedia.py"
+        },
+        {
+          "path": "src/amane/api/routes/metadata.py",
+          "blob_sha": "760dd6a4bc351ca71e5259c40b8bb54ce867f67b",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fapi%2Froutes%2Fmetadata.py"
+        },
+        {
+          "path": "src/amane/db/migrations/versions/9054ebacea29_move_content_type_onto_metadata.py",
+          "blob_sha": "d111370d0dbe981a71cd5854d9b736b50af395ca",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fdb%2Fmigrations%2Fversions%2F9054ebacea29_move_content_type_onto_metadata.py"
+        },
+        {
+          "path": "src/amane/db/models.py",
+          "blob_sha": "02fdd44fd0e6a98c146666148e464b1e2792b788",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fdb%2Fmodels.py"
+        },
+        {
+          "path": "src/amane/db/repo_types.py",
+          "blob_sha": "3a70692d23a7b0fcf9ee3f8030fe26d5538c4d90",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fdb%2Frepo_types.py"
+        },
+        {
+          "path": "src/amane/db/repos/media.py",
+          "blob_sha": "19fb6b01a79c90c8406944286f56edc8fc0797f6",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fdb%2Frepos%2Fmedia.py"
+        },
+        {
+          "path": "src/amane/db/repos/metadata.py",
+          "blob_sha": "980d257407c1acd443cea4daf683b876a2c871d5",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fdb%2Frepos%2Fmetadata.py"
+        },
+        {
+          "path": "src/amane/handlers/file.py",
+          "blob_sha": "233b360bdec6a69f8a305b5007d743465ffb6fec",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fhandlers%2Ffile.py"
+        },
+        {
+          "path": "src/amane/handlers/models.py",
+          "blob_sha": "f5690e242b8a79bfad33fb3f1dc548ead406218e",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fhandlers%2Fmodels.py"
+        },
+        {
+          "path": "src/amane/handlers/rescrape.py",
+          "blob_sha": "c86b3eaa0ed9297862f63fddfb39193b3afed8a5",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fhandlers%2Frescrape.py"
+        },
+        {
+          "path": "src/amane/handlers/scrape.py",
+          "blob_sha": "16f281b64b87371d8bc5231c66536cab014400c9",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fhandlers%2Fscrape.py"
+        },
+        {
+          "path": "src/amane/media/images.py",
+          "blob_sha": "d6782c8a96aa929c7ef456b3ac978c93060e04de",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fmedia%2Fimages.py"
+        },
+        {
+          "path": "src/amane/organize/template.py",
+          "blob_sha": "0d1f2f89bed82ed5344e8e64047e9e7d091a3bdf",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Forganize%2Ftemplate.py"
+        },
+        {
+          "path": "src/amane/parsing/__init__.py",
+          "blob_sha": "695bb6fcc9511de3100aa377aae1d6ee90aded94",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fparsing%2F__init__.py"
+        },
+        {
+          "path": "src/amane/parsing/file_info.py",
+          "blob_sha": "cf51276004533a58a1c4dc80dfab0a4125f50e93",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fparsing%2Ffile_info.py"
+        },
+        {
+          "path": "src/amane/playback/query.py",
+          "blob_sha": "653b002a2a34bf0e7a9e999e2f6d0a2906ed0461",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/src%2Famane%2Fplayback%2Fquery.py"
+        },
+        {
+          "path": "tests/agent/test_metadata_ops.py",
+          "blob_sha": "77ca3b6489fac88c871244a8f85bde79de4b4a27",
+          "url": "https://github.com/sqzw-x/amane/blob/936a4b368d102e608b75427981599d0c4e5e6e34/tests%2Fagent%2Ftest_metadata_ops.py"
+        }
+      ]
+    },
+    {
+      "number": 494,
+      "merge": "19bb76cc9e6451dd3d46db4ee0585374ca513a40",
+      "head": "3c4717384210a6af14ba8b19f4adce5f3766edfa",
+      "files": [
+        {
+          "path": "src/amane/app/runtime.py",
+          "blob_sha": "143f91c872a01cde2084ba012d2124f4d4f7c506",
+          "url": "https://github.com/sqzw-x/amane/blob/3c4717384210a6af14ba8b19f4adce5f3766edfa/src%2Famane%2Fapp%2Fruntime.py"
+        },
+        {
+          "path": "src/amane/config/manager.py",
+          "blob_sha": "daec6dc2769c3722fa9aa70a966b0d333d9c0975",
+          "url": "https://github.com/sqzw-x/amane/blob/3c4717384210a6af14ba8b19f4adce5f3766edfa/src%2Famane%2Fconfig%2Fmanager.py"
+        },
+        {
+          "path": "src/amane/net/http.py",
+          "blob_sha": "61c7bebe99c0639a2c1457cfe5ab2a862d7a4053",
+          "url": "https://github.com/sqzw-x/amane/blob/3c4717384210a6af14ba8b19f4adce5f3766edfa/src%2Famane%2Fnet%2Fhttp.py"
+        },
+        {
+          "path": "tests/net/test_http.py",
+          "blob_sha": "04f93e5da87a2ab93f3cc4a89f44b5139ed3ad6d",
+          "url": "https://github.com/sqzw-x/amane/blob/3c4717384210a6af14ba8b19f4adce5f3766edfa/tests%2Fnet%2Ftest_http.py"
+        }
+      ]
+    }
+  ]
+}

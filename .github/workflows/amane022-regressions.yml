@@ -1,0 +1,64 @@
+name: Amane 0.22 independent regressions
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['AVDB/Services/ImageLoader.swift', 'AVDB/Services/JavRankingCore.swift', 'AVDB/Views/Player/PlayerView.swift', 'UITests/**', 'scripts/test-javranking-mapping.py', '.github/workflows/amane022-regressions.yml']
+permissions:
+  contents: read
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iPhone, iPad]
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute production Swift FC2 matching and EXIF crop contracts
+        run: |
+          python3 scripts/test-javranking-mapping.py
+          python3 scripts/test-front-posters.py
+          python3 scripts/test-player-gestures.py
+      - name: Install simulator test target and dependencies
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          ruby scripts/setup-poster-uitests.rb
+          pod install --repo-update
+      - name: Choose real available simulator
+        env:
+          DEVICE: ${{ matrix.device }}
+        run: |
+          xcrun simctl list devices available -j > devices.json
+          python3 - <<'PY'
+          import json,os
+          devices=[d for ds in json.load(open('devices.json'))['devices'].values() for d in ds if os.environ['DEVICE'] in d['name']]
+          assert devices
+          chosen=devices[0]
+          print(chosen)
+          with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIM_UDID='+chosen['udid']+'\n')
+          PY
+      - name: Compile simulator Metal resource
+        run: |
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Real UIKit gesture and hosted SwiftUI image regressions
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$SIM_UDID" -derivedDataPath "$RUNNER_TEMP/Derived" -resultBundlePath "$RUNNER_TEMP/Amane022.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:DetailPosterQualityTests/Amane022RegressionTests -only-testing:DetailPosterQualityTests/DetailPosterQualityTests -only-testing:PosterNavigationUITests/PosterNavigationTests/testPlayerBackgroundGesturesYieldToChromeAndPanels 2>&1 | tee "$RUNNER_TEMP/amane022.log"
+      - name: Export actual test attachments
+        if: always()
+        run: |
+          if test -d "$RUNNER_TEMP/Amane022.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Amane022.xcresult" --output-path "$RUNNER_TEMP/attachments"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amane022-${{ matrix.device }}-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/Amane022.xcresult
+            ${{ runner.temp }}/amane022.log
+            ${{ runner.temp }}/attachments
+            devices.json

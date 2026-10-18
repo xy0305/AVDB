@@ -327,8 +327,8 @@ struct KSChromePlayer: View {
             // KSVideoPlayer renders only the underlying player view (no official pan).
             // This transparent sibling owns the only pan output; chrome stays above it.
             PlayerGestureLayer(
-                excludedTop: safeArea.top + 80,
-                excludedBottom: safeArea.bottom + 116,
+                excludedTop: showChrome ? safeArea.top + 80 : 0,
+                excludedBottom: showChrome ? safeArea.bottom + 116 : 0,
                 blocked: editingSubtitlePosition || showOnlineSubtitles || showLUT || seekPending || (isSeeking && !horizontalDrag),
                 sourceID: url,
                 onDoubleTap: { x, width in skip(by: x < width * 0.5 ? -10 : 10) },
@@ -581,10 +581,11 @@ struct KSChromePlayer: View {
             .padding(.top, 16)
             .padding(.leading, 12)
 
+            // Only chrome controls own touches. A transparent center tap target
+            // above the UIKit sibling used to swallow double-taps and pan starts.
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture { toggleChrome() }
+                .allowsHitTesting(false)
 
             progressBar
                 .padding(.horizontal, 16)
@@ -665,6 +666,7 @@ struct KSChromePlayer: View {
     private var progressBar: some View {
         HStack(spacing: 8) {
             Text(formatTime(isSeeking ? seekValue : currentTime))
+                .accessibilityIdentifier("player.clock")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
@@ -1112,6 +1114,9 @@ struct PlayerGestureLayer: UIViewRepresentable {
             let point = gesture.location(in: view)
             parent.onDoubleTap(point.x, view.bounds.width)
         }
-        @objc func singleTap(_ gesture: UITapGestureRecognizer) { parent.onSingleTap() }
+        @objc func singleTap(_ gesture: UITapGestureRecognizer) {
+            guard !parent.blocked, gesture.state == .ended else { return }
+            parent.onSingleTap()
+        }
     }
 }

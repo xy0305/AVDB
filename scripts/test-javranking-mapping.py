@@ -86,6 +86,21 @@ Task { @MainActor in
             let result = try await sdk.exactMovie(code: "IPX580")
             check(result?.id == expected, name)
         }
+        for requested in ["FC2-1234567", "FC2-PPV-1234567", "FC21234567", "FC2PPV1234567"] {
+            client.payloads = [try payload([["id":"fc2-exact","number":"FC2-PPV-1234567"],
+                ["id":"wrong-id","number":"FC2-PPV-1234568"],
+                ["id":"non-fc2","number":"ABC-1234567"]])]
+            check(try await sdk.exactMovie(code: requested)?.id == "fc2-exact", "FC2 variant resolves through production SDK: " + requested)
+        }
+        client.payloads = [try payload([["id":"short","number":"FC2-1234567"]])]
+        check(try await sdk.exactMovie(code: "FC2-PPV-1234567")?.id == "short", "FC2 reverse variant exact")
+        for invalid in ["1234567", "FC2-PPV-1234567X", "FC2-PPV-12345670", "ABC-1234567"] {
+            client.payloads = [try payload([["id":"reject","number":"FC2-1234567"]])]
+            check(try await sdk.exactMovie(code: invalid) == nil, "FC2 rejects nonidentity: " + invalid)
+        }
+        client.payloads = [try payload([["id":"a","number":"FC2-1234567"], ["id":"b","number":"FC2-PPV-1234567"]])]
+        do { _ = try await sdk.exactMovie(code: "FC2-1234567"); fatalError("accepted FC2 ambiguity") }
+        catch { check(error.localizedDescription.contains("多个"), "FC2 distinct IDs remain ambiguous") }
         let filler = Array(repeating: ["id":"fuzzy","number":"IPX247"], count:20)
         client.payloads = [try payload(Array(filler.prefix(19)) + [["id":"fast","number":"IPX580"]])]
         client.queries = []

@@ -136,7 +136,9 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
   do { _=try await source.matchedMovie(code:"AMB-001"); preconditionFailure("ambiguity hidden") } catch {}
   precondition(JRPolicy.exactCode("IPX-811") != JRPolicy.exactCode("IPX-8110"))
   precondition(JRPolicy.exactCode("FC2-PPV-12345") == JRPolicy.exactCode("FC2PPV12345"))
-  precondition(JRPolicy.exactCode("FC2-12345") == nil)
+  precondition(JRPolicy.exactCode("FC2-12345") == JRPolicy.exactCode("FC2-PPV-12345"))
+  precondition(JRPolicy.exactCode("FC2-12345") != JRPolicy.exactCode("FC2-PPV-12346"))
+  precondition(JRPolicy.exactCode("12345") == nil)
   await withTaskGroup(of:Void.self) { group in
    for n in 100..<112 { group.addTask { _=try? await source.matchedMovie(code:"TEST-\(n)") } }
   }

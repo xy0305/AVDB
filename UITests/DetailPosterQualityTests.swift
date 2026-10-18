@@ -1,6 +1,7 @@
 import XCTest
 import UIKit
 import ImageIO
+import SwiftUI
 @testable import AVDB
 
 final class OnlineSubtitleModelTests: XCTestCase {
@@ -192,5 +193,88 @@ final class DetailPosterQualityTests: XCTestCase {
         task.cancel()
         let cancelled = await task.value
         XCTAssertTrue(cancelled.isEmpty)
+    }
+}
+
+/// Independent behavioral tests: no upstream implementation or fixtures copied.
+final class Amane022RegressionTests: XCTestCase {
+    func testAlphaPNGAtJPGURLProducesValidFrontAndInvalidCannotWin() {
+        let flags = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+        let context = CGContext(data: nil, width: 800, height: 538, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: flags)!
+        context.clear(CGRect(x: 0, y: 0, width: 800, height: 538))
+        context.setFillColor(UIColor.green.cgColor)
+        context.fill(CGRect(x: 424, y: 0, width: 376, height: 538))
+        let bytes = NSMutableData()
+        let output = CGImageDestinationCreateWithData(bytes, "public.png" as CFString, 1, nil)!
+        CGImageDestinationAddImage(output, context.makeImage()!, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(output))
+        let url = "https://tp.spfcas.com/covers/alpha.jpg"
+        let result = DetailPosterResolver.decode(data: bytes as Data, sourceURL: url, derive: true)
+        XCTAssertNotNil(result, "PNG alpha bytes must work even when the URL suffix says JPG")
+        XCTAssertEqual(result?.image.cgImage?.width, 376)
+        XCTAssertEqual(result?.image.cgImage?.height, 538)
+        XCTAssertEqual(result?.quality.width, 376)
+        XCTAssertFalse(result?.quality.originalPortrait ?? true)
+        let invalid = DetailPosterResolver.decode(data: Data("<html>failure</html>".utf8), sourceURL: "invalid", derive: true)
+        XCTAssertNil(invalid)
+        XCTAssertEqual(DetailPosterQuality.winner([result, invalid].compactMap { $0?.quality })?.source, url)
+        for (w, h) in [(800,538), (1350,1000), (1650,1000), (2,1)] {
+            if let rect = FrontPosterPolicy.cropRect(width: w, height: h, source: url) {
+                XCTAssertGreaterThan(rect.width, 0); XCTAssertGreaterThan(rect.height, 0)
+                XCTAssertTrue(CGRect(x: 0, y: 0, width: w, height: h).contains(rect))
+                XCTAssertEqual(rect.maxX, CGFloat(w))
+            }
+        }
+        for (w, h) in [(0,538), (800,0), (-1,538), (100,200), (1920,1080)] {
+            XCTAssertNil(FrontPosterPolicy.cropRect(width: w, height: h, source: url))
+        }
+    }
+
+    @MainActor private final class Source: ObservableObject {
+        @Published var url = "fixture://poster/wrap"
+    }
+    private struct ReusedImage: View {
+        @ObservedObject var source: Source
+        var body: some View {
+            JavDBImage(url: source.url).frame(width: 200, height: 240)
+                .animation(.easeInOut(duration: 1), value: source.url)
+        }
+    }
+    @MainActor func testReusedImageRejectsPreviousArtworkWhenNewSourceFails() async throws {
+        let source = Source()
+        let host = UIHostingController(rootView: ReusedImage(source: source))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 200, height: 240))
+        window.rootViewController = host; window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        host.view.frame = window.bounds
+        func chromaticFraction() -> Double {
+            host.view.layoutIfNeeded()
+            let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+                host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+            }
+            let flags = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+            let context = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 256,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: flags)!
+            context.draw(image.cgImage!, in: CGRect(x: 0, y: 0, width: 64, height: 64))
+            let pixels = context.data!.assumingMemoryBound(to: UInt8.self)
+            var chromatic = 0
+            for i in stride(from: 0, to: 64 * 64 * 4, by: 4) {
+                let channels = [Int(pixels[i]), Int(pixels[i+1]), Int(pixels[i+2])]
+                if channels.max()! - channels.min()! > 50 { chromatic += 1 }
+            }
+            return Double(chromatic) / 4096
+        }
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertGreaterThan(chromaticFraction(), 0.5, "The real JavDBImage must first render the neutral colorful artwork")
+        let frame = host.view.frame
+        source.url = "invalid://new-artwork"
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertLessThan(chromaticFraction(), 0.1, "Failed new identity must show a neutral placeholder, never the previous winner")
+        XCTAssertEqual(host.view.frame, frame, "Image publication must not change its proposed layout")
+        source.url = "fixture://poster/portrait"
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertGreaterThan(chromaticFraction(), 0.5)
+        XCTAssertEqual(host.view.frame, frame)
     }
 }

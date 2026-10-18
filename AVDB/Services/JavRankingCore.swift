@@ -64,8 +64,8 @@ enum JRPolicy {
         guard sameHost(u, base: base) || allowed else { return nil }
         return u.absoluteString
     }
-    // Only complete ASCII catalogue tokens are eligible for cross-source lookup.
-    // FC2-PPV is not interchangeable with FC2; no prefix/substring matching.
+    // Complete tokens only. FC2's optional PPV marker does not change its
+    // article identity; digits stay byte-exact (no integer or substring matching).
     static func foldedCode(_ input: String) -> String {
         var value = input.folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).uppercased()
         for dash in ["‐", "‑", "‒", "–", "—", "−"] { value = value.replacingOccurrences(of: dash, with: "-") }
@@ -73,7 +73,7 @@ enum JRPolicy {
     }
     static func catalogueCode(_ input: String) -> String? {
         let value = foldedCode(input)
-        return JRHTML.matches(#"^(FC2[-_ ]PPV[-_ ][0-9]+|[A-Z]{2,12}[-_]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
+        return JRHTML.matches(#"^(FC2(?:[-_ ]?PPV)?[-_ ]?[0-9]+|[A-Z]{2,12}[-_]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
     }
     static func movieCode(number: String?, title: String?) -> String? {
         // A present number is authoritative: a conflicting title cannot override it.
@@ -86,7 +86,10 @@ enum JRPolicy {
     static func exactCode(_ input: String) -> String? {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
         let folded = foldedCode(value)
-        guard !JRHTML.matches(#"^(?:FC2[-_ ]?PPV[-_ ]?[0-9]+|[A-Z]{2,12}[-_ ]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})$"#, folded).isEmpty else { return nil }
+        if let digits = JRHTML.matches(#"^FC2(?:[-_ ]?PPV)?[-_ ]?([0-9]+)$"#, folded).first?[1] {
+            return "FC2PPV" + digits
+        }
+        guard !JRHTML.matches(#"^(?:[A-Z]{2,12}[-_ ]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})$"#, folded).isEmpty else { return nil }
         return normalizedCode(folded)
     }
     static func normalizedCode(_ code: String) -> String {
