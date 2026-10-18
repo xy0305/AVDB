@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil,subprocess,tempfile
 root=Path(__file__).resolve().parents[1]
 view=(root/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
-for s in ['private var posterMovie: Movie? { posterSeed ?? vm.movie }','guard let movie = posterMovie else { return }','model.movie = trusted','init(movie: Movie)','await vm.load()']:
+for s in ['private var posterMovie: Movie? { DetailPosterResolver.posterMovie(seed: posterSeed, detail: vm.movie) }','guard let movie = posterMovie else { return }','model.movie = trusted','init(movie: Movie)','await vm.load()']:
     assert s in view,s
 # Poster and full metadata are independent SwiftUI tasks; no await vm.load in poster task.
 poster=view.split('.task(id: posterRequestKey)',1)[1].split('.safeAreaInset',1)[0]

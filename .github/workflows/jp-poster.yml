@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/jp-poster.yml']
+    paths: ['.github/workflows/jp-poster.yml', 'scripts/test-poster-latency.py']
 permissions:
   contents: read
 jobs:
