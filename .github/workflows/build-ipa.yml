@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - fix/subtitle-position-201
     paths:
       - "AVDB/**"
       - "AVDB.xcodeproj/**"
