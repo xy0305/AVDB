@@ -143,7 +143,7 @@ enum WesternCoverService {
     static func testConnection() async -> String {
         let s = WesternCoverSettings.shared.snapshot()
         guard let t = s.token, !t.isEmpty else { return "无 Token（未请求）" }
-        let r = await request(URL(string: "https://api.theporndb.net/scenes?per_page=1")!, token: t, deadline: ProcessInfo.processInfo.systemUptime + 5)
+        let r = await request(URL(string: "https://api.theporndb.net/scenes?site=Vixen&per_page=1")!, token: t, deadline: ProcessInfo.processInfo.systemUptime + 5)
         guard r.status == 200, let j = try? JSONSerialization.jsonObject(with: r.data) as? [String: Any], j["data"] is [[String: Any]] else { return "TPDB：" + failure(r) }
         return "TPDB 连接成功（已请求 HTTP 200）" + (s.enabled ? "" : "；封面开关尚未启用")
     }

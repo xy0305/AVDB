@@ -102,7 +102,15 @@ enum DetailPosterResolver {
         // Opaque memory-only account namespace; never log credentials.
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
         let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + (movie.type == "2" ? "#" + WesternCoverSettings.shared.namespace.uuidString + "#" + (movie.originTitle ?? movie.title ?? "") + "#" + (movie.releaseDate ?? "") + "#" + String(movie.duration ?? 0) + "#" + (movie.originalURL ?? "") : "")
+        var components: [String] = [scope, movie.id, movie.type ?? "", movie.number ?? "", movie.coverURL ?? "", movie.thumbURL ?? "", actors]
+        if movie.type == "2" {
+            components.append(WesternCoverSettings.shared.namespace.uuidString)
+            components.append(movie.originTitle ?? movie.title ?? "")
+            components.append(movie.releaseDate ?? "")
+            components.append(String(movie.duration ?? 0))
+            components.append(movie.originalURL ?? "")
+        }
+        return components.joined(separator: "#")
     }
 
     static func validatedSources(_ movie: Movie) -> [String] {

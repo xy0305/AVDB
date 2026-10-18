@@ -55,6 +55,8 @@ enum WesternCoverPolicy {
               let site = r["site"] as? [String: Any], normalized(site["name"] as? String ?? "") == normalized(i.site.name),
               normalized(site["short_name"] as? String ?? "").replacingOccurrences(of: " ", with: "") == i.site.key,
               let raw = r["url"] as? String, let url = canonicalOfficial(raw), URL(string: url)?.host == "www." + i.site.key + ".com" else { return false }
+        if let external = r["external_id"] as? String, !external.isEmpty,
+           external != i.site.key + ":" + (URL(string: url)?.lastPathComponent ?? "") { return false }
         if !i.title.isEmpty, normalized(r["title"] as? String ?? "") != normalized(i.title) { return false }
         if let minutes = i.minutes, minutes > 0, let seconds = r["duration"] as? Int, abs(seconds - minutes * 60) > 60 { return false }
         if let exact = i.tpdbID { return uuid.lowercased() == exact }
