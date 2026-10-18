@@ -37,7 +37,29 @@ struct MovieDetailView: View {
     }
 
     private var posterArtwork: DetailPosterArtwork? { posterLayout.artwork }
-    private var usesLandscapeLayout: Bool { posterLayout.isLandscape }
+    private var usesLandscapeLayout: Bool {
+        posterLayout.isLandscape || (vm.movie?.type == "2" && posterArtwork != nil)
+    }
+    @State private var fallbackProvenance: CoverProvenance?
+    @State private var fallbackKey = ""
+    private var displayedProvenance: CoverProvenance? {
+        posterArtwork?.provenance ?? (fallbackKey == posterRequestKey ? fallbackProvenance : nil)
+    }
+    @ViewBuilder private var coverSourceLine: some View {
+        if let p = displayedProvenance {
+            Button { UIPasteboard.general.string = CoverSourceDisplay.safeURL(p.url) } label: {
+                Text(p.line).font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+            }.buttonStyle(.plain).accessibilityIdentifier("detail-cover-source")
+                .accessibilityLabel(p.line + "，点按复制安全链接")
+        } else {
+            Text(posterLayout.isLandscape ? "封面来源：等待图片加载" : CoverSourceDisplay.pending)
+                .font(.caption2).foregroundStyle(.secondary).accessibilityIdentifier("detail-cover-source")
+        }
+        if let movie = vm.movie, movie.type == "2" {
+            Text(posterArtwork?.diagnostic.isEmpty == false ? posterArtwork!.diagnostic : WesternCoverService.diagnostic(movie: movie, namespace: DetailPosterResolver.identity(movie: movie, account: APIClient.shared.token)))
+                .font(.caption2).foregroundStyle(.secondary).accessibilityIdentifier("western-cover-diagnostic")
+        }
+    }
     @State private var showPosterResources = false
     @State private var posterAccountEpoch = UUID()
     @State private var reviewPanelHeight: CGFloat = 76
@@ -133,6 +155,9 @@ struct MovieDetailView: View {
             set: { if !$0 { vm.errorMessage = nil } }
         )) { Button("好", role: .cancel) { vm.errorMessage = nil } }
         message: { Text(vm.errorMessage ?? "") }
+        .onReceive(NotificationCenter.default.publisher(for: .westernCoverChanged)) { _ in
+            posterPresentation = nil; fallbackProvenance = nil; posterAccountEpoch = UUID()
+        }
         .task(id: posterRequestKey) {
             guard let movie = posterMovie else { return }
             let key = posterRequestKey
@@ -474,15 +499,24 @@ struct MovieDetailView: View {
             }
 
             ZStack(alignment: .bottomTrailing) {
-                JavDBImage(
-                    // 优先顺序：JAVDB cover_url 无水印 → 首张剧照 → DMM 横版 → Tenhow 竖版
-                    url: movie.coverURL,
-                    fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
-                    secondFallbackURL: movie.hdBackdropURL,
-                    contentMode: .fill
-                )
+                Group {
+                    if movie.type == "2", let art = posterArtwork {
+                        Image(uiImage: art.image).resizable().aspectRatio(contentMode: .fit)
+                    } else {
+                        JavDBImage(
+                            url: movie.coverURL,
+                            fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
+                            secondFallbackURL: movie.hdBackdropURL,
+                            contentMode: .fill,
+                            onLoaded: { source in
+                                fallbackProvenance = CoverLoadEvidence.shared.value(source)
+                                fallbackKey = posterRequestKey
+                            }
+                        )
+                    }
+                }
                 .frame(maxWidth: .infinity)
-                .aspectRatio(1.47, contentMode: .fit)
+                .aspectRatio(movie.type == "2" && posterArtwork != nil ? (posterArtwork!.image.size.width / posterArtwork!.image.size.height) : 1.47, contentMode: .fit)
                 .clipped()
 
                 Button {
@@ -585,6 +619,7 @@ struct MovieDetailView: View {
                 }
                 let count = movie.reviewsCount ?? movie.commentsCount ?? 0
                 detailInfoLine("评分：", count > 0 ? "共\(count)人评分" : movie.scoreText)
+                coverSourceLine
             }
             .padding(20)
             .padding(.trailing, movie.score == nil ? 0 : 62)

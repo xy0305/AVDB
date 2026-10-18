@@ -43,6 +43,19 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }; return body()
     }
 
+    func store(key: String, value: Value) {
+        locked {
+            if entries.count >= 24 { entries.removeAll() }
+            entries[key] = Entry(value: value, expires: Date().addingTimeInterval(positiveTTL))
+        }
+    }
+    func invalidate() {
+        let tasks = locked { () -> [Task<Value?, Never>] in
+            let tasks = flights.values.map(\.task); flights.removeAll(); entries.removeAll(); return tasks
+        }
+        tasks.forEach { $0.cancel() }
+    }
+
     func snapshot(key: String) -> DetailPosterLayout<Value> {
         locked {
             guard let entry = entries[key] else { return .resolving }

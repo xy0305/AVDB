@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D20000000000000000000007 /* CoverSourceDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* CoverSourceDisplay.swift */; };
+		D20000000000000000000006 /* WesternCoverService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* WesternCoverService.swift */; };
+		D20000000000000000000005 /* WesternCoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* WesternCoverPolicy.swift */; };
         A18900000000000000000001 /* OnlineSubtitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18900000000000000000002; };
 		A17900000000000000000002 /* JAVLibraryRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17900000000000000000002; };
 		A17900000000000000000001 /* JAVLibrarySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17900000000000000000001; };
@@ -69,6 +72,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D20000000000000000000003 /* CoverSourceDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverSourceDisplay.swift; sourceTree = "<group>"; };
+		D20000000000000000000002 /* WesternCoverService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WesternCoverService.swift; sourceTree = "<group>"; };
+		D20000000000000000000001 /* WesternCoverPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WesternCoverPolicy.swift; sourceTree = "<group>"; };
         A18900000000000000000002 /* OnlineSubtitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineSubtitle.swift; sourceTree = "<group>"; };
 		B17900000000000000000002 /* JAVLibraryRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVLibraryRankingView.swift; sourceTree = "<group>"; };
 		B17900000000000000000001 /* JAVLibrarySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVLibrarySource.swift; sourceTree = "<group>"; };
@@ -196,6 +202,9 @@
 				B17900000000000000000001 /* JAVLibrarySource.swift */,
 				D18600000000000000000001 /* TenhowPoster.swift */,
 				D18600000000000000000002 /* TenhowActorLinks.swift */,
+				D20000000000000000000001 /* WesternCoverPolicy.swift */,
+				D20000000000000000000002 /* WesternCoverService.swift */,
+				D20000000000000000000003 /* CoverSourceDisplay.swift */,
 				D18300000000000000000001 /* DetailPosterPolicy.swift */,
 				D18300000000000000000002 /* DetailPosterCache.swift */,
 				D18300000000000000000003 /* DetailPosterResolver.swift */,
@@ -445,6 +454,9 @@
 				26F8C24EF56C128165FFC52A /* JavDBSignature.swift in Sources */,
 				D1860000000000000000000B /* TenhowPoster.swift in Sources */,
 				D1860000000000000000000C /* TenhowActorLinks.swift in Sources */,
+				D20000000000000000000005 /* WesternCoverPolicy.swift in Sources */,
+				D20000000000000000000006 /* WesternCoverService.swift in Sources */,
+				D20000000000000000000007 /* CoverSourceDisplay.swift in Sources */,
 				D1830000000000000000000B /* DetailPosterPolicy.swift in Sources */,
 				D1830000000000000000000C /* DetailPosterCache.swift in Sources */,
 				D1830000000000000000000D /* DetailPosterResolver.swift in Sources */,
@@ -545,7 +557,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 197;
+				CURRENT_PROJECT_VERSION = 200;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -568,7 +580,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 197;
+				CURRENT_PROJECT_VERSION = 200;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

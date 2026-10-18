@@ -20,6 +20,7 @@ p.save
 unit = p.new_target(:unit_test_bundle, 'DetailPosterQualityTests', :ios, '17.0')
 unit.add_dependency(app)
 unit.source_build_phase.add_file_reference(p.main_group.new_file('UITests/DetailPosterQualityTests.swift'))
+unit.source_build_phase.add_file_reference(p.main_group.new_file('UITests/WesternCoverTests.swift'))
 unit.build_configurations.each do |c|
   c.build_settings['PRODUCT_NAME'] = 'DetailPosterQualityTests'
   c.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.avdb.DetailPosterQualityTests'

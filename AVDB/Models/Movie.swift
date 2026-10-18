@@ -23,6 +23,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
         self.numberLetter = nil
         self.title = title
         self.originTitle = nil
+        self.originalURL = nil
         self.summary = nil
         self.desc = nil
         self.thumbURL = thumbURL
@@ -77,6 +78,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
     public let numberLetter: String?
     public let title: String?
     public let originTitle: String?
+    public let originalURL: String?
     public let summary: String?
     public let desc: String?
     public let thumbURL: String?
@@ -157,6 +159,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
         case id, type, number, title, summary, desc, duration, score, rating, category
         case numberLetter = "number_letter"
         case originTitle = "origin_title"
+        case originalURL = "original_url"
         case thumbURL = "thumb_url"
         case coverURL = "cover_url"
         case releaseDate = "release_date"
@@ -212,6 +215,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
         numberLetter = JSONFlex.string(c, .numberLetter)
         title = try? c.decode(String.self, forKey: .title)
         originTitle = try? c.decode(String.self, forKey: .originTitle)
+        originalURL = try? c.decode(String.self, forKey: .originalURL)
         summary = try? c.decode(String.self, forKey: .summary)
         desc = try? c.decode(String.self, forKey: .desc)
         thumbURL = try? c.decode(String.self, forKey: .thumbURL)

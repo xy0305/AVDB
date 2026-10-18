@@ -79,7 +79,8 @@ assert 'posterCache.totalCostLimit = 48 * 1024 * 1024' in source
 assert 'posterInFlight[key]' in source
 assert 'contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original' in source
 assert 'FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)' in source
-assert 'landscapeFallback = landscapeFallback ?? img' in source
+assert 'if landscapeFallback == nil { landscapeFallback = img; landscapeSource = candidate }' in source
+assert 'onLoaded?(candidate)' in source
 assert '.allowsHitTesting(false)' in source
 for name in ['Components/JAVDBUI','Components/GlassBookFlipView','Home/DailyDrawView','Rankings/RankingsView','User/LibraryFeaturesView']:
     assert 'MoviePosterImage(movie: movie' in (root/f'AVDB/Views/{name}.swift').read_text()

@@ -220,6 +220,9 @@ struct UserView: View {
                 }
 
                 Section("来源") {
+                    NavigationLink { WesternCoverSettingsView() } label: {
+                        Label("欧美封面", systemImage: "photo")
+                    }.accessibilityIdentifier("western-cover-settings")
                     NavigationLink {
                         ExternalLibrarySettingsView()
                     } label: {

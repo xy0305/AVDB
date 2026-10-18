@@ -317,7 +317,7 @@ public actor ImageLoader {
 
     private static func fetchImage(url: URL, urlString: String, userAgent: String, maxPixelSize: Int) async -> UIImage? {
         do {
-            let downloaded = try await download(url, userAgent: userAgent)
+            let (downloaded, finalURL) = try await download(url, userAgent: userAgent)
             let imageData = isEncryptedCDN(urlString)
                 ? JavDBSignature.decryptImage(downloaded)
                 : downloaded
@@ -333,13 +333,16 @@ public actor ImageLoader {
                     && image.size.height > image.size.width
                 if tooSmall || portraitBackdrop { throw ImageLoaderError.invalidData }
             }
+            let source = CGImageSourceCreateWithData(imageData as CFData, nil)
+            let props = source.flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
+            CoverLoadEvidence.shared.save(request: urlString, final: finalURL, rawWidth: props?[kCGImagePropertyPixelWidth] as? Int ?? 0, rawHeight: props?[kCGImagePropertyPixelHeight] as? Int ?? 0, width: image.cgImage?.width ?? 0, height: image.cgImage?.height ?? 0)
             return image
         } catch {
             return nil
         }
     }
 
-    private static func download(_ url: URL, userAgent: String) async throws -> Data {
+    private static func download(_ url: URL, userAgent: String) async throws -> (Data, URL) {
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.cachePolicy = .returnCacheDataElseLoad
@@ -348,7 +351,7 @@ public actor ImageLoader {
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw ImageLoaderError.downloadFailed
         }
-        return data
+        return (data, response.url ?? url)
     }
 
     /// Read-only detail reuse: no network, no catalog mutations, original decoding unchanged.
@@ -393,6 +396,7 @@ public struct JavDBImage: View {
     let contentMode: ContentMode
     let maxPixelSize: Int
     let frontPoster: Bool
+    var onLoaded: ((String) -> Void)? = nil
 
     @State private var image: UIImage?
     @State private var imageIdentity: String?
@@ -416,7 +420,8 @@ public struct JavDBImage: View {
         secondFallbackURL: String? = nil,
         contentMode: ContentMode = .fill,
         maxPixelSize: Int = 2048,
-        frontPoster: Bool = false
+        frontPoster: Bool = false,
+        onLoaded: ((String) -> Void)? = nil
     ) {
         self.url = url
         self.fallbackURL = fallbackURL
@@ -424,6 +429,7 @@ public struct JavDBImage: View {
         self.contentMode = contentMode
         self.maxPixelSize = maxPixelSize
         self.frontPoster = frontPoster
+        self.onLoaded = onLoaded
     }
 
     private var imageURLs: [String] {
@@ -481,12 +487,15 @@ public struct JavDBImage: View {
                 if frontPoster, let cg = fixtureImage.cgImage,
                    let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: "https://tp.spfcas.com/covers/neutral.jpg"),
                    let cropped = cg.cropping(to: rect) { fixtureImage = UIImage(cgImage: cropped) }
+                CoverLoadEvidence.shared.save(request: url, final: URL(string: "https://tp.spfcas.com/covers/neutral-fixture.jpg")!, rawWidth: Int(size.width), rawHeight: Int(size.height), width: fixtureImage.cgImage?.width ?? 0, height: fixtureImage.cgImage?.height ?? 0)
                 publish(fixtureImage, identity: identity)
+                onLoaded?(url)
                 return
             }
             #endif
             // 不先清空 image。LazyVGrid 滚动时 task 会被取消，先清空会让中间封面变空白。
             var landscapeFallback: UIImage?
+            var landscapeSource: String?
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
                 let loaded = frontPoster
@@ -495,14 +504,15 @@ public struct JavDBImage: View {
                 if let img = loaded {
                     guard !Task.isCancelled else { return }
                     if frontPoster, img.size.width > img.size.height {
-                        landscapeFallback = landscapeFallback ?? img
+                        if landscapeFallback == nil { landscapeFallback = img; landscapeSource = candidate }
                         continue
                     }
                     publish(img, identity: identity)
+                    onLoaded?(candidate)
                     return
                 }
             }
-            if !Task.isCancelled, let landscapeFallback { publish(landscapeFallback, identity: identity) }
+            if !Task.isCancelled, let landscapeFallback { publish(landscapeFallback, identity: identity); if let landscapeSource { onLoaded?(landscapeSource) } }
         }
     }
 
@@ -532,8 +542,12 @@ public struct MoviePosterImage: View {
     public var body: some View {
         let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
         let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
-        JavDBImage(url: sources.first, fallbackURL: sources.dropFirst().first,
+        if movie.type == "2", let winner = DetailPosterResolver.cachedWinner(movie: movie, account: APIClient.shared.token) {
+            Image(uiImage: winner.image).resizable().aspectRatio(contentMode: .fill)
+        } else {
+            JavDBImage(url: sources.first, fallbackURL: sources.dropFirst().first,
                    contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original)
+        }
     }
 }
 

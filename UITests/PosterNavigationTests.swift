@@ -1,6 +1,35 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testWesternCoverSettingsAndActualFallbackSource() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--western-settings-fixture"]
+        app.launch()
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        XCTAssertTrue(app.secureTextFields["tpdb-token"].waitForExistence(timeout: 10))
+        app.buttons["tpdb-clear"].tap()
+        XCTAssertTrue(app.staticTexts["tpdb-configuration"].label.contains("未配置"))
+        app.buttons["tpdb-save"].tap()
+        app.buttons["tpdb-test"].tap()
+        let noToken = NSPredicate(format:"label CONTAINS %@", "无 Token")
+        expectation(for:noToken,evaluatedWith:app.staticTexts["tpdb-status"]);waitForExpectations(timeout:5)
+        let settings = XCTAttachment(screenshot:app.screenshot());settings.name="200-neutral-token-settings";settings.lifetime = .keepAlways;add(settings)
+        app.terminate()
+        app.launchArguments=["--poster-navigation-fixture", "--detail-hero-fixture"]
+        app.launch()
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        app.buttons["neutral-wide-link"].tap()
+        let source=app.buttons["detail-cover-source"]
+        XCTAssertTrue(source.waitForExistence(timeout:10))
+        for _ in 0..<8 where !source.isHittable { app.swipeUp() }
+        XCTAssertTrue(source.label.contains("JavDB"), "Fallback source must be the actually loaded neutral image")
+        XCTAssertFalse(source.label.contains("未找到更优封面"))
+        let shot=XCTAttachment(screenshot:app.screenshot());shot.name="200-neutral-actual-fallback-source";shot.lifetime = .keepAlways;add(shot)
+        app.terminate()
+    }
+
     func testLongDetailTitleThreeLinesExpandsAndPersistsVisibility() {
         verifyReadableDetail(accessibilitySize: false)
     }
