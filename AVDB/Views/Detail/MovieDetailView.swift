@@ -1979,7 +1979,7 @@ struct DetailHeroFixtureGallery: View {
     private func movie(wide: Bool) -> Movie {
         let title = ProcessInfo.processInfo.arguments.contains("--long-detail-title")
             ? String(repeating: "静かな庭園と四季の光をめぐる幾何学の物語。中性排版测试，完整封面与可阅读的信息。", count: 8)
-            : "静谧之光\\nNeutral Portrait Study"
+            : "静谧之光\\nNeutral Study"
         let json = """
         {"id":"neutral-\(wide ? "wide" : "portrait")","type":"0","number":"DEMO-123",
         "title":"\(title)","cover_url":"fixture://poster/\(wide ? "wrap" : "portrait")",
