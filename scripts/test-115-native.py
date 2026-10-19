@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory() as d:
     subprocess.run(['swift',str(p)],check=True)
 view=Path('AVDB/Views/Player/Pan115PlayerView.swift').read_text()
 assert '!refreshUsed' in view and '!fallbackUsed' in view and 'guard !refreshing' in view
-assert 'pan115.delete.current' in view and 'pan115.delete.confirm' in view
+assert 'pan115.episode.current' in view and '正在播放' in view
 assert 'deleteFiles(cid: file.cid, fileIDs: [file.fileID]' in view
 assert 'download_url' not in s[s.index('public func streamsForVideo'):s.index('public func originalStream')]
 assert 'SecRandomCopyBytes' in s and 'Range"' not in s[s.index('public func originalStream'):s.index('/// 推送磁力并等到可播')]

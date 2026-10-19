@@ -136,6 +136,71 @@ struct Pan115PlayerView: View {
     }
 }
 
+private struct PlaybackVersionSheet: View {
+    let episodes: [Pan115Client.FileItem]
+    let currentID: String?
+    let title: (Int, String) -> String
+    let play: (Int) -> Void
+    let deleteCurrent: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("正在播放的版本已高亮") {
+                    ForEach(Array(episodes.enumerated()), id: \.element.fileID) { index, file in
+                        let selected = file.fileID == currentID
+                        Button {
+                            dismiss()
+                            play(index)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: selected ? "play.circle.fill" : "circle")
+                                    .font(.title3)
+                                    .foregroundStyle(selected ? .black : .secondary)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(title(index, file.name))
+                                        .font(.body.weight(selected ? .bold : .regular))
+                                        .foregroundStyle(selected ? .black : .primary)
+                                    Text(selected ? "正在播放" : file.name)
+                                        .font(.caption)
+                                        .foregroundStyle(selected ? .black.opacity(0.7) : .secondary)
+                                        .lineLimit(2)
+                                }
+                                Spacer(minLength: 8)
+                                if selected {
+                                    Image(systemName: "checkmark").font(.headline.weight(.bold)).foregroundStyle(.black)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(selected ? Color.white : Color(.secondarySystemGroupedBackground))
+                        .accessibilityIdentifier(selected ? "pan115.episode.current" : "pan115.episode")
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                    }
+                }
+                if episodes.count > 1, currentID != nil {
+                    Section {
+                        Button("删除当前版本", role: .destructive) {
+                            dismiss()
+                            deleteCurrent()
+                        }
+                        .accessibilityIdentifier("pan115.delete.current")
+                    }
+                }
+            }
+            .navigationTitle("选择播放版本")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
 private struct OfflineCandidate {
     let url: String
     let name: String
