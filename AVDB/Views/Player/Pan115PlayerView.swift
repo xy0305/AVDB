@@ -143,16 +143,23 @@ struct PlaybackVersionMenu: View {
     let play: (Int) -> Void
     let deleteCurrent: () -> Void
 
+    // Bounded Dynamic Type keeps the compact menu usable without disabling scaling.
+    @ScaledMetric(relativeTo: .body) private var scaledTitleSize: CGFloat = 15
+    private var textScale: CGFloat { min(max(scaledTitleSize / 15, 1), 1.3) }
+    private var rowHeight: CGFloat { 56 * textScale }
+
     private var canDelete: Bool {
         episodes.count > 1 && episodes.contains { $0.fileID == currentID }
     }
 
     var body: some View {
         GeometryReader { geometry in
-            let width = min(330, max(0, geometry.size.width - 40))
+            let width = min(310, max(0, geometry.size.width - 40))
             let availableHeight = max(0, geometry.size.height
                 - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom - 32)
-            let contentHeight = CGFloat(episodes.count) * 92 + (canDelete ? 56 : 0) + 12
+            let rowCount = episodes.count + (canDelete ? 1 : 0)
+            let contentHeight = CGFloat(episodes.count) * rowHeight + (canDelete ? 44 : 0)
+                + CGFloat(max(0, rowCount - 1)) * 6 + 16
             ZStack {
                 Button(action: close) {
                     Color.black.opacity(0.24).contentShape(Rectangle())
@@ -163,42 +170,48 @@ struct PlaybackVersionMenu: View {
                 .accessibilityIdentifier("pan115.episode.close")
 
                 ScrollView {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 6) {
                         ForEach(Array(episodes.enumerated()), id: \.element.fileID) { index, file in
                             let selected = file.fileID == currentID
                             Button { close(); play(index) } label: {
                                 VStack(spacing: 2) {
                                     Text(selected ? "正在播放 · \(title(index, file.name))" : title(index, file.name))
-                                        .font(.body.weight(selected ? .bold : .semibold))
+                                        .font(.system(size: 15 * textScale, weight: .semibold))
                                         .lineLimit(1)
-                                    Text(AVDBPlaybackFileSize.text(bytes: file.size))
-                                        .font(.caption.monospacedDigit())
-                                        .lineLimit(1)
-                                    Text(file.name)
-                                        .font(.caption2)
-                                        .lineLimit(2)
-                                        .truncationMode(.middle)
-                                        .opacity(0.78)
+                                    HStack(spacing: 4) {
+                                        Text(AVDBPlaybackFileSize.text(bytes: file.size))
+                                            .font(.system(size: 12 * textScale).monospacedDigit())
+                                            .fixedSize(horizontal: true, vertical: false)
+                                        Text("·").font(.system(size: 11 * textScale))
+                                        Text(file.name)
+                                            .font(.system(size: 11 * textScale))
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                            .opacity(0.78)
+                                    }
+                                    .lineLimit(1)
                                 }
                                 .foregroundStyle(selected ? .black : Color(red: 0.20, green: 0.48, blue: 0.96))
-                                .frame(maxWidth: .infinity, minHeight: 84)
-                                .padding(.horizontal, 14)
+                                .frame(maxWidth: .infinity, minHeight: rowHeight)
+                                .padding(.horizontal, 8)
                                 .background(selected ? .white : Color(white: 0.72), in: Capsule())
                                 .overlay(Capsule().stroke(.white, lineWidth: selected ? 2 : 0))
                             }
                             .buttonStyle(.plain)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(selected ? "正在播放 · " : "")\(title(index, file.name))，\(AVDBPlaybackFileSize.text(bytes: file.size))，\(file.name)")
                             .accessibilityIdentifier(selected ? "pan115.episode.current" : "pan115.episode")
                             .accessibilityAddTraits(selected ? .isSelected : [])
                         }
                         if canDelete {
                             Button("删除当前版本", role: .destructive) { close(); deleteCurrent() }
-                                .font(.body.weight(.semibold)).foregroundStyle(.red)
-                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .font(.system(size: 15 * textScale, weight: .semibold)).foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                                 .background(Color(white: 0.72), in: Capsule())
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("pan115.delete.current")
                         }
-                    }.padding(10)
+                    }.padding(8)
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(width: width, height: min(contentHeight, availableHeight))

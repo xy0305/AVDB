@@ -84,9 +84,40 @@ assert 'Button(action: close)' in menu
 assert 'close(); play(index)' in menu and 'close(); deleteCurrent()' in menu
 assert 'file.fileID == currentID' in menu
 assert '正在播放 ·' in menu and 'selected ? .white' in menu and 'selected ? .black' in menu
-assert 'Text(file.name)' in menu and '.lineLimit(2)' in menu and '.truncationMode(.middle)' in menu
+assert 'Text(file.name)' in menu and '.lineLimit(1)' in menu and '.truncationMode(.middle)' in menu
 assert 'GeometryReader' in menu and 'geometry.safeAreaInsets' in menu
-assert 'min(330,' in menu and 'min(contentHeight, availableHeight)' in menu
+assert 'min(310,' in menu and 'min(contentHeight, availableHeight)' in menu
+# Build 212 compact two-line policy: exact sizes, real row count and >=44pt targets.
+assert '@ScaledMetric(relativeTo: .body)' in menu
+assert 'min(max(scaledTitleSize / 15, 1), 1.3)' in menu
+assert 'private var rowHeight: CGFloat { 56 * textScale }' in menu
+assert '.system(size: 15 * textScale, weight: .semibold)' in menu
+assert '.system(size: 12 * textScale).monospacedDigit()' in menu
+assert '.system(size: 11 * textScale)' in menu
+assert 'HStack(spacing: 4)' in menu and 'VStack(spacing: 6)' in menu
+assert '.padding(.horizontal, 8)' in menu and '}.padding(8)' in menu
+assert '.frame(maxWidth: .infinity, minHeight: rowHeight)' in menu
+assert '.frame(maxWidth: .infinity, minHeight: 44)' in menu
+assert 'let rowCount = episodes.count + (canDelete ? 1 : 0)' in menu
+assert 'CGFloat(episodes.count) * rowHeight + (canDelete ? 44 : 0)' in menu
+assert 'CGFloat(max(0, rowCount - 1)) * 6 + 16' in menu
+assert '.accessibilityElement(children: .ignore)' in menu
+label = menu.split('.accessibilityLabel(')[2].split('.accessibilityIdentifier')[0]
+assert 'file.name' in label and 'file.size' in label
+# Numeric examples tied to the above production source contracts, not rendering tests.
+def compact_height(count, delete, scale, screen, top=0, bottom=0):
+    rows = count + int(delete)
+    content = count * 56 * scale + (44 if delete else 0) + max(0, rows - 1) * 6 + 16
+    return min(content, max(0, screen - top - bottom - 32))
+assert compact_height(4, True, 1, 390) == 308
+assert compact_height(0, False, 1, 390) == 16
+assert compact_height(1, False, 1, 390) == 72
+for scale in [1, 1.15, 1.3]:
+    assert 56 * scale >= 44
+    for count in [1, 4, 5, 30]:
+        assert compact_height(count, count > 1, scale, 390, 0, 21) <= 337
+assert compact_height(30, True, 1, 390, 0, 21) == 337
+print('PASS build212: compact 15/12/11pt two-line menu, 56/44pt targets, 310pt width, exact height and scroll cap contracts')
 assert 'ScrollView {' in menu and '.background(.regularMaterial, in: RoundedRectangle' in menu
 assert 'Color.black.opacity(0.24)' in menu
 assert 'onSelectEpisode: vm.episodes.count > 1 ? { showEpisodes = true } : nil' in route
