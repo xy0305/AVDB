@@ -16,11 +16,12 @@ struct PlaybackVideoMetrics: Equatable {
     }
     var grade: String {
         let long = max(width, height), short = min(width, height)
-        if short >= 4320 && long >= 7680 { return "8K" }
-        if short >= 2160 && long >= 3840 { return "4K" }
-        if short >= 1440 && long >= 2560 { return "1440p" }
-        if short >= 1080 && long >= 1920 { return "1080p" }
-        if short >= 720 && long >= 1280 { return "720p" }
+        // Non-standard/cropped heights retain their measured p value, not a lower bucket.
+        if short == 4320 && long >= 7680 { return "8K" }
+        if short == 2160 && long >= 3840 { return "4K" }
+        if short == 1440 && long >= 2560 { return "1440p" }
+        if short == 1080 && long >= 1920 { return "1080p" }
+        if short == 720 && long >= 1280 { return "720p" }
         return "\(short)p"
     }
     var detail: String {
