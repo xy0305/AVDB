@@ -36,10 +36,15 @@ enum SubtitleCatProvider {
         return [.catDetail, .download].contains(kind) &&
             u.path.range(of: "^/subs/[0-9]+/[^/]+\\." + ext + "$", options: .regularExpression) != nil
     }
-    // JRHTML has already decoded attribute entities exactly once. Foundation resolves raw spaces,
-    // Unicode and existing percent escapes without rebuilding or guessing the download path.
+    // JRHTML decoded attribute entities once. Encode only invalid URL characters, preserving
+    // existing %HH escapes even in a mixed Unicode/%20 href; never decode or guess paths.
+    private static let hrefCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?#[]@!$&'()*+,;=%")
     static func resolve(_ href: String, page: URL, kind: OnlineSubtitleRequestKind) -> URL? {
-        guard href.utf8.count <= 4096, let u = URL(string: href, relativeTo: page)?.absoluteURL,
+        guard href.utf8.count <= 4096,
+              !href.unicodeScalars.contains(where: { $0.value < 32 }),
+              href.range(of: #"%(?![0-9A-Fa-f]{2})"#, options: .regularExpression) == nil,
+              let encoded = href.addingPercentEncoding(withAllowedCharacters: hrefCharacters),
+              let u = URL(string: encoded, relativeTo: page)?.absoluteURL,
               allowed(u, kind: kind) else { return nil }
         return u
     }

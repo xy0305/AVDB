@@ -39,7 +39,7 @@ enum DualSourceRegression {
         precondition(URLComponents(url: page, resolvingAgainstBaseURL: false)!.queryItems!.first!.value == "TEST & 中文")
         let html = Data("<table class='sub-table'><tr><td><a href='subs/1706/中文%20test.html'>Same</a> (translated from Japanese)</td><td><a href='subs/1706/中文%20test.html'>Duplicate</a><a href='subs/1707/中文 test.html'>Same</a><a href='https://evil.test/subs/1/test.html'>Bad</a></td></tr></table>".utf8)
         let rows = try SubtitleCatProvider.candidates(html, page: page)
-        precondition(rows.count == 2 && rows[0].id != rows[1].id && rows[0].language == "待选语言")
+        precondition(rows.count == 2 && rows[0].id != rows[1].id && rows[0].language == "待选语言", "fixture candidates=\(rows.count); resolved=\(String(describing: SubtitleCatProvider.resolve("subs/1706/中文%20test.html", page: page, kind: .catDetail)))")
         precondition(rows[0].url.absoluteString.contains("%20") && !rows[0].url.absoluteString.contains("%2520"))
         let variants = try SubtitleCatProvider.languages(detail, row: rows[0])
         precondition(variants.count == 3 && variants[0].language == "简体中文 (zh-CN)" && variants[1].language == "繁体中文 (zh-TW)")
