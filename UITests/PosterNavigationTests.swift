@@ -569,8 +569,9 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(play.waitForExistence(timeout: 10))
         XCTAssertFalse(title.exists)
         XCTAssertFalse(app.buttons["detail-title-toggle"].exists)
-        XCTAssertEqual(play.frame.minY, shownPlayY, accuracy: 2, "Short/hidden title retains the same control anchor")
+        XCTAssertLessThanOrEqual(play.frame.minY, shownPlayY + 2, "Hiding title never pushes controls below the shown title")
         if app.frame.width < 600 && app.frame.height > 800 {
+            XCTAssertEqual(play.frame.minY, shownPlayY, accuracy: 2, "Short/hidden phone title retains the same control anchor")
             XCTAssertGreaterThanOrEqual(play.frame.minY / app.frame.height, 0.63)
             XCTAssertLessThanOrEqual(play.frame.minY / app.frame.height, 0.65)
         }

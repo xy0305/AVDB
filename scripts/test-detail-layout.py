@@ -61,7 +61,17 @@ for (w,h,pad) in cases {
 let insetCases: [(CGFloat, CGFloat, CGFloat)] = [(390,751,844),(393,759,852),(402,778,874),(430,838,932)]
 for (w, sceneH, displayH) in insetCases {
     let g = DetailPortraitGeometry(availableSize: CGSize(width:w,height:sceneH),isPad:false)
-    assert(g.controlsTop / displayH >= 0.63 && g.controlsTop / displayH <= 0.68)
+    assert(g.controlsTop / displayH >= 0.63 && g.controlsTop / displayH <= 0.65)
+    // Production minimum frame is unconditional: title hidden (metadata only),
+    // short title, and expanded/accessibility content all share this floor.
+    let minimum = max(0, g.controlsTop - g.titleTop - 18)
+    for contentHeight: CGFloat in [36, 100] {
+        let rowTop = g.titleTop + max(contentHeight, minimum) + 18
+        assert(abs(rowTop - g.controlsTop) < 0.01)
+        assert(rowTop / displayH >= 0.63 && rowTop / displayH <= 0.65)
+    }
+    let expandedRow = g.titleTop + max(CGFloat(240), minimum) + 18
+    assert(expandedRow > g.controlsTop) // Long titles still grow naturally.
     assert(g.titleTop / displayH >= 0.47 && g.titleTop / displayH <= 0.51)
     print("safe-area scene \\(Int(w))x\\(Int(sceneH)): title \\(g.titleTop / displayH), controls \\(g.controlsTop / displayH) of display")
 }
