@@ -72,7 +72,8 @@ source+=r'''
 }
 '''
 # Swift assert's autoclosure cannot throw; compute inside a nonthrowing helper.
-source=source.replace('func parse(_ html: String, _ n: String = "SSIS-794", _ url: URL? = nil) throws -> [String] {\n        try JavBusPoster.images', 'func parse(_ html: String, _ n: String = "SSIS-794", _ url: URL? = nil) -> [String] {\n        (try? JavBusPoster.images').replace('finalURL:url ?? page)\n    }','finalURL:url ?? page)) ?? []\n    }').replace('try parse(', 'parse(')
+source=source.replace('func parse(_ html: String, _ n: String = "SSIS-794", _ url: URL? = nil) throws -> [String] {\n        try JavBusPoster.images', 'func parse(_ html: String, _ n: String = "SSIS-794", _ url: URL? = nil) -> [String] {\n        (try? JavBusPoster.images').replace('finalURL:url ?? page)\n    }','finalURL:url ?? page)) ?? []\n    }').replace('assert(try parse(', 'assert(parse(')
+source = 'import CoreGraphics\n' + source
 assert 'supplemental: supplemental' in (services/'DetailPosterResolver.swift').read_text()
 if shutil.which('swiftc'):
     with tempfile.TemporaryDirectory() as td:
