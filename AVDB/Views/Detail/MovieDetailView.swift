@@ -457,7 +457,8 @@ struct MovieDetailView: View {
                 portraitActionGroup(movie).frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
-        .accessibilityIdentifier("portrait-hero-controls")
+        // Do not apply an identifier to ViewThatFits: SwiftUI forwards it to
+        // the selected branch and replaces the play button's stable AX identity.
     }
 
     private var portraitPlayButton: some View {
@@ -2010,10 +2011,13 @@ struct DetailPortraitGeometry {
     init(availableSize: CGSize, isPad: Bool) {
         width = max(1, min(availableSize.width, isPad ? 900 : 600))
         imageHeight = min(width * 1.58, max(600, availableSize.height * 0.8))
-        titleTop = min(width * 1.06, max(390, availableSize.height * 0.50))
-        // Reference control row starts around 64% of the portrait viewport.
-        // On short / rotated windows preserve readable title space and scrolling.
-        controlsTop = max(titleTop + 110, min(width * 1.42, availableSize.height * 0.64))
+        // Scene geometry excludes safe-area bars. The width-based lower-hero
+        // cap and 56% scene anchor keep the title near 50% of the full display.
+        titleTop = min(width * 1.06, max(390, availableSize.height * 0.56))
+        // Reserve a readable two-line title + metadata interval even when the
+        // scene is shorter than the display. This puts the whole row near 64%
+        // on tall phones instead of the previous ~51–59% placement.
+        controlsTop = max(titleTop + 132, min(width * 1.42, availableSize.height * 0.64))
     }
 }
 

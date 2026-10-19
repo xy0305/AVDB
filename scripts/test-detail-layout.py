@@ -18,6 +18,7 @@ assert 'play115 = true' in play and 'GlassHaptic.tap()' in play
 assert 'HStack(spacing: 12)' in controls
 assert controls.index('portraitPlayButton') < controls.index('portraitActionGroup(movie)')
 assert 'ViewThatFits(in: .horizontal)' in controls and 'VStack(spacing: 12)' in controls
+assert '.accessibilityIdentifier(' not in controls # Must not override child play identity.
 assert 'HStack(spacing: 0)' in actions and '.liquidGlass(interactive: false)' in actions
 for x in ['showPosterResources = true','MyListsView(movieID: movie.id)','vm.setReviewStatus("want_watch")','vm.setReviewStatus("watched")']:
     assert x in actions,x
@@ -37,7 +38,7 @@ let cases: [(CGFloat, CGFloat, Bool)] = [(320,568,false),(375,667,false),(390,84
 for (w,h,pad) in cases {
     let g = DetailPortraitGeometry(availableSize: CGSize(width:w,height:h),isPad:pad)
     assert(g.width <= w && g.width <= (pad ? 900 : 600))
-    assert(g.controlsTop >= g.titleTop + 110)
+    assert(g.controlsTop >= g.titleTop + 132)
     assert(g.controlsTop.isFinite && g.imageHeight > 0)
     // Ordinary tall phones: row now starts at ~64%, never the old ~51%.
     if !pad && h >= 800 {
@@ -46,7 +47,15 @@ for (w,h,pad) in cases {
     }
     print("viewport \\(Int(w))x\\(Int(h)): title \\(g.titleTop), control minimum \\(g.controlsTop)")
 }
-print("PASS production Swift portrait geometry: narrow / tall / rotated / iPad / Split View")
+// SceneLayoutReader reports the safe-area-excluding size, not UIScreen size.
+let insetCases: [(CGFloat, CGFloat, CGFloat)] = [(390,751,844),(393,759,852),(402,778,874),(430,838,932)]
+for (w, sceneH, displayH) in insetCases {
+    let g = DetailPortraitGeometry(availableSize: CGSize(width:w,height:sceneH),isPad:false)
+    assert(g.controlsTop / displayH >= 0.63 && g.controlsTop / displayH <= 0.68)
+    assert(g.titleTop / displayH >= 0.47 && g.titleTop / displayH <= 0.51)
+    print("safe-area scene \\(Int(w))x\\(Int(sceneH)): title \\(g.titleTop / displayH), controls \\(g.controlsTop / displayH) of display")
+}
+print("PASS production Swift portrait geometry: narrow / tall / safe areas / rotated / iPad / Split View")
 '''
 if shutil.which('swiftc'):
     with tempfile.TemporaryDirectory() as td:

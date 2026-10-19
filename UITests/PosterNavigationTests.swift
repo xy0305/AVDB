@@ -543,10 +543,13 @@ final class PosterNavigationTests: XCTestCase {
             XCTAssertEqual(action.frame.midY, play.frame.midY, accuracy: 2, "One shared control row")
         }
         if app.frame.width < 600 && app.frame.height > 800 {
-            XCTAssertGreaterThanOrEqual(play.frame.minY / app.frame.height, 0.61,
+            XCTAssertGreaterThanOrEqual(play.frame.minY / app.frame.height, 0.63,
                                        "Build217 must lower controls; old ~51% row is unacceptable")
             XCTAssertLessThanOrEqual(play.frame.minY / app.frame.height, 0.73)
         }
+        let geometryEvidence = XCTAttachment(string: "display=\(app.frame); title=\(title.frame); metadata=\(metadata.frame); play=\(play.frame); playRatio=\(play.frame.minY / app.frame.height)")
+        geometryEvidence.name = "217-neutral-lower-control-geometry"
+        geometryEvidence.lifetime = .keepAlways; add(geometryEvidence)
         XCTAssertFalse(app.buttons["detail-title-toggle"].exists, "Short titles need no expansion control")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "native-neutral-portrait-hero-phone-or-ipad"
