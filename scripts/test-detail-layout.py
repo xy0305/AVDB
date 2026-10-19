@@ -31,7 +31,7 @@ assert '@ScaledMetric(relativeTo: .largeTitle)' in s
 # No unrelated wide-title or action semantics change.
 wide=s.split('private func heroHeader',1)[1].split('private func heroAction',1)[0]
 assert 'landscape-detail-title' in wide and 'collapsedLines: 2' not in wide
-policy=s.split('// MARK: - Portrait viewport policy',1)[1].split('// Two invisible measurements',1)[0]
+policy='struct DetailPortraitGeometry'+s.split('struct DetailPortraitGeometry',1)[1].split('// Two invisible measurements',1)[0]
 main='''
 let cases: [(CGFloat, CGFloat, Bool)] = [(320,568,false),(375,667,false),(390,844,false),(393,852,false),(430,932,false),(600,375,false),(375,600,true),(744,1133,true),(1032,1376,true),(1376,1032,true)]
 for (w,h,pad) in cases {
