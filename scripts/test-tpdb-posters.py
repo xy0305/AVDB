@@ -92,6 +92,11 @@ actor Probe {
   assert(TPDBPolicy.status(401).contains("401"))
   assert(TPDBPolicy.status(403).contains("不能据此断言"))
   assert(TPDBPolicy.status(429).contains("429"))
+  assert(TPDBPolicy.completeLength(actual:17000,expected:2000,encoding:"gzip"))
+  assert(TPDBPolicy.completeLength(actual:17000,expected:2000,encoding:"br"))
+  assert(TPDBPolicy.completeLength(actual:2000,expected:2000,encoding:nil))
+  assert(!TPDBPolicy.completeLength(actual:1999,expected:2000,encoding:nil))
+  assert(!TPDBPolicy.completeLength(actual:1999,expected:2000,encoding:"identity"))
   let c=DetailPosterCache<Int>(positiveTTL:1,negativeTTL:0.03)
   let p=Probe()
   let slow: @Sendable () async -> Int? = {

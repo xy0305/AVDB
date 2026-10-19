@@ -116,7 +116,8 @@ enum TPDBArtworkService {
             guard data.count < limit, ProcessInfo.processInfo.systemUptime < deadline else { throw Failure.message("响应大小或总时间超限") }
             data.append(byte)
         }
-        if response.expectedContentLength >= 0 && data.count != response.expectedContentLength { throw Failure.message("响应读取不完整；保留 JavDB") }
+        guard TPDBPolicy.completeLength(actual: data.count, expected: response.expectedContentLength,
+                                        encoding: http.value(forHTTPHeaderField: "Content-Encoding")) else { throw Failure.message("响应读取不完整；保留 JavDB") }
         return data
     }
     private static func decode(_ data: Data) -> TPDBLandscape? {

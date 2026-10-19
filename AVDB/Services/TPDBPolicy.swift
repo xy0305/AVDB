@@ -85,6 +85,11 @@ enum TPDBPolicy {
     static func permitsRedirect(authenticated: Bool, count: Int, target: URL) -> Bool {
         !authenticated && count <= 2 && imageAllowed(target)
     }
+    static func completeLength(actual: Int, expected: Int64, encoding: String?) -> Bool {
+        // URLSession yields decompressed bytes; Content-Length may describe gzip/br.
+        if let encoding, encoding.lowercased() != "identity", !encoding.isEmpty { return true }
+        return expected < 0 || Int64(actual) == expected
+    }
     static func status(_ code: Int) -> String {
         switch code {
         case 200: return "HTTP 200"
