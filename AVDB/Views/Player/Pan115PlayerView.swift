@@ -92,7 +92,29 @@ struct Pan115PlayerView: View {
                     Task { await vm.selectEpisode(index) }
                 }
             }
+            if vm.episodes.count > 1 {
+                Button("删除当前版本", role: .destructive) {
+                    pendingDelete = vm.currentEpisode
+                }
+                .accessibilityIdentifier("pan115.delete.current")
+            }
             Button("取消", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "删除网盘中的当前版本？",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("删除此版本", role: .destructive) {
+                let file = pendingDelete
+                pendingDelete = nil
+                guard let file else { return }
+                Task { await vm.deleteEpisode(file) }
+            }
+            .accessibilityIdentifier("pan115.delete.confirm")
+            Button("取消", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("仅删除“\(pendingDelete?.name ?? "当前文件")”。文件进入 115 回收站且不可从 App 恢复，其他版本不会删除。")
         }
     }
 
@@ -332,6 +354,34 @@ final class Pan115PlayerViewModel: ObservableObject {
             try await play(file: episodes[index], cookie: Pan115Settings.shared.cookie)
         } catch {
             errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    func deleteEpisode(_ file: Pan115Client.FileItem) async {
+        guard !file.fileID.isEmpty, !file.cid.isEmpty else {
+            showNotice("无法定位网盘文件，未删除")
+            return
+        }
+        isLoading = true
+        errorMessage = nil
+        status = "正在从 115 删除当前版本…"
+        do {
+            let deleted = try await Pan115Client.shared.deleteFiles(cid: file.cid, fileIDs: [file.fileID], cookie: Pan115Settings.shared.cookie)
+            guard deleted == 1 else { throw Pan115Error.api("115 未确认删除") }
+            let remaining = episodes.filter { $0.fileID != file.fileID }
+            episodes = remaining
+            if remaining.isEmpty {
+                playURL = nil
+                currentFile = nil
+                errorMessage = "当前版本已移入 115 回收站，没有其他可播放版本。"
+            } else {
+                let next = remaining.first { $0.fileID == currentFile?.fileID } ?? remaining[0]
+                try await play(file: next, cookie: Pan115Settings.shared.cookie)
+                showNotice("已将当前版本移入 115 回收站")
+            }
+        } catch {
+            errorMessage = "删除失败：\(error.localizedDescription)"
         }
         isLoading = false
     }
