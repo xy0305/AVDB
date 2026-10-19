@@ -19,7 +19,7 @@ pbx=(root/'AVDB.xcodeproj/project.pbxproj').read_text()
 for f in ['TPDBPolicy.swift','TPDBCoverSettings.swift','TPDBArtworkService.swift']:
  assert pbx.count('path = '+f+';')==1
  assert pbx.count(f+' in Sources')==2
-assert pbx.count('CURRENT_PROJECT_VERSION = 214;')==2
+assert pbx.count('CURRENT_PROJECT_VERSION = 215;')==2
 print('PASS TPDB static production auth isolation, bounded budget, Keychain, opt-in, landscape and fallback wiring')
 swift=r'''
 actor Probe {

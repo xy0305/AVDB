@@ -147,6 +147,9 @@ struct KSChromePlayer: View {
     @StateObject private var lut = NativeLUTController()
     @StateObject private var seekPreview = SeekPreviewController()
     var publicSubtitleQuery: String = "" // Explicit public metadata only; never infer from URL/title/path.
+    var onVideoMetrics: ((URL, PlaybackVideoMetrics?, Bool) -> Void)? = nil
+    @State private var lastVideoMetrics: PlaybackVideoMetrics?
+    @State private var metricsSettled = false
     @StateObject private var onlineSubtitles = OnlineSubtitleModel()
     @State private var showOnlineSubtitles = false
     @State private var editingSubtitlePosition = false
@@ -841,6 +844,7 @@ struct KSChromePlayer: View {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled else { return }
                 syncTime()
+                publishVideoMetrics(timedOut: Date().timeIntervalSince(start) > 30)
                 if !hasStarted, !failureReported, Date().timeIntervalSince(start) > 30, onPlaybackFailure != nil {
                     failureReported = true
                     onPlaybackFailure?()
@@ -848,6 +852,29 @@ struct KSChromePlayer: View {
                 lut.tick(coordinator.playerLayer?.player as? KSAVPlayer)
             }
         }
+    }
+
+    @MainActor
+    private func publishVideoMetrics(timedOut: Bool) {
+        guard onVideoMetrics != nil, playbackActive else { return }
+        var value: PlaybackVideoMetrics?
+        if let engine = coordinator.playerLayer?.player {
+            if let av = engine as? KSAVPlayer {
+                // Public KSAVPlayer.player is AVQueuePlayer. Unlike KS naturalSize
+                // (loaded asset track), presentationSize follows the playing HLS rendition.
+                let size = av.player.currentItem?.presentationSize ?? .zero
+                value = PlaybackVideoMetrics(width: Double(size.width), height: Double(size.height), evidence: .presentation)
+            } else {
+                // KSMEPlayer exposes selected-track naturalSize, not per-frame evidence.
+                let size = engine.naturalSize
+                value = PlaybackVideoMetrics(width: Double(size.width), height: Double(size.height), evidence: .track)
+            }
+        }
+        let settled = hasStarted || timedOut || failureReported
+        guard value != lastVideoMetrics || settled != metricsSettled else { return }
+        lastVideoMetrics = value
+        metricsSettled = settled
+        onVideoMetrics?(url, value, settled)
     }
 
     private func syncTime() {

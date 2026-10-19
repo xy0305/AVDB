@@ -21,6 +21,7 @@ struct Pan115PlayerView: View {
         ZStack(alignment: .topLeading) {
             Color.black.ignoresSafeArea()
             if let url = vm.playURL, vm.errorMessage == nil, !vm.isLoading {
+                let metricsGeneration = vm.metricsGeneration
                 KSChromePlayer(
                     url: url,
                     title: movie.displayNumber,
@@ -28,13 +29,22 @@ struct Pan115PlayerView: View {
                     headers: vm.headers,
                     progressID: movie.id,
                     supportsFramePreview: vm.supportsFramePreview,
-                    onPlaybackFailure: { Task { await vm.failed() } },
+                    onPlaybackFailure: {
+                        Task {
+                            guard vm.metricsGeneration == metricsGeneration else { return }
+                            await vm.failed()
+                        }
+                    },
                     managesOrientation: false,
                     onSelectSource: { showQuality = true },
                     onSelectEpisode: vm.episodes.count > 1 ? { showEpisodes = true } : nil,
-                    publicSubtitleQuery: movie.displayNumber
+                    publicSubtitleQuery: movie.displayNumber,
+                    onVideoMetrics: { sourceURL, metrics, settled in
+                        vm.receiveMetrics(metrics, settled: settled, url: sourceURL, generation: metricsGeneration)
+                    }
                 )
                 .id(url)
+                .id(metricsGeneration)
             } else if let err = vm.errorMessage {
                 ContentUnavailableView {
                     Label("无法播放", systemImage: "exclamationmark.triangle")
@@ -94,11 +104,11 @@ struct Pan115PlayerView: View {
         .task { await vm.start(movie: movie, magnetURL: magnetURL) }
         .confirmationDialog("播放源", isPresented: $showQuality, titleVisibility: .visible) {
             ForEach(Array(vm.streams.enumerated()), id: \.offset) { _, stream in
-                Button(stream.name) { Task { await vm.select(stream) } }
+                Button((vm.isCurrent(stream) ? "✓ 正在播放 · " : "") + stream.name) { Task { await vm.select(stream) } }
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("原文件的容器、编码及 HDR 支持取决于设备；LUT 仅支持可分析的 SDR。不兼容时可选择 HLS 转码。")
+            Text(vm.resolutionDetail + "\nHDR/编码支持依设备；LUT 仅支持 SDR。不兼容可选 HLS。分辨率不代表原生画质。")
         }
         .confirmationDialog(
             "删除网盘中的当前版本？",
@@ -298,7 +308,27 @@ final class Pan115PlayerViewModel: ObservableObject {
             self?.dismissNotice()
         }
     }
-    private var activeStream: Pan115Client.PlayStream?
+    @Published private(set) var activeStream: Pan115Client.PlayStream?
+    @Published private var videoMetrics = PlaybackMetricsState()
+    var metricsGeneration: Int { videoMetrics.generation }
+    var resolutionDetail: String { videoMetrics.detail }
+
+    func isCurrent(_ stream: Pan115Client.PlayStream) -> Bool {
+        PlaybackMetricsState.isCurrent(name: stream.name, original: stream.isOriginal,
+            activeName: activeStream?.name, activeOriginal: activeStream?.isOriginal)
+    }
+
+    func receiveMetrics(_ metrics: PlaybackVideoMetrics?, settled: Bool, url: URL, generation: Int) {
+        var next = videoMetrics
+        guard next.receive(metrics, settled: settled, url: url, generation: generation) else { return }
+        videoMetrics = next
+        qualityLabel = next.label(original: activeStream?.isOriginal == true)
+    }
+
+    private func clearMetrics(url: URL? = nil) {
+        videoMetrics.reset(url: url)
+        qualityLabel = videoMetrics.label(original: activeStream?.isOriginal == true)
+    }
     private(set) var currentFile: Pan115Client.FileItem?
     var currentEpisode: Pan115Client.FileItem? { currentFile }
     private var refreshing = false
@@ -322,6 +352,7 @@ final class Pan115PlayerViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         playURL = nil
+        clearMetrics()
         streams = []
         defer { isLoading = false }
 
@@ -403,8 +434,9 @@ final class Pan115PlayerViewModel: ObservableObject {
 
     private func activate(_ stream: Pan115Client.PlayStream) {
         activeStream = stream
-        qualityLabel = stream.name
-        playURL = URL(string: stream.url)
+        let url = URL(string: stream.url)
+        clearMetrics(url: url)
+        playURL = url
     }
 
     func failed() async {
@@ -441,6 +473,7 @@ final class Pan115PlayerViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         playURL = nil
+        clearMetrics()
         do {
             try await play(file: episodes[index], cookie: Pan115Settings.shared.cookie)
         } catch {
@@ -464,6 +497,7 @@ final class Pan115PlayerViewModel: ObservableObject {
             episodes = remaining
             if remaining.isEmpty {
                 playURL = nil
+                clearMetrics()
                 currentFile = nil
                 errorMessage = "当前版本已移入 115 回收站，没有其他可播放版本。"
             } else {

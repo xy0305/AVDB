@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        D2150000000000000000000B /* PlaybackVideoMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21500000000000000000001; };
         D2140000000000000000000B /* TPDBPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21400000000000000000001; };
         D2140000000000000000000C /* TPDBCoverSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21400000000000000000002; };
         D2140000000000000000000D /* TPDBArtworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21400000000000000000003; };
@@ -73,6 +74,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        D21500000000000000000001 /* PlaybackVideoMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackVideoMetrics.swift; sourceTree = "<group>"; };
         D21400000000000000000001 /* TPDBPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPDBPolicy.swift; sourceTree = "<group>"; };
         D21400000000000000000002 /* TPDBCoverSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPDBCoverSettings.swift; sourceTree = "<group>"; };
         D21400000000000000000003 /* TPDBArtworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPDBArtworkService.swift; sourceTree = "<group>"; };
@@ -279,6 +281,7 @@
 			children = (
                 A18900000000000000000002 /* OnlineSubtitle.swift */,
 				B08C58091094C960D502C7F8 /* PlayerView.swift */,
+                D21500000000000000000001 /* PlaybackVideoMetrics.swift */,
 				A16600000000000000000002 /* SeekPreview.swift */,
                 AB1620000000000000000002 /* PlaybackAudioSession.swift */,
 				AB1610000000000000000002 /* AVDBAdjustmentPan.swift */,
@@ -478,6 +481,7 @@
 				BC9852482E251643D9E18203 /* ListsView.swift in Sources */,
                 A18900000000000000000001 /* OnlineSubtitle.swift in Sources */,
 				74B43A483CB7C582A66D2A2D /* PlayerView.swift in Sources */,
+                D2150000000000000000000B /* PlaybackVideoMetrics.swift in Sources */,
 				A16600000000000000000001 /* SeekPreview.swift in Sources */,
                 AB1620000000000000000001 /* PlaybackAudioSession.swift in Sources */,
 				AB1610000000000000000001 /* AVDBAdjustmentPan.swift in Sources */,
@@ -561,7 +565,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 214;
+				CURRENT_PROJECT_VERSION = 215;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -584,7 +588,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 214;
+				CURRENT_PROJECT_VERSION = 215;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

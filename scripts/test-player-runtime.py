@@ -1,6 +1,8 @@
 from pathlib import Path
 import subprocess, sys, tempfile
 root=Path(__file__).resolve().parents[1]
+# Mandatory metrics policy + extracted shipping callback-wiring tests on macOS CI.
+subprocess.run([sys.executable, str(root/'scripts/test-video-metrics.py')], check=True)
 s=(root/'AVDB/Views/Player/NativeLUT.swift').read_text()
 if sys.platform != 'darwin':
     print('SKIP actual Swift/CoreImage numerical tests: requires macOS (run in CI)')
