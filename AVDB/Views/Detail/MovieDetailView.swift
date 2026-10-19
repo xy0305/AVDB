@@ -372,7 +372,7 @@ struct MovieDetailView: View {
                 // Lower the entire control row to the reference's ~64% viewport
                 // anchor. This is a minimum, never a fixed height or an overlay:
                 // expanded / accessibility titles grow and push controls down.
-                .frame(minHeight: showCoverTitle ? max(0, geometry.controlsTop - titleTop - 18) : 0,
+                .frame(minHeight: max(0, geometry.controlsTop - titleTop - 18),
                        alignment: .bottom)
                 portraitControls(movie)
                     .padding(.horizontal, 18).padding(.top, 18)
@@ -498,9 +498,9 @@ struct MovieDetailView: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 6).padding(.vertical, 2)
-        // Existing wrapper calls native iOS 26 glassEffect(.regular, in: Capsule())
-        // and ultraThinMaterial on iOS 17–25. No fictitious iOS 27 API.
-        .liquidGlass(interactive: false)
+        // Match play: a truly clear capsule, not glass or a material fill.
+        .background(.clear, in: Capsule())
+        .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("portrait-hero-actions")
     }

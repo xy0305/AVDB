@@ -118,7 +118,12 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(hiddenPlay.waitForExistence(timeout: 10))
         XCTAssertFalse(title.exists, "Hidden title must not remain in accessibility tree")
         XCTAssertFalse(toggle.exists, "Hidden title must remove disclosure too")
-        XCTAssertLessThan(hiddenPlay.frame.minY, shownPlayY - collapsedHeight + 4, "No reserved title/disclosure height")
+        // Title visibility removes text/disclosure, not the shared reference anchor.
+        XCTAssertLessThanOrEqual(hiddenPlay.frame.minY, shownPlayY + 4)
+        if !accessibilitySize && app.frame.width < 600 && app.frame.height > 800 {
+            XCTAssertGreaterThanOrEqual(hiddenPlay.frame.minY / app.frame.height, 0.63)
+            XCTAssertLessThanOrEqual(hiddenPlay.frame.minY / app.frame.height, 0.65)
+        }
         XCTAssertTrue(app.staticTexts["portrait-hero-metadata"].label.contains("DEMO-123"))
         let hidden = XCTAttachment(screenshot: app.screenshot())
         hidden.name = "192-neutral-original-hero-title-hidden"
@@ -554,6 +559,39 @@ final class PosterNavigationTests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "native-neutral-portrait-hero-phone-or-ipad"
         shot.lifetime = .keepAlways; add(shot)
+        let shownPlayY = play.frame.minY
+        app.buttons["返回"].tap()
+        let visibility = app.switches["detail-cover-title-setting"]
+        XCTAssertTrue(visibility.waitForExistence(timeout: 5))
+        tapCoverTitleSwitch(visibility)
+        XCTAssertEqual(visibility.value as? String, "0")
+        app.buttons["neutral-portrait-link"].tap()
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        XCTAssertFalse(title.exists)
+        XCTAssertFalse(app.buttons["detail-title-toggle"].exists)
+        XCTAssertEqual(play.frame.minY, shownPlayY, accuracy: 2, "Short/hidden title retains the same control anchor")
+        if app.frame.width < 600 && app.frame.height > 800 {
+            XCTAssertGreaterThanOrEqual(play.frame.minY / app.frame.height, 0.63)
+            XCTAssertLessThanOrEqual(play.frame.minY / app.frame.height, 0.65)
+        }
+        for name in ["下载资源", "存入清单", "想看", "看过"] {
+            let action = app.buttons[name]
+            XCTAssertTrue(action.isHittable)
+            XCTAssertGreaterThanOrEqual(action.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(action.frame.height, 44)
+            XCTAssertEqual(action.frame.midY, play.frame.midY, accuracy: 2)
+        }
+        let hiddenGeometry = XCTAttachment(string: "display=\(app.frame); hiddenPlay=\(play.frame); ratio=\(play.frame.minY / app.frame.height)")
+        hiddenGeometry.name = "218-neutral-short-title-hidden-anchor"
+        hiddenGeometry.lifetime = .keepAlways; add(hiddenGeometry)
+        let hiddenShot = XCTAttachment(screenshot: app.screenshot())
+        hiddenShot.name = "218-neutral-clear-actions-title-hidden"
+        hiddenShot.lifetime = .keepAlways; add(hiddenShot)
+        app.buttons["返回"].tap()
+        tapCoverTitleSwitch(visibility)
+        XCTAssertEqual(visibility.value as? String, "1")
+        app.buttons["neutral-portrait-link"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
         app.buttons["下载资源"].tap()
         XCTAssertTrue(app.navigationBars["播放与下载资源"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["完成"].isHittable)

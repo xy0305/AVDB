@@ -19,14 +19,24 @@ assert 'HStack(spacing: 12)' in controls
 assert controls.index('portraitPlayButton') < controls.index('portraitActionGroup(movie)')
 assert 'ViewThatFits(in: .horizontal)' in controls and 'VStack(spacing: 12)' in controls
 assert '.accessibilityIdentifier(' not in controls # Must not override child play identity.
-assert 'HStack(spacing: 0)' in actions and '.liquidGlass(interactive: false)' in actions
+assert 'HStack(spacing: 0)' in actions
+assert '.background(.clear, in: Capsule())' in actions
+assert '.overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5))' in actions
+assert not any(x in actions for x in ['.liquidGlass(', '.glassEffect(', '.glassSurface(', 'Material', '.background(.white', '.fill('])
+assert '.padding(.horizontal, 6).padding(.vertical, 2)' in actions
+assert '.frame(width: 44, height: 44)' in actions
+poster_action=s.split('private func posterAction',1)[1].split('#if DEBUG',1)[0]
+assert '.frame(width: 44, height: 44)' in poster_action
+assert '.accessibilityLabel(label)' in poster_action
+assert '.accessibilityIdentifier("portrait-hero-actions")' in actions
 for x in ['showPosterResources = true','MyListsView(movieID: movie.id)','vm.setReviewStatus("want_watch")','vm.setReviewStatus("watched")']:
     assert x in actions,x
 assert '.accessibilityElement(children: .contain)' in actions
 assert 'if #available(iOS 26.0, *)' in glass and 'content.glassEffect(' in glass
 assert 'content.glassSurface(in: Capsule()' in glass and 'shape.fill(.ultraThinMaterial)' in glass
 assert '27.0' not in actions
-assert '.frame(minHeight: showCoverTitle ? max(0, geometry.controlsTop - titleTop - 18) : 0' in hero
+assert '.frame(minHeight: max(0, geometry.controlsTop - titleTop - 18)' in hero
+assert 'minHeight: showCoverTitle ?' not in hero # Hiding the title must not lift the row.
 assert hero.index('DetailReadableTitle') < hero.index('portraitMetadata(movie)') < hero.index('portraitControls(movie)') < hero.index('portrait-hero-synopsis')
 assert '@ScaledMetric(relativeTo: .largeTitle)' in s
 # No unrelated wide-title or action semantics change.
@@ -65,4 +75,4 @@ if shutil.which('swiftc'):
         subprocess.run([str(exe)],check=True)
 else:
     print('SKIP native geometry execution: swiftc unavailable locally; mandatory on macOS CI')
-print('PASS layout wiring: lower shared row, transparent play, native glass/material, all four actions, adaptive title and disclosure')
+print('PASS layout wiring: lower shared row, transparent play and actions, shared glass implementation retained, all four actions, adaptive title and disclosure')

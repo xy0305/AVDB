@@ -161,7 +161,7 @@ assert '@AppStorage("detail.showCoverTitle") private var showCoverTitle = true' 
 assert '@AppStorage("detail.showCoverTitle") private var showCoverTitle = true' in settings
 assert 'Toggle("显示封面标题", isOn: $showCoverTitle)' in settings
 subprocess.run([__import__('sys').executable,str(root/'scripts/test-detail-layout.py')],check=True)
-print('PASS reference portrait title, transparent play, native glass group, 44pt actions and title visibility/disclosure')
+print('PASS reference portrait title, transparent play and action group, 44pt actions and title visibility/disclosure')
 # Ensure the detail-only resolver really keeps auth/session and bounds in production.
 resolver=(root/'AVDB/Services/DetailPosterResolver.swift').read_text()
 for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','DetailPosterSelection.collect','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','CGImageSourceCopyPropertiesAtIndex','kCGImageSourceCreateThumbnailWithTransform','rules.contains(source)','target.path == path','target.query == nil']:
