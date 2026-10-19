@@ -68,3 +68,30 @@ assert 'scene.requestGeometryUpdate' in player and 'attempt < 5' in player
 assert 'analysisGeneration == analysisToken, self.item === item' in lut
 assert 'LUTRevealState.composite(original: source' in lut
 print('PASS build158: app delegate, bounded route host orientation, same-frame wipe and analysis epoch contracts')
+
+# Version chooser must be a real child of the player ZStack, not a transparent sheet.
+route = pan.split('struct PlaybackVersionMenu: View {')[0]
+menu = pan.split('struct PlaybackVersionMenu: View {')[1].split('private struct OfflineCandidate')[0]
+overlay = route.split('if showEpisodes {')[1].split('.zIndex(30)')[0]
+assert route.count('PlaybackVersionMenu(') == 1
+assert route.index('KSChromePlayer(') < route.index('if showEpisodes {') < route.index('.toolbar(.hidden')
+assert '.sheet(isPresented: $showEpisodes)' not in pan
+assert '.presentationBackground' not in pan
+assert 'currentID: vm.currentEpisode?.fileID' in overlay
+assert 'close: { showEpisodes = false }' in overlay
+assert 'let close: () -> Void' in menu and '@Environment' not in menu and 'dismiss()' not in menu
+assert 'Button(action: close)' in menu
+assert 'close(); play(index)' in menu and 'close(); deleteCurrent()' in menu
+assert 'file.fileID == currentID' in menu
+assert '正在播放 ·' in menu and 'selected ? .white' in menu and 'selected ? .black' in menu
+assert 'Text(file.name)' in menu and '.lineLimit(2)' in menu and '.truncationMode(.middle)' in menu
+assert 'GeometryReader' in menu and 'geometry.safeAreaInsets' in menu
+assert 'min(330,' in menu and 'min(contentHeight, availableHeight)' in menu
+assert 'ScrollView {' in menu and '.background(.regularMaterial, in: RoundedRectangle' in menu
+assert 'Color.black.opacity(0.24)' in menu
+assert 'onSelectEpisode: vm.episodes.count > 1 ? { showEpisodes = true } : nil' in route
+assert '.pause(' not in overlay + menu and 'playURL =' not in overlay + menu
+assert 'Task { await vm.deleteEpisode(file) }' in route
+assert 'Button("删除此版本", role: .destructive)' in route
+assert 'let file = pendingDelete' in route and 'pendingDelete = vm.currentEpisode' in overlay
+print('PASS: in-player compact version overlay, bounded filenames, fileID highlight, explicit close and single-file confirmation source contracts (NOT device rendering tests)')

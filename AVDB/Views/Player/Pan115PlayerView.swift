@@ -73,6 +73,19 @@ struct Pan115PlayerView: View {
                 .padding(.leading, 20)
                 .padding(.top, 16)
             }
+
+            // Keep the player mounted: this is an in-player overlay, never a sheet.
+            if showEpisodes {
+                PlaybackVersionMenu(
+                    episodes: vm.episodes,
+                    currentID: vm.currentEpisode?.fileID,
+                    title: episodeTitle,
+                    close: { showEpisodes = false },
+                    play: { index in Task { await vm.selectEpisode(index) } },
+                    deleteCurrent: { pendingDelete = vm.currentEpisode }
+                )
+                .zIndex(30)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar(.hidden, for: .navigationBar)
@@ -86,16 +99,6 @@ struct Pan115PlayerView: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text("原文件的容器、编码及 HDR 支持取决于设备；LUT 仅支持可分析的 SDR。不兼容时可选择 HLS 转码。")
-        }
-        .sheet(isPresented: $showEpisodes) {
-            PlaybackVersionMenu(
-                episodes: vm.episodes,
-                currentID: vm.currentEpisode?.fileID,
-                title: episodeTitle,
-                play: { index in Task { await vm.selectEpisode(index) } },
-                deleteCurrent: { pendingDelete = vm.currentEpisode }
-            )
-            .presentationBackground(.clear)
         }
         .confirmationDialog(
             "删除网盘中的当前版本？",
@@ -132,49 +135,76 @@ struct Pan115PlayerView: View {
     }
 }
 
-private struct PlaybackVersionMenu: View {
+struct PlaybackVersionMenu: View {
     let episodes: [Pan115Client.FileItem]
     let currentID: String?
     let title: (Int, String) -> String
+    let close: () -> Void
     let play: (Int) -> Void
     let deleteCurrent: () -> Void
-    @Environment(\.dismiss) private var dismiss
+
+    private var canDelete: Bool {
+        episodes.count > 1 && episodes.contains { $0.fileID == currentID }
+    }
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.001).ignoresSafeArea().onTapGesture { dismiss() }
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(Array(episodes.enumerated()), id: \.element.fileID) { index, file in
-                        let selected = file.fileID == currentID
-                        Button { dismiss(); play(index) } label: {
-                            VStack(spacing: 2) {
-                                Text(selected ? "正在播放 · \(title(index, file.name))" : title(index, file.name)).font(.body.weight(selected ? .bold : .semibold)).lineLimit(1)
-                                Text(file.name).font(.caption2).lineLimit(1).opacity(0.78)
+        GeometryReader { geometry in
+            let width = min(330, max(0, geometry.size.width - 40))
+            let availableHeight = max(0, geometry.size.height
+                - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom - 32)
+            let contentHeight = CGFloat(episodes.count) * 72 + (canDelete ? 56 : 0) + 12
+            ZStack {
+                Button(action: close) {
+                    Color.black.opacity(0.24).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .ignoresSafeArea()
+                .accessibilityLabel("关闭版本菜单，返回播放")
+                .accessibilityIdentifier("pan115.episode.close")
+
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(Array(episodes.enumerated()), id: \.element.fileID) { index, file in
+                            let selected = file.fileID == currentID
+                            Button { close(); play(index) } label: {
+                                VStack(spacing: 2) {
+                                    Text(selected ? "正在播放 · \(title(index, file.name))" : title(index, file.name))
+                                        .font(.body.weight(selected ? .bold : .semibold))
+                                        .lineLimit(1)
+                                    Text(file.name)
+                                        .font(.caption2)
+                                        .lineLimit(2)
+                                        .truncationMode(.middle)
+                                        .opacity(0.78)
+                                }
+                                .foregroundStyle(selected ? .black : Color(red: 0.20, green: 0.48, blue: 0.96))
+                                .frame(maxWidth: .infinity, minHeight: 64)
+                                .padding(.horizontal, 14)
+                                .background(selected ? .white : Color(white: 0.72), in: Capsule())
+                                .overlay(Capsule().stroke(.white, lineWidth: selected ? 2 : 0))
                             }
-                            .foregroundStyle(selected ? .black : Color(red: 0.20, green: 0.48, blue: 0.96))
-                            .frame(maxWidth: .infinity, minHeight: selected ? 58 : 48)
-                            .padding(.horizontal, 14)
-                            .background(selected ? .white : Color(white: 0.72), in: Capsule())
-                            .overlay(Capsule().stroke(.white, lineWidth: selected ? 2 : 0))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier(selected ? "pan115.episode.current" : "pan115.episode")
-                        .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                    if episodes.count > 1, currentID != nil {
-                        Button("删除当前版本", role: .destructive) { dismiss(); deleteCurrent() }
-                            .font(.body.weight(.semibold)).foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(Color(white: 0.72), in: Capsule())
                             .buttonStyle(.plain)
-                            .accessibilityIdentifier("pan115.delete.current")
-                    }
-                }.padding(10)
+                            .accessibilityIdentifier(selected ? "pan115.episode.current" : "pan115.episode")
+                            .accessibilityAddTraits(selected ? .isSelected : [])
+                        }
+                        if canDelete {
+                            Button("删除当前版本", role: .destructive) { close(); deleteCurrent() }
+                                .font(.body.weight(.semibold)).foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .background(Color(white: 0.72), in: Capsule())
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("pan115.delete.current")
+                        }
+                    }.padding(10)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(width: width, height: min(contentHeight, availableHeight))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+                .accessibilityIdentifier("pan115.episode.menu")
             }
-            .frame(maxWidth: 330, maxHeight: min(520, CGFloat(episodes.count + 1) * 68 + 24))
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
 }
