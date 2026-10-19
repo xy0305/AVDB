@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D2130000000000000000000B /* JavBusPoster.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21300000000000000000001 /* JavBusPoster.swift */; };
         A18900000000000000000001 /* OnlineSubtitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A18900000000000000000002; };
 		A17900000000000000000002 /* JAVLibraryRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17900000000000000000002; };
 		A17900000000000000000001 /* JAVLibrarySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B17900000000000000000001; };
@@ -69,6 +70,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D21300000000000000000001 /* JavBusPoster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavBusPoster.swift; sourceTree = "<group>"; };
         A18900000000000000000002 /* OnlineSubtitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineSubtitle.swift; sourceTree = "<group>"; };
 		B17900000000000000000002 /* JAVLibraryRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVLibraryRankingView.swift; sourceTree = "<group>"; };
 		B17900000000000000000001 /* JAVLibrarySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVLibrarySource.swift; sourceTree = "<group>"; };
@@ -194,6 +196,7 @@
 				B17400000000000000000001 /* MissAVSource.swift */,
 				B17600000000000000000001 /* MissAVMetadata.swift */,
 				B17900000000000000000001 /* JAVLibrarySource.swift */,
+				D21300000000000000000001 /* JavBusPoster.swift */,
 				D18600000000000000000001 /* TenhowPoster.swift */,
 				D18600000000000000000002 /* TenhowActorLinks.swift */,
 				D18300000000000000000001 /* DetailPosterPolicy.swift */,
@@ -443,6 +446,7 @@
 				66B329B8B504D1A4ABD66D6A /* User.swift in Sources */,
 				0B917EE3D4B4BFD8A9400C51 /* APIClient.swift in Sources */,
 				26F8C24EF56C128165FFC52A /* JavDBSignature.swift in Sources */,
+				D2130000000000000000000B /* JavBusPoster.swift in Sources */,
 				D1860000000000000000000B /* TenhowPoster.swift in Sources */,
 				D1860000000000000000000C /* TenhowActorLinks.swift in Sources */,
 				D1830000000000000000000B /* DetailPosterPolicy.swift in Sources */,
@@ -545,7 +549,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 212;
+				CURRENT_PROJECT_VERSION = 213;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -568,7 +572,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 212;
+				CURRENT_PROJECT_VERSION = 213;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

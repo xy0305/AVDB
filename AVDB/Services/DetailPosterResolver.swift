@@ -49,6 +49,7 @@ private final class AmazonPosterRedirectGuard: NSObject, URLSessionTaskDelegate 
 enum DetailPosterResolver {
     private static let cache = DetailPosterCache<DetailPosterArtwork>()
     private static let amazonPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
+    private static let javbusPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 30 * 60)
     private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
 
     static func navigationSeed(_ movie: Movie, movieID: String) -> Movie? {
@@ -139,7 +140,15 @@ enum DetailPosterResolver {
                     await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
                 }
             }
-            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover) { source, timeout in
+            let supplemental: (@Sendable (TimeInterval) async -> [String])?
+            if original || JavBusPoster.number(movie.number ?? "") == nil {
+                supplemental = nil
+            } else {
+                supplemental = { @Sendable timeout in
+                    await discoverJavBus(number: movie.number ?? "", timeout: timeout)
+                }
+            }
+            let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover, supplemental: supplemental) { source, timeout in
                 guard let url = URL(string: source) else { return nil }
                 return await download(url: url, timeout: timeout, derive: !original)
             }
@@ -150,6 +159,38 @@ enum DetailPosterResolver {
             // independently downsampled source cache, is the only warm fast path.
             return await artwork(image: selected.image, source: winner.source, derive: false)
         }
+    }
+
+    private static func discoverJavBus(number: String, timeout: TimeInterval) async -> [String] {
+        guard timeout > 0, !Task.isCancelled, let url = JavBusPoster.page(number: number) else { return [] }
+        // Cookie-free, one exact page, no automatic age confirmation, aliases or
+        // cross-host redirects. An age/WAF/error result is a 30-minute miss.
+        let html = await javbusPages.value(key: url.absoluteString) {
+            let config = URLSessionConfiguration.ephemeral
+            config.httpCookieStorage = nil; config.httpShouldSetCookies = false
+            config.urlCredentialStorage = nil; config.urlCache = nil
+            config.timeoutIntervalForRequest = timeout; config.timeoutIntervalForResource = timeout
+            let session = URLSession(configuration: config, delegate: PosterRedirectGuard(url: url), delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            do {
+                var request = URLRequest(url: url); request.timeoutInterval = timeout
+                request.setValue("text/html", forHTTPHeaderField: "Accept")
+                let (bytes, response) = try await session.bytes(for: request)
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                      response.url == url, response.expectedContentLength <= 768 * 1024 else { return nil }
+                var data = Data()
+                for try await byte in bytes {
+                    try Task.checkCancellation()
+                    guard data.count < 768 * 1024 else { return nil }
+                    data.append(byte)
+                }
+                guard let html = String(data: data, encoding: .utf8),
+                      !(try JavBusPoster.images(html: html, number: number, finalURL: url)).isEmpty else { return nil }
+                return html
+            } catch { return nil }
+        }
+        guard !Task.isCancelled, let html else { return [] }
+        return (try? JavBusPoster.images(html: html, number: number, finalURL: url)) ?? []
     }
 
     private static func discoverTenhow(paths: [String], number: String, namespace: String, timeout: TimeInterval) async -> [String] {
@@ -264,7 +305,8 @@ enum DetailPosterResolver {
                 kCGImageSourceThumbnailMaxPixelSize: max(rawWidth, rawHeight)
               ] as CFDictionary) else { return nil }
         var cropped = false
-        if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: sourceURL) {
+        let javbusJacket = URL(string: sourceURL).map(JavBusPoster.allowedImage) == true
+        if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: sourceURL, validatedJacket: javbusJacket) {
             guard let front = cg.cropping(to: rect) else { return nil }
             cg = front; cropped = true
         }

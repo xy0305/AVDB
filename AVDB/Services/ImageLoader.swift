@@ -222,8 +222,8 @@ public enum FrontPosterPolicy {
         return result
     }
 
-    public static func cropRect(width: Int, height: Int, source: String) -> CGRect? {
-        guard width > 0, height > 0, isKnownWrap(source) else { return nil }
+    public static func cropRect(width: Int, height: Int, source: String, validatedJacket: Bool = false) -> CGRect? {
+        guard width > 0, height > 0, isKnownWrap(source) || validatedJacket else { return nil }
         let ratio = Double(width) / Double(height)
         // Standard DVD jacket only; never blindly slice arbitrary landscape photos.
         guard (1.35...1.65).contains(ratio) else { return nil }

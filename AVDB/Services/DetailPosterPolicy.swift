@@ -33,6 +33,7 @@ enum DetailPosterSelection {
     static let totalBudget: TimeInterval = 12
     static func collect<Value: Sendable>(sources: [String], budget: TimeInterval = totalBudget,
         discover: (@Sendable (TimeInterval) async -> [String])? = nil,
+        supplemental: (@Sendable (TimeInterval) async -> [String])? = nil,
         operation: @escaping @Sendable (String, TimeInterval) async -> Value?) async -> [Value] {
         guard !Task.isCancelled, budget > 0 else { return [] }
         var seen = Set<String>()
@@ -49,6 +50,12 @@ enum DetailPosterSelection {
                 return (-1, nil, [])
             }
             var discovering = discover != nil
+            var extra: [String] = []
+            if let supplemental {
+                // One opportunistic metadata request. Never wait for it after the
+                // baseline completes, and never replace any baseline image slot.
+                group.addTask { (-3, nil, await supplemental(min(1.2, budget))) }
+            }
             if let discover {
                 group.addTask { (-2, nil, await discover(min(4, budget))) }
             }
@@ -83,9 +90,17 @@ enum DetailPosterSelection {
                     for fallback in originals where candidates.count < maxAttempts {
                         if !candidates.contains(fallback) { candidates.append(fallback) }
                     }
+                } else if index == -3 {
+                    extra = discovered
                 } else {
                     active -= 1
                     if let value { values.append(value) }
+                }
+                if !discovering {
+                    for source in extra where candidates.count < maxAttempts {
+                        if !candidates.contains(source) { candidates.append(source) }
+                    }
+                    extra = []
                 }
                 while active < concurrency && next < candidates.count && (!discovering || next < 2) && ProcessInfo.processInfo.systemUptime < deadline {
                     enqueue(next); next += 1; active += 1

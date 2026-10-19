@@ -173,3 +173,7 @@ else:
         p=Path(td); (p/'main.swift').write_text(dependencies+'\n'+policy+'\n'+cache+'\n'+tests)
         subprocess.run(['swiftc','-parse-as-library',str(p/'main.swift'),'-o',str(p/'test')],check=True)
         subprocess.run([str(p/'test')],check=True,timeout=30)
+
+# Build-ipa already executes this entry point: new JavBus Swift regressions are
+# mandatory on the same macOS runner, not merely an unreferenced test script.
+subprocess.run([__import__('sys').executable,str(root/'scripts/test-javbus-posters.py')],check=True)
