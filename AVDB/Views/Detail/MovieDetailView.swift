@@ -12,6 +12,7 @@ struct MovieDetailView: View {
     let movieID: String
     @StateObject private var vm: MovieDetailViewModel
     @AppStorage("detail.showCoverTitle") private var showCoverTitle = true
+    @ScaledMetric(relativeTo: .largeTitle) private var portraitTitleSize: CGFloat = 34
     @State private var play115 = false
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
@@ -330,9 +331,10 @@ struct MovieDetailView: View {
 
     private func portraitHero(_ movie: Movie, art: DetailPosterArtwork?) -> some View {
         let tint = art?.tint ?? UIColor(red: 0.16, green: 0.16, blue: 0.18, alpha: 1)
-        let width = max(320, min(layoutSize.width, AdaptiveLayout.isPad ? 900 : 600))
-        let imageHeight = min(width * 1.58, max(600, layoutSize.height * 0.8))
-        let titleTop = min(width * 0.99, max(390, layoutSize.height * 0.47))
+        let geometry = DetailPortraitGeometry(availableSize: layoutSize, isPad: AdaptiveLayout.isPad)
+        let width = geometry.width
+        let imageHeight = geometry.imageHeight
+        let titleTop = geometry.titleTop
         return ZStack(alignment: .top) {
             Group {
                 if let art {
@@ -355,63 +357,30 @@ struct MovieDetailView: View {
             ], startPoint: .top, endPoint: .bottom)
             .frame(height: imageHeight + 30)
             VStack(alignment: .leading, spacing: 0) {
-                if showCoverTitle {
-                    DetailReadableTitle(title: movie.displayTitle,
-                                        identifier: art == nil ? "resolving-hero-title" : "portrait-hero-title",
-                                        font: .system(size: AdaptiveLayout.isPad ? 42 : 34, weight: .bold))
-                        .shadow(color: .black.opacity(0.25), radius: 8)
-                        .padding(.horizontal, 40)
-                }
-                HStack(spacing: 7) {
-                    Text(movie.displayNumber).fixedSize()
-                        .padding(.horizontal, 4).overlay(RoundedRectangle(cornerRadius: 3).stroke(.white.opacity(0.9)))
-                    if let date = movie.releaseDate { Text(date).fixedSize() }
-                    if let tags = movie.tags, !tags.isEmpty {
-                        Text(tags.compactMap(\.name).joined(separator: ", "))
-                            .lineLimit(1).truncationMode(.tail).layoutPriority(-1)
+                VStack(alignment: .leading, spacing: 0) {
+                    if showCoverTitle {
+                        DetailReadableTitle(title: movie.displayTitle,
+                                            identifier: art == nil ? "resolving-hero-title" : "portrait-hero-title",
+                                            font: .system(size: portraitTitleSize * (AdaptiveLayout.isPad ? 1.24 : 1), weight: .bold),
+                                            collapsedLines: 2)
+                            .shadow(color: .black.opacity(0.25), radius: 8)
+                            .padding(.horizontal, 32)
                     }
-                    if let minutes = movie.duration { Text("\(minutes / 60) 小时 \(minutes % 60) 分钟").fixedSize() }
-                    if movie.hasCnsub == true { Text("中字").fixedSize() }
+                    portraitMetadata(movie)
+                        .padding(.horizontal, 18).padding(.top, 16)
                 }
-                .font(.system(size: 12, weight: .semibold))
-                .padding(.horizontal, 18).padding(.top, 18)
-                Button {
-                    GlassHaptic.tap()
-                    play115 = true
-                } label: {
-                    Label("播放", systemImage: "play.fill")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.65), radius: 2, y: 1)
-                        .frame(maxWidth: .infinity).frame(minHeight: 44)
-                        .background(.clear, in: RoundedRectangle(cornerRadius: 17))
-                        .overlay(RoundedRectangle(cornerRadius: 17).stroke(.white.opacity(0.72), lineWidth: 1.5))
-                        // Keep the original 44-point hit area without covering the poster.
-                        .padding(.vertical, 1)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 40).padding(.top, 8)
-                .accessibilityIdentifier("portrait-hero-play")
-                HStack(spacing: 28) {
-                    posterAction("arrow.down.circle", label: "下载资源") { showPosterResources = true }
-                    NavigationLink { MyListsView(movieID: movie.id) } label: {
-                        Image(systemName: "rectangle.stack.badge.plus")
-                            .font(.system(size: 23, weight: .regular)).frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.accessibilityLabel("存入清单")
-                    posterAction(vm.reviewStatus == "want_watch" ? "heart.fill" : "heart", label: "想看") {
-                        Task { await vm.setReviewStatus("want_watch") }
-                    }
-                    posterAction(vm.reviewStatus == "watched" ? "checkmark.rectangle.fill" : "checkmark.rectangle", label: "看过") {
-                        Task { await vm.setReviewStatus("watched") }
-                    }
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity).padding(.top, 12)
-                .accessibilityIdentifier("portrait-hero-actions")
+                // Lower the entire control row to the reference's ~64% viewport
+                // anchor. This is a minimum, never a fixed height or an overlay:
+                // expanded / accessibility titles grow and push controls down.
+                .frame(minHeight: showCoverTitle ? max(0, geometry.controlsTop - titleTop - 18) : 0,
+                       alignment: .bottom)
+                portraitControls(movie)
+                    .padding(.horizontal, 18).padding(.top, 18)
                 if let summary = movie.summary, !summary.isEmpty {
-                    Text(summary).font(.system(size: 13)).multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity).padding(.horizontal, 32).padding(.top, 22)
+                    Text(summary).font(.subheadline).multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 18).padding(.top, 18)
+                        .accessibilityIdentifier("portrait-hero-synopsis")
                 } else {
                     Text("「\(movie.displayNumber)」").font(.system(size: 13))
                         .frame(maxWidth: .infinity).padding(.top, 22)
@@ -450,7 +419,7 @@ struct MovieDetailView: View {
                         }.padding(.horizontal, 18)
                     }.padding(.horizontal, -18)
                 }
-                .padding(.horizontal, 18).padding(.top, 76)
+                .padding(.horizontal, 18).padding(.top, 30)
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("portrait-hero-resources")
             }
@@ -459,6 +428,80 @@ struct MovieDetailView: View {
         }
         .foregroundStyle(.white)
         .frame(width: width)
+    }
+
+    // Text wraps at narrow widths / accessibility sizes instead of forcing the
+    // metadata or controls outside the available detail width.
+    private func portraitMetadata(_ movie: Movie) -> some View {
+        let values = [movie.displayNumber, movie.releaseDate,
+                      movie.duration.map { "\($0 / 60) 小时 \($0 % 60) 分钟" },
+                      movie.hasCnsub == true ? "中字" : nil].compactMap { $0 }
+        return Text(values.joined(separator: " · "))
+            .font(.subheadline.weight(.semibold))
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("portrait-hero-metadata")
+    }
+
+    private func portraitControls(_ movie: Movie) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                portraitPlayButton.frame(maxWidth: .infinity)
+                portraitActionGroup(movie)
+            }
+            // Large Dynamic Type can need a full-width play label. Never shrink
+            // the four existing 44pt action hit targets to keep a single row.
+            VStack(spacing: 12) {
+                portraitPlayButton.frame(maxWidth: .infinity)
+                portraitActionGroup(movie).frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+        .accessibilityIdentifier("portrait-hero-controls")
+    }
+
+    private var portraitPlayButton: some View {
+        Button {
+            GlassHaptic.tap()
+            play115 = true
+        } label: {
+            Label("播放", systemImage: "play.fill")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.65), radius: 2, y: 1)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                // Intentionally no material, glass or white fill on play.
+                .background(.clear, in: Capsule())
+                .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("portrait-hero-play")
+    }
+
+    private func portraitActionGroup(_ movie: Movie) -> some View {
+        HStack(spacing: 0) {
+            posterAction("arrow.down.circle", label: "下载资源") { showPosterResources = true }
+            NavigationLink { MyListsView(movieID: movie.id) } label: {
+                Image(systemName: "rectangle.stack.badge.plus")
+                    .font(.system(size: 21, weight: .regular))
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }.accessibilityLabel("存入清单")
+            posterAction(vm.reviewStatus == "want_watch" ? "heart.fill" : "heart", label: "想看") {
+                Task { await vm.setReviewStatus("want_watch") }
+            }
+            posterAction(vm.reviewStatus == "watched" ? "checkmark.rectangle.fill" : "checkmark.rectangle", label: "看过") {
+                Task { await vm.setReviewStatus("watched") }
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        // Existing wrapper calls native iOS 26 glassEffect(.regular, in: Capsule())
+        // and ultraThinMaterial on iOS 17–25. No fictitious iOS 27 API.
+        .liquidGlass(interactive: false)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("portrait-hero-actions")
     }
 
     private func posterAction(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
@@ -1957,6 +2000,23 @@ struct DetailHeroFixtureGallery: View {
 }
 #endif
 
+// MARK: - Portrait viewport policy (also exercised by the native regression)
+struct DetailPortraitGeometry {
+    let width: CGFloat
+    let imageHeight: CGFloat
+    let titleTop: CGFloat
+    let controlsTop: CGFloat
+
+    init(availableSize: CGSize, isPad: Bool) {
+        width = max(1, min(availableSize.width, isPad ? 900 : 600))
+        imageHeight = min(width * 1.58, max(600, availableSize.height * 0.8))
+        titleTop = min(width * 1.06, max(390, availableSize.height * 0.50))
+        // Reference control row starts around 64% of the portrait viewport.
+        // On short / rotated windows preserve readable title space and scrolling.
+        controlsTop = max(titleTop + 110, min(width * 1.42, availableSize.height * 0.64))
+    }
+}
+
 // Two invisible measurements use the exact same SwiftUI font and wrapping width
 // as the readable title, including Japanese and accessibility Dynamic Type.
 private struct DetailTitleHeights: PreferenceKey {
@@ -1970,19 +2030,20 @@ private struct DetailReadableTitle: View {
     let title: String
     let identifier: String
     var font: Font = .title2.weight(.bold)
+    var collapsedLines: Int = 3
     @State private var expanded = false
     @State private var truncated = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            titleText.lineLimit(expanded ? nil : 3)
+            titleText.lineLimit(expanded ? nil : collapsedLines)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier(identifier)
                 .background(alignment: .topLeading) {
                     VStack(spacing: 0) {
-                        titleText.lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                        titleText.lineLimit(collapsedLines).fixedSize(horizontal: false, vertical: true)
                             .background { GeometryReader { proxy in
-                                Color.clear.preference(key: DetailTitleHeights.self, value: ["three": proxy.size.height])
+                                Color.clear.preference(key: DetailTitleHeights.self, value: ["collapsed": proxy.size.height])
                             } }
                         titleText.fixedSize(horizontal: false, vertical: true)
                             .background { GeometryReader { proxy in
@@ -2003,7 +2064,7 @@ private struct DetailReadableTitle: View {
             }
         }
         .onPreferenceChange(DetailTitleHeights.self) { heights in
-            truncated = (heights["full"] ?? 0) > (heights["three"] ?? 0) + 1
+            truncated = (heights["full"] ?? 0) > (heights["collapsed"] ?? 0) + 1
         }
     }
     private var titleText: some View {

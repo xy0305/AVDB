@@ -142,22 +142,26 @@ actor SelectionProbe {
  }
 }
 '''
-# User-requested recovery: original fill hero and original action strip, not build191.
+# Build217 intentionally replaces the separate full-width action strip with the
+# reference layout. Retain all image selection / safety tests above and below.
 detail=(root/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
 settings=(root/'AVDB/Views/User/UserView.swift').read_text()
 portrait=detail.split('private func portraitHero',1)[1].split('private func posterAction',1)[0]
-for literal in ['scaledToFill()', 'width * 1.58', 'width * 0.99', 'location: 0.36', 'location: 0.86', 'HStack(spacing: 28)', '.background(.clear, in: RoundedRectangle(cornerRadius: 17))', '.frame(width: 44, height: 44)', 'if showCoverTitle', 'DetailReadableTitle']:
+for literal in ['scaledToFill()', 'location: 0.36', 'location: 0.86',
+                'DetailPortraitGeometry(availableSize: layoutSize', 'portraitControls(movie)',
+                '.frame(width: 44, height: 44)', 'if showCoverTitle', 'DetailReadableTitle',
+                'collapsedLines: 2', 'geometry.controlsTop - titleTop - 18']:
     assert literal in portrait,literal
-assert 'LazyVGrid' not in portrait  # The unrelated screenshots gallery remains a grid.
-for forbidden in ['DetailActionGlass', 'detailActions(movie)', 'glassEffect(']:
-    assert forbidden not in detail,forbidden
-assert 'lineLimit(expanded ? nil : 3)' in detail
-assert 'truncated = (heights["full"] ?? 0) > (heights["three"] ?? 0) + 1' in detail
+assert 'LazyVGrid' not in portrait
+assert 'lineLimit(expanded ? nil : collapsedLines)' in detail
+assert 'var collapsedLines: Int = 3' in detail # Landscape unchanged.
+assert 'truncated = (heights["full"] ?? 0) > (heights["collapsed"] ?? 0) + 1' in detail
 assert '.hidden().accessibilityHidden(true).allowsHitTesting(false)' in detail
 assert '@AppStorage("detail.showCoverTitle") private var showCoverTitle = true' in detail
 assert '@AppStorage("detail.showCoverTitle") private var showCoverTitle = true' in settings
 assert 'Toggle("显示封面标题", isOn: $showCoverTitle)' in settings
-print('PASS restored fill hero, white play, original 44pt action strip, three-line disclosure and persistent visibility wiring')
+subprocess.run([__import__('sys').executable,str(root/'scripts/test-detail-layout.py')],check=True)
+print('PASS reference portrait title, transparent play, native glass group, 44pt actions and title visibility/disclosure')
 # Ensure the detail-only resolver really keeps auth/session and bounds in production.
 resolver=(root/'AVDB/Services/DetailPosterResolver.swift').read_text()
 for literal in ['URLSessionConfiguration.ephemeral','config.httpCookieStorage = nil','config.httpShouldSetCookies = false','config.urlCredentialStorage = nil','DetailPosterSelection.collect','12 * 1024 * 1024','Task.checkCancellation()','SHA256.hash','CGImageSourceCopyPropertiesAtIndex','kCGImageSourceCreateThumbnailWithTransform','rules.contains(source)','target.path == path','target.query == nil']:

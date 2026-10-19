@@ -56,7 +56,7 @@ final class PosterNavigationTests: XCTestCase {
         app.buttons["neutral-portrait-link"].tap()
         let title = app.staticTexts["portrait-hero-title"]
         XCTAssertTrue(title.waitForExistence(timeout: 15))
-        XCTAssertLessThanOrEqual(title.frame.height, 180, "Default is at most three old-size lines")
+        XCTAssertLessThanOrEqual(title.frame.height, accessibilitySize ? 400 : 125, "Portrait title collapses to two scaled lines")
         XCTAssertGreaterThan(title.frame.minY, app.buttons["返回"].frame.maxY, "Title stays over the original lower hero")
         let toggle = app.buttons["detail-title-toggle"]
         let reviewPanel = app.descendants(matching: .any)["detail-reviews-panel"].firstMatch
@@ -119,7 +119,7 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertFalse(title.exists, "Hidden title must not remain in accessibility tree")
         XCTAssertFalse(toggle.exists, "Hidden title must remove disclosure too")
         XCTAssertLessThan(hiddenPlay.frame.minY, shownPlayY - collapsedHeight + 4, "No reserved title/disclosure height")
-        XCTAssertTrue(app.staticTexts["DEMO-123"].exists)
+        XCTAssertTrue(app.staticTexts["portrait-hero-metadata"].label.contains("DEMO-123"))
         let hidden = XCTAttachment(screenshot: app.screenshot())
         hidden.name = "192-neutral-original-hero-title-hidden"
         hidden.lifetime = .keepAlways; add(hidden)
@@ -358,6 +358,7 @@ final class PosterNavigationTests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 5), .completed)
             XCTAssertTrue(app.staticTexts["subtitle.selection.feedback"].waitForExistence(timeout: 3), "选中字幕后必须在结果处显示反馈")
             XCTAssertTrue(app.staticTexts["subtitle.selection.feedback"].label.contains("已加载"))
+            XCTAssertTrue(app.otherElements["subtitle.selection.box"].waitForExistence(timeout: 3), "选中字幕必须显示选中框")
             // Completion stays pinned even after scrolling down to the result.
             XCTAssertTrue(app.buttons["subtitle.panel.done"].isHittable)
             app.buttons["subtitle.panel.done"].tap()
@@ -528,7 +529,24 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(back.frame.minY, 24, "Back must clear the status bar safe area")
         XCTAssertGreaterThanOrEqual(play.frame.height, 44)
         XCTAssertGreaterThan(title.frame.minY, back.frame.maxY)
-        XCTAssertLessThan(title.frame.maxY, play.frame.minY, "Original overlay title precedes old white play button")
+        XCTAssertLessThan(title.frame.maxY, play.frame.minY, "Separate lower title precedes transparent play")
+        let metadata = app.staticTexts["portrait-hero-metadata"]
+        XCTAssertTrue(metadata.exists)
+        XCTAssertGreaterThan(metadata.frame.minY, title.frame.maxY)
+        XCTAssertLessThan(metadata.frame.maxY, play.frame.minY)
+        for name in ["下载资源", "存入清单", "想看", "看过"] {
+            let action = app.buttons[name]
+            XCTAssertTrue(action.isHittable, name)
+            XCTAssertGreaterThanOrEqual(action.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(action.frame.height, 44)
+            XCTAssertGreaterThan(action.frame.minX, play.frame.maxX, "Glass actions stay to the right of play")
+            XCTAssertEqual(action.frame.midY, play.frame.midY, accuracy: 2, "One shared control row")
+        }
+        if app.frame.width < 600 && app.frame.height > 800 {
+            XCTAssertGreaterThanOrEqual(play.frame.minY / app.frame.height, 0.61,
+                                       "Build217 must lower controls; old ~51% row is unacceptable")
+            XCTAssertLessThanOrEqual(play.frame.minY / app.frame.height, 0.73)
+        }
         XCTAssertFalse(app.buttons["detail-title-toggle"].exists, "Short titles need no expansion control")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "native-neutral-portrait-hero-phone-or-ipad"

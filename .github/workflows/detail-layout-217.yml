@@ -1,0 +1,68 @@
+name: Build217 Neutral Detail Layout
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths:
+      - 'AVDB/Views/Detail/**'
+      - 'UITests/PosterNavigationTests.swift'
+      - 'scripts/test-detail-layout.py'
+      - '.github/workflows/detail-layout-217.yml'
+permissions:
+  contents: read
+concurrency:
+  group: neutral-detail-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  layout:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare existing native neutral fixture scheme
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          ruby scripts/setup-poster-uitests.rb
+          pod install --repo-update
+          xcodebuild -version
+          python3 scripts/test-detail-layout.py
+      - name: Select iPhone and iPad simulators
+        run: |
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          python3 - <<'PY'
+          import json, os
+          devices = json.load(open(os.environ['RUNNER_TEMP']+'/devices.json'))['devices']
+          devices = [d for group in devices.values() for d in group]
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              for kind, key in [('iPhone','IPHONE_UDID'), ('iPad','IPAD_UDID')]:
+                  matches = [d for d in devices if kind in d['name']]
+                  assert matches, kind
+                  chosen = matches[0]
+                  print(kind, chosen['name'], chosen['udid'])
+                  f.write(key+'='+chosen['udid']+'\n')
+          PY
+      - name: Compile simulator Metal resource
+        run: |
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Neutral iPhone reference geometry, title expansion and accessibility
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/LayoutDerived" -resultBundlePath "$RUNNER_TEMP/PhoneLayout.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testConditionalPortraitHeroRealDetailAndWideFallback -only-testing:PosterNavigationUITests/PosterNavigationTests/testLongDetailTitleThreeLinesExpandsAndPersistsVisibility -only-testing:PosterNavigationUITests/PosterNavigationTests/testAccessibleDetailTitleAndLandscapeActions 2>&1 | tee "$RUNNER_TEMP/phone-layout.log"
+      - name: Neutral iPad reference geometry and wide fallback
+        if: success() || failure()
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/LayoutDerived" -resultBundlePath "$RUNNER_TEMP/PadLayout.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testConditionalPortraitHeroRealDetailAndWideFallback 2>&1 | tee "$RUNNER_TEMP/pad-layout.log"
+      - name: Export neutral UI attachments
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/layout-evidence/phone" "$RUNNER_TEMP/layout-evidence/pad"
+          if test -d "$RUNNER_TEMP/PhoneLayout.xcresult"; then xcrun xcresulttool export attachments --path "$RUNNER_TEMP/PhoneLayout.xcresult" --output-path "$RUNNER_TEMP/layout-evidence/phone"; fi
+          if test -d "$RUNNER_TEMP/PadLayout.xcresult"; then xcrun xcresulttool export attachments --path "$RUNNER_TEMP/PadLayout.xcresult" --output-path "$RUNNER_TEMP/layout-evidence/pad"; fi
+          cp "$RUNNER_TEMP/"*-layout.log "$RUNNER_TEMP/layout-evidence/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build217-neutral-layout-${{ github.run_number }}
+          path: ${{ runner.temp }}/layout-evidence/
+          retention-days: 14
