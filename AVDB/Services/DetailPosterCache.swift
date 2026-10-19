@@ -78,6 +78,15 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
         }
     }
 
+    func invalidate() {
+        let abandoned: [Task<Value?, Never>] = locked {
+            let tasks = flights.values.map(\.task)
+            flights.removeAll(); entries.removeAll()
+            return tasks
+        }
+        abandoned.forEach { $0.cancel() }
+    }
+
     private func cancel(key: String, id: UUID, user: UUID) {
         let abandoned: Task<Value?, Never>? = locked {
             guard var flight = flights[key], flight.id == id else { return nil }

@@ -20,13 +20,16 @@ struct MovieDetailView: View {
 
     private var posterRequestKey: String {
         guard let movie = posterMovie else { return "pending#\(movieID)#\(posterAccountEpoch)" }
-        return DetailPosterResolver.identity(movie: movie, account: APIClient.shared.token) + "#\(posterAccountEpoch)"
+        let western = movie.type == "2" ? "#" + TPDBCoverSettings.shared.namespace.uuidString + "#" + (movie.originTitle ?? movie.title ?? "") + "#" + (movie.releaseDate ?? "") + "#" + String(movie.duration ?? 0) + "#" + (movie.originalURL ?? "") : ""
+        return DetailPosterResolver.identity(movie: movie, account: APIClient.shared.token) + "#\(posterAccountEpoch)" + western
     }
 
     private var posterLayout: DetailPosterLayout<DetailPosterArtwork> {
         // Never paint a previous movie/account/source while a new task is scheduled.
         if let presentation = posterPresentation, presentation.key == posterRequestKey { return presentation.layout }
         guard let movie = posterMovie else { return .resolving }
+        // Western artwork is always the independent landscape path, never DVD front.
+        if movie.type == "2" { return .landscape }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
             if movie.id == "neutral-wide" { return .landscape }
@@ -39,6 +42,9 @@ struct MovieDetailView: View {
     private var posterArtwork: DetailPosterArtwork? { posterLayout.artwork }
     private var usesLandscapeLayout: Bool { posterLayout.isLandscape }
     @State private var showPosterResources = false
+    @State private var tpdbArtwork: TPDBLandscape?
+    @State private var tpdbArtworkKey = ""
+    private var activeTPDBArtwork: TPDBLandscape? { tpdbArtworkKey == posterRequestKey ? tpdbArtwork : nil }
     @State private var posterAccountEpoch = UUID()
     @State private var reviewPanelHeight: CGFloat = 76
     @StateObject private var reviewsVM = ReviewsListViewModel()
@@ -133,6 +139,17 @@ struct MovieDetailView: View {
             set: { if !$0 { vm.errorMessage = nil } }
         )) { Button("好", role: .cancel) { vm.errorMessage = nil } }
         message: { Text(vm.errorMessage ?? "") }
+        .onReceive(NotificationCenter.default.publisher(for: .tpdbCoverChanged)) { _ in
+            tpdbArtwork = nil; tpdbArtworkKey = ""; posterAccountEpoch = UUID()
+        }
+        .task(id: posterRequestKey + "#tpdb") {
+            let key = posterRequestKey
+            tpdbArtwork = nil; tpdbArtworkKey = ""
+            guard let movie = posterMovie, movie.type == "2" else { return }
+            let result = await TPDBArtworkService.resolve(movie: movie, namespace: DetailPosterResolver.identity(movie: movie, account: APIClient.shared.token))
+            guard !Task.isCancelled, posterRequestKey == key else { return }
+            tpdbArtwork = result; tpdbArtworkKey = key
+        }
         .task(id: posterRequestKey) {
             guard let movie = posterMovie else { return }
             let key = posterRequestKey
@@ -475,16 +492,22 @@ struct MovieDetailView: View {
             }
 
             ZStack(alignment: .bottomTrailing) {
-                JavDBImage(
-                    // 优先顺序：JAVDB cover_url 无水印 → 首张剧照 → DMM 横版 → Tenhow 竖版
-                    url: movie.coverURL,
-                    fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
-                    secondFallbackURL: movie.hdBackdropURL,
-                    contentMode: .fill
-                )
-                .frame(maxWidth: .infinity)
-                .aspectRatio(1.47, contentMode: .fit)
-                .clipped()
+                if let art = activeTPDBArtwork {
+                    Image(uiImage: art.image).resizable().scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("tpdb-landscape-artwork")
+                } else {
+                    JavDBImage(
+                        // 优先顺序：JAVDB cover_url 无水印 → 首张剧照 → DMM 横版 → Tenhow 竖版
+                        url: movie.coverURL,
+                        fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
+                        secondFallbackURL: movie.hdBackdropURL,
+                        contentMode: .fill
+                    )
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(1.47, contentMode: .fit)
+                    .clipped()
+                }
 
                 Button {
                     GlassHaptic.tap()
@@ -502,6 +525,10 @@ struct MovieDetailView: View {
                 .accessibilityIdentifier("landscape-hero-play")
             }
             .liquidCover(cornerRadius: 16)
+            if let art = activeTPDBArtwork {
+                Text(art.label).font(.caption2).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("tpdb-artwork-source")
+            }
 
             movieInfoCard(movie)
 

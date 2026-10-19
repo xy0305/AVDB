@@ -177,3 +177,4 @@ else:
 # Build-ipa already executes this entry point: new JavBus Swift regressions are
 # mandatory on the same macOS runner, not merely an unreferenced test script.
 subprocess.run([__import__('sys').executable,str(root/'scripts/test-javbus-posters.py')],check=True)
+subprocess.run([__import__('sys').executable,str(root/'scripts/test-tpdb-posters.py')],check=True)

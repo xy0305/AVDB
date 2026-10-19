@@ -221,6 +221,12 @@ struct UserView: View {
 
                 Section("来源") {
                     NavigationLink {
+                        TPDBCoverSettingsView()
+                    } label: {
+                        Label("欧美封面 / ThePornDB", systemImage: "photo.on.rectangle")
+                    }
+                    .accessibilityIdentifier("tpdb-settings-entry")
+                    NavigationLink {
                         ExternalLibrarySettingsView()
                     } label: {
                         Label("外部数据库", systemImage: "externaldrive.badge.person.crop")
