@@ -88,15 +88,14 @@ struct Pan115PlayerView: View {
             Text("原文件的容器、编码及 HDR 支持取决于设备；LUT 仅支持可分析的 SDR。不兼容时可选择 HLS 转码。")
         }
         .sheet(isPresented: $showEpisodes) {
-            PlaybackVersionSheet(
+            PlaybackVersionMenu(
                 episodes: vm.episodes,
                 currentID: vm.currentEpisode?.fileID,
                 title: episodeTitle,
                 play: { index in Task { await vm.selectEpisode(index) } },
                 deleteCurrent: { pendingDelete = vm.currentEpisode }
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .presentationBackground(.clear)
         }
         .confirmationDialog(
             "删除网盘中的当前版本？",
@@ -133,7 +132,7 @@ struct Pan115PlayerView: View {
     }
 }
 
-private struct PlaybackVersionSheet: View {
+private struct PlaybackVersionMenu: View {
     let episodes: [Pan115Client.FileItem]
     let currentID: String?
     let title: (Int, String) -> String
@@ -142,58 +141,40 @@ private struct PlaybackVersionSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("正在播放的版本已高亮") {
+        ZStack {
+            Color.black.opacity(0.001).ignoresSafeArea().onTapGesture { dismiss() }
+            ScrollView {
+                VStack(spacing: 8) {
                     ForEach(Array(episodes.enumerated()), id: \.element.fileID) { index, file in
                         let selected = file.fileID == currentID
-                        Button {
-                            dismiss()
-                            play(index)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: selected ? "play.circle.fill" : "circle")
-                                    .font(.title3)
-                                    .foregroundStyle(selected ? .black : .secondary)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(title(index, file.name))
-                                        .font(.body.weight(selected ? .bold : .regular))
-                                        .foregroundStyle(selected ? .black : .primary)
-                                    Text(selected ? "正在播放" : file.name)
-                                        .font(.caption)
-                                        .foregroundStyle(selected ? .black.opacity(0.7) : .secondary)
-                                        .lineLimit(2)
-                                }
-                                Spacer(minLength: 8)
-                                if selected {
-                                    Image(systemName: "checkmark").font(.headline.weight(.bold)).foregroundStyle(.black)
-                                }
+                        Button { dismiss(); play(index) } label: {
+                            VStack(spacing: 2) {
+                                Text(selected ? "正在播放 · \(title(index, file.name))" : title(index, file.name)).font(.body.weight(selected ? .bold : .semibold)).lineLimit(1)
+                                Text(file.name).font(.caption2).lineLimit(1).opacity(0.78)
                             }
-                            .padding(.vertical, 6)
+                            .foregroundStyle(selected ? .black : Color(red: 0.20, green: 0.48, blue: 0.96))
+                            .frame(maxWidth: .infinity, minHeight: selected ? 58 : 48)
+                            .padding(.horizontal, 14)
+                            .background(selected ? .white : Color(white: 0.72), in: Capsule())
+                            .overlay(Capsule().stroke(.white, lineWidth: selected ? 2 : 0))
                         }
                         .buttonStyle(.plain)
-                        .listRowBackground(selected ? Color.white : Color(.secondarySystemGroupedBackground))
                         .accessibilityIdentifier(selected ? "pan115.episode.current" : "pan115.episode")
                         .accessibilityAddTraits(selected ? .isSelected : [])
                     }
-                }
-                if episodes.count > 1, currentID != nil {
-                    Section {
-                        Button("删除当前版本", role: .destructive) {
-                            dismiss()
-                            deleteCurrent()
-                        }
-                        .accessibilityIdentifier("pan115.delete.current")
+                    if episodes.count > 1, currentID != nil {
+                        Button("删除当前版本", role: .destructive) { dismiss(); deleteCurrent() }
+                            .font(.body.weight(.semibold)).foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(Color(white: 0.72), in: Capsule())
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("pan115.delete.current")
                     }
-                }
+                }.padding(10)
             }
-            .navigationTitle("选择播放版本")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { dismiss() }
-                }
-            }
+            .frame(maxWidth: 330, maxHeight: min(520, CGFloat(episodes.count + 1) * 68 + 24))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
         }
     }
 }
