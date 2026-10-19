@@ -87,19 +87,16 @@ struct Pan115PlayerView: View {
         } message: {
             Text("原文件的容器、编码及 HDR 支持取决于设备；LUT 仅支持可分析的 SDR。不兼容时可选择 HLS 转码。")
         }
-        .confirmationDialog("选择集数", isPresented: $showEpisodes) {
-            ForEach(Array(vm.episodes.enumerated()), id: \.element.fileID) { index, file in
-                Button(episodeTitle(index: index, name: file.name)) {
-                    Task { await vm.selectEpisode(index) }
-                }
-            }
-            if vm.episodes.count > 1 {
-                Button("删除当前版本", role: .destructive) {
-                    pendingDelete = vm.currentEpisode
-                }
-                .accessibilityIdentifier("pan115.delete.current")
-            }
-            Button("取消", role: .cancel) {}
+        .sheet(isPresented: $showEpisodes) {
+            PlaybackVersionSheet(
+                episodes: vm.episodes,
+                currentID: vm.currentEpisode?.fileID,
+                title: episodeTitle,
+                play: { index in Task { await vm.selectEpisode(index) } },
+                deleteCurrent: { pendingDelete = vm.currentEpisode }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .confirmationDialog(
             "删除网盘中的当前版本？",
