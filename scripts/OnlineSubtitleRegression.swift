@@ -5,12 +5,13 @@ final class FixtureProtocol: URLProtocol {
     static var payload = Data()
     static var status = 200
     static var mime = "text/plain"
+    static var extraHeaders: [String: String] = [:]
     static var seenHeaders: [String: String] = [:]
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         Self.seenHeaders = request.allHTTPHeaderFields ?? [:]
-        let r = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": Self.mime])!
+        let r = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: Self.extraHeaders.merging(["Content-Type": Self.mime]) { _, new in new })!
         client?.urlProtocol(self, didReceive: r, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Self.payload)
         client?.urlProtocolDidFinishLoading(self)
@@ -21,7 +22,9 @@ final class FixtureProtocol: URLProtocol {
     static func reject(_ body: () throws -> Void) {
         do { try body(); fatalError("Expected rejection") } catch {}
     }
-    static func main() async throws {
+    @MainActor static func main() async throws {
+        try await DualSourceRegression.run()
+        try await DualSubtitleTransportRegression.run()
         let cdn = "https://subtitle.v.geilijiasu.com/AB/CD/" + String(repeating: "A", count: 40) + ".srt"
         let q = "公开 A&B + ?/# 中文"
         let u = try OnlineSubtitlePolicy.searchURL(q)

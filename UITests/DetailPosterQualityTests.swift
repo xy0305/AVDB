@@ -15,7 +15,8 @@ final class OnlineSubtitleModelTests: XCTestCase {
     @MainActor func testNoAutomaticRequestAndVideoClearCancelsStaleResult() async throws {
         var calls = 0
         let body = Data(#"{"code":0,"data":[{"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt","name":"self authored","ext":"srt","languages":[] }]}"#.utf8)
-        let model = OnlineSubtitleModel(fetch: { _, _ in
+        let model = OnlineSubtitleModel(fetch: { _, kind in
+            if kind == .catSearch { return Data("<table class='sub-table'></table>".utf8) }
             calls += 1
             try? await Task.sleep(nanoseconds: 80_000_000) // deliberately ignore cancellation to test generation guard
             return body
@@ -35,12 +36,12 @@ final class OnlineSubtitleModelTests: XCTestCase {
     }
     @MainActor func testManualSelectionCloseAndOffsetReset() async throws {
         var downloads = 0
-        let model = OnlineSubtitleModel(fetch: { _, search in
-            XCTAssertFalse(search); downloads += 1
+        let model = OnlineSubtitleModel(fetch: { _, kind in
+            XCTAssertEqual(kind, .download); downloads += 1
             return Data("1\n00:00:01,000 --> 00:00:02,000\n自创\n".utf8)
         })
         let row = OnlineSubtitleCandidate(id: "one", name: "自创", language: "未知", ext: "srt", url: URL(string: "https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt")!)
-        model.offset = 3; model.choose(row)
+        model.results = [row]; model.offset = 3; model.choose(row)
         try await awaitModelState { !model.busy && model.selected == row && model.cues.count == 1 }
         XCTAssertEqual(downloads, 1); XCTAssertEqual(model.cues.count, 1)
         XCTAssertEqual(model.offset, 0); XCTAssertEqual(model.selected, row)
@@ -56,6 +57,7 @@ final class OnlineSubtitleModelTests: XCTestCase {
                 DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { continuation.resume(returning: data) }
             }
         })
+        model.results = [row]
         model.choose(row)
         await Task.yield()
         XCTAssertTrue(model.busy)

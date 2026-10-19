@@ -14,6 +14,8 @@ struct OnlineSubtitleCandidate: Identifiable, Equatable {
     let language: String
     let ext: String
     let url: URL
+    var source: OnlineSubtitleSource = .xunlei
+    var parentID: String? = nil
 }
 struct OnlineSubtitleCue: Equatable {
     let start: Double
@@ -51,7 +53,7 @@ enum OnlineSubtitlePolicy {
             guard ["srt", "ass", "vtt"].contains(ext) else { continue }
             let name = String((row["name"] as? String ?? row["simple_name"] as? String ?? "字幕").prefix(240))
             let langs = (row["languages"] as? [String] ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-            output.append(.init(id: raw, name: name, language: langs.isEmpty ? "未知" : String(langs.joined(separator: " / ").prefix(100)), ext: ext, url: u))
+            output.append(.init(id: "xunlei:" + u.absoluteString, name: name, language: langs.isEmpty ? "未知" : String(langs.joined(separator: " / ").prefix(100)), ext: ext, url: u))
             if output.count == 80 { break }
         }
         return output
@@ -61,7 +63,9 @@ enum OnlineSubtitlePolicy {
 // Fresh ephemeral session for each request. No application cookies, credentials or 115 headers.
 // Delegate caps memory while streaming and validates EVERY redirect before following it.
 final class OnlineSubtitleRequest: NSObject, URLSessionDataDelegate, @unchecked Sendable {
-    private let search: Bool
+    let kind: OnlineSubtitleRequestKind
+    private let boundDownloadURL: URL?
+    private var redirects = 0
     private let limit: Int
     private var bytes = Data()
     private var continuation: CheckedContinuation<Data, Error>?
@@ -71,16 +75,28 @@ final class OnlineSubtitleRequest: NSObject, URLSessionDataDelegate, @unchecked 
     private let cancellationLock = NSLock()
     private var cancelled = false
     private let protocolClasses: [AnyClass]?
-    init(search: Bool, protocolClasses: [AnyClass]? = nil) {
-        self.search = search; self.protocolClasses = protocolClasses
-        limit = search ? OnlineSubtitlePolicy.searchLimit : OnlineSubtitlePolicy.downloadLimit
+    convenience init(search: Bool, protocolClasses: [AnyClass]? = nil) {
+        self.init(kind: search ? .xunleiSearch : .download, protocolClasses: protocolClasses)
+    }
+    init(kind: OnlineSubtitleRequestKind, boundDownloadURL: URL? = nil, protocolClasses: [AnyClass]? = nil) {
+        self.kind = kind; self.boundDownloadURL = boundDownloadURL; self.protocolClasses = protocolClasses
+        limit = kind.metadata ? OnlineSubtitlePolicy.searchLimit : OnlineSubtitlePolicy.downloadLimit
+    }
+    func allowed(_ url: URL) -> Bool {
+        switch kind {
+        case .xunleiSearch: return OnlineSubtitlePolicy.allowed(url, search: true)
+        case .catSearch, .catDetail: return SubtitleCatProvider.allowed(url, kind: kind)
+        case .download:
+            return OnlineSubtitlePolicy.allowed(url, search: false) ||
+                (boundDownloadURL == url && SubtitleCatProvider.allowed(url, kind: .download))
+        }
     }
     private func cancel() {
         cancellationLock.lock(); cancelled = true; let running = task; cancellationLock.unlock()
         running?.cancel()
     }
     func run(_ url: URL) async throws -> Data {
-        guard OnlineSubtitlePolicy.allowed(url, search: search) else { throw OnlineSubtitleError.invalid("不安全的字幕地址") }
+        guard allowed(url) else { throw OnlineSubtitleError.invalid("不安全的字幕地址") }
         return try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { continuation in
                 self.continuation = continuation
@@ -92,7 +108,7 @@ final class OnlineSubtitleRequest: NSObject, URLSessionDataDelegate, @unchecked 
                 let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
                 self.session = session
                 var request = URLRequest(url: url); request.cachePolicy = .reloadIgnoringLocalCacheData
-                request.setValue(search ? "application/json" : "text/plain", forHTTPHeaderField: "Accept")
+                request.setValue(kind.accept, forHTTPHeaderField: "Accept")
                 let running = session.dataTask(with: request)
                 cancellationLock.lock(); task = running; let shouldCancel = cancelled; cancellationLock.unlock()
                 running.resume()
@@ -101,15 +117,20 @@ final class OnlineSubtitleRequest: NSObject, URLSessionDataDelegate, @unchecked 
         }, onCancel: { self.cancel() })
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        guard let url = request.url, OnlineSubtitlePolicy.allowed(url, search: search) else {
+        redirects += 1
+        guard redirects <= 5, let url = request.url, allowed(url) else {
             failure = OnlineSubtitleError.invalid("已拒绝不安全的重定向"); completionHandler(nil); task.cancel(); return
         }
-        var clean = URLRequest(url: url); clean.setValue(search ? "application/json" : "text/plain", forHTTPHeaderField: "Accept")
+        var clean = URLRequest(url: url); clean.setValue(kind.accept, forHTTPHeaderField: "Accept")
         completionHandler(clean)
     }
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode), response.expectedContentLength <= Int64(limit), response.mimeType != "text/html" else {
-            failure = OnlineSubtitleError.invalid("字幕服务错误或文件过大"); completionHandler(.cancel); return
+        guard let http = response as? HTTPURLResponse, let url = response.url, allowed(url),
+              (200...299).contains(http.statusCode), response.expectedContentLength <= Int64(limit),
+              (kind.html || !["text/html", "application/xhtml+xml"].contains(response.mimeType ?? "")),
+              !["application/zip", "application/x-zip-compressed"].contains(response.mimeType ?? "") else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            failure = OnlineSubtitleError.invalid("字幕服务 HTTP \(code)：访问受限、格式错误或文件过大"); completionHandler(.cancel); return
         }
         completionHandler(.allow)
     }
@@ -118,6 +139,10 @@ final class OnlineSubtitleRequest: NSObject, URLSessionDataDelegate, @unchecked 
         bytes.append(data)
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if kind == .download && (bytes.starts(with: [0x50, 0x4b]) ||
+            ["<!doctype", "<html", "<script"].contains(where: String(decoding: bytes.prefix(1024), as: UTF8.self).lowercased().contains)) {
+            failure = OnlineSubtitleError.invalid("已拒绝 ZIP / HTML 冒充字幕")
+        }
         if let error = failure ?? error { continuation?.resume(throwing: error) }
         else { continuation?.resume(returning: bytes) }
         continuation = nil
@@ -226,87 +251,6 @@ enum OnlineSubtitleParser {
 #if os(iOS) && canImport(SwiftUI) && !SUBTITLE_CORE_TEST
 import SwiftUI
 import UIKit
-@MainActor final class OnlineSubtitleModel: ObservableObject {
-    @Published var query = ""
-    @Published var results: [OnlineSubtitleCandidate] = []
-    @Published var status = "尚未搜索"
-    @Published var selected: OnlineSubtitleCandidate?
-    @Published var cues: [OnlineSubtitleCue] = []
-    @Published var offset: Double = 0
-    @Published var encodingHint = "auto"
-    @Published var busy = false
-    private var generation = 0
-    private var work: Task<Void, Never>?
-    private var cache: (query: String, date: Date, rows: [OnlineSubtitleCandidate])?
-    private let fetch: (URL, Bool) async throws -> Data
-    init(fetch: @escaping (URL, Bool) async throws -> Data = { url, search in try await OnlineSubtitleRequest(search: search).run(url) }) {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--subtitle-controls-fixture") {
-            // Only substitute transport bytes. Selection, parsing, cancellation,
-            // generation guards, timeline display and dismissal remain production.
-            self.fetch = { _, search in
-                if search {
-                    return Data(#"{"code":0,"data":[{"name":"自创合法测试字幕","ext":"srt","languages":[],"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt"}]}"#.utf8)
-                }
-                return Data("1\n00:00:00,000 --> 00:00:06,000\n自创外置字幕第一段\n\n2\n00:00:06,000 --> 00:02:00,000\n自创外置字幕第二段\n".utf8)
-            }
-            return
-        }
-        #endif
-        self.fetch = fetch
-    }
-    func clear() {
-        generation += 1; work?.cancel(); work = nil
-        cues = []; selected = nil; results = []; offset = 0; busy = false
-        cache = nil; query = ""; encodingHint = "auto"; status = "尚未搜索"
-    }
-    func disable() {
-        generation += 1; work?.cancel(); work = nil
-        cues = []; selected = nil; offset = 0; busy = false; status = "字幕已关闭"
-    }
-    func search() {
-        generation += 1; work?.cancel(); let token = generation
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        results = []; busy = true; status = "搜索中…"
-        let fetch = self.fetch
-        work = Task { [weak self] in
-            do {
-                let url = try OnlineSubtitlePolicy.searchURL(q)
-                let rows: [OnlineSubtitleCandidate]
-                if let cache = self?.cache, cache.query == q, Date().timeIntervalSince(cache.date) < 120 { rows = cache.rows }
-                else {
-                    let data = try await fetch(url, true)
-                    rows = try OnlineSubtitlePolicy.candidates(data)
-                }
-                guard let self, self.generation == token, !Task.isCancelled else { return }
-                self.cache = (q, Date(), rows); self.results = rows
-                self.status = rows.isEmpty ? "无结果，播放不受影响" : "请选择字幕；名称匹配不代表时间轴匹配"
-                self.busy = false
-            } catch {
-                guard let self, self.generation == token, !Task.isCancelled else { return }
-                self.status = "搜索失败：\(error.localizedDescription)"; self.busy = false
-            }
-        }
-    }
-    func choose(_ row: OnlineSubtitleCandidate) {
-        generation += 1; work?.cancel(); let token = generation
-        cues = []; selected = nil; offset = 0; busy = true; status = "下载选中字幕…"
-        let fetch = self.fetch
-        let hint = encodingHint
-        work = Task { [weak self] in
-            do {
-                let data = try await fetch(row.url, false)
-                let cues = try await Task.detached(priority: .userInitiated) { try OnlineSubtitleParser.parse(data, ext: row.ext, encodingHint: hint) }.value
-                guard let self, self.generation == token, !Task.isCancelled else { return }
-                self.cues = cues; self.selected = row; self.busy = false; self.status = "已加载（来源：迅雷第三方服务）"
-                GlassHaptic.tap()
-            } catch {
-                guard let self, self.generation == token, !Task.isCancelled else { return }
-                self.status = "加载失败：\(error.localizedDescription)"; self.busy = false
-            }
-        }
-    }
-}
 // Independent presentation preferences: clearing a media request never clears style.
 // Reference: KSPlayer SubtitleModel.Size/textColor; no upstream code copied.
 private enum SubtitleStyleDefaults {
@@ -456,14 +400,18 @@ struct OnlineSubtitlePanel: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("可选第三方服务 · 迅雷") {
-                    Text("仅点击搜索后才会将下方查询词发送至迅雷。请勿输入私人文件名、路径或链接。本功能没有官方接口保证；失败不影响播放。")
+                Section("可选第三方服务 · 迅雷 + SubtitleCat（同时搜索）") {
+                    Text("仅点击搜索后，本次下方查询词将同时发送至迅雷与 SubtitleCat。不会发送私人文件名、媒体 URL、115 链接、哈希、Cookie 或令牌。请勿自行输入这些信息。本功能无官方接口保证，单个来源失败不影响另一来源或播放。")
                         .font(.footnote)
                     TextField("公开番号或片名", text: $model.query).textInputAutocapitalization(.never)
                         .autocorrectionDisabled().accessibilityIdentifier("subtitle.query")
                     Button("搜索（同意发送本次查询词）") { model.search() }
                         .accessibilityIdentifier("subtitle.search")
                     Text(model.status).font(.footnote).accessibilityIdentifier("subtitle.status")
+                    ForEach(OnlineSubtitleSource.allCases, id: \.self) { source in
+                        Text("\(source.title)：\(model.sourceStates[source] ?? "尚未搜索")")
+                            .font(.footnote).accessibilityIdentifier("subtitle.source.\(source.rawValue)")
+                    }
                 }
                 Section("显示设置") {
                     Picker("字幕编码（重选字幕生效）", selection: $model.encodingHint) {
@@ -472,7 +420,7 @@ struct OnlineSubtitlePanel: View {
                         Text("GB18030").tag("gb18030")
                         Text("Big5").tag("big5")
                     }.accessibilityIdentifier("subtitle.encoding")
-                    if let selected = model.selected { Text("来源：迅雷 · \(selected.name)") }
+                    if let selected = model.selected { Text("来源：\(selected.source.title) · \(selected.language) · \(selected.name)") }
                     Text("关闭字幕只关闭本机加载的外置字幕；视频画面内已烧录的文字无法移除。顶部“关闭字幕”同时取消下载并返回播放；“完成”仅关闭设置面板。")
                         .font(.footnote)
                     HStack {
@@ -488,29 +436,51 @@ struct OnlineSubtitlePanel: View {
                 }
                 Section("搜索结果（不会自动选择）") {
                     ForEach(model.results) { row in
-                        let isSelected = model.selected?.id == row.id
+                        let isSelected = model.selected?.id == row.id || model.selected?.parentID == row.id
                         Button { model.choose(row) } label: {
-                            HStack(alignment: .top, spacing: 12) {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                    .font(.title3).foregroundStyle(isSelected ? .green : .secondary)
+                                    .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(row.name).lineLimit(3)
-                                    Text("\(row.language) · \(row.ext.uppercased())").font(.caption)
+                                    Text(row.name).lineLimit(3).foregroundStyle(.primary)
+                                    Text("\(row.source.title) · \(row.language) · \(row.ext == "html" ? "点击查看现成语言" : row.ext.uppercased())").font(.caption).foregroundStyle(.secondary)
                                     if isSelected {
-                                        Text(model.status).font(.caption.weight(.semibold)).foregroundStyle(.green)
+                                        Text("已加载 · \(model.selected?.source.title ?? row.source.title) · \(model.selected?.language ?? row.language)").font(.caption.weight(.semibold)).foregroundStyle(.green)
                                             .accessibilityIdentifier("subtitle.selection.feedback")
                                     }
                                 }
                                 Spacer(minLength: 8)
-                                if isSelected {
-                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityHidden(true)
-                                }
                             }
-                        }.accessibilityIdentifier("subtitle.candidate")
-                            .accessibilityValue(isSelected ? model.status : "")
+                            .padding(.horizontal, 12).padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                            .background(isSelected ? Color.green.opacity(0.10) : Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? Color.green : Color.secondary.opacity(0.35), lineWidth: isSelected ? 2 : 1))
+                            .accessibilityIdentifier(isSelected ? "subtitle.selection.box" : "subtitle.selection.outline")
+                        }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .accessibilityIdentifier("subtitle.candidate")
+                        .accessibilityValue(isSelected ? "已选中，\(model.status)" : "未选中")
+                        if row.source == .subtitleCat {
+                            if let detailStatus = model.detailStates[row.id] { Text(detailStatus).font(.footnote) }
+                            ForEach(model.languages[row.id] ?? []) { variant in
+                                Button { model.choose(variant) } label: {
+                                    Label(variant.language, systemImage: model.selected?.id == variant.id ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(model.selected?.id == variant.id ? .green : .primary)
+                                }
+                                .accessibilityIdentifier("subtitle.language.\(variant.language)")
+                            }
+                            Link("在 SubtitleCat 原站查看（外部网页）", destination: row.url).font(.footnote)
+                        }
                     }
                 }
                 SubtitleAppearanceControls(adjustPosition: adjustPosition)
             }
             .navigationTitle("在线字幕")
+            .onDisappear { model.cancelPending() }
             .toolbar {
                 // Pinned outside Form: scrolling must never hide the only off switch.
                 ToolbarItem(placement: .cancellationAction) {
@@ -530,8 +500,9 @@ struct OnlineSubtitlePanel: View {
 #if DEBUG && os(iOS)
 struct OnlineSubtitleFixtureView: View {
     @State private var presented = false
-    @StateObject private var model = OnlineSubtitleModel(fetch: { _, search in
-        if search {
+    @StateObject private var model = OnlineSubtitleModel(fetch: { _, kind in
+        if kind == .catSearch { return Data("<table class='sub-table'></table>".utf8) }
+        if kind == .xunleiSearch {
             return Data(#"{"code":0,"result":"ok","data":[{"name":"自创合法测试字幕","ext":"srt","languages":[""],"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt"}]}"#.utf8)
         }
         return Data("1\n00:00:00,000 --> 00:00:10,000\n自创测试对白\n".utf8)

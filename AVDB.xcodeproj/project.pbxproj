@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        D2160000000000000000000B /* SubtitleCatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21600000000000000000001; };
+        D2160000000000000000000C /* OnlineSubtitleModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21600000000000000000002; };
         D2150000000000000000000B /* PlaybackVideoMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21500000000000000000001; };
         D2140000000000000000000B /* TPDBPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21400000000000000000001; };
         D2140000000000000000000C /* TPDBCoverSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21400000000000000000002; };
@@ -74,6 +76,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        D21600000000000000000001 /* SubtitleCatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleCatProvider.swift; sourceTree = "<group>"; };
+        D21600000000000000000002 /* OnlineSubtitleModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineSubtitleModel.swift; sourceTree = "<group>"; };
         D21500000000000000000001 /* PlaybackVideoMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackVideoMetrics.swift; sourceTree = "<group>"; };
         D21400000000000000000001 /* TPDBPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPDBPolicy.swift; sourceTree = "<group>"; };
         D21400000000000000000002 /* TPDBCoverSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPDBCoverSettings.swift; sourceTree = "<group>"; };
@@ -280,6 +284,8 @@
 			isa = PBXGroup;
 			children = (
                 A18900000000000000000002 /* OnlineSubtitle.swift */,
+                D21600000000000000000001 /* SubtitleCatProvider.swift */,
+                D21600000000000000000002 /* OnlineSubtitleModel.swift */,
 				B08C58091094C960D502C7F8 /* PlayerView.swift */,
                 D21500000000000000000001 /* PlaybackVideoMetrics.swift */,
 				A16600000000000000000002 /* SeekPreview.swift */,
@@ -480,6 +486,8 @@
 				FEATSTORE000000000000001 /* FeatureStores.swift in Sources */,
 				BC9852482E251643D9E18203 /* ListsView.swift in Sources */,
                 A18900000000000000000001 /* OnlineSubtitle.swift in Sources */,
+                D2160000000000000000000B /* SubtitleCatProvider.swift in Sources */,
+                D2160000000000000000000C /* OnlineSubtitleModel.swift in Sources */,
 				74B43A483CB7C582A66D2A2D /* PlayerView.swift in Sources */,
                 D2150000000000000000000B /* PlaybackVideoMetrics.swift in Sources */,
 				A16600000000000000000001 /* SeekPreview.swift in Sources */,
@@ -565,7 +573,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 215;
+				CURRENT_PROJECT_VERSION = 216;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -588,7 +596,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 215;
+				CURRENT_PROJECT_VERSION = 216;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
