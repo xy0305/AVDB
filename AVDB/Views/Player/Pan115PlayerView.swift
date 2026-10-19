@@ -15,6 +15,7 @@ struct Pan115PlayerView: View {
     @StateObject private var vm = Pan115PlayerViewModel()
     @State private var showEpisodes = false
     @State private var showQuality = false
+    @State private var pendingDelete: Pan115Client.FileItem?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -209,7 +210,8 @@ final class Pan115PlayerViewModel: ObservableObject {
         }
     }
     private var activeStream: Pan115Client.PlayStream?
-    private var currentFile: Pan115Client.FileItem?
+    private(set) var currentFile: Pan115Client.FileItem?
+    var currentEpisode: Pan115Client.FileItem? { currentFile }
     private var refreshing = false
     private var refreshUsed = false
     private var fallbackUsed = false
