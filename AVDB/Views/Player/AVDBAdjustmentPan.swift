@@ -48,3 +48,34 @@ struct AVDBAdjustmentPan {
 
     mutating func end() { active = false; axis = nil; last = .zero; lockPoint = .zero }
 }
+
+/// Shared by the UIKit receiver on iPhone/iPad, including 115 playback.
+enum AVDBDoubleTapPolicy {
+    enum Action: Equatable { case backward, toggle, forward }
+    static func action(x: CGFloat, width: CGFloat) -> Action? {
+        guard width.isFinite, width > 0, x.isFinite, x >= 0, x <= width else { return nil }
+        if x < width / 3 { return .backward }
+        if x <= width * 2 / 3 { return .toggle }
+        return .forward
+    }
+    static func perform(x: CGFloat, width: CGFloat, toggle: () -> Void, seek: (Double) -> Void) {
+        switch action(x: x, width: width) {
+        case .backward: seek(-10)
+        case .toggle: toggle()
+        case .forward: seek(10)
+        case nil: break
+        }
+    }
+}
+
+/// Real stored bytes only, never inferred from duration, resolution or bitrate.
+enum AVDBPlaybackFileSize {
+    static func text(bytes: Int64) -> String {
+        guard bytes > 0 else { return "大小未知" }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useGB, .useMB]
+        formatter.includesUnit = true
+        return formatter.string(fromByteCount: bytes)
+    }
+}

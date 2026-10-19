@@ -152,7 +152,7 @@ struct PlaybackVersionMenu: View {
             let width = min(330, max(0, geometry.size.width - 40))
             let availableHeight = max(0, geometry.size.height
                 - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom - 32)
-            let contentHeight = CGFloat(episodes.count) * 72 + (canDelete ? 56 : 0) + 12
+            let contentHeight = CGFloat(episodes.count) * 92 + (canDelete ? 56 : 0) + 12
             ZStack {
                 Button(action: close) {
                     Color.black.opacity(0.24).contentShape(Rectangle())
@@ -171,6 +171,9 @@ struct PlaybackVersionMenu: View {
                                     Text(selected ? "正在播放 · \(title(index, file.name))" : title(index, file.name))
                                         .font(.body.weight(selected ? .bold : .semibold))
                                         .lineLimit(1)
+                                    Text(AVDBPlaybackFileSize.text(bytes: file.size))
+                                        .font(.caption.monospacedDigit())
+                                        .lineLimit(1)
                                     Text(file.name)
                                         .font(.caption2)
                                         .lineLimit(2)
@@ -178,7 +181,7 @@ struct PlaybackVersionMenu: View {
                                         .opacity(0.78)
                                 }
                                 .foregroundStyle(selected ? .black : Color(red: 0.20, green: 0.48, blue: 0.96))
-                                .frame(maxWidth: .infinity, minHeight: 64)
+                                .frame(maxWidth: .infinity, minHeight: 84)
                                 .padding(.horizontal, 14)
                                 .background(selected ? .white : Color(white: 0.72), in: Capsule())
                                 .overlay(Capsule().stroke(.white, lineWidth: selected ? 2 : 0))

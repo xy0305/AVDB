@@ -54,6 +54,37 @@ import CoreGraphics
         precondition(pan.lock(translation: CGPoint(x: 6, y: 0), initial: 2))
         precondition(pan.value == 1)
         precondition(pan.horizontal(translation: .zero, size: .zero) == nil && !pan.active)
+        // Execute the shipping policy with neutral effects: center must never seek.
+        for width: CGFloat in [300, 390, 844, 1194] {
+            let third = width / 3
+            let cases: [(CGFloat, AVDBDoubleTapPolicy.Action)] = [
+                (0, .backward), (third - 0.001, .backward), (third, .toggle),
+                (width / 2, .toggle), (width * 2 / 3, .toggle),
+                (width * 2 / 3 + 0.001, .forward), (width, .forward)]
+            for (x, action) in cases {
+                precondition(AVDBDoubleTapPolicy.action(x: x, width: width) == action)
+                var toggles = 0, seeks: [Double] = []
+                AVDBDoubleTapPolicy.perform(x: x, width: width,
+                    toggle: { toggles += 1 }, seek: { seeks.append($0) })
+                precondition(toggles == (action == .toggle ? 1 : 0))
+                precondition(seeks == (action == .toggle ? [] : [action == .backward ? -10 : 10]))
+            }
+        }
+        for (x, width): (CGFloat, CGFloat) in [(0, 0), (0, -1), (0, .nan), (0, .infinity), (-1, 300), (301, 300), (.nan, 300), (.infinity, 300)] {
+            var effects = 0
+            precondition(AVDBDoubleTapPolicy.action(x: x, width: width) == nil)
+            AVDBDoubleTapPolicy.perform(x: x, width: width, toggle: { effects += 1 }, seek: { _ in effects += 1 })
+            precondition(effects == 0)
+        }
+        precondition(AVDBPlaybackFileSize.text(bytes: 0) == "大小未知")
+        precondition(AVDBPlaybackFileSize.text(bytes: -1) == "大小未知")
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useGB, .useMB]
+        for bytes: Int64 in [1, 999_999, 1_000_000, 12_345_678, 1_000_000_000, 12_345_678_901, Int64.max] {
+            precondition(AVDBPlaybackFileSize.text(bytes: bytes) == formatter.string(fromByteCount: bytes))
+        }
+        print("PASS shipping double-tap policy: left/center/right, inclusive center boundaries, phone/pad widths, invalid inputs no effects, center toggle only; real byte file MB/GB and unknown size")
         print("PASS shipping AVDBAdjustmentPan: slow start/6pt/diagonal, half/axis lock, consumed lock travel, incremental event frequency, clamp/immediate reversal, zero route volume, horizontal preview, end/cancel/rebegin, rotation/invalid size")
     }
 }

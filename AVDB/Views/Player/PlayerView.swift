@@ -331,7 +331,10 @@ struct KSChromePlayer: View {
                 excludedBottom: safeArea.bottom + 116,
                 blocked: editingSubtitlePosition || showOnlineSubtitles || showLUT || seekPending || (isSeeking && !horizontalDrag),
                 sourceID: url,
-                onDoubleTap: { x, width in skip(by: x < width * 0.5 ? -10 : 10) },
+                onDoubleTap: { x, width in
+                    AVDBDoubleTapPolicy.perform(x: x, width: width,
+                        toggle: { toggleActualPlayback() }, seek: { skip(by: $0) })
+                },
                 onSingleTap: { toggleChrome() },
                 onAdjustment: { side, value, notice in
                     hideTask?.cancel()
@@ -402,6 +405,18 @@ struct KSChromePlayer: View {
         overlayValue = seekValue
         seekPreview.request(time: seekValue, duration: duration)
         overlay = .seek
+    }
+
+    /// Read the engine now, not the asynchronously refreshed chrome state.
+    private func toggleActualPlayback() {
+        guard let layer = coordinator.playerLayer else { return }
+        if layer.player.isPlaying {
+            layer.pause()
+        } else {
+            audio.begin()
+            layer.play()
+        }
+        if showChrome { scheduleHide() }
     }
 
     private func skip(by seconds: Double) {
@@ -581,10 +596,10 @@ struct KSChromePlayer: View {
             .padding(.top, 16)
             .padding(.leading, 12)
 
+            // The UIKit single/double recognizers own the empty video area even with chrome visible.
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture { toggleChrome() }
+                .allowsHitTesting(false)
 
             progressBar
                 .padding(.horizontal, 16)
