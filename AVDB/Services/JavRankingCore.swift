@@ -377,3 +377,100 @@ enum JRHTML {
         return page
     }
 }
+
+// MARK: - Controlled cache API v1 (no source media/native IDs in this contract)
+enum JRBackendPolicy {
+    static let prefix = "/api/v1/javranking"
+    static func endpoint(_ input: String) throws -> URL? {
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty { return nil }
+        guard let c = URLComponents(string: value), c.scheme == "https", let host = c.host,
+              !host.isEmpty, c.user == nil, c.password == nil, c.query == nil, c.fragment == nil,
+              c.port == nil || c.port == 443,
+              c.path.isEmpty || c.path == "/" || c.path == prefix,
+              !["localhost", "127.0.0.1", "::1", "0.0.0.0"].contains(host.lowercased()),
+              !host.hasSuffix(".local"), !value.contains("%"), !value.contains("\\") else {
+            throw JRError.message("后端必须是受信 HTTPS 公网根地址或固定 API 前缀；不接受凭据、其他路径、查询或自定义端口。")
+        }
+        var clean = c; clean.path = prefix; clean.port = nil
+        return clean.url
+    }
+    static func request(base: URL, route: String, query: [URLQueryItem] = []) throws -> URL {
+        let allowed: [String: Set<String>] = ["home": [], "topics": [], "explore": ["page", "limit", "cat", "year", "sort"], "index": ["kind", "page", "limit", "q"], "rankings": ["topic", "page"], "page": ["path"]]
+        guard let keys = allowed[route], query.allSatisfy({ keys.contains($0.name) }),
+              Set(query.map(\.name)).count == query.count,
+              let normalized = try endpoint(base.absoluteString), normalized == base else { throw JRError.message("不允许的缓存接口") }
+        if let path = query.first(where: { $0.name == "path" })?.value {
+            guard path.hasPrefix("/zh-hans/"), !path.contains(".."), !path.contains("%"), !path.contains("\\"), !path.contains("?"), !path.contains("#"), !path.contains(":") else { throw JRError.message("不允许的来源路径") }
+        }
+        var c = URLComponents(url: base.appendingPathComponent(route), resolvingAgainstBaseURL: false)!
+        c.queryItems = query.isEmpty ? nil : query
+        return c.url!
+    }
+}
+struct JRBackendEnvelope: Decodable {
+    let schemaVersion: Int
+    let sourcePath: String
+    let fetchedAt: String?
+    let lastAttempt: String?
+    let status: String
+    let stale: Bool
+    let nextAttempt: String?
+    let refresh: String?
+    let data: JRBackendPayload?
+    static func decode(_ bytes: Data) throws -> Self {
+        let value = try JSONDecoder().decode(Self.self, from: bytes)
+        guard value.schemaVersion == 1 else { throw JRError.message("不支持的后端版本") }
+        return value
+    }
+    var notice: String {
+        "\(stale ? "旧缓存 · " : "")状态：\(status) · 刷新：\(refresh ?? "未知")\n最后成功：\(fetchedAt ?? "尚无")\n最后尝试：\(lastAttempt ?? "尚无")\n下次尝试：\(nextAttempt ?? "未排定")"
+    }
+}
+struct JRBackendVideo: Decodable {
+    let sourceID: String
+    let sourcePath: String
+    let number: String
+    let exactNumber: String?
+    let rank: Int?
+    let order: Int
+    var video: JRVideo {
+        // This is a SOURCE route, never a native movie/person ID.
+        JRVideo(path: sourcePath, code: number, title: "等待原生番号核验", rank: rank)
+    }
+}
+struct JRBackendLink: Decodable {
+    let sourcePath: String
+    let kind: String
+    let topic: String?
+}
+struct JRBackendEntity: Decodable {
+    let sourceID: String
+    let sourcePath: String
+    let name: String
+    let aliases: [String]?
+    let items: [JRBackendVideo]?
+}
+struct JRBackendSection: Decodable {
+    let id: String
+    let label: String
+    let order: Int
+    let kind: String
+    let links: [JRBackendLink]
+    let items: [JRBackendVideo]?
+    let actors: [JRBackendEntity]?
+}
+struct JRBackendCategory: Decodable { let id: Int; let name: String }
+struct JRBackendPayload: Decodable {
+    let type: String
+    let sections: [JRBackendSection]?
+    let topics: [JRBackendLink]?
+    let items: [JRBackendVideo]?
+    let entities: [JRBackendEntity]?
+    let links: [JRBackendLink]?
+    let categories: [JRBackendCategory]?
+    let page: Int?
+    let nextPage: Int?
+    let nextSourcePath: String?
+    let total: Int?
+}

@@ -15,20 +15,9 @@ struct JavRankingView: View {
     var body: some View {
         Group {
             if adultConfirmed && rankingsOnly {
-                JRPageView(path: "/zh-hans/rankings/").id(source.generation)
+                JRBackendView(route: "topics", title: "全部榜单")
             } else if adultConfirmed {
-                List {
-                    Section { Text("独立公开元数据来源 · 不替换原 JavDB 标签页。账号、网站清单、插件安装及第三方播放不在此执行。") .font(.footnote).foregroundStyle(.secondary) }
-                    Section("浏览") {
-                        ForEach(entries, id: \.1) { e in
-                            NavigationLink { destination(e.1) } label: { Label(e.0, systemImage: e.2) }
-                        }
-                    }
-                    Section("来源") {
-                        NavigationLink { JavRankingSettingsView() } label: { Label("域名与来源设置", systemImage: "gearshape") }
-                        Text(source.base.host ?? "").font(.caption).foregroundStyle(.secondary)
-                    }
-                }.id(source.generation)
+                JRBackendView(route: "home", title: "JAV Ranking")
             } else {
                 ContentUnavailableView {
                     Label("仅限成年人", systemImage: "18.circle")
@@ -53,9 +42,21 @@ struct JavRankingView: View {
 struct JavRankingSettingsView: View {
     @ObservedObject private var source = JavRankingSource.shared
     @State private var domain = ""
+    @State private var backendURL = ""
+    @ObservedObject private var backend = JRBackendClient.shared
     @State private var message = ""
     var body: some View {
         Form {
+            Section("独立缓存后端 · HTTPS") {
+                TextField("尚未配置；不要填回环地址", text: $backendURL)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                Button("保存 HTTPS 后端") {
+                    do { try backend.configure(backendURL); backendURL = backend.endpoint?.absoluteString ?? ""; message = "后端设置已保存；是否可用取决于公网 HTTPS 激活。" }
+                    catch { message = error.localizedDescription }
+                }
+                Text("仅使用系统受信 TLS。没有内置 IP、密钥或自动降级；留空表示未启用。此项不修改下方来源域名或 JavDB。") .font(.footnote)
+                NavigationLink("可选：原站 HTML 直连（可能受限，不自动回退）") { JRPageView(path: "/zh-hans/") }
+            }
             Section("JAV Ranking 来源域名") {
                 TextField("https://javranking.cc", text: $domain)
                     .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
@@ -72,7 +73,7 @@ struct JavRankingSettingsView: View {
                 Button("清空来源缓存并重载") { source.resetCache(); message = "来源缓存已清空。" }
             }.font(.footnote)
         }
-        .onAppear { domain = source.base.absoluteString }
+        .onAppear { domain = source.base.absoluteString; backendURL = backend.endpoint?.absoluteString ?? "" }
         .navigationTitle("来源设置").toolbar(.visible, for: .navigationBar)
     }
 }
@@ -457,5 +458,187 @@ struct JRMovieRoute: View {
             }
         }
         .onDisappear { source.cancelMappings() }
+    }
+}
+
+// Native cache UI: ordered sections; source media is never used as native metadata.
+struct JRBackendView: View {
+    let route: String
+    var title: String = "JAV Ranking"
+    var fixedQuery: [URLQueryItem] = []
+    @ObservedObject private var backend = JRBackendClient.shared
+    @State private var envelope: JRBackendEnvelope?
+    @State private var error = ""
+    @State private var loading = false
+    @State private var page = 1
+    @State private var query = ""
+    @State private var submitted = ""
+    @State private var category = ""
+    @State private var year = ""
+    @State private var sort = "source"
+    @State private var attempt = 0
+    @State private var pick: JRBackendVideo?
+    private var requestKey: String { "\(backend.generation):\(route):\(page):\(submitted):\(category):\(year):\(sort):\(attempt)" }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if route == "home" {
+                    NavigationLink("全部榜单") { JRBackendView(route: "topics", title: "全部榜单") }
+                    NavigationLink("片库与分类") { JRBackendView(route: "explore", title: "片库与分类") }
+                    NavigationLink("番号 / 人物姓名与别名搜索") { JRBackendView(route: "index", title: "索引搜索") }
+                }
+                if backend.endpoint == nil {
+                    Text("安全后端尚未启用").font(.headline)
+                    Text("公网 HTTPS 入口仍待授权和激活；未接通不代表空榜单。没有内置不可达回环地址，也不会强制请求原站。")
+                    NavigationLink("配置受信 HTTPS 后端") { JavRankingSettingsView() }
+                }
+                if route == "index" {
+                    TextField("完整番号或人物姓名 / 别名", text: $query).textFieldStyle(.roundedBorder)
+                    Button("搜索索引") { submitted = query; page = 1 }
+                    Text("索引不支持影片标题全文；人物候选仅保留来源路径，不自动认领第一个原生演员。") .font(.caption).foregroundStyle(.secondary)
+                }
+                if route == "explore" {
+                    HStack {
+                        TextField("分类 ID（0 有效）", text: $category).keyboardType(.numberPad)
+                        TextField("年份", text: $year).keyboardType(.numberPad)
+                    }.textFieldStyle(.roundedBorder)
+                    Picker("排序", selection: $sort) { Text("来源顺序").tag("source"); Text("发行日期").tag("date"); Text("评分").tag("score") }
+                        .pickerStyle(.segmented)
+                    if let categories = envelope?.data?.categories {
+                        Menu("选择分类") {
+                            Button("全部") { category = ""; page = 1 }
+                            ForEach(categories, id: \.id) { cat in Button(cat.name) { category = String(cat.id); page = 1 } }
+                        }
+                    }
+                }
+                if loading { ProgressView("读取缓存…") }
+                if !error.isEmpty { Text(error).foregroundStyle(.orange); Button("重试") { attempt += 1 } }
+                if let envelope {
+                    Text(envelope.notice).font(.caption).foregroundStyle(envelope.stale ? .orange : .secondary)
+                    if let payload = envelope.data { payloadView(payload) }
+                    else { Text("尚无成功快照，已显示真实排队 / 退避状态；请稍后手动重试。"); Button("重新读取") { attempt += 1 } }
+                }
+            }.padding()
+        }
+        .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
+        .task(id: requestKey) { await load() }
+        .refreshable { attempt += 1 }
+    }
+    @ViewBuilder private func payloadView(_ payload: JRBackendPayload) -> some View {
+        if let sections = payload.sections {
+            ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(section.label).font(.title3.bold())
+                    if section.id == "pick" {
+                        Button("从已缓存首页预览中随机抽选（非来源算法）") {
+                            pick = sections.flatMap { $0.items ?? [] }.randomElement()
+                        }
+                        if let pick { JRBackendFilmCell(item: pick) }
+                    }
+                    links(section.links)
+                    if let items = section.items { films(items) }
+                    if let actors = section.actors { entities(actors) }
+                }
+            }
+        }
+        if let topics = payload.topics { links(topics) }
+        if let links = payload.links { self.links(links) }
+        if let items = payload.items { films(items) }
+        if let entities = payload.entities { self.entities(entities) }
+        if let total = payload.total { Text("索引共 \(total) 项 · 第 \(payload.page ?? page) 页").font(.caption) }
+        HStack {
+            if page > 1 { Button("上一页") { page -= 1 } }
+            if payload.nextPage != nil { Button("下一页") { page = payload.nextPage! } }
+            if let next = payload.nextSourcePath {
+                NavigationLink("来源下一页（分页差异尚未实测）") { JRBackendView(route: "page", title: title, fixedQuery: [.init(name: "path", value: next)]) }
+            }
+        }
+    }
+    private func films(_ items: [JRBackendVideo]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 135), spacing: 12)], spacing: 18) {
+            // Offset identity intentionally preserves duplicates and original ranks.
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in JRBackendFilmCell(item: item) }
+        }
+    }
+    private func links(_ values: [JRBackendLink]) -> some View {
+        ForEach(Array(values.enumerated()), id: \.offset) { _, link in
+            NavigationLink(link.topic ?? link.sourcePath) {
+                if link.sourcePath == "/zh-hans/rankings/" { JRBackendView(route: "topics", title: "全部榜单") }
+                else if let topic = link.topic { JRBackendView(route: "rankings", title: topic, fixedQuery: [.init(name: "topic", value: topic)]) }
+                else { JRBackendView(route: "page", title: "来源集合", fixedQuery: [.init(name: "path", value: link.sourcePath)]) }
+            }
+        }
+    }
+    private func entities(_ values: [JRBackendEntity]) -> some View {
+        ForEach(Array(values.enumerated()), id: \.offset) { _, entity in
+            VStack(alignment: .leading) {
+                NavigationLink(entity.name) { JRBackendView(route: "page", title: entity.name, fixedQuery: [.init(name: "path", value: entity.sourcePath)]) }
+                Text("来源身份 · \(entity.sourcePath)").font(.caption2).foregroundStyle(.secondary)
+                if let aliases = entity.aliases, !aliases.isEmpty { Text(aliases.joined(separator: " / ")).font(.caption) }
+                if let items = entity.items { films(items) }
+            }
+        }
+    }
+    private func load() async {
+        guard backend.endpoint != nil else { envelope = nil; return }
+        let key = requestKey; loading = true; error = ""
+        var args = fixedQuery
+        if route == "explore" || route == "index" {
+            args += [.init(name: "page", value: String(page)), .init(name: "limit", value: "20")]
+        }
+        if route == "index" { args += [.init(name: "kind", value: "search"), .init(name: "q", value: submitted)] }
+        if route == "explore" {
+            args += [.init(name: "sort", value: sort)]
+            if !category.isEmpty { args.append(.init(name: "cat", value: category)) }
+            if !year.isEmpty { args.append(.init(name: "year", value: year)) }
+        }
+        do {
+            let result = try await backend.fetch(route, query: args)
+            guard !Task.isCancelled, key == requestKey else { return }
+            envelope = result
+        } catch {
+            guard !Task.isCancelled, key == requestKey else { return }
+            self.error = error.localizedDescription
+        }
+        if key == requestKey { loading = false }
+    }
+}
+
+private struct JRBackendFilmCell: View {
+    let item: JRBackendVideo
+    @ObservedObject private var source = JavRankingSource.shared
+    @State private var movie: Movie?
+    @State private var message = "等待原生核验"
+    @State private var attempt = 0
+    @State private var accountEpoch = 0
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let movie {
+                NavigationLink { MovieDetailView(movieID: movie.id) } label: { MoviePosterCard(movie: movie) }.buttonStyle(.plain)
+            } else {
+                RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.12))
+                    .aspectRatio(0.70, contentMode: .fit)
+                    .overlay { VStack { Image(systemName: "film"); Text(item.number).font(.caption); Text(message).font(.caption2).multilineTextAlignment(.center) }.padding(8) }
+                Button("重试完整番号核验") { attempt += 1 }.font(.caption)
+            }
+            if let rank = item.rank { Text("来源排名 #\(rank)").font(.caption) }
+            Text(item.number).font(.caption).foregroundStyle(.secondary)
+        }
+        .task(id: "\(source.generation):\(accountEpoch):\(attempt):\(item.sourcePath)") {
+            let account = APIClient.shared.token
+            movie = nil; message = "核验中…"
+            do {
+                let found = try await source.matchedMovie(code: item.number, refresh: attempt > 0)
+                guard !Task.isCancelled, account == APIClient.shared.token else { return }
+                movie = found; message = found == nil ? "未找到唯一精确结果" : "已核验"
+            } catch {
+                guard !Task.isCancelled, account == APIClient.shared.token else { return }
+                message = "核验失败，可重试"
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
+            movie = nil; accountEpoch += 1; source.cancelMappings()
+        }
     }
 }

@@ -11,18 +11,37 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private var transfers: [Int: Transfer] = [:]
     private let maximum: Int
     private let responseValidator: ((HTTPURLResponse, Data) -> Error?)?
+    private let rejectRedirects: Bool
     let base: URL
-    init(base: URL, maximum: Int = 12 * 1024 * 1024, responseValidator: ((HTTPURLResponse, Data) -> Error?)? = nil) {
-        self.base = base; self.maximum = maximum; self.responseValidator = responseValidator
+    init(base: URL, maximum: Int = 12 * 1024 * 1024, rejectRedirects: Bool = false, responseValidator: ((HTTPURLResponse, Data) -> Error?)? = nil) {
+        self.base = base; self.maximum = maximum; self.responseValidator = responseValidator; self.rejectRedirects = rejectRedirects
+    }
+    private final class Cancellation: @unchecked Sendable {
+        private let lock = NSLock()
+        private var task: URLSessionTask?
+        private var cancelled = false
+        func attach(_ task: URLSessionTask) {
+            lock.lock(); self.task = task; let stop = cancelled; lock.unlock()
+            if stop { task.cancel() }
+        }
+        func cancel() {
+            lock.lock(); cancelled = true; let current = task; lock.unlock()
+            current?.cancel()
+        }
     }
     func download(_ request: URLRequest, session: URLSession) async throws -> Data {
-        try await withCheckedThrowingContinuation { continuation in
-            let task = session.dataTask(with: request)
-            lock.lock()
-            transfers[task.taskIdentifier] = Transfer(continuation: continuation)
-            lock.unlock()
-            task.resume()
-        }
+        let cancellation = Cancellation()
+        return try await withTaskCancellationHandler(operation: {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                let task = session.dataTask(with: request)
+                lock.lock()
+                transfers[task.taskIdentifier] = Transfer(continuation: continuation)
+                lock.unlock()
+                cancellation.attach(task)
+                task.resume()
+            }
+        }, onCancel: { cancellation.cancel() })
     }
     private func finish(_ task: URLSessionTask, error: Error?) {
         lock.lock()
@@ -57,7 +76,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         finish(task, error: error)
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        completionHandler(request.url.map { JRPolicy.sameHost($0, base: base) } == true ? request : nil)
+        completionHandler(!rejectRedirects && request.url.map { JRPolicy.sameHost($0, base: base) } == true ? request : nil)
     }
 }
 
@@ -238,5 +257,52 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         indexFlights[path] = flight
         defer { if epoch == generation { indexFlights[path] = nil } }
         return try await flight.value
+    }
+}
+
+@MainActor final class JRBackendClient: ObservableObject {
+    static let shared = JRBackendClient()
+    @Published private(set) var endpoint: URL?
+    @Published private(set) var generation = 0
+    private var session: URLSession?
+    private let protocolClasses: [AnyClass]?
+    init(defaults: UserDefaults = .standard, protocolClasses: [AnyClass]? = nil) {
+        self.protocolClasses = protocolClasses
+        endpoint = try? JRBackendPolicy.endpoint(defaults.string(forKey: "javranking.backendHTTPS") ?? "")
+        rebuild()
+    }
+    private func rebuild() {
+        session?.invalidateAndCancel(); session = nil
+        guard let endpoint else { return }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = protocolClasses
+        config.httpShouldSetCookies = false; config.httpCookieStorage = nil; config.urlCache = nil
+        config.timeoutIntervalForRequest = 20; config.timeoutIntervalForResource = 30
+        config.httpMaximumConnectionsPerHost = 3
+        let policy = JRRedirectPolicy(base: endpoint, maximum: 8 * 1024 * 1024, rejectRedirects: true) { response, _ in
+            guard response.statusCode == 200 || response.statusCode == 202 else {
+                return JRError.message("缓存服务 HTTP \(response.statusCode)；保留上次显示结果，可稍后重试。")
+            }
+            guard response.mimeType == "application/json" else { return JRError.message("缓存服务未返回 JSON") }
+            return nil
+        }
+        session = URLSession(configuration: config, delegate: policy, delegateQueue: nil)
+    }
+    func configure(_ input: String, defaults: UserDefaults = .standard) throws {
+        let next = try JRBackendPolicy.endpoint(input)
+        endpoint = next; rebuild(); generation += 1
+        JavRankingSource.shared.cancelMappings()
+        defaults.set(next?.absoluteString ?? "", forKey: "javranking.backendHTTPS")
+    }
+    func fetch(_ route: String, query: [URLQueryItem] = []) async throws -> JRBackendEnvelope {
+        guard let endpoint, let session else { throw JRError.message("安全后端尚未启用；请在设置中配置已验证的 HTTPS 地址。不会请求回环、明文或自动改用原站。") }
+        let epoch = generation
+        let url = try JRBackendPolicy.request(base: endpoint, route: route, query: query)
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("AVDB-readonly", forHTTPHeaderField: "User-Agent")
+        let bytes = try await (session.delegate as! JRRedirectPolicy).download(request, session: session)
+        try Task.checkCancellation(); guard epoch == generation else { throw CancellationError() }
+        return try JRBackendEnvelope.decode(bytes)
     }
 }
