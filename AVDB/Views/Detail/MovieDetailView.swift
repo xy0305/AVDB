@@ -428,16 +428,7 @@ struct MovieDetailView: View {
         }
         .foregroundStyle(.white)
         .frame(width: width)
-        .overlay(alignment: .topLeading) {
-            if let art {
-                Text(art.provenance.text)
-                    .font(.caption2).foregroundStyle(.white.opacity(0.85))
-                    .padding(5).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5))
-                    .padding(.leading, 18).padding(.top, 140)
-                    .accessibilityIdentifier("detail-cover-source")
-                    .allowsHitTesting(false)
-            }
-        }
+
     }
 
     // Text wraps at narrow widths / accessibility sizes instead of forcing the
@@ -580,10 +571,7 @@ struct MovieDetailView: View {
                 .accessibilityIdentifier("landscape-hero-play")
             }
             .liquidCover(cornerRadius: 16)
-            if let art = activeTPDBArtwork {
-                Text(art.label).font(.caption2).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("tpdb-artwork-source")
-            }
+
 
             movieInfoCard(movie)
 
@@ -668,6 +656,16 @@ struct MovieDetailView: View {
                 }
                 let count = movie.reviewsCount ?? movie.commentsCount ?? 0
                 detailInfoLine("评分：", count > 0 ? "共\(count)人评分" : movie.scoreText)
+                    .accessibilityIdentifier("detail-info-rating")
+                if usesLandscapeLayout {
+                    if let art = activeTPDBArtwork {
+                        Text(art.label).font(.system(size: 18)).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("detail-cover-source")
+                    }
+                } else if let art = posterArtwork {
+                    Text(art.provenance.text).font(.system(size: 18)).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("detail-cover-source")
+                }
             }
             .padding(20)
             .padding(.trailing, movie.score == nil ? 0 : 62)

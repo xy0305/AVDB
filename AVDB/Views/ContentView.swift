@@ -59,7 +59,7 @@ struct ContentView: View {
             NavigationStack { MissAVRankingView() }
                 .modifier(SceneLayoutReader())
         } else if ProcessInfo.processInfo.arguments.contains("--jr-design-fixture") {
-            NavigationStack { JRBackendView(route: "home") }.modifier(SceneLayoutReader())
+            RankingsView().modifier(SceneLayoutReader())
         } else if ProcessInfo.processInfo.arguments.contains("--jr-navigation-fixture") {
             NavigationStack { JRPageView(path: "/neutral/ranking/") }
                 .modifier(SceneLayoutReader())

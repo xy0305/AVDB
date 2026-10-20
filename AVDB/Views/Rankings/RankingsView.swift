@@ -62,9 +62,12 @@ struct RankingsView: View {
                 Text("当前来源 · JavDB").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 NavigationLink { JavRankingView(rankingsOnly: true) } label: {
-                    Label("JAV Ranking 榜单", systemImage: "list.number")
+                    Label("JAV Ranking 完整首页", systemImage: "house")
                         .font(.subheadline)
-                }
+                }.accessibilityIdentifier("javranking-home-entry")
+                NavigationLink { JRBackendView(route: "topics", title: "全部榜单") } label: {
+                    Text("全部榜单").font(.caption)
+                }.accessibilityIdentifier("javranking-topics-shortcut")
             }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
             HStack {
                 Text("新增来源 · MissAV").font(.caption).foregroundStyle(.secondary)

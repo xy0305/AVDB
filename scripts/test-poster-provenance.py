@@ -12,9 +12,11 @@ assert 'provenance: PosterProvenance(source: source)' in resolver
 assert 'DetailPosterCache<DetailPosterArtwork>()' in resolver
 assert 'cache.snapshot(key: identity(movie: movie, account: account))' in resolver
 assert 'Text(art.provenance.text)' in view
-assert '.overlay(alignment: .topLeading)' in view
-assert '.padding(.leading, 18).padding(.top, 140)' in view
-assert 'Source label must clear the navigation buttons' in read('UITests/PosterNavigationTests.swift')
+assert '.padding(.leading, 18).padding(.top, 140)' not in view
+info=view.split('private func movieInfoCard')[1].split('private func deferredSection')[0]
+assert info.index('detailInfoLine("评分："') < info.index('Text(art.provenance.text)')
+assert 'Text(art.provenance.text)' not in view.split('private func portraitHero')[1].split('private func portraitMetadata')[0]
+assert 'Source must follow the information-card rating' in read('UITests/PosterNavigationTests.swift')
 assert 'presentation.key == posterRequestKey' in view
 assert 'presentation.complete(art, key: key, generation: generation)' in view
 assert 'guard !Task.isCancelled, posterRequestKey == key' in view
@@ -25,7 +27,8 @@ assert 'publish(img, identity: identity, source: candidate)' in image
 assert 'landscapeFallback = landscapeFallback ?? (img, candidate)' in image
 assert 'publish(landscapeFallback.image, identity: identity, source: landscapeFallback.source)' in image
 assert 'showsSourceLabel: true' in view and 'showsSourceLabel: Bool = false' in image
-assert 'Text(art.label)' in view and view.count('tpdb-artwork-source') == 1
+assert 'Text(art.label)' in info and 'tpdb-artwork-source' not in view
+assert 'activeTPDBArtwork' in info and 'else if let art = posterArtwork' in info
 assert '封面来源：ThePornDB' in read('AVDB/Services/TPDBArtworkService.swift')
 core='\n'.join(read('AVDB/Services/'+p) for p in ['JavRankingCore.swift','TenhowPoster.swift','TenhowActorLinks.swift','DetailPosterPolicy.swift','DetailPosterCache.swift'])
 swift=r'''

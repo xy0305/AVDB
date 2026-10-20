@@ -14,9 +14,7 @@ struct JavRankingView: View {
         ("隐私政策", "/zh-hans/privacy/", "hand.raised"), ("使用条款", "/zh-hans/terms/", "doc.text"), ("商业合作说明", "/zh-hans/sponsor/", "info.circle")]
     var body: some View {
         Group {
-            if adultConfirmed && rankingsOnly {
-                JRBackendView(route: "topics", title: "全部榜单")
-            } else if adultConfirmed {
+            if adultConfirmed {
                 JRBackendView(route: "home", title: "JAV Ranking")
             } else {
                 ContentUnavailableView {
@@ -485,13 +483,15 @@ struct JRBackendView: View {
     @State private var sort = "source"
     @State private var attempt = 0
     @State private var pick: JRBackendVideo?
+    @State private var randomBatch: [JRBackendVideo]?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var contentWidth: CGFloat = 350
     private var requestKey: String { "\(backend.generation):\(route):\(page):\(submitted):\(category):\(year):\(sort):\(attempt)" }
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                masthead
+                masthead.id("jr-home-top")
                 if route == "home" {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 12) { homeActions }
@@ -528,7 +528,14 @@ struct JRBackendView: View {
                     DisclosureGroup("缓存状态 · \(envelope.status)") {
                         Text(envelope.notice).font(.caption).foregroundStyle(JRPalette.muted).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                     }.font(.caption).tint(JRPalette.gold).padding(12).background(JRPalette.panel, in: RoundedRectangle(cornerRadius: 10))
-                    if let payload = envelope.data { payloadView(payload) }
+                    if let payload = envelope.data {
+                        payloadView(payload)
+                        if route == "home" {
+                            homeFooter
+                            Button("回到顶部 ↑") { withAnimation { proxy.scrollTo("jr-home-top", anchor: .top) } }
+                                .frame(minHeight: 44).accessibilityIdentifier("jr-scroll-top")
+                        }
+                    }
                     else { Text("尚无成功快照，已显示真实排队 / 退避状态；请稍后手动重试。"); Button("重新读取") { attempt += 1 }.buttonStyle(.bordered).controlSize(.large) }
                 }
             }.padding()
@@ -551,6 +558,7 @@ struct JRBackendView: View {
         .onChange(of: year) { _, _ in page = 1 }
         .onChange(of: sort) { _, _ in page = 1 }
         .refreshable { attempt += 1 }
+        }
     }
     private var masthead: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -568,7 +576,7 @@ struct JRBackendView: View {
     }
     @ViewBuilder private func payloadView(_ payload: JRBackendPayload) -> some View {
         if let sections = payload.sections {
-            ForEach(Array(sections.sorted { $0.order < $1.order }.enumerated()), id: \.offset) { _, section in
+            ForEach(Array(JRHomePresentation.orderedSections(sections).enumerated()), id: \.offset) { _, section in
                 VStack(alignment: .leading, spacing: 14) {
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .firstTextBaseline) {
@@ -582,9 +590,18 @@ struct JRBackendView: View {
                         }
                     }
                     Rectangle().fill(JRPalette.border).frame(height: 1)
+                    if section.id == "weekly" || section.id == "monthly" {
+                        Text(section.id == "weekly" ? "来源每周热榜 · 快照时间见缓存状态" : "来源每月热榜 · 月份取自来源路径")
+                            .font(.caption).foregroundStyle(JRPalette.muted)
+                    }
+                    if section.id == "pick" { luckyHero(sections) }
                     if section.kind == "topics" || section.id == "rankings" { links(section.links) }
                     if section.id == "pick", let pick { JRBackendFilmCell(item: pick, rankContext: section.label) }
-                    if let items = section.items { films(items, context: section.label) }
+                    if let items = section.items {
+                        let displayed = section.id == "random" ? (randomBatch ?? items) : items
+                        Text("当前预览 \(displayed.count) 部 · " + (section.id == "random" && randomBatch != nil ? "缓存随机" : "来源顺序")).font(.caption).foregroundStyle(JRPalette.muted)
+                        films(displayed, context: section.label)
+                    }
                     if let actors = section.actors { entities(actors) }
                 }.padding(.top, 12).accessibilityIdentifier("jr-section-\(section.id)")
             }
@@ -609,16 +626,62 @@ struct JRBackendView: View {
         return section.label
     }
     @ViewBuilder private func sectionAction(_ section: JRBackendSection, sections: [JRBackendSection]) -> some View {
-        if section.id == "pick" {
-            Button { pick = sections.flatMap { $0.items ?? [] }.randomElement() } label: {
-                Text("换一批").frame(minWidth: 45, minHeight: 45).contentShape(Rectangle())
-            }.foregroundStyle(JRPalette.gold)
-                .accessibilityHint("仅从已缓存首页预览随机抽选，不是来源算法")
-        } else if let link = section.links.first {
+        if section.id == "random" {
+            Button("换一批") {
+                let pool = cachedPool(sections)
+                randomBatch = Array(pool.shuffled().prefix(section.items?.count ?? 8))
+            }.frame(minWidth: 45, minHeight: 45)
+                .accessibilityIdentifier("jr-random-refresh")
+                .accessibilityHint("仅从去重的已缓存首页影片池随机抽选，不是来源算法")
+        } else if let link = JRHomePresentation.moreLink(section) {
             NavigationLink { linkDestination(link) } label: {
                 Label("更多", systemImage: "arrow.right").font(.subheadline.weight(.semibold)).frame(minWidth: 45, minHeight: 45).contentShape(Rectangle()).foregroundStyle(JRPalette.gold)
-            }
+            }.accessibilityIdentifier("jr-more-\(section.id)")
         }
+    }
+    private func cachedPool(_ sections: [JRBackendSection]) -> [JRBackendVideo] {
+        JRHomePresentation.cachedPool(sections)
+    }
+    private func luckyHero(_ sections: [JRBackendSection]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
+                ForEach(["sparkles", "film.stack", "shuffle"], id: \.self) { symbol in
+                    Image(systemName: symbol).font(.largeTitle).frame(maxWidth: .infinity, minHeight: 72)
+                        .background(JRPalette.background, in: RoundedRectangle(cornerRadius: 14))
+                        .rotationEffect(.degrees(symbol == "film.stack" ? 8 : -6))
+                }
+            }.foregroundStyle(JRPalette.gold).accessibilityHidden(true)
+            Text("不再纠结，从当前已缓存的榜单与代表作品中寻找今晚目标。")
+                .fixedSize(horizontal: false, vertical: true)
+            Text("原生影片资料 · 完整番号核验 · 不复制来源抽签算法")
+                .font(.caption).foregroundStyle(JRPalette.muted)
+            Button { pick = cachedPool(sections).randomElement() } label: {
+                Label(pick == nil ? "立即开抽" : "再抽一部", systemImage: "shuffle")
+                    .font(.headline).frame(maxWidth: .infinity, minHeight: 48)
+            }.buttonStyle(.borderedProminent).tint(JRPalette.gold).foregroundStyle(.black)
+                .accessibilityIdentifier("jr-lucky-start")
+            Text("缓存池 \(cachedPool(sections).count) 部；随机结果不是来源站的推荐算法。")
+                .font(.caption).foregroundStyle(JRPalette.muted)
+        }.padding(18).background(JRPalette.panel, in: RoundedRectangle(cornerRadius: 18))
+    }
+    private var homeFooter: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Rectangle().fill(JRPalette.border).frame(height: 1)
+            Text("JAV Ranking · 来源与导航").font(.title2.bold()).foregroundStyle(JRPalette.gold)
+            Text("本页使用来源缓存的顺序、排名与可用数值。影片封面、演员与片名来自您配置的原生资料库；战力积分不等于 AVDB 评分。缓存暂缺的字段不推算、不补造。")
+                .font(.footnote).foregroundStyle(JRPalette.muted)
+            homeActions
+            NavigationLink("神作总榜") { JRBackendView(route: "page", title: "神作总榜", fixedQuery: [.init(name: "path", value: "/zh-hans/most-awarded-videos/")]) }
+            NavigationLink("女优总榜") { JRBackendView(route: "page", title: "女优总榜", fixedQuery: [.init(name: "path", value: "/zh-hans/most-awarded-actors/")]) }
+            NavigationLink("男优总榜") { JRBackendView(route: "page", title: "男优总榜", fixedQuery: [.init(name: "path", value: "/zh-hans/most-awarded-male-actors/")]) }
+            ForEach([("来源首页", ""), ("使用指南", "help/"), ("战力算法", "algorithm/"), ("产品与生态", "ecosystem/"), ("防迷路 / 来源域名", "domains/"), ("标记说明", "marks/"), ("关于来源", "about/"), ("反馈", "feedback/"), ("浏览器扩展", "extension/"), ("隐私政策", "privacy/"), ("使用条款", "terms/"), ("商业合作说明", "sponsor/")], id: \.1) { item in
+                if let url = URL(string: "zh-hans/" + item.1, relativeTo: JavRankingSource.shared.base) {
+                    Link(item.0 + " · 来源网页 ↗", destination: url).frame(minHeight: 44)
+                }
+            }
+            Text("原创原生布局；不镜像来源图片、露骨简介、广告、赞助位或商业宣传。外部信息链接仅打开来源，不携带外部库令牌。")
+                .font(.caption).foregroundStyle(JRPalette.muted)
+        }.padding(.top, 24).accessibilityIdentifier("jr-home-footer")
     }
     private func films(_ items: [JRBackendVideo], context: String) -> some View {
         LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: min(contentWidth, 350)), spacing: 16)], spacing: 14) {
@@ -640,13 +703,17 @@ struct JRBackendView: View {
                         Image(systemName: "person.crop.circle").font(.title).accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(entity.name).font(.headline)
-                            Text("来源人物集合 · 查看作品").font(.caption).foregroundStyle(JRPalette.muted)
+                            Text(entity.score.map { "来源战力总分：" + String(format: "%.0f", $0) } ?? "来源未提供战力总分").font(.caption).foregroundStyle(JRPalette.gold)
+                            Text("来源人物集合 · 作品更多").font(.caption).foregroundStyle(JRPalette.muted)
                         }
                         Spacer(); Image(systemName: "arrow.up.right")
                     }.frame(minHeight: 44)
                 }.buttonStyle(.plain)
                 if let aliases = entity.aliases, !aliases.isEmpty { Text(aliases.joined(separator: " / ")).font(.caption).foregroundStyle(JRPalette.muted) }
-                if let items = entity.items { films(items, context: "\(entity.name) · 作品内来源排名") }
+                if let items = entity.items {
+                    Text("代表作品预览 \(items.count) 部").font(.caption).foregroundStyle(JRPalette.muted)
+                    films(items, context: "\(entity.name) · 作品内来源排名")
+                }
             }.padding(12).background(JRPalette.panel, in: RoundedRectangle(cornerRadius: 12))
         }
     }
@@ -747,6 +814,7 @@ private struct JRFilmArtwork: View {
             Color.clear.frame(width: imageWidth).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text(item.number).font(.headline).foregroundStyle(JRPalette.gold).fixedSize(horizontal: false, vertical: true)
+                Text(item.score.map { "来源战力：" + String(format: "%.0f 分", $0) } ?? "来源未提供战力积分").font(.caption).foregroundStyle(JRPalette.muted)
                 Text(actorText).font(.caption.weight(.semibold)).foregroundStyle(JRPalette.gold).fixedSize(horizontal: false, vertical: true)
                 Text(movie?.title?.isEmpty == false ? movie!.title! : "原生影片资料暂缺")
                     .font(.subheadline).foregroundStyle(JRPalette.ink).fixedSize(horizontal: false, vertical: true)
@@ -853,15 +921,28 @@ private enum JRDesignFixture {
         return (try? JSONDecoder().decode(Movie.self, from: bytes)) ?? Movie(id: "neutral", number: item.number, title: "中性测试影片")
     }
     static func envelope(route: String) -> JRBackendEnvelope {
-        let slugs = ["dmm-weekly", "dmm-monthly-2024-09", "javdb-top250", "javlibrary-top250", "javdb-uncensored-top250", "javdb-fc2-top250", "javdb-top250-2023", "dmm-monthly-2023-12"]
+        let slugs = ["dmm-weekly", "dmm-monthly-2024-09", "javdb-top250", "javlibrary-top250", "javdb-uncensored-top250", "javdb-fc2-top250", "javdb-top250-2023", "dmm-monthly-2023-12"] + (2013...2022).map { "javdb-top250-\($0)" }
         let links = slugs.map { JRBackendLink(sourcePath: "/zh-hans/rankings/\($0)/", kind: "ranking", topic: $0) }
-        let items = (1...3).map { JRBackendVideo(sourceID: "neutral-\($0)", sourcePath: "/neutral/videos/\($0)/", number: "TEST-00\($0)", exactNumber: "TEST00\($0)", rank: [75, 10, 42][$0-1], order: $0) }
+        let items = (1...8).map { JRBackendVideo(sourceID: "neutral-\($0)", sourcePath: "/neutral/videos/\($0)/", number: "TEST-00\($0)", exactNumber: "TEST00\($0)", rank: [75, 10, 42, 9, 8, 7, 6, 5][$0-1], order: $0) }
         let ids = ["pick", "random", "rankings", "weekly", "monthly", "awarded", "actors"]
-        let labels = ["今天看什么？", "随机神作推荐", "查看全部排行榜", "DMM 本周热销", "DMM 来源月榜", "全站神作总榜", "演员作品集合"]
-        let sections = ids.enumerated().map { i, id in
-            JRBackendSection(id: id, label: labels[i], order: i+1, kind: id == "rankings" ? "navigation" : "videos", links: id == "rankings" ? links : [links[0]], items: ["pick", "rankings", "actors"].contains(id) ? [] : items, actors: id == "actors" ? [JRBackendEntity(sourceID: "neutral-actor", sourcePath: "/zh-hans/actors/neutral/", name: "中性示例演员", aliases: ["示例别名"], items: items)] : nil)
+        let labels = ["今天冲哪个？", "随机神作推荐", "查看全部排行榜", "DMM 本周热销", "DMM 来源月榜", "全站神作总榜", "女优战力总榜"]
+        let sections: [JRBackendSection] = ids.enumerated().map { i, id in
+            let sectionLinks: [JRBackendLink]
+            switch id {
+            case "rankings": sectionLinks = Array(links.prefix(8)) + [JRBackendLink(sourcePath: "/zh-hans/rankings/", kind: "collection", topic: nil)]
+            case "monthly": sectionLinks = [links[1]]
+            case "weekly": sectionLinks = [links[0]]
+            case "awarded": sectionLinks = [JRBackendLink(sourcePath: "/zh-hans/most-awarded-videos/", kind: "collection", topic: nil)]
+            case "actors": sectionLinks = [JRBackendLink(sourcePath: "/zh-hans/most-awarded-actors/", kind: "collection", topic: nil)]
+            default: sectionLinks = []
+            }
+            let actors: [JRBackendEntity]? = id == "actors" ? (1...3).map {
+                JRBackendEntity(sourceID: "neutral-actor-\($0)", sourcePath: "/zh-hans/actors/neutral-\($0)/", name: "中性示例演员 \($0)", aliases: ["示例别名"], score: Double($0 * 1000), items: Array(items.prefix(4)))
+            } : nil
+            return JRBackendSection(id: id, label: labels[i], order: i+1, kind: id == "rankings" ? "navigation" : "videos", links: sectionLinks, items: ["pick", "rankings", "actors"].contains(id) ? [] : items, actors: actors)
         }
-        let payload = JRBackendPayload(type: route == "topics" ? "topics" : "home", sections: route == "topics" ? nil : sections, topics: route == "topics" ? links : nil, items: nil, entities: nil, links: nil, categories: nil, page: 1, nextPage: nil, nextSourcePath: nil, total: nil)
+        let isHome = route == "home", isTopics = route == "topics"
+        let payload = JRBackendPayload(type: isTopics ? "topics" : isHome ? "home" : "collection", sections: isHome ? sections : nil, topics: isTopics ? links : nil, items: !isHome && !isTopics ? items : nil, entities: nil, links: nil, categories: nil, page: 1, nextPage: nil, nextSourcePath: nil, total: nil)
         return JRBackendEnvelope(schemaVersion: 1, sourcePath: "/neutral/", fetchedAt: "中性快照", lastAttempt: nil, status: "ok", stale: false, nextAttempt: nil, refresh: "not_due", data: payload)
     }
     #endif

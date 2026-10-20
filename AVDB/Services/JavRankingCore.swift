@@ -459,6 +459,7 @@ struct JRBackendVideo: Decodable {
     let sourcePath: String
     let number: String
     let exactNumber: String?
+    var score: Double? = nil
     let rank: Int?
     let order: Int
     var video: JRVideo {
@@ -476,6 +477,7 @@ struct JRBackendEntity: Decodable {
     let sourcePath: String
     let name: String
     let aliases: [String]?
+    var score: Double? = nil
     let items: [JRBackendVideo]?
 }
 struct JRBackendSection: Decodable {
@@ -534,5 +536,21 @@ struct JRTopicStyle {
             }
             period = "COLLECTION"
         }
+    }
+}
+
+/// Shared production homepage policy: source order/counts are never preview-clipped.
+enum JRHomePresentation {
+    static func orderedSections(_ values: [JRBackendSection]) -> [JRBackendSection] {
+        values.enumerated().sorted { a, b in a.element.order == b.element.order ? a.offset < b.offset : a.element.order < b.element.order }.map(\.element)
+    }
+    static func cachedPool(_ sections: [JRBackendSection]) -> [JRBackendVideo] {
+        var seen = Set<String>()
+        return orderedSections(sections).flatMap { ($0.items ?? []) + ($0.actors ?? []).flatMap { $0.items ?? [] } }
+            .filter { seen.insert($0.sourcePath).inserted }
+    }
+    static func moreLink(_ section: JRBackendSection) -> JRBackendLink? {
+        guard section.id != "pick" && section.id != "random" else { return nil }
+        return section.links.first { $0.sourcePath == "/zh-hans/rankings/" } ?? section.links.first
     }
 }

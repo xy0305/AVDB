@@ -6,6 +6,8 @@ final class PosterNavigationTests: XCTestCase {
         app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture"]
         XCUIDevice.shared.orientation = .portrait
         app.launch()
+        enterJRHome(app)
+        for _ in 0..<5 { if app.staticTexts["TEST-001"].firstMatch.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(app.staticTexts["JAV Ranking"].firstMatch.waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["随机神作推荐"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["TEST-001"].firstMatch.waitForExistence(timeout: 10))
@@ -13,7 +15,8 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(film.waitForExistence(timeout: 5))
         XCTAssertGreaterThan(film.frame.width, film.frame.height)
         let home = XCTAttachment(screenshot: app.screenshot()); home.name = "224-native-home-horizontal-cards"; home.lifetime = .keepAlways; add(home)
-        let topics = app.buttons["jr-open-topics"]
+        let topics = app.buttons["jr-open-topics"].firstMatch
+        for _ in 0..<8 { if topics.isHittable { break }; app.swipeDown() }
         XCTAssertTrue(topics.isHittable); XCTAssertGreaterThanOrEqual(topics.frame.height, 44); topics.tap()
         let monthly = app.buttons.matching(NSPredicate(format: "label CONTAINS '2024 · 09 月'")).firstMatch
         XCTAssertTrue(monthly.waitForExistence(timeout: 10))
@@ -40,7 +43,8 @@ final class PosterNavigationTests: XCTestCase {
         app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         XCUIDevice.shared.orientation = .portrait
         app.launch()
-        let entry = app.buttons["jr-open-topics"]
+        enterJRHome(app)
+        let entry = app.buttons["jr-open-topics"].firstMatch
         XCTAssertTrue(entry.waitForExistence(timeout: 15))
         for _ in 0..<4 { if entry.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(entry.isHittable)
@@ -55,6 +59,59 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(month.exists)
         XCTAssertGreaterThanOrEqual(month.frame.minY, weekly.frame.maxY)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "224-native-accessibility-single-column-readable"; shot.lifetime = .keepAlways; add(shot)
+    }
+
+    private func enterJRHome(_ app: XCUIApplication) {
+        let route = app.buttons["javranking-home-entry"]
+        XCTAssertTrue(route.waitForExistence(timeout: 15)); route.tap()
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        XCTAssertTrue(app.buttons["jr-lucky-start"].waitForExistence(timeout: 10))
+    }
+
+    func testJRCompleteHomepageProductionEntryAndFullScroll() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        enterJRHome(app)
+        let lucky = app.buttons["jr-lucky-start"]
+        XCTAssertGreaterThanOrEqual(lucky.frame.height, 44)
+        lucky.tap()
+        XCTAssertTrue(app.buttons["再抽一部"].exists || app.buttons["jr-lucky-start"].exists)
+        var markers = Set<String>()
+        let labels = ["今天冲哪个？", "随机神作推荐", "查看全部排行榜", "DMM 本周热销", "DMM 月度热销 · 2024 · 09 月", "全站神作总榜", "女优战力总榜", "中性示例演员 1", "中性示例演员 2", "中性示例演员 3", "JAV Ranking · 来源与导航"]
+        for index in 0..<75 {
+            for label in labels where app.staticTexts[label].firstMatch.isHittable { markers.insert(label) }
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "225-neutral-fullhome-scroll-\(index)"; shot.lifetime = .keepAlways; add(shot)
+            if app.links.matching(NSPredicate(format: "label CONTAINS '使用条款'")).firstMatch.isHittable { break }
+            app.swipeUp(velocity: 700)
+        }
+        for label in labels { XCTAssertTrue(markers.contains(label), "Missing visible production home block: \(label)") }
+        XCTAssertTrue(app.staticTexts["JAV Ranking · 来源与导航"].exists)
+        XCTAssertTrue(app.buttons["神作总榜"].exists)
+        XCTAssertTrue(app.buttons["女优总榜"].exists)
+        XCTAssertTrue(app.buttons["男优总榜"].exists)
+        for _ in 0..<75 { if app.buttons["jr-open-topics"].firstMatch.isHittable { break }; app.swipeDown(velocity: 1500) }
+        app.buttons["jr-open-topics"].firstMatch.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS '2024 · 09 月'")).firstMatch.waitForExistence(timeout: 10))
+    }
+
+    func testCoverSourceBelowRatingInformationCard() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        app.buttons["neutral-portrait-link"].tap()
+        let source = app.staticTexts["detail-cover-source"]
+        let rating = app.descendants(matching: .any)["detail-info-rating"].firstMatch
+        for _ in 0..<15 { if source.isHittable && rating.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(source.isHittable); XCTAssertTrue(rating.isHittable)
+        XCTAssertEqual(source.label, "封面来源：原始封面/未知来源")
+        XCTAssertGreaterThanOrEqual(source.frame.minY, rating.frame.maxY, "Source must follow the information-card rating")
+        XCTAssertEqual(app.staticTexts.matching(identifier: "detail-cover-source").count, 1)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "225-neutral-cover-source-below-info-rating"; shot.lifetime = .keepAlways; add(shot)
     }
 
     func testLongDetailTitleThreeLinesExpandsAndPersistsVisibility() {
@@ -588,11 +645,6 @@ final class PosterNavigationTests: XCTestCase {
         let back = app.buttons["返回"]
         XCTAssertTrue(back.isHittable)
         XCTAssertGreaterThanOrEqual(back.frame.minY, 24, "Back must clear the status bar safe area")
-        let source = app.staticTexts["detail-cover-source"]
-        XCTAssertTrue(source.waitForExistence(timeout: 5))
-        XCTAssertEqual(source.label, "封面来源：原始封面/未知来源")
-        XCTAssertGreaterThan(source.frame.minY, back.frame.maxY, "Source label must clear the navigation buttons")
-        XCTAssertLessThan(source.frame.maxY, title.frame.minY, "Unobtrusive cover corner must not move the title or controls")
         XCTAssertGreaterThanOrEqual(play.frame.height, 44)
         XCTAssertGreaterThan(title.frame.minY, back.frame.maxY)
         XCTAssertLessThan(title.frame.maxY, play.frame.minY, "Separate lower title precedes transparent play")

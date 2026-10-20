@@ -1,4 +1,4 @@
-name: Build224 Native JR Visual Acceptance
+name: Build225 Full Home and Cover Info Acceptance
 on:
   push:
     branches: [fix/subtitle-position-201]
@@ -48,12 +48,12 @@ jobs:
       - name: Native JR iPhone home, topics and rotation
         run: |
           set -o pipefail
-          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/LayoutDerived" -resultBundlePath "$RUNNER_TEMP/PhoneLayout.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingNativeBlackGoldHomeAndTopics -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingAccessibleTopics 2>&1 | tee "$RUNNER_TEMP/phone-layout.log"
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/LayoutDerived" -resultBundlePath "$RUNNER_TEMP/PhoneLayout.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingNativeBlackGoldHomeAndTopics -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingAccessibleTopics -only-testing:PosterNavigationUITests/PosterNavigationTests/testJRCompleteHomepageProductionEntryAndFullScroll -only-testing:PosterNavigationUITests/PosterNavigationTests/testCoverSourceBelowRatingInformationCard 2>&1 | tee "$RUNNER_TEMP/phone-layout.log"
       - name: Native JR iPad home, topics and rotation
         if: success() || failure()
         run: |
           set -o pipefail
-          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/LayoutDerived" -resultBundlePath "$RUNNER_TEMP/PadLayout.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingNativeBlackGoldHomeAndTopics -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingAccessibleTopics 2>&1 | tee "$RUNNER_TEMP/pad-layout.log"
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPAD_UDID" -derivedDataPath "$RUNNER_TEMP/LayoutDerived" -resultBundlePath "$RUNNER_TEMP/PadLayout.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingNativeBlackGoldHomeAndTopics -only-testing:PosterNavigationUITests/PosterNavigationTests/testJavRankingAccessibleTopics -only-testing:PosterNavigationUITests/PosterNavigationTests/testJRCompleteHomepageProductionEntryAndFullScroll -only-testing:PosterNavigationUITests/PosterNavigationTests/testCoverSourceBelowRatingInformationCard 2>&1 | tee "$RUNNER_TEMP/pad-layout.log"
       - name: Export neutral UI attachments
         if: always()
         run: |
@@ -64,6 +64,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build224-native-jr-${{ github.run_number }}
+          name: build225-native-jr-${{ github.run_number }}
           path: ${{ runner.temp }}/layout-evidence/
           retention-days: 14
