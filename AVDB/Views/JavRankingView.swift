@@ -486,6 +486,7 @@ struct JRBackendView: View {
     @State private var attempt = 0
     @State private var pick: JRBackendVideo?
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var contentWidth: CGFloat = 350
     private var requestKey: String { "\(backend.generation):\(route):\(page):\(submitted):\(category):\(year):\(sort):\(attempt)" }
     var body: some View {
         ScrollView {
@@ -504,7 +505,7 @@ struct JRBackendView: View {
                 }
                 if route == "index" {
                     TextField("完整番号或人物姓名 / 别名", text: $query).textFieldStyle(.roundedBorder)
-                    Button("搜索索引") { submitted = query; page = 1 }
+                    Button("搜索索引") { submitted = query; page = 1 }.buttonStyle(.bordered).controlSize(.large)
                     Text("索引不支持影片标题全文；人物候选仅保留来源路径，不自动认领第一个原生演员。") .font(.caption).foregroundStyle(.secondary)
                 }
                 if route == "explore" {
@@ -522,19 +523,23 @@ struct JRBackendView: View {
                     }
                 }
                 if loading { ProgressView("读取缓存…") }
-                if !error.isEmpty { Text(error).foregroundStyle(.orange); Button("重试") { attempt += 1 } }
+                if !error.isEmpty { Text(error).foregroundStyle(.orange); Button("重试") { attempt += 1 }.buttonStyle(.bordered).controlSize(.large) }
                 if let envelope {
-                    DisclosureGroup("缓存与刷新状态") {
+                    DisclosureGroup("缓存状态 · \(envelope.status)") {
                         Text(envelope.notice).font(.caption).foregroundStyle(JRPalette.muted).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                     }.font(.caption).tint(JRPalette.gold).padding(12).background(JRPalette.panel, in: RoundedRectangle(cornerRadius: 10))
                     if let payload = envelope.data { payloadView(payload) }
-                    else { Text("尚无成功快照，已显示真实排队 / 退避状态；请稍后手动重试。"); Button("重新读取") { attempt += 1 } }
+                    else { Text("尚无成功快照，已显示真实排队 / 退避状态；请稍后手动重试。"); Button("重新读取") { attempt += 1 }.buttonStyle(.bordered).controlSize(.large) }
                 }
             }.padding()
+                .frame(maxWidth: 1100, alignment: .leading)
+                .background { GeometryReader { g in Color.clear.preference(key: JRWidthKey.self, value: max(0, g.size.width - 32)) } }
+                .onPreferenceChange(JRWidthKey.self) { if $0 > 0 { contentWidth = $0 } }
+                .frame(maxWidth: .infinity)
         }
         .background(JRPalette.background.ignoresSafeArea())
         .foregroundStyle(JRPalette.ink).tint(JRPalette.gold)
-        .environment(\.colorScheme, .dark)
+        .preferredColorScheme(.dark) // Route-scoped preference; no persistent app appearance mutation.
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(JRPalette.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -557,9 +562,9 @@ struct JRBackendView: View {
         }.accessibilityIdentifier("jr-native-masthead")
     }
     @ViewBuilder private var homeActions: some View {
-        NavigationLink { JRBackendView(route: "topics", title: "全部榜单") } label: { Label("全部榜单", systemImage: "chart.bar.xaxis") }.accessibilityIdentifier("jr-open-topics").frame(minHeight: 44)
-        NavigationLink { JRBackendView(route: "explore", title: "片库与分类") } label: { Label("片库分类", systemImage: "square.grid.2x2") }.frame(minHeight: 44)
-        NavigationLink { JRBackendView(route: "index", title: "索引搜索") } label: { Label("搜索", systemImage: "magnifyingglass") }.frame(minHeight: 44)
+        NavigationLink { JRBackendView(route: "topics", title: "全部榜单") } label: { Label("全部榜单", systemImage: "chart.bar.xaxis").frame(minHeight: 45).contentShape(Rectangle()) }.buttonStyle(.plain).foregroundStyle(JRPalette.gold).accessibilityIdentifier("jr-open-topics")
+        NavigationLink { JRBackendView(route: "explore", title: "片库与分类") } label: { Label("片库分类", systemImage: "square.grid.2x2").frame(minHeight: 45).contentShape(Rectangle()) }.buttonStyle(.plain).foregroundStyle(JRPalette.gold)
+        NavigationLink { JRBackendView(route: "index", title: "索引搜索") } label: { Label("搜索", systemImage: "magnifyingglass").frame(minHeight: 45).contentShape(Rectangle()) }.buttonStyle(.plain).foregroundStyle(JRPalette.gold)
     }
     @ViewBuilder private func payloadView(_ payload: JRBackendPayload) -> some View {
         if let sections = payload.sections {
@@ -567,12 +572,12 @@ struct JRBackendView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(section.label).font(.title2.bold()).fixedSize(horizontal: false, vertical: true)
+                            Text(sectionTitle(section)).font(.title2.bold()).fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 10)
                             sectionAction(section, sections: sections)
                         }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(section.label).font(.title2.bold())
+                            Text(sectionTitle(section)).font(.title2.bold())
                             sectionAction(section, sections: sections)
                         }
                     }
@@ -597,25 +602,32 @@ struct JRBackendView: View {
             }
         }.buttonStyle(.bordered).controlSize(.large)
     }
+    private func sectionTitle(_ section: JRBackendSection) -> String {
+        if section.id == "monthly", let link = section.links.first {
+            return "DMM 月度热销 · " + JRTopicStyle(path: link.sourcePath).period
+        }
+        return section.label
+    }
     @ViewBuilder private func sectionAction(_ section: JRBackendSection, sections: [JRBackendSection]) -> some View {
         if section.id == "pick" {
-            Button("换一批") { pick = sections.flatMap { $0.items ?? [] }.randomElement() }
-                .frame(minWidth: 44, minHeight: 44)
+            Button { pick = sections.flatMap { $0.items ?? [] }.randomElement() } label: {
+                Text("换一批").frame(minWidth: 45, minHeight: 45).contentShape(Rectangle())
+            }.foregroundStyle(JRPalette.gold)
                 .accessibilityHint("仅从已缓存首页预览随机抽选，不是来源算法")
         } else if let link = section.links.first {
             NavigationLink { linkDestination(link) } label: {
-                Label("更多", systemImage: "arrow.right").font(.subheadline.weight(.semibold)).frame(minWidth: 44, minHeight: 44)
+                Label("更多", systemImage: "arrow.right").font(.subheadline.weight(.semibold)).frame(minWidth: 45, minHeight: 45).contentShape(Rectangle()).foregroundStyle(JRPalette.gold)
             }
         }
     }
     private func films(_ items: [JRBackendVideo], context: String) -> some View {
-        LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: 280), spacing: 16)], spacing: 14) {
+        LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: min(contentWidth, 350)), spacing: 16)], spacing: 14) {
             // Offset identity intentionally preserves duplicates and original ranks.
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in JRBackendFilmCell(item: item, rankContext: context) }
         }
     }
     private func links(_ values: [JRBackendLink]) -> some View {
-        JRTopicGrid(values: values)
+        JRTopicGrid(values: values.filter { $0.sourcePath != "/zh-hans/rankings/" })
     }
     @ViewBuilder private func linkDestination(_ link: JRBackendLink) -> some View {
         JRCollectionDestination(link: link)
@@ -681,7 +693,7 @@ private struct JRBackendFilmCell: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     JRFilmArtwork(item: item, movie: nil, message: message, rankContext: rankContext)
-                    Button("重试完整番号核验") { attempt += 1 }.font(.caption).frame(minHeight: 44).padding(.horizontal, 12)
+                    Button { attempt += 1 } label: { Text("重试完整番号核验").font(.caption).frame(minHeight: 45).contentShape(Rectangle()) }.padding(.horizontal, 12)
                 }
             }
         }
@@ -725,36 +737,46 @@ private struct JRFilmArtwork: View {
     let message: String
     let rankContext: String
     @Environment(\.dynamicTypeSize) private var typeSize
+    private var imageWidth: CGFloat { typeSize.isAccessibilitySize ? 92 : 144 }
     private var actorText: String {
         let names = movie?.actorNames ?? movie?.actors?.compactMap(\.name) ?? []
         return names.isEmpty ? "演员资料暂缺" : names.joined(separator: " · ")
     }
-    private var image: some View {
-        ZStack(alignment: .topLeading) {
-            Group {
-                if let movie { MoviePosterImage(movie: movie, maxPixelSize: 600) }
-                else { Rectangle().fill(JRPalette.border).overlay { Image(systemName: "film").font(.title).foregroundStyle(JRPalette.muted) } }
-            }.frame(width: typeSize.isAccessibilitySize ? 92 : 116, height: typeSize.isAccessibilitySize ? 128 : 154).clipped()
-            if let rank = item.rank {
-                Text("#\(rank)").font(.caption.bold()).foregroundStyle(JRPalette.background)
-                    .padding(.horizontal, 7).padding(.vertical, 6).background(JRPalette.gold, in: UnevenRoundedRectangle(topLeadingRadius: 11, bottomTrailingRadius: 8))
-                    .accessibilityLabel("\(rankContext)，来源排名第 \(rank)")
-            }
-        }.clipShape(UnevenRoundedRectangle(topLeadingRadius: 12, bottomLeadingRadius: 12))
-    }
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            image.accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 7) {
+            Color.clear.frame(width: imageWidth).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
                 Text(item.number).font(.headline).foregroundStyle(JRPalette.gold).fixedSize(horizontal: false, vertical: true)
-                Text(actorText).font(.subheadline.weight(.semibold)).foregroundStyle(JRPalette.gold).fixedSize(horizontal: false, vertical: true)
+                Text(actorText).font(.caption.weight(.semibold)).foregroundStyle(JRPalette.gold).fixedSize(horizontal: false, vertical: true)
                 Text(movie?.title?.isEmpty == false ? movie!.title! : "原生影片资料暂缺")
                     .font(.subheadline).foregroundStyle(JRPalette.ink).fixedSize(horizontal: false, vertical: true)
-                Text(item.rank.map { "\(rankContext) · 来源 #\($0)" } ?? "来源未提供排名")
+                if let synopsis = movie?.summary ?? movie?.desc, !synopsis.isEmpty, synopsis != movie?.title {
+                    Text(synopsis).font(.caption).foregroundStyle(JRPalette.muted).fixedSize(horizontal: false, vertical: true)
+                }
+                Text(item.rank.map { "来源 #\($0) · \(movie == nil ? "待核验" : "已核验")" } ?? "来源未提供排名")
                     .font(.caption2).foregroundStyle(JRPalette.muted).fixedSize(horizontal: false, vertical: true)
-                Text(message).font(.caption2).foregroundStyle(JRPalette.muted)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10).padding(.trailing, 10)
-        }.frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
+                    .accessibilityLabel(item.rank.map { "\(rankContext)，来源排名第 \($0)" } ?? "来源未提供排名")
+                if movie == nil { Text(message).font(.caption2).foregroundStyle(JRPalette.muted) }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8).padding(.trailing, 10)
+        }.frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .background(alignment: .leading) {
+            GeometryReader { geometry in
+                Group {
+                    if let movie {
+                        // Own native landscape cover, never source artwork or source title fallback.
+                        JavDBImage(url: movie.coverURL, fallbackURL: movie.thumbURL, contentMode: .fill, maxPixelSize: 600, frontPoster: false)
+                    } else {
+                        Rectangle().fill(JRPalette.border).overlay { Image(systemName: "film").font(.title).foregroundStyle(JRPalette.muted) }
+                    }
+                }.frame(width: imageWidth, height: geometry.size.height).clipped()
+            }.frame(width: imageWidth).accessibilityHidden(true)
+        }
+        .overlay(alignment: .topLeading) {
+            if let rank = item.rank {
+                Text("#\(rank)").font(.caption.bold()).foregroundStyle(JRPalette.background)
+                    .padding(.horizontal, 7).padding(.vertical, 6).background(JRPalette.gold, in: UnevenRoundedRectangle(topLeadingRadius: 11, bottomTrailingRadius: 8)).accessibilityHidden(true)
+            }
+        }.clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -771,16 +793,25 @@ private struct JRCollectionDestination: View {
 private struct JRTopicGrid: View {
     let values: [JRBackendLink]
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var width: CGFloat = 360
+    private var tileWidth: CGFloat { typeSize.isAccessibilitySize ? width : max(0, (width - 12) / 2) }
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: typeSize.isAccessibilitySize ? 1 : 2), spacing: 12) {
             ForEach(Array(values.enumerated()), id: \.offset) { _, link in
-                NavigationLink { JRCollectionDestination(link: link) } label: { JRTopicTile(style: JRTopicStyle(path: link.sourcePath)) }.buttonStyle(.plain)
+                NavigationLink { JRCollectionDestination(link: link) } label: { JRTopicTile(style: JRTopicStyle(path: link.sourcePath), width: tileWidth) }.buttonStyle(.plain)
             }
         }.accessibilityIdentifier("jr-topic-grid")
+        .background { GeometryReader { g in Color.clear.preference(key: JRTopicWidthKey.self, value: g.size.width) } }
+        .onPreferenceChange(JRTopicWidthKey.self) { if $0 > 0 { width = $0 } }
     }
+}
+private struct JRTopicWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 360
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 private struct JRTopicTile: View {
     let style: JRTopicStyle
+    let width: CGFloat
     private var accent: Color {
         switch style.family {
         case "DMM": return Color(red: 0.73, green: 0.25, blue: 0.15)
@@ -792,12 +823,12 @@ private struct JRTopicTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack { Rectangle().fill(JRPalette.gold).frame(width: 5, height: 16); Text("RANKING ARCHIVE").font(.caption2.weight(.bold)); Spacer(minLength: 0) }
-            Text(style.family).font(.title3.weight(.black)).fixedSize(horizontal: false, vertical: true)
+            Text(style.family).font(width > 300 ? .largeTitle.weight(.black) : .title3.weight(.black)).fontWidth(.condensed).fixedSize(horizontal: false, vertical: true)
             Rectangle().fill(JRPalette.ink.opacity(0.45)).frame(height: 1)
-            Text(style.edition).font(.headline.weight(.heavy)).fixedSize(horizontal: false, vertical: true)
+            Text(style.edition).font(width > 300 ? .title2.weight(.heavy) : .headline.weight(.heavy)).fixedSize(horizontal: false, vertical: true)
             HStack { Text(style.period).font(.caption.weight(.medium)); Spacer(minLength: 0); Image(systemName: "arrow.up.right") }
         }
-        .foregroundStyle(JRPalette.ink).padding(12).frame(maxWidth: .infinity, minHeight: 135, alignment: .leading)
+        .foregroundStyle(JRPalette.ink).padding(12).frame(maxWidth: .infinity, minHeight: max(125, width / 1.55), alignment: .leading)
         .background(LinearGradient(colors: [accent, accent.opacity(0.38), JRPalette.panel], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12))
         .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(JRPalette.ink.opacity(0.24), lineWidth: 1) }
         .accessibilityElement(children: .ignore).accessibilityLabel(style.label)

@@ -8,9 +8,9 @@ core=(R/'AVDB/Services/JavRankingCore.swift').read_text()
 view=(R/'AVDB/Views/JavRankingView.swift').read_text()
 source=(R/'AVDB/Services/JavRankingSource.swift').read_text()
 backend=view.split('struct JRBackendView: View')[1]
-assert 'JRTopicGrid(values: values)' in backend
+assert 'JRTopicGrid(values: values.filter' in backend
 assert 'JRFilmArtwork(item: item, movie: movie' in backend
-assert 'MoviePosterImage(movie: movie, maxPixelSize: 600)' in backend
+assert 'JavDBImage(url: movie.coverURL, fallbackURL: movie.thumbURL' in backend
 assert 'movie?.actorNames' in backend and 'movie?.title' in backend
 assert 'source.matchedMovie(code: item.number' in backend
 assert 'MovieDetailView(movieID: movie.id)' in backend
@@ -19,7 +19,7 @@ assert 'item.rank.map' in backend and 'item.score' not in backend
 assert 'Date()' not in backend and 'Calendar' not in backend
 assert 'isAccessibilitySize ? 1 : 2' in backend
 assert '.fixedSize(horizontal: false, vertical: true)' in backend
-assert '.environment(\\.colorScheme, .dark)' in backend and '.preferredColorScheme' not in backend
+assert '.preferredColorScheme(.dark)' in backend and 'overrideUserInterfaceStyle' not in backend
 assert 'WKWebView' not in view
 assert 'sourcePath: entity.sourcePath' not in backend # source identities never become native movie IDs
 assert '.init(name: "path", value: entity.sourcePath)' in backend

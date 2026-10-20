@@ -6,7 +6,7 @@ final class PosterNavigationTests: XCTestCase {
         app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture"]
         XCUIDevice.shared.orientation = .portrait
         app.launch()
-        XCTAssertTrue(app.otherElements["jr-native-masthead"].waitForExistence(timeout: 15) || app.staticTexts["JAV Ranking"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["JAV Ranking"].firstMatch.waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["随机神作推荐"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["TEST-001"].firstMatch.waitForExistence(timeout: 10))
         let film = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'jr-film-'")).firstMatch
@@ -23,9 +23,38 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(top250.frame.minY, second250.frame.minY, accuracy: 2)
         XCTAssertLessThan(top250.frame.maxX, second250.frame.minX)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "224-native-topics-two-column-original-art"; shot.lifetime = .keepAlways; add(shot)
+        let isPadWindow = app.frame.width > 600
         XCUIDevice.shared.orientation = .landscapeLeft
-        waitForInterfaceGeometry(app, portrait: false)
-        let wide = XCTAttachment(screenshot: app.screenshot()); wide.name = "224-native-topics-landscape"; wide.lifetime = .keepAlways; add(wide)
+        if isPadWindow {
+            waitForInterfaceGeometry(app, portrait: false)
+        } else {
+            // Preserve the production KSOptions portrait mask on non-player
+            // iPhone routes. Do not change app-wide orientation for a JR page.
+            XCTAssertLessThan(app.frame.width, app.frame.height)
+        }
+        let wide = XCTAttachment(screenshot: app.screenshot()); wide.name = isPadWindow ? "224-native-topics-ipad-landscape" : "224-native-topics-iphone-portrait-policy"; wide.lifetime = .keepAlways; add(wide)
+    }
+
+    func testJavRankingAccessibleTopics() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        let entry = app.buttons["jr-open-topics"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 15))
+        for _ in 0..<4 { if entry.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(entry.isHittable)
+        XCTAssertGreaterThanOrEqual(entry.frame.height, 44)
+        entry.tap()
+        let weekly = app.buttons.matching(NSPredicate(format: "label CONTAINS '每周热榜' AND label CONTAINS 'WEEKLY'")).firstMatch
+        XCTAssertTrue(weekly.waitForExistence(timeout: 10))
+        for _ in 0..<5 { if weekly.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(weekly.isHittable)
+        XCTAssertGreaterThan(weekly.frame.width, 250)
+        let month = app.buttons.matching(NSPredicate(format: "label CONTAINS '2024 · 09 月'")).firstMatch
+        XCTAssertTrue(month.exists)
+        XCTAssertGreaterThanOrEqual(month.frame.minY, weekly.frame.maxY)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "224-native-accessibility-single-column-readable"; shot.lifetime = .keepAlways; add(shot)
     }
 
     func testLongDetailTitleThreeLinesExpandsAndPersistsVisibility() {
