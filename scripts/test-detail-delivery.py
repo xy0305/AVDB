@@ -26,6 +26,14 @@ actor DeliveryProbe {
  func join() async { await poster?.value }
  func values() -> (Double,Double,Int,Int,String?) { (nativeTime,winnerTime,metadataCalls,imageCalls,winner) }
 }
+actor DeliveryGate {
+ var released=false
+ func open() { released=true }
+ func wait() async -> Bool {
+  while !released && !Task.isCancelled { await Task.yield() }
+  return !Task.isCancelled
+ }
+}
 @main struct DeliveryRegression {
  static func run(early: Bool) async -> [String:Any] {
   let p=DeliveryProbe(); let metadata=DetailPosterCache<Int>(positiveTTL:3600,negativeTTL:300,capacity:128)
@@ -72,14 +80,15 @@ actor DeliveryProbe {
   assert((after["stable_hq_winner_ms"] as! Double) < (before["stable_hq_winner_ms"] as! Double))
   // Leased metadata lookup: cancelling the detail consumer keeps the poster
   // consumer alive; cancelling the last consumer cancels I/O without a miss.
-  let cache=DetailPosterCache<Int>();let probe=DeliveryProbe()
+  let cache=DetailPosterCache<Int>();let probe=DeliveryProbe();let gate=DeliveryGate()
   let work: @Sendable () async -> Int? = {
    await probe.metadata()
-   do { try await Task.sleep(nanoseconds:100_000_000); return 9 } catch { return nil }
+   return await gate.wait() ? 9 : nil
   }
   let a=Task { await cache.value(key:"shared",operation:work) }
   let b=Task { await cache.value(key:"shared",operation:work) }
-  try? await Task.sleep(nanoseconds:20_000_000);a.cancel()
+  while cache.fixtureLeaseCount(key:"shared") != 2 { await Task.yield() }
+  a.cancel();await gate.open()
   let survivor=await b.value;let cancelled=await a.value
   assert(survivor == 9 && cancelled == nil)
   let v=await probe.values();assert(v.2 == 1)
@@ -87,7 +96,8 @@ actor DeliveryProbe {
   let c=Task { await cache.value(key:"last") {
    do { try await Task.sleep(nanoseconds:5_000_000_000); return 8 } catch { return nil }
   } }
-  try? await Task.sleep(nanoseconds:20_000_000);c.cancel()
+  while cache.fixtureLeaseCount(key:"last") != 1 { await Task.yield() }
+  c.cancel()
   let cancelledLast=await c.value;assert(cancelledLast == nil)
   assert(!cache.snapshot(key:"last").isLandscape)
   let cancelMS=(ProcessInfo.processInfo.systemUptime-start)*1000
@@ -102,7 +112,7 @@ actor DeliveryProbe {
 if shutil.which('swiftc'):
  with tempfile.TemporaryDirectory() as td:
   p=Path(td);(p/'main.swift').write_text(core+'\n'+swift)
-  subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(p/'main.swift'),'-o',str(p/'test')],check=True)
+  subprocess.run(['swiftc','-D','DEBUG','-swift-version','5','-parse-as-library',str(p/'main.swift'),'-o',str(p/'test')],check=True)
   subprocess.run([str(p/'test')],check=True,timeout=20)
 else:
  print('PASS build220 source integration; SKIP native timing: requires macOS Swift CI')

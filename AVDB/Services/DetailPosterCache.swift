@@ -80,6 +80,12 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
         }
     }
 
+    #if DEBUG
+    // Native regression synchronization: observe real acquisition, never infer
+    // cancellation ordering from sleeps on a busy CI runner.
+    func fixtureLeaseCount(key: String) -> Int { locked { flights[key]?.users.count ?? 0 } }
+    #endif
+
     func invalidate() {
         let abandoned: [Task<Value?, Never>] = locked {
             let tasks = flights.values.map(\.task)

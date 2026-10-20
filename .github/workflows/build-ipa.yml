@@ -154,7 +154,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: javranking-performance-${{ github.run_number }}
-          path: javranking-performance.txt
+          path: |
+            javranking-performance.txt
+            detail-delivery-performance.txt
           if-no-files-found: ignore
 
       - name: Upload build log on failure
