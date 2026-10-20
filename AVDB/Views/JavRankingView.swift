@@ -553,7 +553,7 @@ struct JRBackendView: View {
         .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
         .task(id: requestKey) { await load() }
-        .onChange(of: backend.generation) { _, _ in envelope = nil; pick = nil; error = ""; page = 1 }
+        .onChange(of: backend.generation) { _, _ in envelope = nil; pick = nil; randomBatch = nil; error = ""; page = 1 }
         .onChange(of: category) { _, _ in page = 1 }
         .onChange(of: year) { _, _ in page = 1 }
         .onChange(of: sort) { _, _ in page = 1 }

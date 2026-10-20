@@ -98,6 +98,35 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS '2024 · 09 月'")).firstMatch.waitForExistence(timeout: 10))
     }
 
+    func testJRHomeCachedShuffleAndEveryMoreAction() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch(); enterJRHome(app)
+        let refresh = app.buttons["jr-random-refresh"]
+        for _ in 0..<12 { if refresh.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(refresh.isHittable); refresh.tap()
+        XCTAssertTrue(app.staticTexts["当前预览 8 部 · 缓存随机"].waitForExistence(timeout: 5))
+        for id in ["rankings", "weekly", "monthly", "awarded", "actors"] {
+            let more = app.buttons["jr-more-\(id)"]
+            for _ in 0..<60 { if more.isHittable { break }; app.swipeUp(velocity: 1000) }
+            XCTAssertTrue(more.isHittable, "More action \(id)"); more.tap()
+            if id == "rankings" {
+                XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS '2024 · 09 月'")).firstMatch.waitForExistence(timeout: 10))
+            } else {
+                XCTAssertTrue(app.staticTexts["TEST-001"].firstMatch.waitForExistence(timeout: 10))
+                XCTAssertFalse(app.buttons["jr-lucky-start"].exists, "More must open collection, not recursively reload home")
+            }
+            let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "225-neutral-more-\(id)"; shot.lifetime = .keepAlways; add(shot)
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        let top = app.buttons["jr-scroll-top"]
+        for _ in 0..<60 { if top.isHittable { break }; app.swipeUp(velocity: 1000) }
+        XCTAssertTrue(top.isHittable); top.tap()
+        XCTAssertTrue(app.buttons["jr-lucky-start"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["jr-lucky-start"].isHittable)
+    }
+
     func testCoverSourceBelowRatingInformationCard() {
         continueAfterFailure = false
         let app = XCUIApplication()
