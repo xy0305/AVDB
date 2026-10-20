@@ -80,7 +80,7 @@ struct JavRankingSettingsView: View {
                 Button("清空来源缓存并重载") { source.resetCache(); message = "来源缓存已清空。" }
             }.font(.footnote)
         }
-        .onAppear { domain = source.base.absoluteString; backendURL = backend.endpoint?.absoluteString ?? "" }
+        .onAppear { domain = source.base.absoluteString; backendURL = UserDefaults.standard.string(forKey: "javranking.backendHTTPS") ?? "" }
         .navigationTitle("来源设置").toolbar(.visible, for: .navigationBar)
     }
 }
@@ -496,7 +496,7 @@ struct JRBackendView: View {
                 }
                 if backend.endpoint == nil {
                     Text("JAV Ranking 后端尚未配置").font(.headline)
-                    Text("公网 HTTPS 入口仍待授权和激活；未接通不代表空榜单。没有内置不可达回环地址，也不会强制请求原站。")
+                    Text("默认复用与 JAVLibrary 相同的外部数据库。请先在外部数据库设置中启用服务并保存 API 令牌；也可选择独立受信 HTTPS 后端。未配置不是空榜单，不匿名回退或自动请求原站。")
                     NavigationLink("配置外部数据库或独立 HTTPS") { JavRankingSettingsView() }
                 }
                 if route == "index" {
