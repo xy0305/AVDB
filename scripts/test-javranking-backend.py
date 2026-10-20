@@ -72,6 +72,11 @@ func check(_ ok: Bool, _ name: String) { precondition(ok,name); print("PASS "+na
    do { _ = try JRBackendPolicy.request(base:ip,route:route); fatalError("accepted route") } catch {}
   }
   do { _ = try JRBackendPolicy.request(base:ip,route:"page",query:[.init(name:"path",value:"https://evil.test")]);fatalError("proxy") } catch {}
+  for denied in ["/zh-hans/videos/1/", "/zh-hans/actors/a/?page=6", "/zh-hans/actors/a/?url=x", "//evil.test/zh-hans/", "/zh-hans/actors/a/%2e%2e/"] {
+   do { _ = try JRBackendPolicy.request(base:ip,route:"page",query:[.init(name:"path",value:denied)]);fatalError("denied source") } catch {}
+  }
+  let next = try JRBackendPolicy.request(base:ip,route:"page",query:[.init(name:"path",value:"/zh-hans/rankings/dmm-weekly/?page=2")])
+  check(next.host == ip.host && next.path == JRBackendPolicy.prefix+"/page","source next-page stays fixed API host/path")
   check(JRPolicy.exactCode("R18-292") != JRPolicy.exactCode("R1-8292"),"numeric prefix not stripped")
   check(JRPolicy.exactCode("FC2-PPV-12345") == JRPolicy.exactCode("FC2-12345"),"explicit FC2 equivalence")
   let defaults = UserDefaults(suiteName:"backend-"+UUID().uuidString)!

@@ -401,7 +401,16 @@ enum JRBackendPolicy {
               Set(query.map(\.name)).count == query.count,
               let normalized = try endpoint(base.absoluteString), normalized == base else { throw JRError.message("不允许的缓存接口") }
         if let path = query.first(where: { $0.name == "path" })?.value {
-            guard path.hasPrefix("/zh-hans/"), !path.contains(".."), !path.contains("%"), !path.contains("\\"), !path.contains("?"), !path.contains("#"), !path.contains(":") else { throw JRError.message("不允许的来源路径") }
+            guard path.count <= 250, !path.contains("%"), !path.contains("\\"), !path.contains(".."),
+                  !path.contains("\r"), !path.contains("\n"),
+                  let source = URLComponents(string: path), source.scheme == nil, source.host == nil, source.fragment == nil else { throw JRError.message("不允许的来源路径") }
+            let roots = ["/zh-hans/", "/zh-hans/rankings/", "/zh-hans/explore/", "/zh-hans/most-awarded-videos/", "/zh-hans/most-awarded-actors/", "/zh-hans/most-awarded-male-actors/"]
+            let pattern = #"^/zh-hans/(?:rankings/(?:dmm-weekly|dmm-monthly-20[0-9]{2}-(?:0[1-9]|1[0-2])|jav(?:db|library)-(?:top250(?:-20[0-9]{2})?|uncensored-top250|fc2-top250))|(?:actors|makers|directors)/[A-Za-z0-9_-]{1,64})/$"#
+            guard roots.contains(source.path) || source.path.range(of: pattern, options: .regularExpression) != nil else { throw JRError.message("不允许的来源集合") }
+            if let queryItems = source.queryItems {
+                guard queryItems.count == 1, queryItems[0].name == "page", let n = queryItems[0].value.flatMap(Int.init), (1...5).contains(n),
+                      source.path != "/zh-hans/", source.path != "/zh-hans/rankings/" else { throw JRError.message("来源页码超出范围") }
+            }
         }
         var c = URLComponents(url: base.appendingPathComponent(route), resolvingAgainstBaseURL: false)!
         c.queryItems = query.isEmpty ? nil : query

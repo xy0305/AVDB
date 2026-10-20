@@ -280,6 +280,8 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         config.timeoutIntervalForRequest = 20; config.timeoutIntervalForResource = 30
         config.httpMaximumConnectionsPerHost = 3
         let policy = JRRedirectPolicy(base: endpoint, maximum: 8 * 1024 * 1024, rejectRedirects: true) { response, _ in
+            guard let url = response.url, url.scheme == "https", url.host == endpoint.host,
+                  url.port == nil, url.path.hasPrefix(JRBackendPolicy.prefix + "/") else { return JRError.message("缓存响应不属于配置的 HTTPS 主机/API 路径") }
             guard response.statusCode == 200 || response.statusCode == 202 else {
                 return JRError.message("缓存服务 HTTP \(response.statusCode)；保留上次显示结果，可稍后重试。")
             }
