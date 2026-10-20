@@ -120,11 +120,15 @@ enum DetailPosterResolver {
         return anchors + validated.filter { !anchors.contains($0) }
     }
 
+    static func catalogueEligible(_ movie: Movie) -> Bool {
+        CatalogueIdentity.key(movie.number ?? "") != nil && !["1", "2", "3", "4"].contains(movie.type ?? "")
+    }
+
     static func initialLayout(movie: Movie, account: String?) -> DetailPosterLayout<DetailPosterArtwork> {
         let saved = cache.snapshot(key: identity(movie: movie, account: account))
         if case .resolving = saved {
             // Definite unsupported/no eligible candidates: retain legacy immediately.
-            if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty { return .landscape }
+            if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty && !catalogueEligible(movie) { return .landscape }
         }
         return saved
     }
@@ -136,19 +140,27 @@ enum DetailPosterResolver {
             let validated = validatedSources(movie)
             let paths = tenhowPaths(movie)
             let discover: (@Sendable (TimeInterval) async -> [String])?
-            if paths.isEmpty {
-                // A navigation seed deliberately stays immutable to prevent layout
-                // jumps. Discover here as well, so seeded native routes still get
-                // the exact-record source images without rewriting that seed.
-                if CatalogueIdentity.key(movie.number ?? "") != nil && !["1", "2", "3", "4"].contains(movie.type ?? "") {
-                    discover = { @Sendable timeout in
-                        let metadata = await CatalogueMetadataService.shared.lookup(number: movie.number ?? "", originalURL: movie.originalURL, timeout: timeout)
-                        return metadata?.images ?? []
+            let catalogue = catalogueEligible(movie)
+            if paths.isEmpty && !catalogue { discover = nil }
+            else {
+                discover = { @Sendable timeout in
+                    // Native detail and poster selection share one leased lookup.
+                    // Tenhow/Amazon and exact-record metadata run concurrently,
+                    // never a second serial four-second gate before selection.
+                    async let tenhow = discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
+                    async let metadata: ScrapedMetadata? = catalogue ? CatalogueMetadataService.shared.lookup(number: movie.number ?? "", originalURL: movie.originalURL, timeout: timeout) : nil
+                    let (images, record) = await (tenhow, metadata)
+                    if paths.isEmpty, let record {
+                        // Missing native actor identities may be filled by the
+                        // exact record. Retain the old Tenhow/Amazon opportunity,
+                        // inside the same global 12-second selection budget.
+                        let enrichedPaths = tenhowPaths(movie.withCatalogueMetadata(record))
+                        if !enrichedPaths.isEmpty {
+                            let extra = await discoverTenhow(paths: enrichedPaths, number: movie.number ?? "", namespace: key, timeout: timeout)
+                            return extra + record.images
+                        }
                     }
-                } else { discover = nil }
-            } else {
-                discover = { @Sendable (timeout: TimeInterval) async -> [String] in
-                    await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
+                    return images + (record?.images ?? [])
                 }
             }
             let supplemental: (@Sendable (TimeInterval) async -> [String])?

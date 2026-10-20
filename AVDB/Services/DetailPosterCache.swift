@@ -34,7 +34,9 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
     private var flights: [String: Flight] = [:]
     private let positiveTTL: TimeInterval
     private let negativeTTL: TimeInterval
-    init(positiveTTL: TimeInterval = 120, negativeTTL: TimeInterval = 30) {
+    private let capacity: Int
+    init(positiveTTL: TimeInterval = 120, negativeTTL: TimeInterval = 30, capacity: Int = 24) {
+        self.capacity = max(1, capacity)
         self.positiveTTL = positiveTTL
         self.negativeTTL = negativeTTL
     }
@@ -104,8 +106,20 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
             flights[key] = nil
             guard !cancelled else { return }
             entries = entries.filter { $0.value.expires > Date() }
-            if entries.count >= 24, let oldest = entries.min(by: { $0.value.expires < $1.value.expires })?.key { entries[oldest] = nil }
+            if entries.count >= capacity, let oldest = entries.min(by: { $0.value.expires < $1.value.expires })?.key { entries[oldest] = nil }
             entries[key] = Entry(value: value, expires: Date().addingTimeInterval(value == nil ? negativeTTL : positiveTTL))
         }
+    }
+}
+
+/// Native detail is useful immediately; optional enrichment must not gate the
+/// first poster task. Default callers still receive the fully enriched result.
+/// The observer is awaited, so its account/generation check precedes enrichment.
+enum DetailMetadataDelivery {
+    static func complete<Value>(native: Value,
+        onNative: ((Value) async -> Void)? = nil,
+        enrich: (Value) async throws -> Value) async rethrows -> Value {
+        await onNative?(native)
+        return try await enrich(native)
     }
 }

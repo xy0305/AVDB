@@ -253,7 +253,8 @@ public final class JavDBSDK {
     }
 
     /// 影片详情完整数据（含相似推荐/演员影片）
-    public func movieDetailFull(_ id: String, fromRankings: Bool = false) async throws -> MovieDetailData {
+    public func movieDetailFull(_ id: String, fromRankings: Bool = false,
+                                onNative: ((MovieDetailData) async -> Void)? = nil) async throws -> MovieDetailData {
         let resp: JavDBResponse<MovieDetailData> = try await client.get(
             "/api/v4/movies/\(id)", query: ["from_rankings": fromRankings ? "true" : "false"])
         guard resp.isSuccess else {
@@ -263,7 +264,9 @@ public final class JavDBSDK {
             throw JavDBError.apiError(action: nil, message: "获取详情失败")
         }
         guard let movie = data.movie else { return data }
-        return MovieDetailData(movie: try await enrichCatalogue(movie), relativeMovies: data.relativeMovies, actorMovies: data.actorMovies)
+        return try await DetailMetadataDelivery.complete(native: data, onNative: onNative) { native in
+            MovieDetailData(movie: try await self.enrichCatalogue(movie), relativeMovies: native.relativeMovies, actorMovies: native.actorMovies)
+        }
     }
 
     /// 磁力列表（GET /api/v1/movies/{id}/magnets）

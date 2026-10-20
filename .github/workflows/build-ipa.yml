@@ -53,6 +53,7 @@ jobs:
           python3 scripts/test-catalogue-metadata.py
           python3 scripts/test-dmm-posters.py
           python3 scripts/test-poster-latency.py
+          python3 scripts/test-detail-delivery.py | tee detail-delivery-performance.txt
           python3 scripts/test-native-rankings.py
           python3 scripts/test-auth-persistence.py
           python3 scripts/test-external-library.py

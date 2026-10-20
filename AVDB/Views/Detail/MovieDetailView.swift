@@ -17,7 +17,7 @@ struct MovieDetailView: View {
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
     private let posterSeed: Movie?
-    private var posterMovie: Movie? { posterSeed ?? vm.movie }
+    private var posterMovie: Movie? { posterSeed ?? vm.posterMovie ?? vm.movie }
 
     private var posterRequestKey: String {
         guard let movie = posterMovie else { return "pending#\(movieID)#\(posterAccountEpoch)" }
@@ -1110,6 +1110,10 @@ struct MovieDetailView: View {
 final class MovieDetailViewModel: ObservableObject {
     let movieID: String
     @Published var movie: Movie?
+    // Immutable native image identity for this visit; text enrichment cannot
+    // restart the winner task, change geometry or publish a second winner.
+    @Published private(set) var posterMovie: Movie?
+    private var loadGeneration = UUID()
     @Published var relatedMovies: [Movie] = []
     @Published var actorMovies: [Movie] = []
     @Published var magnets: [Magnet] = []
@@ -1134,10 +1138,20 @@ final class MovieDetailViewModel: ObservableObject {
 
     func load() async {
         guard !movieID.isEmpty else { return }
+        let generation = UUID()
+        loadGeneration = generation
+        let account = APIClient.shared.token
         isLoading = true
-        defer { isLoading = false }
+        defer { if loadGeneration == generation { isLoading = false } }
         do {
-            let full = try await sdk.movieDetailFull(movieID)
+            let full = try await sdk.movieDetailFull(movieID, onNative: { native in
+                guard !Task.isCancelled, self.loadGeneration == generation,
+                      APIClient.shared.token == account, native.movie?.id == self.movieID else { return }
+                if self.posterMovie == nil { self.posterMovie = native.movie }
+                self.movie = native.movie
+            })
+            guard !Task.isCancelled, loadGeneration == generation,
+                  APIClient.shared.token == account, full.movie?.id == movieID else { return }
             movie = full.movie
             relatedMovies = full.movie?.relativeMovies
                 ?? full.relativeMovies
@@ -1147,6 +1161,7 @@ final class MovieDetailViewModel: ObservableObject {
                 ?? []
             reviewStatus = full.movie?.review?.status
         } catch {
+            guard !Task.isCancelled, loadGeneration == generation, APIClient.shared.token == account else { return }
             errorMessage = error.localizedDescription
         }
     }

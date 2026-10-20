@@ -244,14 +244,18 @@ private final class CatalogueRedirectBlocker: NSObject, URLSessionTaskDelegate {
 /// A WAF, age/auth challenge, timeout or ambiguous response is a cached miss.
 actor CatalogueMetadataService {
     static let shared = CatalogueMetadataService()
-    private struct Entry { let until: TimeInterval; let value: ScrapedMetadata? }
-    private var cache: [String: Entry] = [:]
+    private let cache = DetailPosterCache<ScrapedMetadata>(positiveTTL: 3600, negativeTTL: 300, capacity: 128)
     func lookup(number: String, originalURL: String? = nil, timeout: TimeInterval = 4) async -> ScrapedMetadata? {
-        guard let identity = CatalogueIdentity.key(number), !Task.isCancelled else { return nil }
+        guard let identity = CatalogueIdentity.key(number), !Task.isCancelled, timeout > 0 else { return nil }
         let linked = originalURL.flatMap { DMMAmateurMetadata.boundLink($0, number: number) }
         let key = identity + "#" + (linked?.cid ?? "avbase")
+        return await cache.value(key: key) {
+            await Self.fetch(number: number, originalURL: originalURL, timeout: timeout)
+        }
+    }
+    private static func fetch(number: String, originalURL: String?, timeout: TimeInterval) async -> ScrapedMetadata? {
+        let linked = originalURL.flatMap { DMMAmateurMetadata.boundLink($0, number: number) }
         let now = ProcessInfo.processInfo.systemUptime
-        if let entry = cache[key], entry.until > now { return entry.value }
         let deadline = now + min(6, max(0, timeout))
         var found: ScrapedMetadata?
         if let linked, let payload = DMMAmateurMetadata.payload(cid: linked.cid),
@@ -286,8 +290,6 @@ actor CatalogueMetadataService {
             }
         }
         guard !Task.isCancelled else { return nil }
-        if cache.count >= 128 { cache.removeAll() }
-        cache[key] = Entry(until: ProcessInfo.processInfo.systemUptime + (found == nil ? 300 : 3600), value: found)
         return found
     }
     private static func request(_ url: URL, timeout: TimeInterval, body: Data? = nil) async -> Data? {
