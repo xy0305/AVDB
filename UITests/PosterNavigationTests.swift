@@ -532,6 +532,11 @@ final class PosterNavigationTests: XCTestCase {
         let back = app.buttons["返回"]
         XCTAssertTrue(back.isHittable)
         XCTAssertGreaterThanOrEqual(back.frame.minY, 24, "Back must clear the status bar safe area")
+        let source = app.staticTexts["detail-cover-source"]
+        XCTAssertTrue(source.waitForExistence(timeout: 5))
+        XCTAssertEqual(source.label, "封面来源：原始封面/未知来源")
+        XCTAssertGreaterThan(source.frame.minY, back.frame.maxY, "Source label must clear the navigation buttons")
+        XCTAssertLessThan(source.frame.maxY, title.frame.minY, "Unobtrusive cover corner must not move the title or controls")
         XCTAssertGreaterThanOrEqual(play.frame.height, 44)
         XCTAssertGreaterThan(title.frame.minY, back.frame.maxY)
         XCTAssertLessThan(title.frame.maxY, play.frame.minY, "Separate lower title precedes transparent play")

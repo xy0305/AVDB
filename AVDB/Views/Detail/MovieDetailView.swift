@@ -433,7 +433,7 @@ struct MovieDetailView: View {
                 Text(art.provenance.text)
                     .font(.caption2).foregroundStyle(.white.opacity(0.85))
                     .padding(5).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5))
-                    .padding(.leading, 18).padding(.top, 92)
+                    .padding(.leading, 18).padding(.top, 140)
                     .accessibilityIdentifier("detail-cover-source")
                     .allowsHitTesting(false)
             }

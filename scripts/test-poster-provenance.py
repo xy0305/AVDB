@@ -13,6 +13,8 @@ assert 'DetailPosterCache<DetailPosterArtwork>()' in resolver
 assert 'cache.snapshot(key: identity(movie: movie, account: account))' in resolver
 assert 'Text(art.provenance.text)' in view
 assert '.overlay(alignment: .topLeading)' in view
+assert '.padding(.leading, 18).padding(.top, 140)' in view
+assert 'Source label must clear the navigation buttons' in read('UITests/PosterNavigationTests.swift')
 assert 'presentation.key == posterRequestKey' in view
 assert 'presentation.complete(art, key: key, generation: generation)' in view
 assert 'guard !Task.isCancelled, posterRequestKey == key' in view
