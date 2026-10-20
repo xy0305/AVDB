@@ -703,7 +703,7 @@ struct JRBackendView: View {
                         Image(systemName: "person.crop.circle").font(.title).accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(entity.name).font(.headline)
-                            Text(entity.score.map { "来源战力总分：" + String(format: "%.0f", $0) } ?? "来源未提供战力总分").font(.caption).foregroundStyle(JRPalette.gold)
+                            Text(entity.score.map { "来源战力总分：" + String(format: "%.0f", $0) } ?? "当前缓存未包含战力总分").font(.caption).foregroundStyle(JRPalette.gold)
                             Text("来源人物集合 · 作品更多").font(.caption).foregroundStyle(JRPalette.muted)
                         }
                         Spacer(); Image(systemName: "arrow.up.right")
@@ -923,7 +923,7 @@ private enum JRDesignFixture {
     static func envelope(route: String) -> JRBackendEnvelope {
         let slugs = ["dmm-weekly", "dmm-monthly-2024-09", "javdb-top250", "javlibrary-top250", "javdb-uncensored-top250", "javdb-fc2-top250", "javdb-top250-2023", "dmm-monthly-2023-12"] + (2013...2022).map { "javdb-top250-\($0)" }
         let links = slugs.map { JRBackendLink(sourcePath: "/zh-hans/rankings/\($0)/", kind: "ranking", topic: $0) }
-        let items = (1...8).map { JRBackendVideo(sourceID: "neutral-\($0)", sourcePath: "/neutral/videos/\($0)/", number: "TEST-00\($0)", exactNumber: "TEST00\($0)", rank: [75, 10, 42, 9, 8, 7, 6, 5][$0-1], order: $0) }
+        let items = (1...8).map { JRBackendVideo(sourceID: "neutral-\($0)", sourcePath: "/neutral/videos/\($0)/", number: "TEST-00\($0)", exactNumber: "TEST00\($0)", score: Double(1000 + $0), rank: [75, 10, 42, 9, 8, 7, 6, 5][$0-1], order: $0) }
         let ids = ["pick", "random", "rankings", "weekly", "monthly", "awarded", "actors"]
         let labels = ["今天冲哪个？", "随机神作推荐", "查看全部排行榜", "DMM 本周热销", "DMM 来源月榜", "全站神作总榜", "女优战力总榜"]
         let sections: [JRBackendSection] = ids.enumerated().map { i, id in

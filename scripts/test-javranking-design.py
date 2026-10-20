@@ -13,7 +13,8 @@ assert 'JRBackendView(route: "home"' in view.split('struct JavRankingSettingsVie
 assert 'JRBackendView(route: "topics"' not in view.split('struct JavRankingSettingsView')[0]
 assert 'luckyHero(sections)' in backend and 'jr-lucky-start' in backend
 assert 'jr-random-refresh' in backend and 'cachedPool(sections)' in backend
-assert 'homeFooter' in backend and '来源未提供战力总分' in backend
+assert 'homeFooter' in backend and '当前缓存未包含战力总分' in backend
+assert 'randomBatch = nil' in backend
 assert 'ForEach(Array(items.enumerated())' in backend
 assert 'ForEach(Array(values.enumerated())' in backend
 assert 'items.prefix' not in backend.split('// Runtime fixtures')[0]

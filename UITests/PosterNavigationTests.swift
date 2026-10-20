@@ -11,6 +11,7 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["JAV Ranking"].firstMatch.waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["随机神作推荐"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["TEST-001"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["来源战力：1001 分"].firstMatch.waitForExistence(timeout: 5))
         let film = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'jr-film-'")).firstMatch
         XCTAssertTrue(film.waitForExistence(timeout: 5))
         XCTAssertGreaterThan(film.frame.width, film.frame.height)
@@ -82,7 +83,11 @@ final class PosterNavigationTests: XCTestCase {
         var markers = Set<String>()
         let labels = ["今天冲哪个？", "随机神作推荐", "查看全部排行榜", "DMM 本周热销", "DMM 月度热销 · 2024 · 09 月", "全站神作总榜", "女优战力总榜", "中性示例演员 1", "中性示例演员 2", "中性示例演员 3", "JAV Ranking · 来源与导航"]
         for index in 0..<75 {
-            for label in labels where app.staticTexts[label].firstMatch.isHittable { markers.insert(label) }
+            for label in labels {
+                let text = app.staticTexts[label].firstMatch
+                let control = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
+                if text.isHittable || control.isHittable { markers.insert(label) }
+            }
             let shot = XCTAttachment(screenshot: app.screenshot())
             shot.name = "225-neutral-fullhome-scroll-\(index)"; shot.lifetime = .keepAlways; add(shot)
             if app.links.matching(NSPredicate(format: "label CONTAINS '使用条款'")).firstMatch.isHittable { break }
