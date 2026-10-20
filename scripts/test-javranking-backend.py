@@ -11,8 +11,9 @@ view=(R/'AVDB/Views/JavRankingView.swift').read_text()
 for f in F.glob('*.json'):
  d=json.loads(f.read_text());assert d['schemaVersion']==1
  assert not any(k in f.read_text() for k in ['"coverURL"','"thumbURL"','"cookie"','"nativeID"'])
-assert 'JRBackendFilmCell(item: item)' in view and '.avdbCatalogAccountChanged' in view
-assert 'MoviePosterCard(movie: movie)' in view
+assert 'JRBackendFilmCell(item: item, rankContext: context)' in view and '.avdbCatalogAccountChanged' in view
+assert 'MoviePosterImage(movie: movie, maxPixelSize: 600)' in view
+assert 'JRFilmArtwork(item: item, movie: movie' in view and 'MovieDetailView(movieID: movie.id)' in view
 assert 'rejectRedirects: true' in source and 'javranking.backendHTTPS' in source
 if not shutil.which('swiftc'):
  print('PASS fixture/static contracts; SKIP native Swift backend runtime (macOS required)');raise SystemExit(0)

@@ -1,6 +1,33 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testJavRankingNativeBlackGoldHomeAndTopics() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        XCTAssertTrue(app.otherElements["jr-native-masthead"].waitForExistence(timeout: 15) || app.staticTexts["JAV Ranking"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["随机神作推荐"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["TEST-001"].firstMatch.waitForExistence(timeout: 10))
+        let film = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'jr-film-'")).firstMatch
+        XCTAssertTrue(film.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(film.frame.width, film.frame.height)
+        let home = XCTAttachment(screenshot: app.screenshot()); home.name = "224-native-home-horizontal-cards"; home.lifetime = .keepAlways; add(home)
+        let topics = app.buttons["jr-open-topics"]
+        XCTAssertTrue(topics.isHittable); XCTAssertGreaterThanOrEqual(topics.frame.height, 44); topics.tap()
+        let monthly = app.buttons.matching(NSPredicate(format: "label CONTAINS '2024 · 09 月'")).firstMatch
+        XCTAssertTrue(monthly.waitForExistence(timeout: 10))
+        let tiles = app.buttons.matching(NSPredicate(format: "label CONTAINS 'TOP 250'"))
+        XCTAssertGreaterThanOrEqual(tiles.count, 2)
+        let top250 = tiles.element(boundBy: 0), second250 = tiles.element(boundBy: 1)
+        XCTAssertEqual(top250.frame.minY, second250.frame.minY, accuracy: 2)
+        XCTAssertLessThan(top250.frame.maxX, second250.frame.minX)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "224-native-topics-two-column-original-art"; shot.lifetime = .keepAlways; add(shot)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        waitForInterfaceGeometry(app, portrait: false)
+        let wide = XCTAttachment(screenshot: app.screenshot()); wide.name = "224-native-topics-landscape"; wide.lifetime = .keepAlways; add(wide)
+    }
+
     func testLongDetailTitleThreeLinesExpandsAndPersistsVisibility() {
         verifyReadableDetail(accessibilitySize: false)
     }

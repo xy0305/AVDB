@@ -451,7 +451,7 @@ struct JRBackendEnvelope: Decodable {
         return value
     }
     var notice: String {
-        "\(stale ? "旧缓存 · " : "")状态：\(status) · 刷新：\(refresh ?? "未知")\n最后成功：\(fetchedAt ?? "尚无")\n最后尝试：\(lastAttempt ?? "尚无")\n下次尝试：\(nextAttempt ?? "未排定")"
+        "\(stale && fetchedAt != nil && data != nil ? "旧缓存 · " : "")状态：\(status) · 刷新：\(refresh ?? "未知")\n最后成功：\(fetchedAt ?? "尚无")\n最后尝试：\(lastAttempt ?? "尚无")\n下次尝试：\(nextAttempt ?? "未排定")"
     }
 }
 struct JRBackendVideo: Decodable {
@@ -500,4 +500,39 @@ struct JRBackendPayload: Decodable {
     let nextPage: Int?
     let nextSourcePath: String?
     let total: Int?
+}
+
+/// Labels are derived only from the cached source route, never the device calendar.
+struct JRTopicStyle {
+    let family: String
+    let edition: String
+    let period: String
+    var label: String { "\(family) · \(edition) · \(period)" }
+    init(path: String) {
+        let slug = path.split(separator: "/").last.map(String.init) ?? ""
+        if slug.hasPrefix("dmm-") {
+            family = "DMM"
+            if slug == "dmm-weekly" { edition = "每周热榜"; period = "WEEKLY" }
+            else {
+                let parts = slug.split(separator: "-")
+                edition = "月度热榜"
+                period = parts.count == 4 ? "\(parts[2]) · \(parts[3]) 月" : "来源月榜"
+            }
+        } else if slug.hasPrefix("javdb-") || slug.hasPrefix("javlibrary-") {
+            family = slug.hasPrefix("javdb-") ? "JAVDB" : "JAVLIBRARY"
+            edition = slug.contains("uncensored") ? "无码 TOP 250" : slug.contains("fc2") ? "FC2 TOP 250" : "TOP 250"
+            let tail = slug.split(separator: "-").last.map(String.init) ?? ""
+            period = tail.count == 4 && Int(tail) != nil ? "\(tail) 年度" : "ALL TIME"
+        } else {
+            family = "JAV Ranking"
+            switch slug {
+            case "rankings": edition = "全部排行榜"
+            case "most-awarded-videos": edition = "神作总榜"
+            case "most-awarded-actors": edition = "女优总榜"
+            case "most-awarded-male-actors": edition = "男优总榜"
+            default: edition = "来源集合"
+            }
+            period = "COLLECTION"
+        }
+    }
 }
