@@ -22,7 +22,7 @@ struct TPDBLandscape: @unchecked Sendable {
     let image: UIImage
     let width: Int
     let height: Int
-    var label: String { "TPDB · \(width) × \(height)" }
+    var label: String { "封面来源：ThePornDB · \(width) × \(height)" }
 }
 
 /// Separate budget and cache. Never participates in Japanese DVD front scoring.

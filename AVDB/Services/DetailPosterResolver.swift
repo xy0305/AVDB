@@ -8,6 +8,8 @@ struct DetailPosterArtwork: @unchecked Sendable {
     let image: UIImage
     let backdrop: UIImage
     let tint: UIColor
+    // Travel with the decoded winner through the cache and synchronous snapshot.
+    let provenance: PosterProvenance
 }
 
 /// A separate cookie-free session is essential: this resolver never sees a 115
@@ -407,7 +409,7 @@ enum DetailPosterResolver {
             let input = CIImage(cgImage: cg).transformed(by: CGAffineTransform(scaleX: 0.08, y: 0.08))
             let blurred = input.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 12]).cropped(to: input.extent)
             let backdrop = CIContext(options: [.cacheIntermediates: false]).createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) } ?? UIImage(cgImage: cg)
-            return DetailPosterArtwork(image: UIImage(cgImage: cg), backdrop: backdrop, tint: tint)
+            return DetailPosterArtwork(image: UIImage(cgImage: cg), backdrop: backdrop, tint: tint, provenance: PosterProvenance(source: source))
         }.value
     }
 }

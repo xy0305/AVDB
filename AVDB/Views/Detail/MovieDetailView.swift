@@ -428,6 +428,16 @@ struct MovieDetailView: View {
         }
         .foregroundStyle(.white)
         .frame(width: width)
+        .overlay(alignment: .topLeading) {
+            if let art {
+                Text(art.provenance.text)
+                    .font(.caption2).foregroundStyle(.white.opacity(0.85))
+                    .padding(5).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5))
+                    .padding(.leading, 18).padding(.top, 92)
+                    .accessibilityIdentifier("detail-cover-source")
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     // Text wraps at narrow widths / accessibility sizes instead of forcing the
@@ -523,7 +533,7 @@ struct MovieDetailView: View {
             UIColor(red: 0.21, green: 0.27, blue: 0.31, alpha: 1).setFill()
             ctx.cgContext.fill(CGRect(x: 130, y: 500, width: 440, height: 500))
         }
-        return DetailPosterArtwork(image: image, backdrop: image, tint: UIColor(red: 0.59, green: 0.50, blue: 0.45, alpha: 1))
+        return DetailPosterArtwork(image: image, backdrop: image, tint: UIColor(red: 0.59, green: 0.50, blue: 0.45, alpha: 1), provenance: PosterProvenance(source: "fixture://neutral"))
     }
     #endif
 
@@ -546,7 +556,8 @@ struct MovieDetailView: View {
                         url: movie.coverURL,
                         fallbackURL: movie.previewImages?.first?.largeURL ?? movie.previewImages?.first?.thumbURL,
                         secondFallbackURL: movie.hdBackdropURL,
-                        contentMode: .fill
+                        contentMode: .fill,
+                        showsSourceLabel: true
                     )
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1.47, contentMode: .fit)

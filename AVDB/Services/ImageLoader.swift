@@ -396,19 +396,23 @@ public struct JavDBImage: View {
     let contentMode: ContentMode
     let maxPixelSize: Int
     let frontPoster: Bool
+    let showsSourceLabel: Bool
 
     @State private var image: UIImage?
+    @State private var imageProvenance: PosterProvenance?
     @State private var imageIdentity: String?
 
     private var requestIdentity: String {
         imageURLs.joined(separator: "|") + "#\(frontPoster)#\(maxPixelSize)"
     }
 
-    private func publish(_ value: UIImage, identity: String) {
+    private func publish(_ value: UIImage, identity: String, source: String) {
+        guard !Task.isCancelled, identity == requestIdentity else { return }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             image = value
+            imageProvenance = PosterProvenance(source: source)
             imageIdentity = identity
         }
     }
@@ -419,7 +423,8 @@ public struct JavDBImage: View {
         secondFallbackURL: String? = nil,
         contentMode: ContentMode = .fill,
         maxPixelSize: Int = 2048,
-        frontPoster: Bool = false
+        frontPoster: Bool = false,
+        showsSourceLabel: Bool = false
     ) {
         self.url = url
         self.fallbackURL = fallbackURL
@@ -427,6 +432,7 @@ public struct JavDBImage: View {
         self.contentMode = contentMode
         self.maxPixelSize = maxPixelSize
         self.frontPoster = frontPoster
+        self.showsSourceLabel = showsSourceLabel
     }
 
     private var imageURLs: [String] {
@@ -455,6 +461,15 @@ public struct JavDBImage: View {
                 }
             }
             .clipped()
+            .overlay(alignment: .bottomLeading) {
+                if showsSourceLabel, image != nil, imageIdentity == requestIdentity, let imageProvenance {
+                    Text(imageProvenance.text)
+                        .font(.caption2).foregroundStyle(.white.opacity(0.85))
+                        .padding(5).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 5))
+                        .padding(10)
+                        .accessibilityIdentifier("detail-cover-source")
+                }
+            }
             // Identity replacement must also ignore a parent's animation. Merely
             // disabling animation in publish() leaves an old Image fading out
             // when the new source fails and no publication ever occurs.
@@ -484,12 +499,12 @@ public struct JavDBImage: View {
                 if frontPoster, let cg = fixtureImage.cgImage,
                    let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: "https://tp.spfcas.com/covers/neutral.jpg"),
                    let cropped = cg.cropping(to: rect) { fixtureImage = UIImage(cgImage: cropped) }
-                publish(fixtureImage, identity: identity)
+                publish(fixtureImage, identity: identity, source: url)
                 return
             }
             #endif
             // 不先清空 image。LazyVGrid 滚动时 task 会被取消，先清空会让中间封面变空白。
-            var landscapeFallback: UIImage?
+            var landscapeFallback: (image: UIImage, source: String)?
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
                 let loaded = frontPoster
@@ -498,14 +513,14 @@ public struct JavDBImage: View {
                 if let img = loaded {
                     guard !Task.isCancelled else { return }
                     if frontPoster, img.size.width > img.size.height {
-                        landscapeFallback = landscapeFallback ?? img
+                        landscapeFallback = landscapeFallback ?? (img, candidate)
                         continue
                     }
-                    publish(img, identity: identity)
+                    publish(img, identity: identity, source: candidate)
                     return
                 }
             }
-            if !Task.isCancelled, let landscapeFallback { publish(landscapeFallback, identity: identity) }
+            if !Task.isCancelled, let landscapeFallback { publish(landscapeFallback.image, identity: identity, source: landscapeFallback.source) }
         }
     }
 

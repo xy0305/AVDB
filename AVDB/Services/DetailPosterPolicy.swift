@@ -1,5 +1,25 @@
 import Foundation
 
+/// Attribution of the displayed raster, never the page which discovered it.
+/// Only fixed names leave this boundary: signed URLs and private paths stay private.
+struct PosterProvenance: Equatable, Sendable {
+    let label: String
+
+    init(source: String) {
+        switch URL(string: source)?.host?.lowercased() {
+        case "tp.spfcas.com", "c0.jdbstatic.com": label = "JavDB"
+        case "pics.dmm.co.jp", "awsimgsrc.dmm.co.jp": label = "DMM"
+        case "m.media-amazon.com", "images-na.ssl-images-amazon.com": label = "Amazon"
+        case "www.tenhow.net": label = "Tenhow"
+        case "www.javbus.com": label = "JavBus"
+        case "image.mgstage.com": label = "MGS"
+        default: label = "原始封面/未知来源"
+        }
+    }
+
+    var text: String { "封面来源：" + label }
+}
+
 /// Scores only the decoded, EXIF-oriented, actually usable portrait (after crop).
 /// Rendering never upscales. Score keeps native effective pixels even though
 /// the retained display raster is capped at 1800 pixels to bound cache memory.
