@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        D2190000000000000000000B /* CatalogueMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21900000000000000000001; };
         D2160000000000000000000B /* SubtitleCatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21600000000000000000001; };
         D2160000000000000000000C /* OnlineSubtitleModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21600000000000000000002; };
         D2150000000000000000000B /* PlaybackVideoMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21500000000000000000001; };
@@ -76,6 +77,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        D21900000000000000000001 /* CatalogueMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogueMetadata.swift; sourceTree = "<group>"; };
         D21600000000000000000001 /* SubtitleCatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleCatProvider.swift; sourceTree = "<group>"; };
         D21600000000000000000002 /* OnlineSubtitleModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineSubtitleModel.swift; sourceTree = "<group>"; };
         D21500000000000000000001 /* PlaybackVideoMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackVideoMetrics.swift; sourceTree = "<group>"; };
@@ -212,6 +214,7 @@
                 D21400000000000000000002 /* TPDBCoverSettings.swift */,
                 D21400000000000000000003 /* TPDBArtworkService.swift */,
 				D21300000000000000000001 /* JavBusPoster.swift */,
+                D21900000000000000000001 /* CatalogueMetadata.swift */,
 				D18600000000000000000001 /* TenhowPoster.swift */,
 				D18600000000000000000002 /* TenhowActorLinks.swift */,
 				D18300000000000000000001 /* DetailPosterPolicy.swift */,
@@ -468,6 +471,7 @@
                 D2140000000000000000000C /* TPDBCoverSettings.swift in Sources */,
                 D2140000000000000000000D /* TPDBArtworkService.swift in Sources */,
 				D2130000000000000000000B /* JavBusPoster.swift in Sources */,
+                D2190000000000000000000B /* CatalogueMetadata.swift in Sources */,
 				D1860000000000000000000B /* TenhowPoster.swift in Sources */,
 				D1860000000000000000000C /* TenhowActorLinks.swift in Sources */,
 				D1830000000000000000000B /* DetailPosterPolicy.swift in Sources */,
@@ -573,7 +577,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 218;
+				CURRENT_PROJECT_VERSION = 219;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -596,7 +600,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 218;
+				CURRENT_PROJECT_VERSION = 219;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

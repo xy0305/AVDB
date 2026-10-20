@@ -229,6 +229,16 @@ public final class JavDBSDK {
 
     // MARK: - 影片 / 元数据
 
+    private func enrichCatalogue(_ movie: Movie) async throws -> Movie {
+        guard let number = movie.number, CatalogueIdentity.key(number) != nil,
+              !["1", "2", "3", "4"].contains(movie.type ?? "") else { return movie }
+        let account = client.token
+        let metadata = await CatalogueMetadataService.shared.lookup(number: number, originalURL: movie.originalURL)
+        try Task.checkCancellation()
+        guard account == client.token else { throw CancellationError() }
+        return metadata.map { movie.withCatalogueMetadata($0) } ?? movie
+    }
+
     /// 影片详情（GET /api/v4/movies/{id}）
     public func movieDetail(_ id: String, fromRankings: Bool = false) async throws -> Movie {
         let resp: JavDBResponse<MovieDetailData> = try await client.get(
@@ -239,7 +249,7 @@ public final class JavDBSDK {
         guard let movie = resp.data?.movie else {
             throw JavDBError.apiError(action: nil, message: "获取详情失败")
         }
-        return movie
+        return try await enrichCatalogue(movie)
     }
 
     /// 影片详情完整数据（含相似推荐/演员影片）
@@ -252,7 +262,8 @@ public final class JavDBSDK {
         guard let data = resp.data else {
             throw JavDBError.apiError(action: nil, message: "获取详情失败")
         }
-        return data
+        guard let movie = data.movie else { return data }
+        return MovieDetailData(movie: try await enrichCatalogue(movie), relativeMovies: data.relativeMovies, actorMovies: data.actorMovies)
     }
 
     /// 磁力列表（GET /api/v1/movies/{id}/magnets）

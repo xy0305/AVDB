@@ -1,0 +1,47 @@
+[
+  {
+    "number": "R18-292",
+    "url": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/h_093r1800292/h_093r1800292ps.jpg",
+    "status": 200,
+    "content_type": "image/jpeg",
+    "bytes": 14643,
+    "dimensions": [
+      147,
+      200
+    ],
+    "format": "JPEG",
+    "sha256": "73569d1ffb7b4697c823bf86247be81b84a76bc2329b864143e430a591b1daa0",
+    "decoded": true,
+    "rendered": false
+  },
+  {
+    "number": "723GGH-009",
+    "url": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/amateur/ggh009/ggh009jp.jpg",
+    "status": 200,
+    "content_type": "image/jpeg",
+    "bytes": 42045,
+    "dimensions": [
+      300,
+      300
+    ],
+    "format": "JPEG",
+    "sha256": "37c3b4243f4705a6180e29645bae803d905f0a5d90f3410ec6bfb5e56cde85a1",
+    "decoded": true,
+    "rendered": false
+  },
+  {
+    "number": "SIRO-5000",
+    "url": "https://image.mgstage.com/images/shirouto/sp/siro/5000/h1-06_sp-siro-5000.jpg",
+    "status": 200,
+    "content_type": "image/jpeg",
+    "bytes": 154126,
+    "dimensions": [
+      422,
+      600
+    ],
+    "format": "JPEG",
+    "sha256": "2df8de730c316a23c24a2900c864cb283ec9a9bae7765d820b4c585cf24733ba",
+    "decoded": true,
+    "rendered": false
+  }
+]

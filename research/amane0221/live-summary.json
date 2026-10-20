@@ -1,0 +1,140 @@
+[
+  {
+    "url": "https://www.avbase.net/works?q=R18-292",
+    "status": 200,
+    "bytes": 48433,
+    "props_keys": [
+      "_superjson",
+      "cast_size",
+      "on_sale",
+      "page",
+      "pathname",
+      "q",
+      "since",
+      "total",
+      "until",
+      "works"
+    ],
+    "work_count": 1,
+    "identities": [
+      {
+        "work_id": "R18-292",
+        "prefix": "cherries",
+        "product_keys": [
+          [
+            "authors",
+            "book_type",
+            "content_type",
+            "date",
+            "id",
+            "image_url",
+            "iteminfo",
+            "label",
+            "maker",
+            "manufacture",
+            "product_id",
+            "sample_image_urls",
+            "sample_movie_url",
+            "series",
+            "source",
+            "thumbnail_url",
+            "title",
+            "url"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "url": "https://www.avbase.net/works?q=723GGH-009",
+    "status": 200,
+    "bytes": 46092,
+    "props_keys": [
+      "_superjson",
+      "cast_size",
+      "on_sale",
+      "page",
+      "pathname",
+      "q",
+      "since",
+      "total",
+      "until",
+      "works"
+    ],
+    "work_count": 1,
+    "identities": [
+      {
+        "work_id": "GGH-009",
+        "prefix": "",
+        "product_keys": [
+          [
+            "authors",
+            "book_type",
+            "content_type",
+            "date",
+            "id",
+            "image_url",
+            "iteminfo",
+            "label",
+            "maker",
+            "manufacture",
+            "product_id",
+            "sample_image_urls",
+            "sample_movie_url",
+            "series",
+            "source",
+            "thumbnail_url",
+            "title",
+            "url"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "url": "https://www.avbase.net/works?q=SIRO-5000",
+    "status": 200,
+    "bytes": 43122,
+    "props_keys": [
+      "_superjson",
+      "cast_size",
+      "on_sale",
+      "page",
+      "pathname",
+      "q",
+      "since",
+      "total",
+      "until",
+      "works"
+    ],
+    "work_count": 1,
+    "identities": [
+      {
+        "work_id": "SIRO-5000",
+        "prefix": "",
+        "product_keys": [
+          [
+            "authors",
+            "book_type",
+            "content_type",
+            "date",
+            "id",
+            "image_url",
+            "iteminfo",
+            "label",
+            "maker",
+            "manufacture",
+            "product_id",
+            "sample_image_urls",
+            "sample_movie_url",
+            "series",
+            "source",
+            "thumbnail_url",
+            "title",
+            "url"
+          ]
+        ]
+      }
+    ]
+  }
+]

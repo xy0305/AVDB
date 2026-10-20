@@ -73,7 +73,7 @@ enum JRPolicy {
     }
     static func catalogueCode(_ input: String) -> String? {
         let value = foldedCode(input)
-        return JRHTML.matches(#"^(FC2(?:[-_ ]?PPV)?[-_ ]?[0-9]+|[A-Z]{2,12}[-_]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
+        return JRHTML.matches(#"^(FC2(?:[-_ ]?PPV)?[-_ ]?[0-9]+|[A-Z]{1,4}[0-9]{1,4}[-_ ][0-9]{2,10}|[0-9]{1,4}[A-Z]{2,12}[-_]?[0-9]{2,10}|[A-Z]{2,12}[-_]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})(?=\s|$)"#, value).first?[1]
     }
     static func movieCode(number: String?, title: String?) -> String? {
         // A present number is authoritative: a conflicting title cannot override it.
@@ -89,7 +89,12 @@ enum JRPolicy {
         if let digits = JRHTML.matches(#"^FC2(?:[-_ ]?PPV)?[-_ ]?([0-9]+)$"#, folded).first?[1] {
             return "FC2PPV" + digits
         }
-        guard !JRHTML.matches(#"^(?:[A-Z]{2,12}[-_ ]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})$"#, folded).isEmpty else { return nil }
+        // Keep the studio/serial boundary when both contain digits. Removing
+        // it would collide R18-292 with R1-8292 in exact caches and API matching.
+        if let m = JRHTML.matches(#"^([A-Z]{1,4}[0-9]{1,4})[-_ ]([0-9]{2,10})$"#, folded).first {
+            return m[1] + "-" + m[2]
+        }
+        guard !JRHTML.matches(#"^(?:[A-Z]{1,4}[0-9]{1,4}[-_ ][0-9]{2,10}|[0-9]{1,4}[A-Z]{2,12}[-_ ]?[0-9]{2,10}|[A-Z]{2,12}[-_ ]?[0-9]{2,10}|[0-9]{6}_[0-9]{3})$"#, folded).isEmpty else { return nil }
         return normalizedCode(folded)
     }
     static func normalizedCode(_ code: String) -> String {

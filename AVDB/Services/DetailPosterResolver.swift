@@ -91,7 +91,7 @@ enum DetailPosterResolver {
         // Opaque memory-only account namespace; never log credentials.
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
         let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + "#" + (movie.catalogueMetadata?.images.joined(separator: "|") ?? "")
     }
 
     static func validatedSources(_ movie: Movie) -> [String] {
@@ -104,15 +104,18 @@ enum DetailPosterResolver {
             let values = DMMPoster.candidates(metadata: source, number: movie.number ?? "")
             return values.isEmpty ? nil : values
         }.first ?? [])
-        let validated = (exact + sources + rules).filter { source in
-            guard let url = URL(string: source), allowed(url), !url.path.contains("/small_covers/") else { return false }
+        let bound = movie.catalogueMetadata?.images ?? []
+        let validated = (bound + exact + sources + rules).filter { source in
+            guard let url = URL(string: source), !url.path.contains("/small_covers/") else { return false }
+            if bound.contains(source) { return AvbaseMetadata.allowedDiscoveredImage(url) }
+            guard allowed(url) else { return false }
             return !DetailPosterPolicy.allowedPublicImage(url) || exact.contains(source) || rules.contains(source)
         }
         // Start a JavDB and MGS opportunity where available, not two new DMM
         // variants that could consume every non-Tenhow/Amazon family slot.
         let anchors = [validated.first { source in
             guard let url = URL(string: source) else { return false }
-            return !DetailPosterPolicy.allowedPublicImage(url)
+            return !DetailPosterPolicy.allowedPublicImage(url) && !AvbaseMetadata.allowedDiscoveredImage(url)
         }, validated.first { URL(string: $0)?.host == "image.mgstage.com" }].compactMap { $0 }
         return anchors + validated.filter { !anchors.contains($0) }
     }
@@ -134,7 +137,15 @@ enum DetailPosterResolver {
             let paths = tenhowPaths(movie)
             let discover: (@Sendable (TimeInterval) async -> [String])?
             if paths.isEmpty {
-                discover = nil
+                // A navigation seed deliberately stays immutable to prevent layout
+                // jumps. Discover here as well, so seeded native routes still get
+                // the exact-record source images without rewriting that seed.
+                if CatalogueIdentity.key(movie.number ?? "") != nil && !["1", "2", "3", "4"].contains(movie.type ?? "") {
+                    discover = { @Sendable timeout in
+                        let metadata = await CatalogueMetadataService.shared.lookup(number: movie.number ?? "", originalURL: movie.originalURL, timeout: timeout)
+                        return metadata?.images ?? []
+                    }
+                } else { discover = nil }
             } else {
                 discover = { @Sendable (timeout: TimeInterval) async -> [String] in
                     await discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
@@ -150,7 +161,9 @@ enum DetailPosterResolver {
             }
             let decoded: [DecodedPoster] = await DetailPosterSelection.collect(sources: validated, discover: discover, supplemental: supplemental) { source, timeout in
                 guard let url = URL(string: source) else { return nil }
-                return await download(url: url, timeout: timeout, derive: !original)
+                // Amateur jp.jpg is a complete single image, never a DVD jacket.
+                let singleImage = url.path.contains("/digital/amateur/") || url.lastPathComponent.hasPrefix("h1-")
+                return await download(url: url, timeout: timeout, derive: !original && !singleImage)
             }
             guard !Task.isCancelled,
                   let winner = DetailPosterQuality.winner(decoded.map(\.quality)),

@@ -35,7 +35,7 @@ enum RankPeriod: String { case daily, weekly, monthly }
  func playbackRankings(filterBy:String,period:String,page:Int) async throws -> [Movie] { [] }
 '''+top+'}\n'
 external=(root/'AVDB/Services/ExternalLibraryClient.swift').read_text().split('final class ExternalLibraryClient')[0]
-source=support+response+'\n'+external+'\n'+(root/'AVDB/Models/JSONFlex.swift').read_text()+'\n'+(root/'AVDB/Models/Movie.swift').read_text()+'\n'+tab+'\n'+vm+'\n'+(root/'scripts/RankingsRegression.swift').read_text()
+source=support+response+'\n'+(root/'AVDB/Services/JavRankingCore.swift').read_text()+'\n'+(root/'AVDB/Services/CatalogueMetadata.swift').read_text().split('private final class CatalogueRedirectBlocker:')[0]+'\n'+external+'\n'+(root/'AVDB/Models/JSONFlex.swift').read_text()+'\n'+(root/'AVDB/Models/Movie.swift').read_text()+'\n'+tab+'\n'+vm+'\n'+(root/'scripts/RankingsRegression.swift').read_text()
 assert 'try? await sdk.topMovies' not in view
 assert 'guard resp.isSuccess' in top
 assert 'guard let decoded = resp.data?.movies' in top

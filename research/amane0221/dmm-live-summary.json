@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://api.video.dmm.co.jp/graphql",
+    "cid": "ggh009",
+    "status": 200,
+    "bytes": 2282,
+    "sha256": "f26839a885573975c8b0fc93500cc355b65cbea6747565f626187d515a93bd56",
+    "record_present": true,
+    "record_keys": [
+      "actresses",
+      "deliveryStartDate",
+      "description",
+      "duration",
+      "label",
+      "maker",
+      "packageImage",
+      "series",
+      "title"
+    ],
+    "package_nulls": {
+      "mediumUrl": false,
+      "largeUrl": true
+    },
+    "graphql_errors": false
+  }
+]

@@ -1,0 +1,63 @@
+{
+  "project": "sqzw-x/amane",
+  "release_url": "https://github.com/sqzw-x/amane/releases/tag/v0.22.1",
+  "tag": "v0.22.1",
+  "published_at": "2026-10-19T19:10:22Z",
+  "license_spdx": "GPL-3.0",
+  "license_url": "https://github.com/sqzw-x/amane/blob/v0.22.1/LICENSE",
+  "implementation": "Independent Swift implementation; no upstream code or test fixtures incorporated",
+  "pull_requests": [
+    {
+      "number": 505,
+      "html_url": "https://github.com/sqzw-x/amane/pull/505",
+      "title": "fix(parsing): 前缀内含数字的番号按整段提取",
+      "merge_commit_sha": "471389175bec37fb7cc2e9ec2b4c4c6fcb239692",
+      "merged_at": "2026-10-18T18:10:32Z"
+    },
+    {
+      "number": 507,
+      "html_url": "https://github.com/sqzw-x/amane/pull/507",
+      "title": "fix(crawlers): 修补素人番号在 DMM 与 avbase 的获取缺口",
+      "merge_commit_sha": "18d95cf3927622c49895755aa0d3de199f70cb62",
+      "merged_at": "2026-10-19T08:20:37Z"
+    }
+  ],
+  "source_files": [
+    {
+      "filename": "dmm.py",
+      "tag": "v0.22.1",
+      "sha256": "9ee142c49f0f59b09322a199b3712f3cbbc827da0980bcc51c0339658c4f9bd8",
+      "stored_in_app_repository": false
+    },
+    {
+      "filename": "dmm_api.py",
+      "tag": "v0.22.1",
+      "sha256": "0819ba91b8438294a1cc0967e941f73f40584aede72ccb436b13cb75eb4040aa",
+      "stored_in_app_repository": false
+    },
+    {
+      "filename": "avbase.py",
+      "tag": "v0.22.1",
+      "sha256": "6a151cd79fec151c95e6de44bf1d2b7ea4b49f43a6aa38543ba53f5e1d3a9541",
+      "stored_in_app_repository": false
+    },
+    {
+      "filename": "parsing.py",
+      "tag": "v0.22.1",
+      "sha256": "f240e927db84648b44773aafe9517688738da4d60ec9be074c73653ba877d7f8",
+      "stored_in_app_repository": false
+    },
+    {
+      "filename": "test_file_info.py",
+      "tag": "v0.22.1",
+      "sha256": "9ae2240588b832a68deaa37c613eec7f760e9e184bc70ba888f846936a28d22a",
+      "stored_in_app_repository": false
+    }
+  ],
+  "tag_object": {
+    "sha": "36253ba9cc5c4dd0d8d84e14cc38b0e5d09f10dd",
+    "type": "tag",
+    "url": "https://api.github.com/repos/sqzw-x/amane/git/tags/36253ba9cc5c4dd0d8d84e14cc38b0e5d09f10dd"
+  },
+  "release_commit": "fd9294fbe5b4aa88ce1df84d534f6816ad9460d5"
+}

@@ -43,6 +43,9 @@ public enum CoverURLBuilder {
     public static func coverURLs(for number: String?) -> (poster: String?, backdrop: String?) {
         guard let number, !number.isEmpty else { return (nil, nil) }
         let raw = number.uppercased()
+        // Digit-bearing prefixes and amateur namespaces have no safe guessed CID.
+        // Use linked-record metadata instead of truncating R18 or 723GGH.
+        if let parsed = CatalogueIdentity.parts(raw), parsed.prefix.contains(where: { $0.isNumber }) { return (nil, nil) }
         guard let match = raw.range(of: #"([A-Z0-9]+)-?(\d{2,5})"#, options: .regularExpression) else {
             return (nil, nil)
         }

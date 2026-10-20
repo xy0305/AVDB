@@ -74,19 +74,38 @@ public struct Movie: Decodable, Identifiable, Hashable {
         copy.type = catalog
         return copy
     }
+    // Bound source record retained separately from primary API metadata.
+    var catalogueMetadata: ScrapedMetadata? = nil
+    func withCatalogueMetadata(_ metadata: ScrapedMetadata) -> Movie {
+        guard let number, let key = CatalogueIdentity.key(number), key == CatalogueIdentity.key(metadata.number),
+              !["1", "2", "3", "4"].contains(type ?? "") else { return self }
+        var copy = self
+        copy.catalogueMetadata = metadata
+        if title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false { copy.title = metadata.title }
+        if summary?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false && desc?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false { copy.summary = metadata.summary }
+        if thumbURL?.isEmpty != false { copy.thumbURL = metadata.poster }
+        if coverURL?.isEmpty != false { copy.coverURL = metadata.cover }
+        if duration == nil { copy.duration = metadata.duration }
+        if releaseDate?.isEmpty != false { copy.releaseDate = metadata.releaseDate }
+        if actorNames?.isEmpty != false && actors?.isEmpty != false { copy.actorNames = metadata.actorNames }
+        if makerName?.isEmpty != false { copy.makerName = metadata.maker }
+        if publisherName?.isEmpty != false { copy.publisherName = metadata.publisher }
+        if seriesName?.isEmpty != false { copy.seriesName = metadata.series }
+        return copy
+    }
     public let number: String?
     public let numberLetter: String?
-    public let title: String?
+    public private(set) var title: String?
     public let originalURL: String?
     public let originTitle: String?
-    public let summary: String?
+    public private(set) var summary: String?
     public let desc: String?
-    public let thumbURL: String?
-    public let coverURL: String?
-    public let duration: Int?
+    public private(set) var thumbURL: String?
+    public private(set) var coverURL: String?
+    public private(set) var duration: Int?
     public let score: Double?
     public let rating: Double?
-    public let releaseDate: String?
+    public private(set) var releaseDate: String?
 
     public let magnetsCount: Int?
     public let canPlay: Bool?
@@ -98,16 +117,16 @@ public struct Movie: Decodable, Identifiable, Hashable {
     public let tags: [Tag]?
     public let category: String?
     public let actors: [Actor]?
-    public let actorNames: [String]?
+    public private(set) var actorNames: [String]?
 
     public let makerID: String?
-    public let makerName: String?
+    public private(set) var makerName: String?
     public let directorID: String?
     public let directorName: String?
     public let publisherID: String?
-    public let publisherName: String?
+    public private(set) var publisherName: String?
     public let seriesID: String?
-    public let seriesName: String?
+    public private(set) var seriesName: String?
 
     public let fileSize: Int?
     public let reviewsCount: Int?
@@ -130,8 +149,10 @@ public struct Movie: Decodable, Identifiable, Hashable {
 
     /// 官方番号前缀：`filter_by={type}:c:{prefix}:`（IPX-123 → IPX，Tushy.2026.08.16 → Tushy）
     public var codePrefix: String {
-        if let letter = numberLetter, !letter.isEmpty { return letter }
         let n = displayNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let parsed = CatalogueIdentity.parts(n), parsed.prefix.contains(where: { $0.isNumber }) { return parsed.prefix }
+        if let letter = numberLetter, !letter.isEmpty { return letter }
+        if let parsed = CatalogueIdentity.parts(n) { return parsed.prefix }
         if let r = n.range(of: #"^[A-Za-z]+"#, options: .regularExpression) {
             return String(n[r])
         }
