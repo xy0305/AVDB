@@ -395,11 +395,29 @@ enum JRBackendPolicy {
         var clean = c; clean.path = prefix; clean.port = nil
         return clean.url
     }
-    static func request(base: URL, route: String, query: [URLQueryItem] = []) throws -> URL {
-        let allowed: [String: Set<String>] = ["home": [], "topics": [], "explore": ["page", "limit", "cat", "year", "sort"], "index": ["kind", "page", "limit", "q"], "rankings": ["topic", "page"], "page": ["path"]]
+    static func sameOrigin(_ a: URL, _ b: URL) -> Bool {
+        func port(_ u: URL) -> Int { u.port ?? (u.scheme == "https" ? 443 : 80) }
+        return a.scheme == b.scheme && a.host?.lowercased() == b.host?.lowercased() && port(a) == port(b) && a.user == nil && a.password == nil
+    }
+    static func externalEndpoint(_ origin: URL) throws -> URL {
+        guard ["http", "https"].contains(origin.scheme ?? ""), origin.host != nil,
+              origin.user == nil, origin.password == nil, origin.query == nil, origin.fragment == nil,
+              origin.path.isEmpty || origin.path == "/" else { throw JRError.message("外部数据库地址无效") }
+        return origin.appendingPathComponent(String(prefix.dropFirst()))
+    }
+    static func authenticatedRequest(base: URL, origin: URL, token: String, route: String, query: [URLQueryItem] = []) throws -> URLRequest {
+        guard !token.isEmpty, token.utf8.allSatisfy({ (33...126).contains($0) }),
+              sameOrigin(base, origin), base == (try externalEndpoint(origin)) else { throw JRError.message("拒绝向非配置外部数据库发送凭据") }
+        let url = try request(base: base, route: route, query: query, externalOrigin: origin)
+        var request = URLRequest(url: url)
+        request.setValue(token, forHTTPHeaderField: "X-API-Key")
+        return request
+    }
+    static func request(base: URL, route: String, query: [URLQueryItem] = [], externalOrigin: URL? = nil) throws -> URL {
+        let allowed: [String: Set<String>] = ["health": [], "home": [], "topics": [], "explore": ["page", "limit", "cat", "year", "sort"], "index": ["kind", "page", "limit", "q"], "rankings": ["topic", "page"], "page": ["path"]]
         guard let keys = allowed[route], query.allSatisfy({ keys.contains($0.name) }),
               Set(query.map(\.name)).count == query.count,
-              let normalized = try endpoint(base.absoluteString), normalized == base else { throw JRError.message("不允许的缓存接口") }
+              let normalized = try (externalOrigin.map { try externalEndpoint($0) } ?? endpoint(base.absoluteString)), normalized == base else { throw JRError.message("不允许的缓存接口") }
         if let path = query.first(where: { $0.name == "path" })?.value {
             guard path.count <= 250, !path.contains("%"), !path.contains("\\"), !path.contains(".."),
                   !path.contains("\r"), !path.contains("\n"),

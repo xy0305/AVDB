@@ -199,6 +199,6 @@ func check(_ condition: @autoclosure () -> Bool, line: Int = #line) {
     main = main.replace('final class Mock: URLProtocol', 'extension JavDBSDK {\n' + helper + '\n}\nfinal class Mock: URLProtocol')
     cache = sdk.split('    // Memory only,', 1)[1].split('    // MARK: - 搜索类', 1)[0]
     main = main.replace('@MainActor final class JavDBSDK {', '@MainActor final class APIClient { static let shared = APIClient(); var token: String? }\n@MainActor final class JavDBSDK {\n private let client = APIClient.shared\n // Memory only,' + cache)
-    p=d/'client.swift';p.write_text(current+'\n'+(root/'AVDB/Services/JavRankingSource.swift').read_text()+'\n'+main.replace('precondition(', 'check('))
+    p=d/'client.swift';p.write_text(current+'\n'+(root/'AVDB/Services/ExternalLibraryClient.swift').read_text()+'\n'+(root/'AVDB/Services/JavRankingSource.swift').read_text()+'\n'+main.replace('precondition(', 'check('))
     subprocess.run(['swiftc','-O','-swift-version','5','-parse-as-library',str(p),'-o',str(d/'client')],check=True)
     subprocess.run([str(d/'client'),str(fixtures),str(d/'most-awarded-videos.html')],check=True,timeout=180)

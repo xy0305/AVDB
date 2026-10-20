@@ -47,7 +47,14 @@ struct JavRankingSettingsView: View {
     @State private var message = ""
     var body: some View {
         Form {
-            Section("独立缓存后端 · HTTPS") {
+            Section("默认 · 与 JAVLibrary 共用外部数据库") {
+                Button("复用已配置的外部数据库与钥匙串令牌") { backend.useExternalLibrary(); message = "已切换；旧请求与显示已取消。" }
+                NavigationLink("配置外部数据库 / API 令牌") { ExternalLibrarySettingsView() }
+                Text(backend.externalMode ? "当前：外部数据库同源模式" : "当前：独立 HTTPS 模式")
+                Text("若外部数据库使用 HTTP，地址与令牌均以未加密明文传输。仅向您已配置的同一协议、主机和端口发送令牌；不自动降级、不转发至来源站点。未启用或缺少令牌时请先完成外部数据库设置。") .font(.footnote)
+                if backend.externalMode, let endpoint = backend.endpoint { Text(endpoint.absoluteString).font(.caption).textSelection(.enabled) }
+            }
+            Section("可选 · 独立缓存后端 HTTPS（不携带外部库令牌）") {
                 TextField("尚未配置；不要填回环地址", text: $backendURL)
                     .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
                 Button("保存 HTTPS 后端") {
@@ -488,9 +495,9 @@ struct JRBackendView: View {
                     NavigationLink("番号 / 人物姓名与别名搜索") { JRBackendView(route: "index", title: "索引搜索") }
                 }
                 if backend.endpoint == nil {
-                    Text("安全后端尚未启用").font(.headline)
+                    Text("JAV Ranking 后端尚未配置").font(.headline)
                     Text("公网 HTTPS 入口仍待授权和激活；未接通不代表空榜单。没有内置不可达回环地址，也不会强制请求原站。")
-                    NavigationLink("配置受信 HTTPS 后端") { JavRankingSettingsView() }
+                    NavigationLink("配置外部数据库或独立 HTTPS") { JavRankingSettingsView() }
                 }
                 if route == "index" {
                     TextField("完整番号或人物姓名 / 别名", text: $query).textFieldStyle(.roundedBorder)

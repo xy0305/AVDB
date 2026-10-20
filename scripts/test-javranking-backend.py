@@ -21,11 +21,14 @@ backend='@MainActor final class JRBackendClient:'+source.split('@MainActor final
 stubs=r'''
 @MainActor final class JavRankingSource { static let shared = JavRankingSource(); func cancelMappings() {} }
 final class Mock: URLProtocol, @unchecked Sendable {
+ static var expectedToken: String? = nil; static var seen = 0
  static var body = Data(); static var status = 200; static var delay = 0.01
  override class func canInit(with request: URLRequest) -> Bool { true }
  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
  var work: DispatchWorkItem?
  override func startLoading() {
+  Self.seen += 1
+  precondition(request.value(forHTTPHeaderField: "X-API-Key") == Self.expectedToken)
   precondition(request.value(forHTTPHeaderField: "Authorization") == nil)
   precondition(request.value(forHTTPHeaderField: "Cookie") == nil)
   let body = Self.body, status = Self.status
@@ -38,6 +41,12 @@ final class Mock: URLProtocol, @unchecked Sendable {
  override func stopLoading() { work?.cancel() }
 }
 func check(_ ok: Bool, _ name: String) { precondition(ok,name); print("PASS "+name) }
+final class MemoryTokenStore: ExternalTokenStore {
+ var value: String? = nil
+ func read() throws -> String? { value }
+ func write(_ token: String) throws { value = token }
+ func clear() throws { value = nil }
+}
 @main struct Regression {
  @MainActor static func main() async throws {
   let path = CommandLine.arguments[1]
@@ -80,7 +89,11 @@ func check(_ ok: Bool, _ name: String) { precondition(ok,name); print("PASS "+na
   check(JRPolicy.exactCode("R18-292") != JRPolicy.exactCode("R1-8292"),"numeric prefix not stripped")
   check(JRPolicy.exactCode("FC2-PPV-12345") == JRPolicy.exactCode("FC2-12345"),"explicit FC2 equivalence")
   let defaults = UserDefaults(suiteName:"backend-"+UUID().uuidString)!
-  let client = JRBackendClient(defaults:defaults,protocolClasses:[Mock.self])
+  defaults.set(false,forKey:"javranking.externalMode")
+  let store = MemoryTokenStore()
+  let externalDefaults = UserDefaults(suiteName:"external-"+UUID().uuidString)!
+  let settings = ExternalLibrarySettings(store:store,defaults:externalDefaults)
+  let client = JRBackendClient(defaults:defaults,protocolClasses:[Mock.self],settings:settings)
   do { _ = try await client.fetch("home");fatalError("unconfigured") } catch {}
   try client.configure("https://example.com",defaults:defaults)
   Mock.body = try Data(contentsOf:URL(fileURLWithPath:path+"/snapshot-home.json"))
@@ -103,11 +116,50 @@ func check(_ ok: Bool, _ name: String) { precondition(ok,name); print("PASS "+na
   try await Task.sleep(nanoseconds:10_000_000)
   try client.configure("https://other.example",defaults:defaults)
   do { _ = try await old.value;fatalError("old endpoint published") } catch { print("PASS endpoint generation isolation") }
+  Mock.delay = 0.01; Mock.status = 200
+  Mock.body = try Data(contentsOf:URL(fileURLWithPath:path+"/snapshot-home.json"))
+  let origin = URL(string:"http://EXAMPLE.com:8000")!
+  let same = try JRBackendPolicy.externalEndpoint(origin)
+  let request = try JRBackendPolicy.authenticatedRequest(base:same,origin:origin,token:"fixture-only",route:"home")
+  check(request.url?.scheme == "http" && request.value(forHTTPHeaderField:"X-API-Key") == "fixture-only","explicit HTTP exact-origin credential request")
+  for denied in ["http://other.test:8000/api/v1/javranking","http://example.com:8001/api/v1/javranking","https://example.com:8000/api/v1/javranking","http://sub.example.com:8000/api/v1/javranking","http://example.com:8000/solver"] {
+   do { _ = try JRBackendPolicy.authenticatedRequest(base:URL(string:denied)!,origin:origin,token:"fixture-only",route:"home");fatalError("credential leak") } catch {}
+  }
+  check(JRPolicy.sameHost(URL(string:"http://example.com")!,base:URL(string:"https://example.com")!) == false,"source HTTPS policy not globally relaxed")
+  client.useExternalLibrary(defaults:defaults)
+  let seen = Mock.seen
+  do { _ = try await client.fetch("home");fatalError("missing setup") } catch {}
+  check(Mock.seen == seen && client.endpoint == nil,"no anonymous fallback when external disabled")
+  try settings.save(baseURL:"http://example.com:8000",enabled:true,replacementToken:"fixture-only")
+  try await Task.sleep(nanoseconds:20_000_000)
+  Mock.expectedToken = "fixture-only"
+  check(try await client.fetch("home").data?.sections?.count == 7,"production external HTTP transport uses request-time keychain token")
+  for route in ["solver","../home"] {
+   do { _ = try await client.fetch(route);fatalError("route") } catch {}
+  }
+  do { _ = try await client.fetch("home",query:[.init(name:"url",value:"https://evil.test")]);fatalError("query") } catch {}
+  Mock.delay = 0.5
+  let oldExternal = Task { try await client.fetch("home") }
+  try await Task.sleep(nanoseconds:10_000_000)
+  try settings.clearToken()
+  try await Task.sleep(nanoseconds:20_000_000)
+  do { _ = try await oldExternal.value;fatalError("old token generation") } catch { print("PASS external token change cancels generation") }
+  check(client.endpoint == nil,"effective endpoint cleared after token removal")
+  try client.configure("https://independent.example",defaults:defaults)
+  Mock.expectedToken = nil;Mock.delay = 0.01
+  check(try await client.fetch("home").data?.sections?.count == 7,"independent HTTPS never receives external credentials")
+  let policy = JRRedirectPolicy(base:same,rejectRedirects:true,exactOrigin:true)
+  let session = URLSession(configuration:.ephemeral)
+  let task = session.dataTask(with:same)
+  for destination in [same,URL(string:"https://evil.test")!] {
+   policy.urlSession(session,task:task,willPerformHTTPRedirection:HTTPURLResponse(url:same,statusCode:302,httpVersion:nil,headerFields:nil)!,newRequest:URLRequest(url:destination)) { check($0 == nil,"all redirects blocked even same origin") }
+  }
+  session.invalidateAndCancel()
  }
 }
 '''
 with tempfile.TemporaryDirectory() as tmp:
- p=Path(tmp)/'Backend.swift';p.write_text(core+'\n'+transport+'\n'+backend+'\n'+stubs)
+ p=Path(tmp)/'Backend.swift';p.write_text(core+'\n'+(R/'AVDB/Services/ExternalLibraryClient.swift').read_text()+'\n'+transport+'\n'+backend+'\n'+stubs)
  exe=Path(tmp)/'backend'
  subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(p),'-o',str(exe)],check=True)
  subprocess.run([str(exe),str(F)],check=True,timeout=60)

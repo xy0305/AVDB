@@ -12,9 +12,10 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private let maximum: Int
     private let responseValidator: ((HTTPURLResponse, Data) -> Error?)?
     private let rejectRedirects: Bool
+    private let exactOrigin: Bool
     let base: URL
-    init(base: URL, maximum: Int = 12 * 1024 * 1024, rejectRedirects: Bool = false, responseValidator: ((HTTPURLResponse, Data) -> Error?)? = nil) {
-        self.base = base; self.maximum = maximum; self.responseValidator = responseValidator; self.rejectRedirects = rejectRedirects
+    init(base: URL, maximum: Int = 12 * 1024 * 1024, rejectRedirects: Bool = false, exactOrigin: Bool = false, responseValidator: ((HTTPURLResponse, Data) -> Error?)? = nil) {
+        self.base = base; self.maximum = maximum; self.responseValidator = responseValidator; self.rejectRedirects = rejectRedirects; self.exactOrigin = exactOrigin
     }
     private final class Cancellation: @unchecked Sendable {
         private let lock = NSLock()
@@ -55,7 +56,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         guard let http = response as? HTTPURLResponse,
               responseValidator != nil || (200..<300).contains(http.statusCode),
-              let url = response.url, JRPolicy.sameHost(url, base: base), response.expectedContentLength <= maximum else {
+              let url = response.url, (exactOrigin ? JRBackendPolicy.sameOrigin(url, base) && url == dataTask.originalRequest?.url : JRPolicy.sameHost(url, base: base)), response.expectedContentLength <= maximum else {
             finish(dataTask, error: JRError.message("来源请求失败或超过安全大小限制（HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)）"))
             completionHandler(.cancel); return
         }
@@ -264,11 +265,44 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     static let shared = JRBackendClient()
     @Published private(set) var endpoint: URL?
     @Published private(set) var generation = 0
+    @Published private(set) var externalMode: Bool
     private var session: URLSession?
     private let protocolClasses: [AnyClass]?
-    init(defaults: UserDefaults = .standard, protocolClasses: [AnyClass]? = nil) {
+    private let settings: ExternalLibrarySettings
+    private var observation: AnyCancellable?
+    private var accountObservation: AnyCancellable?
+    init(defaults: UserDefaults = .standard, protocolClasses: [AnyClass]? = nil, settings: ExternalLibrarySettings? = nil) {
         self.protocolClasses = protocolClasses
-        endpoint = try? JRBackendPolicy.endpoint(defaults.string(forKey: "javranking.backendHTTPS") ?? "")
+        self.settings = settings ?? .shared
+        externalMode = defaults.object(forKey: "javranking.externalMode") as? Bool ?? true
+        endpoint = externalMode ? nil : (try? JRBackendPolicy.endpoint(defaults.string(forKey: "javranking.backendHTTPS") ?? ""))
+        if externalMode { updateExternal() } else { rebuild() }
+        accountObservation = NotificationCenter.default.publisher(for: Notification.Name("avdb.catalog.accountChanged")).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.session?.invalidateAndCancel(); self.endpoint = nil; self.generation += 1
+                JavRankingSource.shared.cancelMappings()
+                if self.externalMode { self.updateExternal() }
+                else { self.endpoint = try? JRBackendPolicy.endpoint(defaults.string(forKey: "javranking.backendHTTPS") ?? ""); self.rebuild() }
+            }
+        }
+        observation = self.settings.$revision.dropFirst().sink { [weak self] _ in
+            // @Published fires before revision assignment; defer to the completed settings transaction.
+            Task { @MainActor [weak self] in self?.externalChanged() }
+        }
+    }
+    private func externalChanged() {
+        guard externalMode else { return }
+        endpoint = nil; rebuild(); generation += 1
+        JavRankingSource.shared.cancelMappings()
+        updateExternal()
+    }
+    private func updateExternal() {
+        endpoint = nil
+        if settings.enabled, settings.hasToken,
+           let root = try? ExternalLibrarySettings.normalizedURL(settings.baseURL), let origin = URL(string: root) {
+            endpoint = try? JRBackendPolicy.externalEndpoint(origin)
+        }
         rebuild()
     }
     private func rebuild() {
@@ -277,11 +311,12 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = protocolClasses
         config.httpShouldSetCookies = false; config.httpCookieStorage = nil; config.urlCache = nil
+        config.urlCredentialStorage = nil; config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 20; config.timeoutIntervalForResource = 30
         config.httpMaximumConnectionsPerHost = 3
-        let policy = JRRedirectPolicy(base: endpoint, maximum: 8 * 1024 * 1024, rejectRedirects: true) { response, _ in
-            guard let url = response.url, url.scheme == "https", url.host == endpoint.host,
-                  url.port == nil, url.path.hasPrefix(JRBackendPolicy.prefix + "/") else { return JRError.message("缓存响应不属于配置的 HTTPS 主机/API 路径") }
+        let policy = JRRedirectPolicy(base: endpoint, maximum: 8 * 1024 * 1024, rejectRedirects: true, exactOrigin: true) { response, _ in
+            guard let url = response.url, JRBackendPolicy.sameOrigin(url, endpoint),
+                  url.path.hasPrefix(JRBackendPolicy.prefix + "/") else { return JRError.message("缓存响应不属于配置的同源 API") }
             guard response.statusCode == 200 || response.statusCode == 202 else {
                 return JRError.message("缓存服务 HTTP \(response.statusCode)；保留上次显示结果，可稍后重试。")
             }
@@ -290,21 +325,39 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         }
         session = URLSession(configuration: config, delegate: policy, delegateQueue: nil)
     }
+    func useExternalLibrary(defaults: UserDefaults = .standard) {
+        externalMode = true; defaults.set(true, forKey: "javranking.externalMode")
+        externalChanged()
+    }
     func configure(_ input: String, defaults: UserDefaults = .standard) throws {
         let next = try JRBackendPolicy.endpoint(input)
+        externalMode = false; defaults.set(false, forKey: "javranking.externalMode")
         endpoint = next; rebuild(); generation += 1
         JavRankingSource.shared.cancelMappings()
         defaults.set(next?.absoluteString ?? "", forKey: "javranking.backendHTTPS")
     }
     func fetch(_ route: String, query: [URLQueryItem] = []) async throws -> JRBackendEnvelope {
-        guard let endpoint, let session else { throw JRError.message("安全后端尚未启用；请在设置中配置已验证的 HTTPS 地址。不会请求回环、明文或自动改用原站。") }
+        let revision = settings.revision
+        // Revalidate settings and read Keychain for EVERY request. No token in stored endpoints.
+        var request: URLRequest
+        if externalMode {
+            guard settings.enabled, let token = try settings.token(), !token.isEmpty else { throw ExternalLibraryError.rankingNotConfigured }
+            let root = try ExternalLibrarySettings.normalizedURL(settings.baseURL)
+            guard let origin = URL(string: root) else { throw ExternalLibraryError.invalidURL }
+            let effective = try JRBackendPolicy.externalEndpoint(origin)
+            if effective != endpoint { endpoint = effective; rebuild(); generation += 1 }
+            request = try JRBackendPolicy.authenticatedRequest(base: effective, origin: origin, token: token, route: route, query: query)
+        } else {
+            guard let endpoint else { throw JRError.message("独立 HTTPS 后端尚未配置；可切换为复用外部数据库。") }
+            request = URLRequest(url: try JRBackendPolicy.request(base: endpoint, route: route, query: query))
+        }
+        guard let session else { throw ExternalLibraryError.rankingNotConfigured }
         let epoch = generation
-        let url = try JRBackendPolicy.request(base: endpoint, route: route, query: query)
-        var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("AVDB-readonly", forHTTPHeaderField: "User-Agent")
         let bytes = try await (session.delegate as! JRRedirectPolicy).download(request, session: session)
-        try Task.checkCancellation(); guard epoch == generation else { throw CancellationError() }
+        try Task.checkCancellation()
+        guard epoch == generation, !externalMode || revision == settings.revision else { throw CancellationError() }
         return try JRBackendEnvelope.decode(bytes)
     }
 }
