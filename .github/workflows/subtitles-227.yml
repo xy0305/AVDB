@@ -32,6 +32,7 @@ jobs:
           with open(os.environ['GITHUB_ENV'],'a') as f: f.write('DEVICE_ID='+d['udid']+'\n')
           print(d['name'],d['udid'])
           PY
+          DEVICE_ID=$(python3 -c "import json,os; ds=json.load(open(os.environ['RUNNER_TEMP']+'/devices.json'))['devices']; print(next(d['udid'] for group in ds.values() for d in group if '${{ matrix.device }}' in d['name']))")
           xcrun simctl boot "$DEVICE_ID" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
