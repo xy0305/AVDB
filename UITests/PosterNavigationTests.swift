@@ -1,6 +1,42 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testOnlinePlaybackSixSourceManualNativeFlow() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture", "--online-playback-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        XCTAssertTrue(app.buttons["neutral-portrait-link"].waitForExistence(timeout: 10))
+        app.buttons["neutral-portrait-link"].tap()
+        let download = app.buttons["下载资源"]
+        XCTAssertTrue(download.waitForExistence(timeout: 10)); download.tap()
+        XCTAssertTrue(app.navigationBars["播放与下载资源"].waitForExistence(timeout: 5))
+        func reveal(_ element: XCUIElement) {
+            for _ in 0..<12 { if element.isHittable { return }; app.swipeUp() }
+        }
+        for key in ["thirdPartyAVDB", "javmenu", "av01", "memojav", "missav", "jable"] {
+            let state = app.staticTexts["online.state." + key]
+            reveal(state); XCTAssertTrue(state.exists); XCTAssertEqual(state.label,"未查询")
+        }
+        // Scroll back to the first provider in the REAL resources sheet.
+        for _ in 0..<8 { if app.buttons["online.query.thirdPartyAVDB"].isHittable { break }; app.swipeDown() }
+        let query = app.buttons["online.query.thirdPartyAVDB"]
+        XCTAssertTrue(query.isHittable); query.tap()
+        let found = app.staticTexts["online.state.thirdPartyAVDB"]
+        let expectation = XCTNSPredicateExpectation(predicate:NSPredicate(format:"label CONTAINS %@","找到 1 版本 / 1 线路"),object:found)
+        XCTAssertEqual(XCTWaiter.wait(for:[expectation],timeout:8),.completed)
+        XCTAssertFalse(app.otherElements["online.native-player"].exists,"Discovery cannot auto-open playback")
+        XCTAssertEqual(app.staticTexts["online.state.javmenu"].label,"未查询","Sources must remain independent")
+        let panelShot = XCTAttachment(screenshot:app.screenshot()); panelShot.name="228-neutral-real-detail-manual-source"; panelShot.lifetime = .keepAlways; add(panelShot)
+        let line = app.buttons["online.line.thirdPartyAVDB:1:Full"]
+        reveal(line); XCTAssertTrue(line.isHittable); line.tap()
+        XCTAssertTrue(app.buttons["player.subtitle.settings"].waitForExistence(timeout:15),"Real KSChromePlayer with single subtitle pipeline must open")
+        let playerShot = XCTAttachment(screenshot:app.screenshot()); playerShot.name="228-neutral-native-online-player"; playerShot.lifetime = .keepAlways; add(playerShot)
+    }
+
     func testChickenRiceThirdSourceManualSelection() {
         continueAfterFailure = false
         let app = XCUIApplication()

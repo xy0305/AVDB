@@ -46,6 +46,7 @@ jobs:
       - name: Check poster identity, latency and shared regressions
         run: |
           set -euo pipefail
+          ONLINE_PLAYBACK_LIVE=1 python3 scripts/test-online-playback.py | tee online-playback-tests.txt
           python3 scripts/test-detail-back.py
           python3 scripts/test-catalog-lifecycle.py
           python3 scripts/test-front-posters.py
@@ -161,6 +162,7 @@ jobs:
           path: |
             javranking-performance.txt
             detail-delivery-performance.txt
+            online-playback-tests.txt
           if-no-files-found: ignore
 
       - name: Upload build log on failure
