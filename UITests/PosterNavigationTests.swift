@@ -9,6 +9,7 @@ final class PosterNavigationTests: XCTestCase {
         defer { app.terminate() }
         let consent = app.buttons["我已满 18 岁，继续"]
         if consent.waitForExistence(timeout: 2) { consent.tap() }
+        refreshPlayerChrome(app)
         let entry = app.buttons["player.subtitle.settings"]
         XCTAssertTrue(entry.waitForExistence(timeout: 15)); entry.tap()
         let toggle = app.switches["subtitle.chickenRice.enabled"]

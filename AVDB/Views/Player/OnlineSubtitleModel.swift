@@ -32,6 +32,13 @@ import SwiftUI
     private struct CacheEntry { let date: Date; let rows: [OnlineSubtitleCandidate] }
     private var cache: [String: CacheEntry] = [:]
     private let fetch: OnlineSubtitleParallelSearch.Fetch
+    private var accountObservation: NSObjectProtocol?
+    private func observeAccountChanges() {
+        accountObservation = NotificationCenter.default.addObserver(forName: Notification.Name("avdb.catalog.accountChanged"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.clear() }
+        }
+    }
+    deinit { if let accountObservation { NotificationCenter.default.removeObserver(accountObservation) } }
     init(fetch: @escaping OnlineSubtitleParallelSearch.Fetch = { url, kind in
         try await OnlineSubtitleRequest(kind: kind, boundDownloadURL: kind == .download ? url : nil).run(url)
     }) {
@@ -51,10 +58,12 @@ import SwiftUI
                     return Data("1\n00:00:00,000 --> 00:00:06,000\n自创外置字幕第一段\n\n2\n00:00:06,000 --> 00:02:00,000\n自创外置字幕第二段\n".utf8)
                 }
             }
+            observeAccountChanges()
             return
         }
         #endif
         self.fetch = fetch
+        observeAccountChanges()
     }
     private func cancelChoice() {
         selectionGeneration += 1; choice?.cancel(); choice = nil; downloading = false; busy = !state.pending.isEmpty || downloading

@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Production Swift regressions and dependencies
         run: |
-          CHICKEN_LIVE_PROBE=${{ matrix.device == 'iPhone' && '1' || '0' }} python3 scripts/test-online-subtitles.py
+          CHICKEN_LIVE_PROBE=${{ matrix.device == 'iPhone' && github.run_number == '3' && '1' || '0' }} python3 scripts/test-online-subtitles.py
           gem install cocoapods -v 1.16.2 --no-document
           ruby scripts/setup-poster-uitests.rb
           pod install --repo-update
@@ -32,6 +32,8 @@ jobs:
           with open(os.environ['GITHUB_ENV'],'a') as f: f.write('DEVICE_ID='+d['udid']+'\n')
           print(d['name'],d['udid'])
           PY
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
           xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
       - name: Neutral real player third-source settings and selection

@@ -58,6 +58,12 @@ enum ChickenRiceRegression {
         var absent = base; for key in ["duration_seconds", "size_bytes", "sha256", "uploaded_at"] { absent.removeValue(forKey: key) }
         let absentRows = try ChickenRiceProvider.candidates(json(absent), query: query)
         precondition(absentRows[0].durationSeconds == nil && absentRows[0].sizeBytes == nil && absentRows[0].uploadedAt == nil)
+        var vector = rows[0]; vector.expectedSHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        try ChickenRiceProvider.verify(Data("abc".utf8), row: vector)
+        SubtitleRegression.reject { try ChickenRiceProvider.verify(Data("abd".utf8), row: vector) }
+        var injected = base; injected["url"] = "https://evil.test/secret"
+        let injectedRows = try ChickenRiceProvider.candidates(json(injected), query: query)
+        precondition(injectedRows[0].url == download, "Response URL fields must never control downloads")
         for (key, value) in [("duration_seconds", -1 as Any), ("duration_seconds", true as Any), ("duration_seconds", "3" as Any), ("size_bytes", -1 as Any), ("size_bytes", 1.5 as Any), ("size_bytes", OnlineSubtitlePolicy.downloadLimit + 1 as Any), ("sha256", "not-a-hash" as Any)] {
             var bad = base; bad[key] = value
             SubtitleRegression.reject { _ = try ChickenRiceProvider.candidates(json(bad), query: query) }
@@ -169,11 +175,20 @@ enum ChickenRiceRegression {
         try await Task.sleep(nanoseconds: 220_000_000); precondition(model.results.isEmpty)
         model.chickenRiceEnabled = true; model.query = "TEST-005"; model.search(); model.clear()
         try await Task.sleep(nanoseconds: 220_000_000); precondition(model.results.isEmpty && model.cues.isEmpty)
+        model.query = "TEST-006"; model.search(); await Task.yield()
+        NotificationCenter.default.post(name: Notification.Name("avdb.catalog.accountChanged"), object: nil)
+        try await DualSourceRegression.wait { model.query.isEmpty }
+        try await Task.sleep(nanoseconds: 220_000_000)
+        precondition(model.results.isEmpty && model.cues.isEmpty && model.selected == nil)
+        let beforeAccountSearch = await transport.count("chickenSearch")
+        model.query = "TEST-001"; model.search(); try await DualSourceRegression.wait { !model.busy }
+        let afterAccountSearch = await transport.count("chickenSearch")
+        precondition(afterAccountSearch == beforeAccountSearch + 1, "Account switch must invalidate cached rows")
     }
     static func live() async {
         // One explicit public number, no filename/hash/media URL/duration. Never print subtitle text.
         do {
-            let query = "IPX-001"
+            let query = "IPX-247"
             let data = try await OnlineSubtitleRequest(kind: .chickenSearch).run(ChickenRiceProvider.searchURL(query))
             let rows = try ChickenRiceProvider.candidates(data, query: query)
             print("CHICKEN_LIVE search=verified items=\(rows.count) metadata_bytes=\(data.count)")
