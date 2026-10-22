@@ -105,7 +105,7 @@ enum ChickenRiceProvider {
     static let host = "chickenrice-subtitle-pool.jzdxjk.workers.dev"
     static func searchURL(_ query: String) throws -> URL {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard CatalogueIdentity.key(q) != nil else { throw OnlineSubtitleError.invalid("海南鸡仅支持完整公开番号；不支持此查询") }
+        guard q.rangeOfCharacter(from: .whitespacesAndNewlines) == nil, CatalogueIdentity.key(q) != nil else { throw OnlineSubtitleError.invalid("海南鸡仅支持完整公开番号；不支持此查询") }
         var c = URLComponents(string: origin + "/api/v1/subtitles/search")!
         c.queryItems = [URLQueryItem(name: "code", value: q)]
         return c.url!
@@ -129,7 +129,7 @@ enum ChickenRiceProvider {
         if search {
             let items = c.queryItems ?? []
             return u.path == "/api/v1/subtitles/search" && items.count == 1 && items[0].name == "code" &&
-                items[0].value.flatMap(CatalogueIdentity.key) != nil
+                items[0].value.flatMap { try? searchURL($0) } == u
         }
         let parts = u.path.split(separator: "/", omittingEmptySubsequences: false)
         guard u.query == nil, parts.count == 6, parts[0].isEmpty, parts[1] == "api", parts[2] == "v1",
