@@ -96,7 +96,7 @@ enum OnlinePolicy {
         case .javmenu: return url.host == "javmenu.com" && url.query == nil && path.hasPrefix("/zh/") && path.split(separator: "/").count == 2
         case .thirdPartyAVDB: return url.host == "avdbapi.com" && path == "/api.php/provide/vod"
         case .jable: return url.host == "jable.tv" && url.query == nil && (path.hasPrefix("/search/") || path.hasPrefix("/videos/"))
-        case .missav: return url.host == "missav.ws" && url.query == nil && path.hasPrefix("/cn/")
+        case .missav: return url.host == "missav.fans" && url.query == nil && path.hasPrefix("/cn/")
         case .memojav: return url.host == "memojav.org" && (path.hasPrefix("/video/") || path.hasPrefix("/embed/") || path == "/hls/get_video_info.php")
         case .av01: return (url.host == "www.av01.media" && path.hasPrefix("/api/v1/videos/")) || (url.host == "files.iw01.xyz" && path == "/edge/geo.js" && url.query == "json")
         }

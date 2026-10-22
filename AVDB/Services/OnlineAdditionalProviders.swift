@@ -6,7 +6,7 @@ enum OnlineAdditional {
         guard let n = OnlineIdentity.key(code) else { throw OnlineFailure.noMatch }
         switch source {
         case .jable: return URL(string: "https://jable.tv/videos/" + n.lowercased() + "/")!
-        case .missav: return URL(string: "https://missav.ws/cn/" + n.lowercased())!
+        case .missav: return URL(string: "https://missav.fans/cn/" + n.lowercased())!
         case .memojav: return URL(string: "https://memojav.org/video/" + n)!
         default: throw OnlineFailure.parse
         }
@@ -95,7 +95,7 @@ extension OnlineProvider {
         let detail: URL
         if source == .memojav { detail = try OnlineAdditional.page(source, code) }
         else {
-            let search = source == .jable ? URL(string:"https://jable.tv/search/" + code + "/")! : URL(string:"https://missav.ws/cn/search/" + code)!
+            let search = source == .jable ? URL(string:"https://jable.tv/search/" + code + "/")! : URL(string:"https://missav.fans/cn/search/" + code)!
             let links = try OnlineAdditional.searchLinks(try await transport.fetch(search, cap: 2*1024*1024), base: search, source: source, number: code)
             guard let first = links.first else { return [] }; detail = first
         }
@@ -112,8 +112,9 @@ extension OnlineProvider {
                   let dvd = obj["dvd_id"] as? String, OnlineIdentity.key(dvd) == OnlineIdentity.key(number), obj["storage_base"] is String else { throw OnlineFailure.noMatch }
             let geo = try await transport.fetch(URL(string:"https://files.iw01.xyz/edge/geo.js?json")!, cap: 64*1024)
             guard let issued = try? JSONSerialization.jsonObject(with: geo) as? [String:Any] else { throw OnlineFailure.parse }
-            // Observed comp=true. Do not override region/compliance or invent credentials.
-            if issued["comp"] as? Bool == true { throw OnlineFailure.blocked }
+            // Observed comp=true, but its policy semantics are unconfirmed. Do not
+            // fabricate a 403, override policy, or invent authorization. Stop explicitly unsupported.
+            if issued["comp"] as? Bool == true { throw OnlineFailure.unsupported }
             // Public site requires dynamic master rewriting with CDN-issued authorization.
             // Native scoped adaptation is NOT yet verified; fail closed, never pass embed/API as media.
             throw OnlineFailure.unsupported

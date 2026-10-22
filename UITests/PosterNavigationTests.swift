@@ -30,8 +30,14 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for:[expectation],timeout:8),.completed)
         XCTAssertFalse(app.otherElements["online.native-player"].exists,"Discovery cannot auto-open playback")
         XCTAssertEqual(app.staticTexts["online.state.javmenu"].label,"未查询","Sources must remain independent")
+        let secondQuery = app.buttons["online.query.javmenu"]
+        reveal(secondQuery); XCTAssertTrue(secondQuery.isHittable); secondQuery.tap()
+        let secondFound = app.staticTexts["online.state.javmenu"]
+        let secondExpectation = XCTNSPredicateExpectation(predicate:NSPredicate(format:"label CONTAINS %@","找到 1 版本 / 1 线路"),object:secondFound)
+        XCTAssertEqual(XCTWaiter.wait(for:[secondExpectation],timeout:8),.completed)
+        XCTAssertFalse(app.otherElements["online.native-player"].exists,"Two queries still must not select a route")
         let panelShot = XCTAttachment(screenshot:app.screenshot()); panelShot.name="228-neutral-real-detail-manual-source"; panelShot.lifetime = .keepAlways; add(panelShot)
-        let line = app.buttons["online.line.thirdPartyAVDB:1:Full"]
+        let line = app.buttons["online.line.javmenu:DEMO-123:0"]
         reveal(line); XCTAssertTrue(line.isHittable); line.tap()
         XCTAssertTrue(app.buttons["player.subtitle.settings"].waitForExistence(timeout:15),"Real KSChromePlayer with single subtitle pipeline must open")
         let playerShot = XCTAttachment(screenshot:app.screenshot()); playerShot.name="228-neutral-native-online-player"; playerShot.lifetime = .keepAlways; add(playerShot)

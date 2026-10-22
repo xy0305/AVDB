@@ -103,6 +103,21 @@ actor OnlineRequests {
         check(try OnlineAdditional.av01Records(av,number:"SSIS-001").count == 1,"AV01 real id exact matching")
         let proof = OnlineAdditional.memoProof(milliseconds:1792686900000)
         check(proof.count == 2 && proof[0].name == "sig" && proof[1].name == "sts","normal public timestamp proof")
+        check(proof[0].value == "NjkwMDAwMA" && proof[1].value == "6534508","public protocol deterministic vector")
+        let protectedLog = OnlineRequests()
+        let protectedProvider = OnlineProvider(transport:OnlineTransport(loader:{ request in
+            await protectedLog.add(request)
+            if request.url!.path.hasSuffix("index.m3u8") { return master }
+            if request.url!.path.hasSuffix("child.m3u8") { return Data("#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key\"\n#EXTINF:4,\na.ts".utf8) }
+            return try fixture(request)
+        }))
+        do {
+            _ = try await protectedProvider.resolve(OnlineLine(source:.javmenu,recordID:"DEMO-123",code:"DEMO-123",version:"原始版本",lineKey:"0"),number:"DEMO-123",versions:false)
+            preconditionFailure("protected child must not create a player plan")
+        } catch { check(OnlineFailure.classify(error) == .blocked,"master child protection blocks entire plan") }
+        let protectedRequests = await protectedLog.all()
+        check(protectedRequests.contains(where: { $0.url!.path.hasSuffix("child.m3u8") }),"actual child manifest validation")
+        check(!protectedRequests.contains(where: { $0.url!.path.hasSuffix("key") || $0.url!.path.hasSuffix(".ts") }),"never request keys or segments")
         check(try OnlineAdditional.memoMedia(Data("{\"success\":true,\"type\":\"hls\",\"url\":\"https%3A%2F%2Fvideo10.memojav.net%2Fstream%2FDEMO-123%2Fmaster.m3u8\"}".utf8)).host == "video10.memojav.net","normal once-encoded URL")
         print("PASS \(assertions) production online playback assertions; six registry, exact DOM/JSON/identity, bounded safe HLS, independent model and credential isolation")
         if ProcessInfo.processInfo.environment["ONLINE_PLAYBACK_LIVE"] == "1" {

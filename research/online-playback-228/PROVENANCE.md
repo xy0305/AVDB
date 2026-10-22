@@ -7,8 +7,8 @@
 - **JavMenu**：真实 `/zh/{number}`，完整 canonical + h1 身份，然后真正 DOM 的 `a[data-m3u8]`；选线重新获取。三个普通样本中：一个 CDN TLS 自签名失败，一个 HLS 主/子清单 200 但子清单声明加密密钥（拒绝，不请求 key），一个 CDN 404。不能称当前样本可播。
 - **第三方AVDB**：真实 `ac=detail&wd={number}&pagesize=5`，精确 `movie_code`，保留实际 id、版本、对象 `episodes.server_data.Full.link_embed`；详情重新核验；upload18.org 正常 embed 的 `window.PLAYER_CONFIG` 只读字面 JSON。三个样本精确链路成立，但 helvid.com 媒体 404。它不是用户应用 AVDB，更不共享 JavDB/115/TPDB 凭据。
 - **MemoJav**：本站 `/video/{number}` 的 og:url+h1+实际 iframe，embed 声明 id；公开 `/static/main.js` 展示客户端时间戳证明，不含私钥或口令。独立重写为时间戳 Base64 的指定 10 字符与公开加权校验和；仅正常调用本站 `/hls/get_video_info.php`，不猜签名、不读取 IPA 凭据、不模拟广告。真实 START-642 得到 success/hls，正常一次 URL 百分号解码后 video10.memojav.net HLS **200**，920 个相对分片引用、无加密 key 声明，未请求任何分片。原生 macOS 同一 production provider 的另次结果由 CI 单独记录。
-- **AV01**：公开站点 JS 明确 POST `/api/v1/videos/search?lang=en&include_facets=true`，query+pagination(page1,limit5)；普通请求确认 SSIS-001 对应真实 id42439，详情 dvd_id 精确成立。正常匿名 `/edge/geo.js?json` 返回站方短期授权结构，但 `comp=true`；不覆盖地域/合规策略，不输出/缓存授权值，不继续 CDN。原生实现真实搜索/详情/geo 阶段；动态授权清单改写尚未验证，返回访问受限或暂不支持，不冒充已完成可播。
-- **MissAV**：真实公开搜索与精确详情 DOM 校验；只支持直接明文 HLS 候选识别。普通 TLS 信任链失败，不关闭验证。打包词表 reconstruction 未核实，不猜 URL、不执行 JS；尚无已批准实测媒体主机，因此清单阶段明确暂不支持。
+- **AV01**：公开站点 JS 明确 POST `/api/v1/videos/search?lang=en&include_facets=true`，query+pagination(page1,limit5)；普通请求确认 SSIS-001 对应真实 id42439，详情 dvd_id 精确成立。正常匿名 `/edge/geo.js?json` 返回站方短期授权结构，但 `comp=true`；comp 的语义未确认，不擅自覆盖站方策略，不输出/缓存授权值，不继续 CDN。原生实现真实搜索/详情/geo 阶段；动态授权清单改写尚未验证，明确返回暂不支持（不把未确定策略伪装成 HTTP403），不冒充已完成可播。
+- **MissAV**：真实公开搜索与精确详情 DOM 校验；只支持直接明文 HLS 候选识别。用户指定 MissAV_TuT v3.7 的默认域名为 missav.fans，已据此更正本 provider 的默认地址；missav.ws 与 missav.fans 普通 TLS 均信任链失败，不关闭验证。打包词表 reconstruction 未核实，不猜 URL、不执行 JS；尚无已批准实测媒体主机，因此清单阶段明确暂不支持。
 - **Jable**：真实搜索 `/search/{number}/`、同源详情 `/videos/{slug}/`、canonical/og:url+h1 和 `hlsUrl` 静态解析。普通请求403，停止反爬边界；尚无已批准实测媒体主机，后续清单阶段明确暂不支持。
 
 ## App 集成和安全
@@ -20,3 +20,6 @@
 
 ## 未完成与不宣称
 这是六源 registry + 真实网络适配阶段、**不是六源全部可播**。AV01 动态授权清单桥接、MissAV 打包候选恢复和两站未知 CDN allowlist 尚未完成。真实成人媒体首帧不验证、不截图；仅完成合法匿名元数据和 HLS 清单验证。无VPS/Cloudflare/One/直播/新账单变更。
+
+## 用户指定 MissAV 参考复核
+参考：https://rex.fwd.ccwu.cc/js/MissAV_TuT.js ，116766字节，版本3.7；已先读取 writing-forward-widgets 技能约束。静态检查默认域名 missav.fans、`/cn/search/{number}`、详情 source/明文 surrit URL 与 Packer 字面表解包机制、UA/Referer/Origin 和 HLS 验证。脚本未声明可确认的开源许可证，因此不复制/执行或捆绑其实现。未导入 keys/cookies、域名轮询、挑战重试、UUID猜测、固定清晰度猜测、宽泛前缀匹配、短签缓存。Swift 保留严格身份、单一明确默认域名、直接明文解析及未验证解析的 fail-closed 分支；Packer 字面重建尚未接入，不宣称支持。
