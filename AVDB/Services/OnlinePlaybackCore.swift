@@ -1,6 +1,9 @@
 // Independently implemented from bounded anonymous public responses. No AvPlay code.
 import Foundation
 import CryptoKit
+#if canImport(Darwin)
+import Darwin
+#endif
 
 enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
     case thirdPartyAVDB, javmenu, av01, memojav, missav, jable
@@ -17,11 +20,14 @@ enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
     }
 }
 enum OnlineFailure: Error, LocalizedError, Equatable {
-    case noMatch, blocked, tls, parse, timeout, unsafe, tooLarge, cancelled, unsupported, http(Int)
+    case noMatch, blocked, tls, parse, timeout, unsafe, tooLarge, cancelled, unsupported, incomplete, drm, keyUnavailable, http(Int)
     var errorDescription: String? {
         switch self {
         case .noMatch: return "未匹配"
-        case .blocked: return "访问受限（含受保护清单；不会请求密钥或绕过限制）"
+        case .blocked: return "来源拒绝访问或要求验证（未绕过限制）"
+        case .drm: return "不支持 DRM / SAMPLE-AES 或专有密钥格式"
+        case .keyUnavailable: return "标准 AES-128 密钥不可用或格式无效"
+        case .incomplete: return "适配未完成（不是未匹配）"
         case .tls: return "TLS 错误（未降低证书验证）"
         case .parse: return "解析失败"
         case .unsupported: return "暂不支持（媒体协议或来源主机尚未验证）"
@@ -49,6 +55,7 @@ struct OnlineLine: Identifiable, Equatable, Sendable {
     let version: String
     let lineKey: String
     var routeDigest: String = "" // One-way binding only; never cache a signed media URL.
+    var detailURL: URL? = nil // Public metadata provenance, not a guessed slug or media URL.
     var id: String { source.rawValue + ":" + recordID + ":" + lineKey }
 }
 struct OnlinePlaybackPlan: Identifiable, Sendable {
@@ -97,7 +104,17 @@ enum OnlinePolicy {
         switch source {
         case .javmenu: return url.host == "javmenu.com" && url.query == nil && path.hasPrefix("/zh/") && path.split(separator: "/").count == 2
         case .thirdPartyAVDB: return url.host == "avdbapi.com" && path == "/api.php/provide/vod"
-        case .jable: return url.host == "jable.tv" && url.query == nil && (path.hasPrefix("/search/") || path.hasPrefix("/videos/"))
+        case .jable:
+            guard url.host == "jable.tv", path.split(separator: "/").count == 2 else { return false }
+            if path.hasPrefix("/videos/") { return url.query == nil }
+            guard path.hasPrefix("/search/"), let code = path.split(separator: "/").last,
+                  OnlineIdentity.key(String(code)) != nil else { return false }
+            if url.query == nil { return true }
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            return items.count == 4 && items.filter { $0.name == "mode" && $0.value == "async" }.count == 1
+                && items.filter { $0.name == "function" && $0.value == "get_block" }.count == 1
+                && items.filter { $0.name == "block_id" && $0.value == "list_videos_videos_list_search_result" }.count == 1
+                && items.filter { $0.name == "q" && $0.value == String(code) }.count == 1
         case .missav: return url.host == "missav.fans" && url.query == nil && path.hasPrefix("/cn/")
         case .memojav: return url.host == "memojav.org" && (path.hasPrefix("/video/") || path.hasPrefix("/embed/") || path == "/hls/get_video_info.php")
         case .av01: return (url.host == "www.av01.media" && path.hasPrefix("/api/v1/videos/")) || (url.host == "files.iw01.xyz" && path == "/edge/geo.js" && url.query == "json")
@@ -120,44 +137,184 @@ enum OnlinePolicy {
         }
     }
     static func bound(_ child: URL, to root: URL) -> Bool {
-        guard secure(child), child.host == root.host else { return false }
-        let folder = root.deletingLastPathComponent().path + "/"
-        return child.path.hasPrefix(folder) && !child.path.contains("..") && !child.absoluteString.lowercased().contains("%2e")
+        // HLS routinely references ../keys and sibling rendition directories.
+        // URL resolves dot segments first; security is an exact HTTPS origin, not a folder prefix.
+        secure(child) && child.host?.lowercased() == root.host?.lowercased()
+    }
+    static func discoveredMedia(_ url: URL, source: OnlineSource) -> Bool {
+        source == .jable && secure(url) && OnlineMediaScope.publicHost(url.host ?? "")
+            && url.path.lowercased().hasSuffix(".m3u8")
     }
     static func headers(referrer: URL) -> [String:String] {
-        // No account cookies, Authorization, Origin guesses or alternate header spraying.
-        ["User-Agent": ua, "Referer": referrer.absoluteString]
+        var value = ["User-Agent": ua, "Referer": referrer.absoluteString]
+        if referrer.host == "jable.tv" { value["Origin"] = "https://jable.tv" }
+        return value // No account cookies or Authorization; never rotate headers after a 403.
     }
 }
+// A media origin is either an existing per-provider allowlist entry, or the exact
+// public HTTPS origin explicitly issued by an identity-validated Jable detail page.
+// No suffix/domain wildcard; requests never follow redirects. DNS preflight is not
+// DNS pinning and cannot guarantee the native player's later redirect/DNS behavior.
+struct OnlineMediaScope: Sendable {
+    let root: URL
+    func contains(_ url: URL) -> Bool { OnlinePolicy.bound(url, to: root) }
+    static func publicHost(_ host: String) -> Bool {
+        let h = host.lowercased()
+        guard h.count <= 253, h.contains("."), !h.hasSuffix("."),
+              !h.allSatisfy({ $0.isNumber || $0 == "." }),
+              !["localhost", "local", "internal", "invalid", "test", "example", "onion"].contains(String(h.split(separator: ".").last ?? "")) else { return false }
+        return h.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
+            !label.isEmpty && label.count <= 63 && label.first != "-" && label.last != "-"
+                && label.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }
+        }
+    }
+    static func publicAddress(_ address: String) -> Bool {
+        if address.contains(":") {
+            #if canImport(Darwin)
+            var value = in6_addr()
+            guard inet_pton(AF_INET6, address, &value) == 1 else { return false }
+            return withUnsafeBytes(of: &value) { bytes in
+                let a = Array(bytes)
+                guard a.count == 16, a[0] & 0xe0 == 0x20 else { return false } // global unicast only
+                if a[0] == 0x20 && a[1] == 0x02 { return false } // 6to4 may embed private IPv4
+                if a[0] == 0x20 && a[1] == 0x01 {
+                    if a[2] == 0x0d && a[3] == 0xb8 { return false } // documentation
+                    if a[2] == 0 && a[3] <= 0x2f { return false } // special-use, Teredo, ORCHID
+                }
+                return true
+            }
+            #else
+            return false
+            #endif
+        }
+        let parts = address.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4, let a = Int(parts[0]), let b = Int(parts[1]),
+              let c = Int(parts[2]), let d = Int(parts[3]), [a,b,c,d].allSatisfy({ (0...255).contains($0) }) else { return false }
+        if [0,10,127].contains(a) || a >= 224 { return false }
+        if a == 100 && (64...127).contains(b) { return false }
+        if a == 169 && b == 254 || a == 172 && (16...31).contains(b) { return false }
+        if a == 192 && (b == 168 || b == 0 || b == 88 && c == 99) { return false }
+        if a == 198 && (b == 18 || b == 19 || b == 51 && c == 100) { return false }
+        if a == 203 && b == 0 && c == 113 { return false }
+        return true
+    }
+    func validateDNS() async throws {
+        guard let host = root.host, Self.publicHost(host) else { throw OnlineFailure.unsafe }
+        try await Task.detached(priority: .utility) {
+            #if canImport(Darwin)
+            var result: UnsafeMutablePointer<addrinfo>?
+            guard getaddrinfo(host, nil, nil, &result) == 0, let first = result else { throw OnlineFailure.unsafe }
+            defer { freeaddrinfo(first) }
+            var cursor: UnsafeMutablePointer<addrinfo>? = first; var count = 0
+            while let item = cursor {
+                var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                let value = item.pointee
+                guard value.ai_family == AF_INET || value.ai_family == AF_INET6,
+                      let address = value.ai_addr,
+                      getnameinfo(address, value.ai_addrlen, &buffer, socklen_t(NI_MAXHOST), nil, 0, NI_NUMERICHOST) == 0,
+                      Self.publicAddress(String(cString: buffer)) else { throw OnlineFailure.unsafe }
+                count += 1; cursor = value.ai_next
+            }
+            guard count > 0 else { throw OnlineFailure.unsafe }
+            #else
+            throw OnlineFailure.unsafe
+            #endif
+        }.value
+        try Task.checkCancellation()
+    }
+}
+
 struct OnlineManifest {
     let variants: [URL]
+    let keys: [URL]
+    // RFC 8216 attribute lists: quoted commas are not delimiters; duplicate names
+    // and unbalanced quotes are rejected rather than guessing a decryption method.
+    static func attributes(_ value: String) throws -> [String:String] {
+        var fields: [String] = []; var part = ""; var quoted = false
+        for c in value {
+            if c == "\"" { quoted.toggle() }
+            if c == "," && !quoted { fields.append(part); part = "" } else { part.append(c) }
+        }
+        guard !quoted else { throw OnlineFailure.parse }; fields.append(part)
+        var result: [String:String] = [:]
+        for field in fields {
+            let pieces = field.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pieces.count == 2 else { throw OnlineFailure.parse }
+            let name = pieces[0].trimmingCharacters(in: .whitespaces)
+            var value = pieces[1].trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty, !value.isEmpty, result[name] == nil else { throw OnlineFailure.parse }
+            if value.hasPrefix("\"") {
+                guard value.hasSuffix("\""), value.count >= 2 else { throw OnlineFailure.parse }
+                value = String(value.dropFirst().dropLast())
+                guard !value.contains("\"") else { throw OnlineFailure.parse }
+            } else if value.contains("\"") { throw OnlineFailure.parse }
+            result[name] = value
+        }
+        return result
+    }
     static func parse(_ data: Data, at url: URL, root: URL) throws -> OnlineManifest {
-        guard data.count <= 512 * 1024, let text = String(data: data, encoding: .utf8) else { throw OnlineFailure.parse }
+        guard data.count <= 512 * 1024 else { throw OnlineFailure.tooLarge }
+        guard let text = String(data: data, encoding: .utf8) else { throw OnlineFailure.parse }
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard t.hasPrefix("#EXTM3U"), !t.lowercased().contains("<html"), !t.lowercased().contains("<!doctype") else { throw OnlineFailure.parse }
-        // Protected playlists fail BEFORE reading any key URI or requesting any segment.
-        guard !t.contains("#EXT-X-KEY:"), !t.contains("#EXT-X-SESSION-KEY:"), !t.contains("#EXT-X-SESSION-DATA:"), !t.contains("#EXT-X-DEFINE:") else { throw OnlineFailure.blocked }
         let lines = t.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        var variants: [URL] = []; var expectsVariant = false; var segments = 0
-        for line in lines where !line.isEmpty {
-            if line.hasPrefix("#EXT-X-STREAM-INF:") { expectsVariant = true; continue }
+        guard lines.first == "#EXTM3U" else { throw OnlineFailure.parse }
+        var variants: [URL] = []; var keys: [URL] = []; var expectsVariant = false; var segments = 0
+        func scoped(_ raw: String) throws -> URL {
+            if raw.lowercased().hasPrefix("skd:") { throw OnlineFailure.drm }
+            guard !raw.contains("{$"), !raw.contains("\\"), !raw.contains(where: { $0.isWhitespace }),
+                  let child = URL(string: raw, relativeTo: url)?.absoluteURL.standardized,
+                  OnlinePolicy.bound(child, to: root) else { throw OnlineFailure.unsafe }
+            return child
+        }
+        func appendVariant(_ child: URL) throws {
+            guard !variants.contains(child) else { return }
+            guard variants.count < 6 else { throw OnlineFailure.tooLarge }; variants.append(child)
+        }
+        for line in lines.dropFirst() where !line.isEmpty {
+            if line.hasPrefix("#EXT-X-KEY:") || line.hasPrefix("#EXT-X-SESSION-KEY:") {
+                let sessionKey = line.hasPrefix("#EXT-X-SESSION-KEY:")
+                let a = try attributes(String(line.split(separator: ":", maxSplits: 1)[1]))
+                guard let method = a["METHOD"] else { throw OnlineFailure.parse }
+                if method == "NONE" {
+                    guard !sessionKey, a.count == 1 else { throw OnlineFailure.parse }; continue
+                }
+                // Ordinary identity AES-128 is NOT DRM. The normal native HLS
+                // client receives the unchanged manifest and handles it itself.
+                guard method == "AES-128", a["KEYFORMAT"] == nil || a["KEYFORMAT"] == "identity",
+                      a["KEYFORMATVERSIONS"] == nil || a["KEYFORMATVERSIONS"] == "1" else { throw OnlineFailure.drm }
+                if let iv = a["IV"] {
+                    guard iv.lowercased().hasPrefix("0x"), (3...34).contains(iv.count),
+                          iv.dropFirst(2).allSatisfy({ $0.isHexDigit }) else { throw OnlineFailure.parse }
+                }
+                guard let raw = a["URI"], !raw.isEmpty else { throw OnlineFailure.parse }
+                let key = try scoped(raw)
+                if !keys.contains(key) { guard keys.count < 16 else { throw OnlineFailure.tooLarge }; keys.append(key) }
+                continue
+            }
+            if line.hasPrefix("#EXT-X-DEFINE:") || line.hasPrefix("#EXT-X-CONTENT-STEERING:") { throw OnlineFailure.unsupported }
+            if line.hasPrefix("#EXT-X-STREAM-INF:") {
+                guard !expectsVariant else { throw OnlineFailure.parse }; expectsVariant = true; continue
+            }
             if line.hasPrefix("#") {
-                // URI-bearing alternate audio, map and subtitles must also be source/path bound.
-                for match in JRHTML.matches(#"URI\s*=\s*"([^"]+)""#, line) {
-                    guard let u = URL(string: match[1], relativeTo: url)?.absoluteURL, OnlinePolicy.bound(u, to: root) else { throw OnlineFailure.unsafe }
-                    // Alternate rendition manifests are not silently left unvalidated.
-                    if u.path.hasSuffix(".m3u8") { throw OnlineFailure.blocked }
+                let uriTags = ["#EXT-X-MEDIA:", "#EXT-X-I-FRAME-STREAM-INF:", "#EXT-X-MAP:", "#EXT-X-PART:", "#EXT-X-PRELOAD-HINT:", "#EXT-X-SESSION-DATA:", "#EXT-X-RENDITION-REPORT:"]
+                if uriTags.contains(where: { line.hasPrefix($0) }) {
+                    let a = try attributes(String(line.split(separator: ":", maxSplits: 1)[1]))
+                    if let raw = a["URI"] {
+                        let child = try scoped(raw)
+                        if line.hasPrefix("#EXT-X-MEDIA:") || line.hasPrefix("#EXT-X-I-FRAME-STREAM-INF:") || line.hasPrefix("#EXT-X-RENDITION-REPORT:") { try appendVariant(child) }
+                    }
+                } else {
+                    for match in JRHTML.matches(#"(?:[:,])\s*URI\s*=\s*\"([^\"]+)\""#, line) { _ = try scoped(match[1]) }
                 }
                 continue
             }
-            guard let child = URL(string: line, relativeTo: url)?.absoluteURL, OnlinePolicy.bound(child, to: root) else { throw OnlineFailure.unsafe }
-            if expectsVariant {
-                guard OnlinePolicy.media(child), variants.count < 6 else { throw OnlineFailure.unsafe }
-                variants.append(child); expectsVariant = false
-            } else { segments += 1 }
+            let child = try scoped(line)
+            if expectsVariant { try appendVariant(child); expectsVariant = false } else { segments += 1 }
         }
-        guard !expectsVariant, !variants.isEmpty || (segments > 0 && t.contains("#EXTINF:")), !(segments > 0 && !variants.isEmpty) else { throw OnlineFailure.parse }
-        return OnlineManifest(variants: variants)
+        guard !expectsVariant, !variants.isEmpty || (segments > 0 && t.contains("#EXTINF:")),
+              !(segments > 0 && lines.contains(where: { $0.hasPrefix("#EXT-X-STREAM-INF:") })) else { throw OnlineFailure.parse }
+        return OnlineManifest(variants: variants, keys: keys)
     }
 }
 final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
@@ -172,9 +329,14 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         return URLSession(configuration: c, delegate: self, delegateQueue: nil)
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
-    func fetch(_ url: URL, cap: Int, headers: [String:String] = [:], body: Data? = nil) async throws -> Data {
+    func fetch(_ url: URL, cap: Int, headers: [String:String] = [:], body: Data? = nil, scope: OnlineMediaScope? = nil) async throws -> Data {
         try Task.checkCancellation()
-        guard OnlineSource.allCases.contains(where: { OnlinePolicy.metadata(url, source: $0) }) || OnlinePolicy.embed(url) || OnlinePolicy.media(url) else { throw OnlineFailure.unsafe }
+        if let scope {
+            guard scope.contains(url) else { throw OnlineFailure.unsafe }
+            if loader == nil { try await scope.validateDNS() }
+        } else {
+            guard OnlineSource.allCases.contains(where: { OnlinePolicy.metadata(url, source: $0) }) || OnlinePolicy.embed(url) || OnlinePolicy.media(url) else { throw OnlineFailure.unsafe }
+        }
         var request = URLRequest(url: url); request.timeoutInterval = 12
         if let body {
             guard url.host == "www.av01.media", url.path == "/api/v1/videos/search", body.count <= 4096 else { throw OnlineFailure.unsafe }
@@ -182,7 +344,10 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         request.setValue(OnlinePolicy.ua, forHTTPHeaderField: "User-Agent")
-        for (key,value) in headers where ["User-Agent","Referer"].contains(key) { request.setValue(value, forHTTPHeaderField: key) }
+        for (key,value) in headers where ["User-Agent","Referer","Origin","Accept"].contains(key) {
+            if key == "Origin" && value != "https://jable.tv" { throw OnlineFailure.unsafe }
+            request.setValue(value, forHTTPHeaderField: key)
+        }
         if let loader {
             let data = try await loader(request); try Task.checkCancellation()
             guard data.count <= cap else { throw OnlineFailure.tooLarge }; return data
@@ -260,7 +425,7 @@ struct OnlineProvider: Sendable {
             let urls = try Self.javmenu(try await transport.fetch(Self.page(exact), cap: 2*1024*1024), number: exact)
             return urls.indices.map { OnlineLine(source: source, recordID: exact, code: exact, version: "原始版本", lineKey: String($0), routeDigest: Self.routeDigest(urls[$0])) }
         }
-        if source != .thirdPartyAVDB { return try await discoverAdditional(source, number: exact) }
+        if source != .thirdPartyAVDB { return try await discoverAdditional(source, number: exact, versions: versions) }
         let list = try Self.records(try await transport.fetch(Self.api(number: exact), cap: 1024*1024))
         return list.flatMap { record -> [OnlineLine] in
             guard let code = record["movie_code"] as? String, let version = OnlineIdentity.version(code, number: exact, allowVersions: versions), let id = Self.identifier(record) else { return [] }
@@ -270,7 +435,7 @@ struct OnlineProvider: Sendable {
     func resolve(_ line: OnlineLine, number: String, versions: Bool) async throws -> OnlinePlaybackPlan {
         try Task.checkCancellation()
         guard OnlineIdentity.version(line.code, number: number, allowVersions: versions) != nil else { throw OnlineFailure.noMatch }
-        if line.source != .javmenu && line.source != .thirdPartyAVDB { return try await resolveAdditional(line, number: number) }
+        if line.source != .javmenu && line.source != .thirdPartyAVDB { return try await resolveAdditional(line, number: number, versions: versions) }
         let media: URL; let referrer: URL
         if line.source == .javmenu {
             referrer = try Self.page(number)
@@ -287,14 +452,35 @@ struct OnlineProvider: Sendable {
         }
         return try await validatedPlan(media:media, referrer:referrer, line:line, number:number)
     }
-    func validatedPlan(media: URL, referrer: URL, line: OnlineLine, number: String) async throws -> OnlinePlaybackPlan {
-        guard OnlinePolicy.media(media, source:line.source) else { throw OnlineFailure.unsafe }
+    func validatedPlan(media: URL, referrer: URL, line: OnlineLine, number: String, pageIssued: Bool = false) async throws -> OnlinePlaybackPlan {
+        guard OnlinePolicy.media(media, source: line.source) || (pageIssued && OnlinePolicy.discoveredMedia(media, source: line.source)) else { throw OnlineFailure.unsafe }
         let headers = OnlinePolicy.headers(referrer: referrer)
-        let master = try OnlineManifest.parse(try await transport.fetch(media, cap: 512*1024, headers: headers), at: media, root: media)
-        // Validate ALL allowed variants; no unvalidated adaptive branch can be played.
-        for variant in master.variants {
-            let child = try OnlineManifest.parse(try await transport.fetch(variant, cap: 512*1024, headers: headers), at: variant, root: media)
-            guard child.variants.isEmpty else { throw OnlineFailure.blocked }
+        let scope = OnlineMediaScope(root: media)
+        var pending: [(URL,Int)] = [(media,0)]; var seen = Set<URL>(); var keys = Set<URL>(); var hasLeaf = false
+        // Validate every adaptive/rendition playlist, bounded across the whole graph.
+        while !pending.isEmpty {
+            let (url,depth) = pending.removeFirst()
+            guard !seen.contains(url) else { continue }
+            guard seen.count < 8, depth <= 3 else { throw OnlineFailure.tooLarge }
+            seen.insert(url)
+            let manifest = try OnlineManifest.parse(try await transport.fetch(url, cap: 512*1024, headers: headers, scope: scope), at: url, root: media)
+            for key in manifest.keys { keys.insert(key) }
+            guard keys.count <= 16 else { throw OnlineFailure.tooLarge }
+            if manifest.variants.isEmpty { hasLeaf = true }
+            pending += manifest.variants.map { ($0,depth+1) }
+        }
+        guard hasLeaf else { throw OnlineFailure.parse }
+        // Probe only ordinary, publicly provided identity AES-128 keys. Never
+        // derive, persist, log, rewrite or decrypt them; the native HLS client
+        // subsequently consumes the original playlist. DRM fails above first.
+        for key in keys.sorted(by: { $0.absoluteString < $1.absoluteString }) {
+            do {
+                let bytes = try await transport.fetch(key, cap: 64*1024, headers: headers, scope: scope)
+                guard bytes.count == 16 else { throw OnlineFailure.keyUnavailable }
+            } catch let failure as OnlineFailure {
+                if failure == .noMatch || failure == .tooLarge || failure == .parse { throw OnlineFailure.keyUnavailable }
+                throw failure
+            }
         }
         try Task.checkCancellation()
         #if DEBUG
@@ -312,6 +498,21 @@ struct OnlineProvider: Sendable {
 enum OnlineNeutralFixture {
     static func response(_ url: URL) throws -> Data {
         let media = "https://2608.xbv2608.com/neutral/demo/index.m3u8"
+        if ProcessInfo.processInfo.arguments.contains("--online-playback-failures") {
+            if url.host == "avdbapi.com" { throw OnlineFailure.blocked }
+            if url.host == "missav.fans" { throw OnlineFailure.unsupported }
+            if url.host == "memojav.org" { throw OnlineFailure.tls }
+            if url.host == "www.av01.media" { return Data("{\"videos\":[]}".utf8) }
+        }
+        if url.host == "jable.tv" {
+            if url.path.hasPrefix("/search/") { return Data("<a href='/videos/demo-123/'>DEMO-123 Neutral</a>".utf8) }
+            return Data("<meta property='og:url' content='https://jable.tv/videos/demo-123/'><section class='video-info'><h4>DEMO-123 Neutral</h4></section><script>var hlsUrl = 'https://neutral.jable-cdn.net/demo/index.m3u8';</script>".utf8)
+        }
+        if url.host == "neutral.jable-cdn.net" {
+            if url.path.hasSuffix(".m3u8") { return Data("#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key\"\n#EXTINF:4,\nneutral.ts\n#EXT-X-ENDLIST\n".utf8) }
+            // Deliberately malformed OWN neutral fixture, never a third-party key.
+            return Data(repeating: 0, count: 15)
+        }
         if url.host == "javmenu.com" {
             return Data("<link rel='canonical' href='https://javmenu.com/zh/DEMO-123'><h1>DEMO-123 Neutral</h1><a data-m3u8='\(media)'>1</a>".utf8)
         }

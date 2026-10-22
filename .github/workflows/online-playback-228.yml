@@ -1,4 +1,4 @@
-name: Build228 Online Playback Native Acceptance
+name: Build229 Online Playback Native Acceptance
 on:
   push:
     branches: [fix/subtitle-position-201]
@@ -37,7 +37,7 @@ jobs:
       - name: Manual six-source panel and real native neutral playback
         run: |
           set -o pipefail
-          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/OnlineDerived" -resultBundlePath "$RUNNER_TEMP/Online.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testOnlinePlaybackSixSourceManualNativeFlow 2>&1 | tee "$RUNNER_TEMP/online.log"
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/OnlineDerived" -resultBundlePath "$RUNNER_TEMP/Online.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testOnlinePlaybackSixSourceManualNativeFlow -only-testing:PosterNavigationUITests/PosterNavigationTests/testOnlinePlaybackAttributedFailures 2>&1 | tee "$RUNNER_TEMP/online.log"
       - name: Export neutral-only actual UI evidence
         if: always()
         run: |
@@ -50,6 +50,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build228-online-native-${{ matrix.device }}-${{ github.run_number }}
+          name: build229-online-native-${{ matrix.device }}-${{ github.run_number }}
           path: ${{ runner.temp }}/online-evidence/
           retention-days: 14

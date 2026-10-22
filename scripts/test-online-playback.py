@@ -14,7 +14,11 @@ assert 'Task.sleep(nanoseconds: 25_000_000_000)' in panel and 'count >= 2' in pa
 assert 'query.queryItems' in extra and 'memoProof' in extra and 'issued["comp"] as? Bool == true' in extra
 assert 'JavDBSDK' not in core+extra+panel and 'APIClient.shared.token' not in core+extra+panel
 assert 'evaluateJavaScript' not in core+extra+panel
-assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='228'
+assert 'resolutions[line.source]' in panel and 'queryMessages[source]' in panel
+assert 'resolutionMessage' not in panel and 'online.resolve-state' not in panel
+assert '.accessibilityIdentifier("online.panel")' not in panel, 'Container ID must not propagate over child StaticText identifiers'
+assert '找到候选，待解析' in panel and '尚未确认首帧' in panel
+assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='229'
 print('PASS six-source production UI wiring/static privacy/size/timeout/cache/cancellation policies (not runtime claim)')
 if platform.system()=='Darwin':
  with tempfile.TemporaryDirectory() as d:

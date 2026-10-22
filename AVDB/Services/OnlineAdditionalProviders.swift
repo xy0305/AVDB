@@ -18,7 +18,13 @@ enum OnlineAdditional {
     static func exactDetail(_ data: Data, page: URL, code: String, source: OnlineSource) throws -> String {
         let text = try html(data); let dom = try JRHTML.tree(text)
         let urls = dom.all { ($0.tag == "link" && $0.attrs["rel"] == "canonical") || ($0.tag == "meta" && $0.attrs["property"] == "og:url") }.compactMap { $0.attrs["href"] ?? $0.attrs["content"] }
-        guard urls.contains(page.absoluteString), dom.all({ $0.tag == "h1" }).contains(where: { OnlineIdentity.heading($0.text, number: code) }) else {
+        let jableHeadings = source == .jable ? dom.all { $0.tag == "section" && $0.cls("video-info") }.flatMap { $0.all { $0.tag == "h4" } }.map(\.text)
+            + dom.all { $0.tag == "meta" && $0.attrs["property"] == "og:title" }.compactMap { $0.attrs["content"] } : []
+        let headings = dom.all { $0.tag == "h1" }.map(\.text) + jableHeadings
+        let slug = page.lastPathComponent.uppercased()
+        let exactVersionHeading = source == .jable && OnlineIdentity.version(slug, number: code, allowVersions: true) != nil
+            && headings.contains { !JRHTML.matches("(?<![A-Z0-9_-])" + NSRegularExpression.escapedPattern(for: slug) + "(?![A-Z0-9_-])", $0).isEmpty }
+        guard urls.contains(page.absoluteString), headings.contains(where: { OnlineIdentity.heading($0, number: code) }) || exactVersionHeading else {
             if text.lowercased().contains("just a moment") || text.contains("cf-chl-") { throw OnlineFailure.blocked }
             throw OnlineFailure.noMatch
         }
@@ -70,10 +76,69 @@ enum OnlineAdditional {
         let decoded = raw.hasPrefix("https%3A") || raw.hasPrefix("https%3a") ? raw.removingPercentEncoding ?? "" : raw
         guard let url = URL(string: decoded), OnlinePolicy.media(url, source: .memojav) else { throw OnlineFailure.unsafe }; return url
     }
+    static func jableSearch(_ number: String) throws -> URL {
+        guard let code = OnlineIdentity.key(number) else { throw OnlineFailure.noMatch }
+        var components = URLComponents(string: "https://jable.tv/search/\(code)/")!
+        components.queryItems = [URLQueryItem(name: "mode", value: "async"), URLQueryItem(name: "function", value: "get_block"),
+                                 URLQueryItem(name: "block_id", value: "list_videos_videos_list_search_result"), URLQueryItem(name: "q", value: code)]
+        return components.url!
+    }
+    static func jableLines(_ data: Data, base: URL, number: String, versions: Bool) throws -> [OnlineLine] {
+        let text = try html(data)
+        if text.lowercased().contains("just a moment") || text.contains("cf-chl-") { throw OnlineFailure.blocked }
+        let dom = try JRHTML.tree(text); var seen = Set<URL>()
+        // Use the actual search anchors, not a constructed /videos/{number}/ URL.
+        // Every complete slug is independently matched; never fall back to a random first result.
+        return dom.all { $0.tag == "a" }.compactMap { node in
+            guard let raw = node.attrs["href"], let url = URL(string: raw, relativeTo: base)?.absoluteURL,
+                  OnlinePolicy.metadata(url, source: .jable), url.path.hasPrefix("/videos/"),
+                  let slug = url.path.split(separator: "/").last,
+                  let version = OnlineIdentity.version(String(slug), number: number, allowVersions: versions),
+                  seen.insert(url).inserted else { return nil }
+            return OnlineLine(source: .jable, recordID: String(slug), code: String(slug).uppercased(),
+                              version: version, lineKey: "primary", detailURL: url)
+        }.prefix(5).map { $0 }
+    }
+    // Decode bounded JS string literals only. No JS evaluation, Packer execution,
+    // dynamic expressions, credentials, word-table reconstruction or guessed CDN URLs.
+    static func jsURLLiteral(_ literal: String) throws -> String {
+        guard literal.count <= 8192, literal.count >= 2, let quote = literal.first,
+              (quote == "\"" || quote == "'"), literal.last == quote else { throw OnlineFailure.parse }
+        let chars = Array(literal.dropFirst().dropLast()); var result = ""; var i = 0
+        while i < chars.count {
+            let c = chars[i]; i += 1
+            if c != "\\" { result.append(c); continue }
+            guard i < chars.count else { throw OnlineFailure.parse }
+            let escaped = chars[i]; i += 1
+            if escaped == "\\" || escaped == "/" || escaped == "\"" || escaped == "'" { result.append(escaped) }
+            else if escaped == "u" || escaped == "x" {
+                let count = escaped == "u" ? 4 : 2
+                guard i + count <= chars.count,
+                      chars[i..<(i+count)].allSatisfy({ $0.isHexDigit }),
+                      let number = UInt32(String(chars[i..<(i+count)]), radix: 16),
+                      let scalar = UnicodeScalar(number) else { throw OnlineFailure.parse }
+                result.unicodeScalars.append(scalar); i += count
+            } else { throw OnlineFailure.parse }
+        }
+        guard !result.contains(where: { $0.isWhitespace || $0.asciiValue.map({ $0 < 32 || $0 == 127 }) == true }) else { throw OnlineFailure.unsafe }
+        return result
+    }
+    static func jableMedia(_ text: String) throws -> URL {
+        var found = Set<URL>()
+        for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
+            for match in JRHTML.matches(#"\b(?:var|let|const)\s+hlsUrl\s*=\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')\s*(?:;|$)"#, block[1]) {
+                let raw = try jsURLLiteral(match[1])
+                guard let url = URL(string: raw.hasPrefix("//") ? "https:" + raw : raw),
+                      OnlinePolicy.discoveredMedia(url, source: .jable) else { throw OnlineFailure.unsafe }
+                found.insert(url)
+            }
+        }
+        guard found.count == 1, let media = found.first else { throw OnlineFailure.unsupported }
+        return media
+    }
     static func staticMedia(_ text: String, source: OnlineSource) throws -> URL {
-        let patterns: [String]
-        if source == .jable { patterns = [#"\bhlsUrl\s*=\s*['"](https://[^'"\s<>]+\.m3u8(?:\?[^'"\s<>]*)?)['"]"#] }
-        else { patterns = [#"(?:source|hlsUrl)\s*=\s*['"](https://[^'"\s<>]+\.m3u8(?:\?[^'"\s<>]*)?)['"]"#, #"https://surrit\.com/[A-Za-z0-9/_-]+/playlist\.m3u8"#] }
+        if source == .jable { return try jableMedia(text) }
+        let patterns = [#"(?:source|hlsUrl)\s*=\s*['"](https://[^'"\s<>]+\.m3u8(?:\?[^'"\s<>]*)?)['"]"#, #"https://surrit\.com/[A-Za-z0-9/_-]+/playlist\.m3u8"#]
         for pattern in patterns {
             if let m = JRHTML.matches(pattern, text).first, let url = URL(string: m.count > 1 ? m[1] : m[0]) {
                 guard OnlinePolicy.media(url, source: source) else { throw OnlineFailure.unsupported }; return url
@@ -85,8 +150,13 @@ enum OnlineAdditional {
 }
 
 extension OnlineProvider {
-    func discoverAdditional(_ source: OnlineSource, number: String) async throws -> [OnlineLine] {
+    func discoverAdditional(_ source: OnlineSource, number: String, versions: Bool = false) async throws -> [OnlineLine] {
         guard let code = OnlineIdentity.key(number) else { throw OnlineFailure.noMatch }
+        if source == .jable {
+            let search = try OnlineAdditional.jableSearch(code)
+            let data = try await transport.fetch(search, cap: 2*1024*1024, headers: ["Accept": "text/html,application/xhtml+xml"])
+            return try OnlineAdditional.jableLines(data, base: search, number: code, versions: versions)
+        }
         if source == .av01 {
             let url = URL(string: "https://www.av01.media/api/v1/videos/search?lang=en&include_facets=true")!
             let body = try JSONSerialization.data(withJSONObject: ["query":code,"pagination":["page":1,"limit":5]])
@@ -95,7 +165,7 @@ extension OnlineProvider {
         let detail: URL
         if source == .memojav { detail = try OnlineAdditional.page(source, code) }
         else {
-            let search = source == .jable ? URL(string:"https://jable.tv/search/" + code + "/")! : URL(string:"https://missav.fans/cn/search/" + code)!
+            let search = URL(string:"https://missav.fans/cn/search/" + code)!
             let links = try OnlineAdditional.searchLinks(try await transport.fetch(search, cap: 2*1024*1024), base: search, source: source, number: code)
             guard let first = links.first else { return [] }; detail = first
         }
@@ -103,8 +173,18 @@ extension OnlineProvider {
         if source == .memojav { _ = try OnlineAdditional.memoID(text, number: code) }
         return [OnlineLine(source:source, recordID:code, code:code, version:"原始版本", lineKey:"primary")]
     }
-    func resolveAdditional(_ line: OnlineLine, number: String) async throws -> OnlinePlaybackPlan {
-        guard OnlineIdentity.key(line.code) == OnlineIdentity.key(number) else { throw OnlineFailure.noMatch }
+    func resolveAdditional(_ line: OnlineLine, number: String, versions: Bool = false) async throws -> OnlinePlaybackPlan {
+        guard OnlineIdentity.version(line.code, number: number, allowVersions: versions) != nil else { throw OnlineFailure.noMatch }
+        if line.source == .jable {
+            guard let detail = line.detailURL, OnlinePolicy.metadata(detail, source: .jable), detail.path.hasPrefix("/videos/"),
+                  let slug = detail.path.split(separator: "/").last,
+                  String(slug).uppercased() == line.code.uppercased(),
+                  String(slug) == line.recordID else { throw OnlineFailure.noMatch }
+            let text = try OnlineAdditional.exactDetail(try await transport.fetch(detail, cap: 2*1024*1024,
+                headers: OnlinePolicy.headers(referrer: URL(string: "https://jable.tv/")!)), page: detail, code: number, source: .jable)
+            let media = try OnlineAdditional.jableMedia(text)
+            return try await validatedPlan(media: media, referrer: detail, line: line, number: number, pageIssued: true)
+        }
         if line.source == .av01 {
             let url = URL(string:"https://www.av01.media/api/v1/videos/" + line.recordID)!
             let data = try await transport.fetch(url, cap: 1024*1024)
@@ -114,10 +194,10 @@ extension OnlineProvider {
             guard let issued = try? JSONSerialization.jsonObject(with: geo) as? [String:Any] else { throw OnlineFailure.parse }
             // Observed comp=true, but its policy semantics are unconfirmed. Do not
             // fabricate a 403, override policy, or invent authorization. Stop explicitly unsupported.
-            if issued["comp"] as? Bool == true { throw OnlineFailure.unsupported }
+            if issued["comp"] as? Bool == true { throw OnlineFailure.incomplete }
             // Public site requires dynamic master rewriting with CDN-issued authorization.
             // Native scoped adaptation is NOT yet verified; fail closed, never pass embed/API as media.
-            throw OnlineFailure.unsupported
+            throw OnlineFailure.incomplete
         }
         let detail = try OnlineAdditional.page(line.source, number)
         let text = try OnlineAdditional.exactDetail(try await transport.fetch(detail, cap: 2*1024*1024), page: detail, code: number, source: line.source)

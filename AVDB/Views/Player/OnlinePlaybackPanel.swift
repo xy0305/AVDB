@@ -8,15 +8,36 @@ final class OnlinePlaybackModel: ObservableObject {
             switch self {
             case .idle: return "未查询"
             case .querying: return "查询中"
-            case .found(let rows): return "找到 \(Set(rows.map(\.recordID)).count) 版本 / \(rows.count) 线路"
+            case .found(let rows): return "找到候选，待解析 · \(Set(rows.map(\.recordID)).count) 版本 / \(rows.count) 线路"
             case .failed(let error): return error.localizedDescription
             }
         }
     }
     @Published private(set) var states: [OnlineSource:State] = [:]
     @Published var plan: OnlinePlaybackPlan?
+    struct Resolution: Equatable {
+        enum Status: Equatable { case resolving, validated, failed(OnlineFailure) }
+        let line: OnlineLine
+        var status: Status
+        var label: String {
+            let prefix = "\(line.source.label) · \(line.code) · 线路 \(line.lineKey)："
+            switch status {
+            case .resolving: return prefix + "正在重新解析并验证 HLS 清单…"
+            case .validated: return prefix + "清单已验证，尚未确认首帧"
+            case .failed(let error): return prefix + error.localizedDescription
+            }
+        }
+    }
     @Published private(set) var resolving: String?
-    @Published private(set) var resolutionMessage: String?
+    @Published private(set) var resolutions: [OnlineSource:Resolution] = [:]
+    @Published private(set) var queryMessages: [OnlineSource:String] = [:]
+    private var selectedLine: OnlineLine?
+    private var context: String?
+    private func bind(number: String, versions: Bool) {
+        let next = number + ":" + String(versions)
+        if let context, context != next { reset() }
+        context = next
+    }
     private var tasks: [OnlineSource:Task<Void,Never>] = [:]
     private var epochs: [OnlineSource:UUID] = [:]
     private var selection: Task<Void,Never>?
@@ -36,10 +57,13 @@ final class OnlinePlaybackModel: ObservableObject {
     var state: (OnlineSource) -> State { { self.states[$0] ?? .idle } }
     // The panel is inert on creation. Only explicit per-source buttons call query.
     func query(_ source: OnlineSource, number: String, versions: Bool) {
-        guard resolving == nil else { return }
+        bind(number: number, versions: versions)
+        queryMessages[source] = nil
         if states[source] != .querying && states.values.filter({ $0 == .querying }).count >= 2 {
-            resolutionMessage = "最多同时查询两个来源；请等待或取消一个查询。"; return
+            queryMessages[source] = source.label + "：最多同时查询两个来源；请等待或取消一个查询。"; return
         }
+        if selectedLine?.source == source { cancelSelection() }
+        resolutions[source] = nil
         tasks[source]?.cancel()
         let epoch = UUID(); epochs[source] = epoch
         let key = namespace.uuidString + ":" + number + ":" + source.rawValue + ":" + String(versions)
@@ -59,17 +83,22 @@ final class OnlinePlaybackModel: ObservableObject {
         }
     }
     func choose(_ line: OnlineLine, number: String, versions: Bool) {
-        selection?.cancel(); selectionEpoch = UUID(); let epoch = selectionEpoch
-        resolving = line.id; resolutionMessage = "正在重新解析并验证 HLS 清单…"
+        bind(number: number, versions: versions)
+        cancelSelection(); plan = nil
+        selectionEpoch = UUID(); let epoch = selectionEpoch
+        selectedLine = line; resolving = line.id
+        resolutions[line.source] = Resolution(line: line, status: .resolving)
         selection = Task { [weak self] in
             guard let self else { return }
             do {
                 let result = try await Self.bounded { try await self.provider.resolve(line, number: number, versions: versions) }
                 guard !Task.isCancelled, self.selectionEpoch == epoch else { return }
-                self.plan = result; self.resolving = nil; self.resolutionMessage = nil
+                self.resolutions[line.source] = Resolution(line: line, status: .validated)
+                self.plan = result; self.resolving = nil; self.selectedLine = nil
             } catch {
                 guard !Task.isCancelled, self.selectionEpoch == epoch else { return }
-                self.resolving = nil; self.resolutionMessage = OnlineFailure.classify(error).localizedDescription
+                self.resolving = nil; self.selectedLine = nil
+                self.resolutions[line.source] = Resolution(line: line, status: .failed(OnlineFailure.classify(error)))
             }
         }
     }
@@ -85,12 +114,19 @@ final class OnlinePlaybackModel: ObservableObject {
         tasks[source]?.cancel(); tasks[source] = nil; epochs[source] = nil
         if states[source] == .querying { states[source] = .idle }
     }
+    private func cancelSelection() {
+        selection?.cancel(); selection = nil; selectionEpoch = UUID()
+        if let line = selectedLine, resolutions[line.source]?.status == .resolving {
+            resolutions[line.source] = Resolution(line: line, status: .failed(.cancelled))
+        }
+        selectedLine = nil; resolving = nil
+    }
     func cancelPending() {
         tasks.values.forEach { $0.cancel() }; tasks.removeAll(); epochs.removeAll()
-        selection?.cancel(); selection = nil; selectionEpoch = UUID(); resolving = nil
+        cancelSelection()
         for source in OnlineSource.allCases where states[source] == .querying { states[source] = .idle }
     }
-    func reset() { cancelPending(); namespace = UUID(); cache.removeAll(); states.removeAll(); plan = nil; resolutionMessage = nil }
+    func reset() { cancelPending(); namespace = UUID(); context = nil; cache.removeAll(); states.removeAll(); plan = nil; resolutions.removeAll(); queryMessages.removeAll() }
 }
 
 #if !ONLINE_CORE_TEST
@@ -116,7 +152,19 @@ struct OnlinePlaybackPanel: View {
                             else { model.query(source, number: number, versions: versions) }
                         }.buttonStyle(.bordered).accessibilityIdentifier("online.query." + source.rawValue)
                     }
-                    Text(model.state(source).label).font(.caption).accessibilityIdentifier("online.state." + source.rawValue)
+                    Text(model.state(source).label).font(.caption)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text(model.state(source).label))
+                        .accessibilityIdentifier("online.state." + source.rawValue)
+                    if let message = model.queryMessages[source] {
+                        Text(message).font(.caption).accessibilityIdentifier("online.query-state." + source.rawValue)
+                    }
+                    if let resolution = model.resolutions[source] {
+                        Text(resolution.label).font(.caption).foregroundStyle(.secondary)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text(resolution.label))
+                            .accessibilityIdentifier("online.resolve." + source.rawValue)
+                    }
                     if case .found(let rows) = model.state(source) {
                         ForEach(rows) { line in
                             Button {
@@ -128,11 +176,11 @@ struct OnlinePlaybackPanel: View {
                         }
                     }
                 }.padding(12).background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityElement(children: .contain)
             }
-            if let message = model.resolutionMessage { Text(message).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("online.resolve-state") }
         }
         .padding(.horizontal)
-        .accessibilityIdentifier("online.panel")
+        .accessibilityElement(children: .contain)
         .onChange(of: number) { _, _ in model.reset() }
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in model.reset() }
         .onDisappear { model.cancelPending() }
