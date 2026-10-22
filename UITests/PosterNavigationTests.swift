@@ -1,6 +1,38 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testChickenRiceThirdSourceManualSelection() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--subtitle-controls-fixture", "--subtitle-no-cue"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let entry = app.buttons["player.subtitle.settings"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 15)); entry.tap()
+        let toggle = app.switches["subtitle.chickenRice.enabled"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        if toggle.value as? String == "0" { toggle.tap() }
+        let query = app.textFields["subtitle.query"]
+        XCTAssertTrue(query.exists); query.tap()
+        query.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 80) + "TEST-001")
+        XCTAssertFalse(app.buttons["subtitle.candidate"].exists, "Typing must not search or download")
+        app.buttons["subtitle.search"].tap()
+        let state = app.staticTexts["subtitle.source.chickenRice"]
+        for _ in 0..<6 { if state.isHittable { break }; scrollSubtitleForm(app) }
+        XCTAssertTrue(state.waitForExistence(timeout: 5)); XCTAssertTrue(state.label.contains("找到 1 条"))
+        let candidate = app.buttons.matching(identifier: "subtitle.candidate").matching(NSPredicate(format: "label CONTAINS %@", "海南鸡字幕池")).firstMatch
+        for _ in 0..<12 { if candidate.isHittable { break }; scrollSubtitleForm(app) }
+        XCTAssertTrue(candidate.isHittable, app.debugDescription)
+        XCTAssertEqual(candidate.value as? String, "未选中")
+        candidate.tap()
+        let feedback = app.staticTexts["subtitle.selection.feedback"].firstMatch
+        XCTAssertTrue(feedback.waitForExistence(timeout: 5)); XCTAssertTrue(feedback.label.contains("海南鸡字幕池"))
+        XCTAssertTrue(app.otherElements["subtitle.selection.box"].exists || candidate.value as? String != "未选中")
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "227-neutral-chickenrice-manually-selected"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
     func testStationaryDetailRootDoesNotPop() {
         continueAfterFailure = false
         let app = XCUIApplication()

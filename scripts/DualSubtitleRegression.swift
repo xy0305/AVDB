@@ -10,7 +10,7 @@ actor DualFixtureTransport {
     func count(_ key: OnlineSubtitleRequestKindKey) -> Int { counts[key] ?? 0 }
     func fetch(_ url: URL, _ kind: OnlineSubtitleRequestKind) async throws -> Data {
         let key: OnlineSubtitleRequestKindKey
-        switch kind { case .xunleiSearch: key = .xunlei; case .catSearch: key = .cat; case .catDetail: key = .detail; case .download: key = .download }
+        switch kind { case .xunleiSearch: key = .xunlei; case .catSearch: key = .cat; case .catDetail: key = .detail; case .chickenSearch: return Data(#"{"items":[]}"#.utf8); case .download: key = .download }
         counts[key, default: 0] += 1
         let delay = kind == .xunleiSearch ? xunleiDelay : catDelay
         // Deliberately return despite cancellation: production epochs must reject late bytes.
@@ -18,6 +18,7 @@ actor DualFixtureTransport {
         if kind == .xunleiSearch && failXunlei { throw OnlineSubtitleError.invalid("fixture HTTP 429") }
         let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first?.value ?? "variant"
         switch kind {
+        case .chickenSearch: return Data(#"{"items":[]}"#.utf8)
         case .xunleiSearch:
             return try JSONSerialization.data(withJSONObject: ["code": 0, "data": [["name": q, "url": DualSourceRegression.cdn, "ext": "srt"]]])
         case .catSearch:
@@ -61,7 +62,7 @@ enum DualSourceRegression {
         precondition(!OnlineSubtitleRequest(kind: .download, boundDownloadURL: srtURL).allowed(variants[1].url))
         // Production epoch aggregation: either finish order, partial failure, duplicates and stale replies.
         for order in [[OnlineSubtitleSource.xunlei, .subtitleCat], [.subtitleCat, .xunlei]] {
-            var state = OnlineSubtitleSearchState(); let token = state.begin()
+            var state = OnlineSubtitleSearchState(); let token = state.begin(sources: [.xunlei, .subtitleCat])
             precondition(state.receive(order[0], token: token, result: .success(rows)))
             precondition(state.results.count == 2 && state.pending.count == 1)
             precondition(state.receive(order[1], token: token, result: .failure(OnlineSubtitleError.invalid("403"))))

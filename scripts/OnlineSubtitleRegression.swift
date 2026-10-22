@@ -23,6 +23,7 @@ final class FixtureProtocol: URLProtocol {
         do { try body(); fatalError("Expected rejection") } catch {}
     }
     @MainActor static func main() async throws {
+        try await ChickenRiceRegression.run()
         try await DualSourceRegression.run()
         try await DualSubtitleTransportRegression.run()
         let cdn = "https://subtitle.v.geilijiasu.com/AB/CD/" + String(repeating: "A", count: 40) + ".srt"

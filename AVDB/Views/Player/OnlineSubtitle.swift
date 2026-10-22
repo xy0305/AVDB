@@ -16,6 +16,17 @@ struct OnlineSubtitleCandidate: Identifiable, Equatable {
     let url: URL
     var source: OnlineSubtitleSource = .xunlei
     var parentID: String? = nil
+    var durationSeconds: Double? = nil
+    var sizeBytes: Int? = nil
+    var expectedSHA256: String? = nil
+    var uploadedAt: Date? = nil
+    var metadataSummary: String {
+        var parts: [String] = []
+        if let durationSeconds { parts.append(String(format: "%.0f 秒", durationSeconds)) }
+        if let sizeBytes { parts.append("\(sizeBytes) 字节") }
+        if let uploadedAt { parts.append(uploadedAt.formatted(date: .numeric, time: .omitted)) }
+        return parts.joined(separator: " · ")
+    }
 }
 struct OnlineSubtitleCue: Equatable {
     let start: Double
@@ -86,9 +97,11 @@ final class OnlineSubtitleRequest: NSObject, URLSessionDataDelegate, @unchecked 
         switch kind {
         case .xunleiSearch: return OnlineSubtitlePolicy.allowed(url, search: true)
         case .catSearch, .catDetail: return SubtitleCatProvider.allowed(url, kind: kind)
+        case .chickenSearch: return ChickenRiceProvider.allowed(url, search: true)
         case .download:
+            if let boundDownloadURL, ChickenRiceProvider.allowed(boundDownloadURL, search: false) { return url == boundDownloadURL }
             return OnlineSubtitlePolicy.allowed(url, search: false) ||
-                (boundDownloadURL == url && SubtitleCatProvider.allowed(url, kind: .download))
+                (boundDownloadURL == url && (SubtitleCatProvider.allowed(url, kind: .download) || ChickenRiceProvider.allowed(url, search: false)))
         }
     }
     private func cancel() {
@@ -118,7 +131,8 @@ final class OnlineSubtitleRequest: NSObject, URLSessionDataDelegate, @unchecked 
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
         redirects += 1
-        guard redirects <= 5, let url = request.url, allowed(url) else {
+        guard kind != .chickenSearch, boundDownloadURL?.host != ChickenRiceProvider.host,
+              redirects <= 5, let url = request.url, allowed(url) else {
             failure = OnlineSubtitleError.invalid("已拒绝不安全的重定向"); completionHandler(nil); task.cancel(); return
         }
         var clean = URLRequest(url: url); clean.setValue(kind.accept, forHTTPHeaderField: "Accept")
@@ -193,7 +207,7 @@ enum OnlineSubtitleParser {
         let lower = text.prefix(1024).lowercased()
         guard !lower.contains("<!doctype"), !lower.contains("<html"), !lower.contains("<script"), !lower.contains("<?xml"), !lower.contains("<error"),
               !text.unicodeScalars.contains(where: { $0.value < 32 && ![9, 10, 13].contains($0.value) }),
-              ["srt", "vtt", "ass"].contains(ext) else { throw OnlineSubtitleError.invalid("不是支持的文本字幕") }
+              ["srt", "vtt", "ass", "ssa"].contains(ext) else { throw OnlineSubtitleError.invalid("不是支持的文本字幕") }
         // Reject newline bombs before components creates an unbounded array of tiny strings.
         guard text.utf8.lazy.filter({ $0 == 10 }).prefix(150001).count < 150000 else {
             throw OnlineSubtitleError.invalid("字幕行数过多")
@@ -209,7 +223,7 @@ enum OnlineSubtitleParser {
             if !clean.isEmpty { cues.append(.init(start: start, end: end, text: clean)) }
             guard cues.count <= 20000, Date() < deadline else { throw OnlineSubtitleError.invalid("字幕段落过多或解析超时") }
         }
-        if ext == "ass" {
+        if ext == "ass" || ext == "ssa" {
             var events = false
             var format = ["layer", "start", "end", "style", "name", "marginl", "marginr", "marginv", "effect", "text"]
             for line in lines {
@@ -400,9 +414,13 @@ struct OnlineSubtitlePanel: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("可选第三方服务 · 迅雷 + SubtitleCat（同时搜索）") {
-                    Text("仅点击搜索后，本次下方查询词将同时发送至迅雷与 SubtitleCat。不会发送私人文件名、媒体 URL、115 链接、哈希、Cookie 或令牌。请勿自行输入这些信息。本功能无官方接口保证，单个来源失败不影响另一来源或播放。")
+                Section("可选第三方服务 · 迅雷 + SubtitleCat + 海南鸡字幕池（同时搜索）") {
+                    Text("仅点击搜索后，本次下方查询词将发送至迅雷、SubtitleCat 与已启用的海南鸡字幕池（第三方服务，非本应用自营；仅支持完整番号）。不会发送私人文件名、媒体 URL、115 链接、哈希、Cookie 或令牌，也不发送影片时长。请勿自行输入这些信息。本功能无官方接口保证，单个来源失败不影响其他来源或播放。")
                         .font(.footnote)
+                    Toggle("海南鸡字幕池", isOn: $model.chickenRiceEnabled).accessibilityIdentifier("subtitle.chickenRice.enabled")
+                    Text(ChickenRiceProvider.origin).font(.caption).textSelection(.enabled)
+                    Text("地址已固定到用户提供的 HTTPS 服务，不接受响应中的任意下载链接。关闭后不发送请求；设置改变会取消未完成任务。")
+                        .font(.caption)
                     TextField("公开番号或片名", text: $model.query).textInputAutocapitalization(.never)
                         .autocorrectionDisabled().accessibilityIdentifier("subtitle.query")
                     Button("搜索（同意发送本次查询词）") { model.search() }
@@ -445,6 +463,7 @@ struct OnlineSubtitlePanel: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(row.name).lineLimit(3).foregroundStyle(.primary)
                                     Text("\(row.source.title) · \(row.language) · \(row.ext == "html" ? "点击查看现成语言" : row.ext.uppercased())").font(.caption).foregroundStyle(.secondary)
+                                    if !row.metadataSummary.isEmpty { Text(row.metadataSummary).font(.caption).foregroundStyle(.secondary) }
                                     if isSelected {
                                         Text("已加载 · \(model.selected?.source.title ?? row.source.title) · \(model.selected?.language ?? row.language)").font(.caption.weight(.semibold)).foregroundStyle(.green)
                                             .accessibilityIdentifier("subtitle.selection.feedback")
