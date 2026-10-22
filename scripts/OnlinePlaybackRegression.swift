@@ -112,7 +112,7 @@ actor OnlineRequests {
             return try fixture(request)
         }))
         do {
-            _ = try await protectedProvider.resolve(OnlineLine(source:.javmenu,recordID:"DEMO-123",code:"DEMO-123",version:"原始版本",lineKey:"0"),number:"DEMO-123",versions:false)
+            _ = try await protectedProvider.resolve(OnlineLine(source:.javmenu,recordID:"DEMO-123",code:"DEMO-123",version:"原始版本",lineKey:"0",routeDigest:OnlineProvider.routeDigest(URL(string:"https://2608.xbv2608.com/neutral/demo/index.m3u8")!)),number:"DEMO-123",versions:false)
             preconditionFailure("protected child must not create a player plan")
         } catch { check(OnlineFailure.classify(error) == .blocked,"master child protection blocks entire plan") }
         let protectedRequests = await protectedLog.all()

@@ -1,5 +1,6 @@
 // Independently implemented from bounded anonymous public responses. No AvPlay code.
 import Foundation
+import CryptoKit
 
 enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
     case thirdPartyAVDB, javmenu, av01, memojav, missav, jable
@@ -47,6 +48,7 @@ struct OnlineLine: Identifiable, Equatable, Sendable {
     let code: String
     let version: String
     let lineKey: String
+    var routeDigest: String = "" // One-way binding only; never cache a signed media URL.
     var id: String { source.rawValue + ":" + recordID + ":" + lineKey }
 }
 struct OnlinePlaybackPlan: Identifiable, Sendable {
@@ -205,6 +207,7 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
 struct OnlineProvider: Sendable {
     let transport: OnlineTransport
     init(transport: OnlineTransport = OnlineTransport()) { self.transport = transport }
+    static func routeDigest(_ url: URL) -> String { SHA256.hash(data: Data(url.absoluteString.utf8)).map { String(format:"%02x",$0) }.joined() }
     static func api(number: String? = nil, id: String? = nil) -> URL {
         var c = URLComponents(string: "https://avdbapi.com/api.php/provide/vod")!
         c.queryItems = [URLQueryItem(name: "ac", value: "detail")]
@@ -255,7 +258,7 @@ struct OnlineProvider: Sendable {
         guard let exact = OnlineIdentity.key(number) else { throw OnlineFailure.noMatch }
         if source == .javmenu {
             let urls = try Self.javmenu(try await transport.fetch(Self.page(exact), cap: 2*1024*1024), number: exact)
-            return urls.indices.map { OnlineLine(source: source, recordID: exact, code: exact, version: "原始版本", lineKey: String($0)) }
+            return urls.indices.map { OnlineLine(source: source, recordID: exact, code: exact, version: "原始版本", lineKey: String($0), routeDigest: Self.routeDigest(urls[$0])) }
         }
         if source != .thirdPartyAVDB { return try await discoverAdditional(source, number: exact) }
         let list = try Self.records(try await transport.fetch(Self.api(number: exact), cap: 1024*1024))
@@ -272,7 +275,8 @@ struct OnlineProvider: Sendable {
         if line.source == .javmenu {
             referrer = try Self.page(number)
             let fresh = try Self.javmenu(try await transport.fetch(referrer, cap: 2*1024*1024), number: number)
-            guard let index = Int(line.lineKey), fresh.indices.contains(index) else { throw OnlineFailure.noMatch }; media = fresh[index]
+            guard !line.routeDigest.isEmpty, let bound = fresh.first(where: { Self.routeDigest($0) == line.routeDigest }) else { throw OnlineFailure.noMatch }
+            media = bound // Changed/expired candidate requires an explicit new query, never another line.
         } else {
             let records = try Self.records(try await transport.fetch(Self.api(id: line.recordID), cap: 1024*1024))
             guard let record = records.first(where: { Self.identifier($0) == line.recordID }), let code = record["movie_code"] as? String, code == line.code,
