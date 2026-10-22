@@ -2046,16 +2046,21 @@ struct StationaryDetailBackGesture: UIViewControllerRepresentable {
         private var startOffsets: [CGPoint] = []
         private var probeSamples = 0
         private var probeStable = true
+        private var probeInteractive = false
         private func recordProbe(_ sender: UIPanGestureRecognizer) {
             guard ProcessInfo.processInfo.arguments.contains("--detail-back-probe"), let root = detailController?.view else { return }
             func views(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { views($0) } }
             let all = views(root)
             let frames = all.map { $0.layer.presentation()?.frame ?? $0.layer.frame }
             let offsets = all.compactMap { ($0 as? UIScrollView)?.contentOffset }
+            let interactive = installedNavigation?.interactivePopGestureRecognizer?.isEnabled == true
+                || installedNavigation?.transitionCoordinator?.isInteractive == true
             if sender.state == .began {
                 startFrames = frames; startOffsets = offsets; probeSamples = 0; probeStable = true
+                probeInteractive = interactive
             } else if sender.state == .changed {
                 probeSamples += 1
+                probeInteractive = probeInteractive || interactive
                 probeStable = probeStable && frames == startFrames && offsets == startOffsets
                 if probeSamples == 1, let window = root.window {
                     // Native window render while touches are active, not a web
@@ -2068,7 +2073,7 @@ struct StationaryDetailBackGesture: UIViewControllerRepresentable {
                 }
             }
             if sender.state == .ended || sender.state == .cancelled {
-                UserDefaults.standard.set("samples=\(probeSamples);stable=\(probeStable);interactive=false", forKey: "detail-back-probe")
+                UserDefaults.standard.set("samples=\(probeSamples);stable=\(probeStable);interactive=\(probeInteractive)", forKey: "detail-back-probe")
                 NotificationCenter.default.post(name: Notification.Name("detail-back-probe"), object: nil)
             }
         }
@@ -2086,6 +2091,7 @@ extension View {
 /// Self-authored geometric artwork and fictional catalog metadata (CC0).
 /// Uses MovieDetailView itself, not an HTML recreation or a screenshot mock.
 struct DetailHeroFixtureGallery: View {
+    var nested = false
     @State private var backProbe = ""
 
     private func movie(wide: Bool) -> Movie {
@@ -2102,6 +2108,13 @@ struct DetailHeroFixtureGallery: View {
         return try! JSONDecoder().decode(Movie.self, from: Data(json.utf8))
     }
     var body: some View {
+        if ProcessInfo.processInfo.arguments.contains("--detail-back-root") {
+            MovieDetailView(fixture: movie(wide: false))
+        } else {
+            gallery
+        }
+    }
+    private var gallery: some View {
         List {
             CoverTitleSettingsSection()
             NavigationLink("Portrait detail") { MovieDetailView(fixture: movie(wide: false)) }
@@ -2109,6 +2122,12 @@ struct DetailHeroFixtureGallery: View {
             NavigationLink("Wide detail") { MovieDetailView(fixture: movie(wide: true)) }
                 .accessibilityIdentifier("neutral-wide-link")
             if ProcessInfo.processInfo.arguments.contains("--detail-back-probe") {
+                if nested {
+                    Text("Existing intermediate level").accessibilityIdentifier("detail-back-intermediate")
+                } else {
+                    NavigationLink("Nested fixtures") { DetailHeroFixtureGallery(nested: true) }
+                        .accessibilityIdentifier("detail-back-nested-link")
+                }
                 Text(backProbe).accessibilityIdentifier("detail-back-probe-result")
             }
         }.navigationTitle("Neutral Detail Fixtures")

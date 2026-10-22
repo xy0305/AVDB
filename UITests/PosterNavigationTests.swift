@@ -1,6 +1,27 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testStationaryDetailRootDoesNotPop() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture", "--detail-back-root", "--detail-back-probe"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let title = app.staticTexts["portrait-hero-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        let before = title.frame
+        let window = app.windows.firstMatch
+        let start = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 6, dy: 220))
+        let end = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 260, dy: 220))
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.5)
+        XCTAssertTrue(title.exists)
+        XCTAssertEqual(title.frame.minX, before.minX, accuracy: 1)
+        XCTAssertEqual(title.frame.minY, before.minY, accuracy: 1)
+        XCTAssertFalse(app.buttons["neutral-portrait-link"].exists)
+    }
+
     func testStationaryDetailLeadingEdgeBack() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -16,9 +37,16 @@ final class PosterNavigationTests: XCTestCase {
                 thenDragTo: origin.withOffset(CGVector(dx: to.x, dy: to.y)),
                 withVelocity: .slow, thenHoldForDuration: 0.5)
         }
+        let nested = app.buttons["detail-back-nested-link"]
+        XCTAssertTrue(nested.waitForExistence(timeout: 10)); nested.tap()
+        XCTAssertTrue(app.staticTexts["detail-back-intermediate"].waitForExistence(timeout: 10))
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
-            waitForInterfaceGeometry(app, portrait: orientation == .portrait)
+            // Production KSPlayer's non-player phone mask is portrait. Do not
+            // fake a DEBUG .all mask or change player orientation ownership.
+            // iPad rotates; iPhone must retain its real portrait geometry.
+            let portrait = orientation == .portrait || UIDevice.current.userInterfaceIdiom != .pad
+            waitForInterfaceGeometry(app, portrait: portrait)
             for link in ["neutral-portrait-link", "neutral-wide-link"] {
                 let entry = app.buttons[link]
                 XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
@@ -26,8 +54,13 @@ final class PosterNavigationTests: XCTestCase {
                 XCTAssertTrue(back.waitForExistence(timeout: 10))
                 let poster = app.descendants(matching: .any)[link == "neutral-portrait-link" ? "portrait-hero-title" : "landscape-detail-title"].firstMatch
                 XCTAssertTrue(poster.waitForExistence(timeout: 15))
-                let initialFrame = poster.frame
                 let w = app.frame.width, y = min(app.frame.height * 0.38, 260)
+                // A vertical edge drag belongs to scrolling, never back.
+                drag(CGPoint(x: 6, y: y), CGPoint(x: 6, y: max(80, y - 120)))
+                XCTAssertTrue(back.exists)
+                back.tap(); XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+                XCTAssertTrue(poster.waitForExistence(timeout: 15))
+                let initialFrame = poster.frame
                 // Body swipe is not a back gesture, regardless of distance.
                 drag(CGPoint(x: w * 0.3, y: y), CGPoint(x: w * 0.8, y: y))
                 XCTAssertTrue(back.exists); XCTAssertEqual(poster.frame.minX, initialFrame.minX, accuracy: 1)
@@ -41,6 +74,7 @@ final class PosterNavigationTests: XCTestCase {
                 // is still down, before this completion-only pop can execute.
                 drag(CGPoint(x: 6, y: y), CGPoint(x: min(w * 0.75, 350), y: y))
                 XCTAssertTrue(entry.waitForExistence(timeout: 10), "Exactly one pop must return to the existing gallery")
+                XCTAssertTrue(app.staticTexts["detail-back-intermediate"].exists, "Must not skip the existing intermediate controller")
                 let probe = app.staticTexts["detail-back-probe-result"]
                 XCTAssertTrue(probe.waitForExistence(timeout: 5))
                 XCTAssertTrue(probe.label.contains("stable=true;interactive=false"), probe.label)
