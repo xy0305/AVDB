@@ -1,0 +1,57 @@
+name: Build226 Stationary Detail Back
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Views/Detail/**', 'UITests/PosterNavigationTests.swift', 'scripts/test-detail-back.py', '.github/workflows/detail-back-226.yml']
+permissions:
+  contents: read
+concurrency:
+  group: stationary-back-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  back:
+    runs-on: macos-26
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iPhone, iPad]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare native production tests
+        run: |
+          python3 scripts/test-detail-back.py
+          gem install cocoapods -v 1.16.2 --no-document
+          ruby scripts/setup-poster-uitests.rb
+          pod install --repo-update
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          python3 - <<'PY'
+          import json,os
+          ds=json.load(open(os.environ['RUNNER_TEMP']+'/devices.json'))['devices']
+          d=next(d for group in ds.values() for d in group if '${{ matrix.device }}' in d['name'])
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('DEVICE_ID='+d['udid']+'\n')
+          print(d['name'],d['udid'])
+          PY
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Actual detail edge cancellation, completion and stationary in-progress geometry
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/BackDerived" -resultBundlePath "$RUNNER_TEMP/DetailBack.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/testStationaryDetailLeadingEdgeBack 2>&1 | tee "$RUNNER_TEMP/detail-back.log"
+      - name: Export actual neutral native evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/back-evidence/attachments" "$RUNNER_TEMP/back-evidence/mid-pan"
+          if test -d "$RUNNER_TEMP/DetailBack.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/DetailBack.xcresult" --output-path "$RUNNER_TEMP/back-evidence/attachments"
+            xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/DetailBack.xcresult" --format json > "$RUNNER_TEMP/back-evidence/summary.json"
+          fi
+          container=$(xcrun simctl get_app_container "$DEVICE_ID" com.xy0305.AVDB data 2>/dev/null || true)
+          if test -n "$container"; then cp "$container"/Documents/226-mid-pan-*.png "$RUNNER_TEMP/back-evidence/mid-pan/" 2>/dev/null || true; fi
+          cp "$RUNNER_TEMP/detail-back.log" "$RUNNER_TEMP/back-evidence/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build226-native-back-${{ matrix.device }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/back-evidence/
+          retention-days: 14

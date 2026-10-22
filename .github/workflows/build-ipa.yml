@@ -46,6 +46,7 @@ jobs:
       - name: Check poster identity, latency and shared regressions
         run: |
           set -euo pipefail
+          python3 scripts/test-detail-back.py
           python3 scripts/test-catalog-lifecycle.py
           python3 scripts/test-front-posters.py
           python3 scripts/test-detail-posters.py

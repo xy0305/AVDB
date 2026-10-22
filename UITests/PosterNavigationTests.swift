@@ -1,6 +1,58 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func testStationaryDetailLeadingEdgeBack() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture", "--detail-back-probe"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        func drag(_ from: CGPoint, _ to: CGPoint) {
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            origin.withOffset(CGVector(dx: from.x, dy: from.y)).press(forDuration: 0.05,
+                thenDragTo: origin.withOffset(CGVector(dx: to.x, dy: to.y)),
+                withVelocity: .slow, thenHoldForDuration: 0.5)
+        }
+        for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
+            XCUIDevice.shared.orientation = orientation
+            waitForInterfaceGeometry(app, portrait: orientation == .portrait)
+            for link in ["neutral-portrait-link", "neutral-wide-link"] {
+                let entry = app.buttons[link]
+                XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+                let back = app.buttons["返回"]
+                XCTAssertTrue(back.waitForExistence(timeout: 10))
+                let poster = app.descendants(matching: .any)[link == "neutral-portrait-link" ? "portrait-hero-title" : "landscape-detail-title"].firstMatch
+                XCTAssertTrue(poster.waitForExistence(timeout: 15))
+                let initialFrame = poster.frame
+                let w = app.frame.width, y = min(app.frame.height * 0.38, 260)
+                // Body swipe is not a back gesture, regardless of distance.
+                drag(CGPoint(x: w * 0.3, y: y), CGPoint(x: w * 0.8, y: y))
+                XCTAssertTrue(back.exists); XCTAssertEqual(poster.frame.minX, initialFrame.minX, accuracy: 1)
+                // Too short even for the flick path: release keeps current page.
+                drag(CGPoint(x: 6, y: y), CGPoint(x: 32, y: y))
+                XCTAssertTrue(back.exists)
+                XCTAssertEqual(poster.frame.minX, initialFrame.minX, accuracy: 1)
+                XCTAssertEqual(poster.frame.minY, initialFrame.minY, accuracy: 1)
+                let before = XCTAttachment(screenshot: app.screenshot()); before.name = "226-native-before-commit-\(link)-\(orientation.rawValue)"; before.lifetime = .keepAlways; add(before)
+                // Pan changes are sampled in production UIKit while the finger
+                // is still down, before this completion-only pop can execute.
+                drag(CGPoint(x: 6, y: y), CGPoint(x: min(w * 0.75, 350), y: y))
+                XCTAssertTrue(entry.waitForExistence(timeout: 10), "Exactly one pop must return to the existing gallery")
+                let probe = app.staticTexts["detail-back-probe-result"]
+                XCTAssertTrue(probe.waitForExistence(timeout: 5))
+                XCTAssertTrue(probe.label.contains("stable=true;interactive=false"), probe.label)
+                XCTAssertFalse(probe.label.contains("samples=0;"), probe.label)
+                let report = XCTAttachment(string: probe.label); report.name = "226-native-in-progress-stationarity-\(link)-\(orientation.rawValue)"; report.lifetime = .keepAlways; add(report)
+                // Header return still works after recognizer lifecycle cleanup.
+                entry.tap(); XCTAssertTrue(back.waitForExistence(timeout: 10)); back.tap()
+                XCTAssertTrue(entry.waitForExistence(timeout: 10))
+            }
+        }
+    }
+
     func testJavRankingNativeBlackGoldHomeAndTopics() {
         let app = XCUIApplication()
         app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture"]

@@ -199,7 +199,7 @@ struct MovieDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(AdaptiveLayout.isPad ? .visible : .hidden, for: .tabBar)
-        .nativeSwipeBackEnabled()
+        .stationaryDetailBackGesture()
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .task {
             #if DEBUG
@@ -1952,47 +1952,133 @@ private struct HorizontalScrollLock: ViewModifier {
     }
 }
 
-/// 关掉当前导航的交互式返回，避免详情页跟着左右滑。
-struct NativeSwipeBackEnabler: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> Controller { Controller() }
-    func updateUIViewController(_ uiViewController: Controller, context: Context) {
-        uiViewController.lockWhenAvailable()
+// Build226: pure policy shared verbatim with the macOS Swift regression.
+struct DetailBackGesturePolicy {
+    static let edge: CGFloat = 26
+    static func starts(x: CGFloat, width: CGFloat, rtl: Bool) -> Bool {
+        let leading = rtl ? width - x : x
+        return width > 0 && leading >= 0 && leading <= edge
     }
+    static func horizontal(x: CGFloat, y: CGFloat, rtl: Bool) -> Bool {
+        let forward = rtl ? -x : x
+        return forward > 0 && forward > abs(y) * 1.5
+    }
+    static func commits(x: CGFloat, y: CGFloat, velocity: CGFloat, width: CGFloat, rtl: Bool) -> Bool {
+        let forward = rtl ? -x : x
+        let speed = rtl ? -velocity : velocity
+        guard horizontal(x: x, y: y, rtl: rtl), speed > -100 else { return false }
+        return forward >= min(120, max(72, width * 0.22)) || (forward >= 36 && speed >= 650)
+    }
+}
 
-    final class Controller: UIViewController {
+/// A completion-only leading-edge pan. Never drives a percent transition or a
+/// view transform; even the committed pop is unanimated to keep artwork fixed.
+struct StationaryDetailBackGesture: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) { controller.install() }
+    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) { controller.uninstall() }
+
+    final class Controller: UIViewController, UIGestureRecognizerDelegate {
+        private weak var installedNavigation: UINavigationController?
+        private weak var detailController: UIViewController?
+        private var previousPopEnabled: Bool?
+        private var pan: UIPanGestureRecognizer?
+        private var committed = false
+        private var rtl: Bool { installedNavigation?.view.effectiveUserInterfaceLayoutDirection == .rightToLeft }
         override func loadView() {
-            let v = UIView(frame: .zero)
-            v.isUserInteractionEnabled = false
-            v.backgroundColor = .clear
-            view = v
+            view = UIView(); view.backgroundColor = .clear; view.isUserInteractionEnabled = false
         }
-
-        override func viewDidAppear(_ animated: Bool) {
-            super.viewDidAppear(animated)
-            lockWhenAvailable()
+        override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); install() }
+        override func viewWillDisappear(_ animated: Bool) { super.viewWillDisappear(animated); uninstall() }
+        func install() {
+            guard viewIfLoaded?.window != nil, pan == nil, let nav = navigationController,
+                  let top = nav.topViewController else { return }
+            var ancestor: UIViewController? = self
+            while ancestor != nil && ancestor !== top { ancestor = ancestor?.parent }
+            guard ancestor === top else { return }
+            installedNavigation = nav; detailController = top; committed = false
+            previousPopEnabled = nav.interactivePopGestureRecognizer?.isEnabled
+            nav.interactivePopGestureRecognizer?.isEnabled = false
+            let recognizer = UIPanGestureRecognizer(target: self, action: #selector(handle(_:)))
+            recognizer.maximumNumberOfTouches = 1; recognizer.delegate = self
+            recognizer.cancelsTouchesInView = true
+            nav.view.addGestureRecognizer(recognizer); pan = recognizer
         }
-
-        override func viewWillDisappear(_ animated: Bool) {
-            super.viewWillDisappear(animated)
-            navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+        func uninstall() {
+            if let pan { pan.view?.removeGestureRecognizer(pan) }
+            if let enabled = previousPopEnabled { installedNavigation?.interactivePopGestureRecognizer?.isEnabled = enabled }
+            pan = nil; previousPopEnabled = nil; installedNavigation = nil; detailController = nil
         }
-
-        func lockWhenAvailable() {
-            DispatchQueue.main.async { [weak self] in
-                self?.navigationController?.interactivePopGestureRecognizer?.isEnabled = false
+        private var canPop: Bool {
+            guard let nav = installedNavigation, let detail = detailController else { return false }
+            return !committed && nav.topViewController === detail && nav.viewControllers.count > 1
+                && nav.presentedViewController == nil && detail.presentedViewController == nil
+                && nav.transitionCoordinator == nil && detail.viewIfLoaded?.window != nil
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            guard canPop, let view = gestureRecognizer.view else { return false }
+            return DetailBackGesturePolicy.starts(x: touch.location(in: view).x, width: view.bounds.width, rtl: rtl)
+        }
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard canPop, let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+            let velocity = pan.velocity(in: pan.view)
+            return DetailBackGesturePolicy.horizontal(x: velocity.x, y: velocity.y, rtl: rtl)
+        }
+        // Give only edge-origin, horizontal-intent back pans priority over a
+        // scroll pan. Vertical intent fails shouldBegin, releasing the scroller;
+        // no simultaneous scrolling may move artwork during an accepted pan.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            guard canPop, let scroll = other.view as? UIScrollView else { return false }
+            return other === scroll.panGestureRecognizer
+        }
+        @objc private func handle(_ sender: UIPanGestureRecognizer) {
+            #if DEBUG
+            recordProbe(sender)
+            #endif
+            guard sender.state == .ended, canPop, let nav = installedNavigation else { return }
+            let delta = sender.translation(in: nav.view), velocity = sender.velocity(in: nav.view)
+            guard DetailBackGesturePolicy.commits(x: delta.x, y: delta.y, velocity: velocity.x, width: nav.view.bounds.width, rtl: rtl) else { return }
+            committed = true
+            nav.popViewController(animated: false)
+        }
+        #if DEBUG
+        private var startFrames: [CGRect] = []
+        private var startOffsets: [CGPoint] = []
+        private var probeSamples = 0
+        private var probeStable = true
+        private func recordProbe(_ sender: UIPanGestureRecognizer) {
+            guard ProcessInfo.processInfo.arguments.contains("--detail-back-probe"), let root = detailController?.view else { return }
+            func views(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap { views($0) } }
+            let all = views(root)
+            let frames = all.map { $0.layer.presentation()?.frame ?? $0.layer.frame }
+            let offsets = all.compactMap { ($0 as? UIScrollView)?.contentOffset }
+            if sender.state == .began {
+                startFrames = frames; startOffsets = offsets; probeSamples = 0; probeStable = true
+            } else if sender.state == .changed {
+                probeSamples += 1
+                probeStable = probeStable && frames == startFrames && offsets == startOffsets
+                if probeSamples == 1, let window = root.window {
+                    // Native window render while touches are active, not a web
+                    // recreation. Only enabled by the neutral fixture UI test.
+                    let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                        window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
+                    }
+                    let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    try? image.pngData()?.write(to: folder.appendingPathComponent("226-mid-pan-\(Int(window.bounds.width))x\(Int(window.bounds.height)).png"))
+                }
+            }
+            if sender.state == .ended || sender.state == .cancelled {
+                UserDefaults.standard.set("samples=\(probeSamples);stable=\(probeStable);interactive=false", forKey: "detail-back-probe")
+                NotificationCenter.default.post(name: Notification.Name("detail-back-probe"), object: nil)
             }
         }
+        #endif
     }
 }
 
 extension View {
-    func nativeSwipeBackEnabled() -> some View {
-        background {
-            NativeSwipeBackEnabler()
-                .frame(width: 0, height: 0)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
+    func stationaryDetailBackGesture() -> some View {
+        background { StationaryDetailBackGesture().frame(width: 0, height: 0).allowsHitTesting(false).accessibilityHidden(true) }
     }
 }
 
@@ -2000,6 +2086,8 @@ extension View {
 /// Self-authored geometric artwork and fictional catalog metadata (CC0).
 /// Uses MovieDetailView itself, not an HTML recreation or a screenshot mock.
 struct DetailHeroFixtureGallery: View {
+    @State private var backProbe = ""
+
     private func movie(wide: Bool) -> Movie {
         let title = ProcessInfo.processInfo.arguments.contains("--long-detail-title")
             ? String(repeating: "静かな庭園と四季の光をめぐる幾何学の物語。中性排版测试，完整封面与可阅读的信息。", count: 8)
@@ -2020,7 +2108,14 @@ struct DetailHeroFixtureGallery: View {
                 .accessibilityIdentifier("neutral-portrait-link")
             NavigationLink("Wide detail") { MovieDetailView(fixture: movie(wide: true)) }
                 .accessibilityIdentifier("neutral-wide-link")
+            if ProcessInfo.processInfo.arguments.contains("--detail-back-probe") {
+                Text(backProbe).accessibilityIdentifier("detail-back-probe-result")
+            }
         }.navigationTitle("Neutral Detail Fixtures")
+        .onAppear { backProbe = UserDefaults.standard.string(forKey: "detail-back-probe") ?? "" }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("detail-back-probe"))) { _ in
+            backProbe = UserDefaults.standard.string(forKey: "detail-back-probe") ?? ""
+        }
     }
 }
 #endif
