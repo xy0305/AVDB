@@ -279,7 +279,7 @@ struct OnlineProvider: Sendable {
                   OnlineIdentity.version(code, number: number, allowVersions: versions) != nil,
                   let embed = Self.episodes(record).first(where: { $0.0 == line.lineKey })?.1 else { throw OnlineFailure.noMatch }
             referrer = embed
-            media = try Self.config(try await transport.fetch(embed, cap: 2*1024*1024, headers: OnlinePolicy.headers(referrer: URL(string: "https://avdbapi.com/")!))))
+            media = try Self.config(try await transport.fetch(embed, cap: 2*1024*1024, headers: OnlinePolicy.headers(referrer: URL(string: "https://avdbapi.com/")!)))
         }
         return try await validatedPlan(media:media, referrer:referrer, line:line, number:number)
     }
