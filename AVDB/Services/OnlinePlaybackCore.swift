@@ -207,6 +207,7 @@ struct OnlineMediaScope: Sendable {
             defer { freeaddrinfo(first) }
             var cursor: UnsafeMutablePointer<addrinfo>? = first; var count = 0
             while let item = cursor {
+                guard count < 32 else { throw OnlineFailure.tooLarge }
                 var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
                 let value = item.pointee
                 guard value.ai_family == AF_INET || value.ai_family == AF_INET6,

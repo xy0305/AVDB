@@ -153,16 +153,16 @@ struct OnlinePlaybackPanel: View {
                         }.buttonStyle(.bordered).accessibilityIdentifier("online.query." + source.rawValue)
                     }
                     Text(model.state(source).label).font(.caption)
-                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel(Text(model.state(source).label))
+                        .accessibilityAddTraits(.isStaticText)
                         .accessibilityIdentifier("online.state." + source.rawValue)
                     if let message = model.queryMessages[source] {
                         Text(message).font(.caption).accessibilityIdentifier("online.query-state." + source.rawValue)
                     }
                     if let resolution = model.resolutions[source] {
                         Text(resolution.label).font(.caption).foregroundStyle(.secondary)
-                            .accessibilityElement(children: .ignore)
                             .accessibilityLabel(Text(resolution.label))
+                            .accessibilityAddTraits(.isStaticText)
                             .accessibilityIdentifier("online.resolve." + source.rawValue)
                     }
                     if case .found(let rows) = model.state(source) {
@@ -176,11 +176,9 @@ struct OnlinePlaybackPanel: View {
                         }
                     }
                 }.padding(12).background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-                    .accessibilityElement(children: .contain)
             }
         }
         .padding(.horizontal)
-        .accessibilityElement(children: .contain)
         .onChange(of: number) { _, _ in model.reset() }
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in model.reset() }
         .onDisappear { model.cancelPending() }
@@ -190,7 +188,6 @@ struct OnlinePlaybackPanel: View {
                            headers: plan.headers, progressID: "online:" + plan.id.uuidString,
                            supportsFramePreview: false, publicSubtitleQuery: plan.number)
                 .id(plan.id)
-                .accessibilityIdentifier("online.native-player")
         }
     }
 }

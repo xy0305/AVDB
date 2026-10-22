@@ -17,6 +17,9 @@ final class PosterNavigationTests: XCTestCase {
         func reveal(_ element: XCUIElement) {
             for _ in 0..<12 { if element.isHittable { return }; app.swipeUp() }
         }
+        defer {
+            let tree = XCTAttachment(string: app.debugDescription); tree.name = "229-online-actual-hierarchy"; tree.lifetime = .keepAlways; add(tree)
+        }
         for key in ["thirdPartyAVDB", "javmenu", "av01", "memojav", "missav", "jable"] {
             let state = app.staticTexts["online.state." + key]
             reveal(state); XCTAssertTrue(state.exists); XCTAssertEqual(state.label,"未查询")
@@ -28,14 +31,14 @@ final class PosterNavigationTests: XCTestCase {
         let found = app.staticTexts["online.state.thirdPartyAVDB"]
         let expectation = XCTNSPredicateExpectation(predicate:NSPredicate(format:"label CONTAINS %@","找到候选，待解析 · 1 版本 / 1 线路"),object:found)
         XCTAssertEqual(XCTWaiter.wait(for:[expectation],timeout:8),.completed)
-        XCTAssertFalse(app.otherElements["online.native-player"].exists,"Discovery cannot auto-open playback")
+        XCTAssertFalse(app.buttons["player.subtitle.settings"].exists,"Discovery cannot auto-open playback")
         XCTAssertEqual(app.staticTexts["online.state.javmenu"].label,"未查询","Sources must remain independent")
         let secondQuery = app.buttons["online.query.javmenu"]
         reveal(secondQuery); XCTAssertTrue(secondQuery.isHittable); secondQuery.tap()
         let secondFound = app.staticTexts["online.state.javmenu"]
         let secondExpectation = XCTNSPredicateExpectation(predicate:NSPredicate(format:"label CONTAINS %@","找到候选，待解析 · 1 版本 / 1 线路"),object:secondFound)
         XCTAssertEqual(XCTWaiter.wait(for:[secondExpectation],timeout:8),.completed)
-        XCTAssertFalse(app.otherElements["online.native-player"].exists,"Two queries still must not select a route")
+        XCTAssertFalse(app.buttons["player.subtitle.settings"].exists,"Two queries still must not select a route")
         let panelShot = XCTAttachment(screenshot:app.screenshot()); panelShot.name="228-neutral-real-detail-manual-source"; panelShot.lifetime = .keepAlways; add(panelShot)
         let line = app.buttons["online.line.javmenu:DEMO-123:0"]
         reveal(line); XCTAssertTrue(line.isHittable); line.tap()
@@ -57,6 +60,9 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["播放与下载资源"].waitForExistence(timeout: 5))
         func reveal(_ element: XCUIElement) {
             for _ in 0..<14 { if element.isHittable { return }; app.swipeUp() }
+        }
+        defer {
+            let tree = XCTAttachment(string: app.debugDescription); tree.name = "229-online-failure-actual-hierarchy"; tree.lifetime = .keepAlways; add(tree)
         }
         let expected: [(String,String)] = [
             ("thirdPartyAVDB", "来源拒绝访问或要求验证（未绕过限制）"),
