@@ -177,20 +177,21 @@ enum OnlineAdditional {
         else if let layout = layout as? String { values.append(layout) }
         var found = Set<URL>()
         for value in values {
-            guard let raw = value as? String, !raw.isEmpty, let url = URL(string: raw),
-                  OnlinePolicy.discoveredMedia(url, source: .av01) else { continue }
+            guard let raw = value as? String, !raw.isEmpty,
+                  let url = OnlineProvider.issuedPlaylist(raw, relativeTo: URL(string: "https://www.av01.media/")!, source: .av01) else { continue }
             found.insert(url)
         }
+        // A numeric layout or geo authorization is not a public playlist.
         guard found.count == 1, let url = found.first else { throw OnlineFailure.incomplete }
         return url
     }
     static func jableMedia(_ text: String) throws -> URL {
         var found = Set<URL>()
+        let page = URL(string: "https://jable.tv/")!
         for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
             for match in JRHTML.matches(#"\b(?:var|let|const)\s+hlsUrl\s*=\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')\s*(?:;|$)"#, block[1]) {
                 let raw = try jsURLLiteral(match[1])
-                guard let url = URL(string: raw.hasPrefix("//") ? "https:" + raw : raw),
-                      OnlinePolicy.discoveredMedia(url, source: .jable) else { throw OnlineFailure.unsafe }
+                guard let url = OnlineProvider.issuedPlaylist(raw, relativeTo: page, source: .jable) else { throw OnlineFailure.unsafe }
                 found.insert(url)
             }
         }

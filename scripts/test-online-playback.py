@@ -18,7 +18,7 @@ assert 'resolutions[line.source]' in panel and 'queryMessages[source]' in panel
 assert 'resolutionMessage' not in panel and 'online.resolve-state' not in panel
 assert '.accessibilityIdentifier("online.panel")' not in panel, 'Container ID must not propagate over child StaticText identifiers'
 assert '找到候选，待解析' in panel and '尚未确认首帧' in panel
-assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='230'
+assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='231'
 print('PASS six-source production UI wiring/static privacy/size/timeout/cache/cancellation policies (not runtime claim)')
 if platform.system()=='Darwin':
  with tempfile.TemporaryDirectory() as d:

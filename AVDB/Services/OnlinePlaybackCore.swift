@@ -20,7 +20,7 @@ enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
     }
 }
 enum OnlineFailure: Error, LocalizedError, Equatable {
-    case noMatch, blocked, tls, parse, timeout, unsafe, tooLarge, cancelled, unsupported, incomplete, drm, keyUnavailable, http(Int)
+    case noMatch, blocked, tls, parse, timeout, unsafe, resolver, tooLarge, cancelled, unsupported, incomplete, drm, keyUnavailable, http(Int)
     var errorDescription: String? {
         switch self {
         case .noMatch: return "未匹配"
@@ -33,6 +33,7 @@ enum OnlineFailure: Error, LocalizedError, Equatable {
         case .unsupported: return "暂不支持（媒体协议或来源主机尚未验证）"
         case .timeout: return "请求超时"
         case .unsafe: return "来源地址不在安全范围"
+        case .resolver: return "来源域名暂时无法解析（未判定地址不安全，也未固定 DNS）"
         case .tooLarge: return "响应超出大小限制"
         case .cancelled: return "已取消"
         case .http(let status): return "来源 HTTP \(status)"
@@ -45,6 +46,7 @@ enum OnlineFailure: Error, LocalizedError, Equatable {
         if code == NSURLErrorCancelled { return .cancelled }
         if code == NSURLErrorTimedOut { return .timeout }
         if [-1200,-1201,-1202,-1203,-1204,-1205,-1206].contains(code) { return .tls }
+        if [NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed, NSURLErrorCannotConnectToHost].contains(code) { return .resolver }
         return .parse
     }
 }
@@ -400,7 +402,10 @@ struct OnlineProvider: Sendable {
         }
         var seen = Set<URL>()
         return tree.all { $0.tag == "a" && $0.has("data-m3u8") }.compactMap { n in
-            guard let raw = n.attrs["data-m3u8"], let u = URL(string: raw), OnlinePolicy.media(u, source: .javmenu), seen.insert(u).inserted else { return nil }; return u
+            guard let raw = n.attrs["data-m3u8"],
+                  let u = Self.issuedPlaylist(raw, relativeTo: expected, source: .javmenu),
+                  seen.insert(u).inserted else { return nil }
+            return u
         }.prefix(8).map { $0 }
     }
     static func records(_ data: Data) throws -> [[String:Any]] {
@@ -435,8 +440,7 @@ struct OnlineProvider: Sendable {
                 let raws = [object["m3u8"] as? String, object["url"] as? String].compactMap { $0 }
                 guard !raws.isEmpty else { throw OnlineFailure.parse }
                 for raw in raws {
-                    guard let url = URL(string: raw),
-                          OnlinePolicy.media(url, source: .thirdPartyAVDB) || OnlinePolicy.discoveredMedia(url, source: .thirdPartyAVDB) else { throw OnlineFailure.parse }
+                    guard let url = Self.issuedPlaylist(raw, relativeTo: URL(string: "https://upload18.org/")!, source: .thirdPartyAVDB) else { throw OnlineFailure.parse }
                     found.insert(url)
                 }
             }
@@ -444,8 +448,7 @@ struct OnlineProvider: Sendable {
         if found.isEmpty {
             for match in JRHTML.matches(#"(?:file|source|url)\s*:\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')"#, html) {
                 let raw = try OnlineAdditional.jsURLLiteral(match[1])
-                guard let url = URL(string: raw), url.path.lowercased().hasSuffix(".m3u8"),
-                      OnlinePolicy.media(url, source: .thirdPartyAVDB) || OnlinePolicy.discoveredMedia(url, source: .thirdPartyAVDB) else { continue }
+                guard let url = Self.issuedPlaylist(raw, relativeTo: URL(string: "https://upload18.org/")!, source: .thirdPartyAVDB) else { continue }
                 found.insert(url)
             }
         }

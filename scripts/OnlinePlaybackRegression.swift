@@ -59,6 +59,10 @@ actor OnlineRequests {
         check(try OnlineManifest.parse(Data("#EXTM3U\n#EXTINF:4,\n../a.ts".utf8),at:root,root:root).variants.isEmpty,"canonical same-origin parent path allowed")
         let page = try fixture(URLRequest(url:OnlineProvider.page("DEMO-123")))
         check(try OnlineProvider.javmenu(page,number:"DEMO-123").count == 1,"real DOM selector")
+        let issuedPage = Data("<link rel='canonical' href='https://javmenu.com/zh/DEMO-123'><h1>DEMO-123 Neutral</h1><a data-m3u8='//issued-cdn.example.net/neutral/index.m3u8?opaque=a%2Fb'>1</a>".utf8)
+        let issuedMenu = try OnlineProvider.javmenu(issuedPage, number:"DEMO-123")
+        check(issuedMenu.count == 1 && issuedMenu[0].host == "issued-cdn.example.net" && issuedMenu[0].absoluteString.contains("a%2Fb"),"protocol-relative page-issued host outside stale CDN allowlist")
+        fails(.noMatch) { _ = try OnlineProvider.javmenu(Data("<link rel='canonical' href='https://javmenu.com/zh/DEMO-123'><h1>DEMO-1230</h1><a data-m3u8='https://issued-cdn.example.net/a.m3u8'>1</a>".utf8), number:"DEMO-123") }
         let bad = String(data:page,encoding:.utf8)!.replacingOccurrences(of:"<h1>DEMO-123",with:"<h1>DEMO-1230")
         fails(.noMatch) { _ = try OnlineProvider.javmenu(Data(bad.utf8),number:"DEMO-123") }
         fails(.blocked) { _ = try OnlineProvider.javmenu(Data("<html>Just a moment cf-chl-</html>".utf8),number:"DEMO-123") }
@@ -105,6 +109,7 @@ actor OnlineRequests {
         check(cancelled.states.isEmpty && cancelled.plan == nil,"no stale result after close/reset")
         check(OnlineFailure.classify(NSError(domain:NSURLErrorDomain,code:-1202)) == .tls,"TLS state")
         check(OnlineFailure.classify(NSError(domain:NSURLErrorDomain,code:-1001)) == .timeout,"timeout state")
+        check(OnlineFailure.classify(NSError(domain:NSURLErrorDomain,code:-1003)) == .resolver,"temporary DNS failure is not an unsafe-origin verdict")
         let av = Data("{\"videos\":[{\"id\":42439,\"dvd_id\":\"SSIS-001\"},{\"id\":1,\"dvd_id\":\"SSIS-0010\"}]}".utf8)
         check(try OnlineAdditional.av01Records(av,number:"SSIS-001").count == 1,"AV01 real id exact matching")
         let proof = OnlineAdditional.memoProof(milliseconds:1792686900000)
@@ -219,6 +224,32 @@ actor OnlineRequests {
             check(plan.source == source && plan.headers["Cookie"] == nil && plan.headers["Authorization"] == nil, "neutral \(source.rawValue) reaches player handoff")
         }
         check(try await six.resolve(try await six.discover(.missav, number:"DEMO-123", versions:false)[0], number:"DEMO-123", versions:false).headers["Origin"] == "https://missav.fans","scoped MissAV origin")
+        let leakHTML = Data("<a href='/cn/snos-329-uncensored-leak'>SNOS-329 leak</a><a href='/cn/snos-329'>SNOS-329 original</a><a href='/cn/snos-3290'>SNOS-3290</a>".utf8)
+        let leakRows = try OnlineAdditional.missavLines(leakHTML, base: URL(string:"https://missav.fans/cn/search/SNOS-329")!, number:"SNOS-329", versions:true)
+        check(leakRows.count == 2 && leakRows[0].detailURL != leakRows[1].detailURL,"version lines stay separate")
+        let selected = leakRows[0]
+        let selectedDetail = "<link rel='canonical' href='\(selected.detailURL!.absoluteString)'><h1>\(selected.code) Neutral</h1><video class='player' src='https://surrit.selected.media/11111111-1111-1111-1111-111111111111/720p/video.m3u8'></video>"
+        let other = leakRows[1]
+        let otherDetail = "<link rel='canonical' href='\(other.detailURL!.absoluteString)'><h1>\(other.code) Neutral</h1><video class='player' src='https://surrit.other.media/22222222-2222-2222-2222-222222222222/720p/video.m3u8'></video>"
+        let isolatedLog = OnlineRequests()
+        let isolatedProvider = OnlineProvider(transport: OnlineTransport(loader: { request in
+            await isolatedLog.add(request)
+            let url = request.url!
+            if url.path.hasPrefix("/cn/search/") { return leakHTML }
+            if url.absoluteString == selected.detailURL!.absoluteString { return Data(selectedDetail.utf8) }
+            if url.absoluteString == other.detailURL!.absoluteString { return Data(otherDetail.utf8) }
+            if url.host == "surrit.selected.media" { return Data("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\n720p/video.m3u8\n".utf8) }
+            if url.path.hasSuffix("720p/video.m3u8") { return leaf }
+            preconditionFailure("unexpected selected-line request")
+        }))
+        let chosen = try await isolatedProvider.discover(.missav, number:"SNOS-329", versions:true)
+        check(chosen.count == 2,"production discovery retains both exact versions")
+        let chosenPlan = try await isolatedProvider.resolve(chosen[0], number:"SNOS-329", versions:true)
+        check(chosenPlan.url.host == "surrit.selected.media","selected line uses only its own detail playlist")
+        let chosenRequests = await isolatedLog.all()
+        check(!chosenRequests.contains { $0.url?.host == "surrit.other.media" },"other version playlist is not fetched")
+        check(!chosenRequests.contains { $0.url?.path.hasSuffix(".ts") == true },"selected line still does not fetch segments")
+        fails(.drm) { _ = try OnlineManifest.parse(Data("#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://asset\"\n#EXTINF:4,\na.ts".utf8), at:root, root:root) }
         check(!OnlinePolicy.discoveredMedia(URL(string:"https://user:pass@issued.neutral.media/a.m3u8")!, source:.thirdPartyAVDB),"issued URL cannot carry userinfo")
         check(!OnlinePolicy.discoveredMedia(URL(string:"http://issued.neutral.media/a.m3u8")!, source:.javmenu),"issued media must stay HTTPS")
         check(!OnlinePolicy.discoveredMedia(URL(string:"https://10.1.2.3/a.m3u8")!, source:.av01),"issued media cannot be a bare IP")
