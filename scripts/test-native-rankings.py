@@ -41,6 +41,18 @@ assert 'guard resp.isSuccess' in top
 assert 'guard let decoded = resp.data?.movies' in top
 assert 'setToken(' not in top and 'setToken(' not in vm
 assert 'native-ranking-error' in view and '暂无符合条件的作品' in view
+# Trigger-only contract: do not remove icons from the original menu rows.
+trigger=view[view.index('    private var sourceMenuLabelContent:'):view.index('    private func reload(')]
+assert 'Text("来源")' in trigger
+assert all(token not in trigger for token in ['Image(', 'Label(', 'HStack(', 'chevron', 'square.stack'])
+assert '.lineLimit(1)' in trigger and '.fixedSize(horizontal: true, vertical: true)' in trigger
+assert '.frame(minWidth: 44, minHeight: 44)' in trigger
+menu=view[view.index('    private var rankingSourceMenu:'):view.index('    @ViewBuilder\n    private var sourceMenuLabel:')]
+assert '.menuIndicator(.hidden)' in menu
+for icon in ['checkmark.circle.fill', 'house', 'square.grid.2x2', 'chart.bar', 'list.number']:
+ assert 'systemImage: "'+icon+'"' in menu
+assert 'sourceMenuLabelContent.liquidGlass(interactive: true)' in view
+print('PASS text-only source trigger; original row icons and single-surface branches preserved')
 if shutil.which('swiftc'):
  with tempfile.TemporaryDirectory() as tmp:
   p=Path(tmp)/'ranking.swift';p.write_text(source)

@@ -1,4 +1,5 @@
 import XCTest
+import Vision
 
 final class PosterNavigationTests: XCTestCase {
     // Evidence must precede target assertions: a failing source must not hide the
@@ -15,6 +16,56 @@ final class PosterNavigationTests: XCTestCase {
         lines.append("tabbars=\(app.tabBars.count)")
         let note = XCTAttachment(string: lines.joined(separator: "\n"))
         note.name = name + "-all-controls-geometry"; note.lifetime = .keepAlways; add(note)
+    }
+
+    func test238TextOnlySourceTrigger() throws {
+        continueAfterFailure = true
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        for largeText in [false, true] {
+            app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "--rankings235-fixture"]
+            if largeText {
+                app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+            }
+            app.launch()
+            let source = app.buttons["ranking-source-menu"]
+            XCTAssertTrue(source.waitForExistence(timeout: 20))
+            captureRankingHeader(app, name: "238-text-only-\(largeText ? "XXXL" : "normal")")
+            XCTAssertEqual(app.buttons.matching(identifier: "ranking-source-menu").count, 1)
+            XCTAssertEqual(source.label, "榜单来源，当前 JavDB")
+            XCTAssertTrue(source.isHittable)
+            XCTAssertGreaterThanOrEqual(source.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(source.frame.height, 44)
+            XCTAssertEqual(source.images.count, 0, "Trigger has no stack or chevron; menu row icons are unchanged")
+            let crop = source.screenshot()
+            let attachment = XCTAttachment(screenshot: crop)
+            attachment.name = "238-single-source-glass-\(largeText ? "XXXL" : "normal")"
+            attachment.lifetime = .keepAlways; add(attachment)
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["zh-Hans", "en-US"]
+            request.usesLanguageCorrection = false
+            try VNImageRequestHandler(cgImage: XCTUnwrap(crop.image.cgImage)).perform([request])
+            let words = request.results ?? []
+            XCTAssertEqual(words.compactMap { $0.topCandidates(1).first?.string }.joined(), "来源",
+                           "The actual trigger screenshot must contain only 来源, not clipped/extra text")
+            for word in words {
+                XCTAssertGreaterThan(word.boundingBox.minX, 0.01)
+                XCTAssertLessThan(word.boundingBox.maxX, 0.99)
+                XCTAssertGreaterThan(word.boundingBox.minY, 0.01)
+                XCTAssertLessThan(word.boundingBox.maxY, 0.99)
+            }
+            // A real center tap must still expand all original source routes.
+            source.tap()
+            for id in ["javranking-home-entry", "javranking-topics-shortcut", "missav-ranking-entry", "javlibrary-ranking-entry"] {
+                XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5), id)
+            }
+            let open = XCTAttachment(screenshot: app.screenshot())
+            open.name = "238-original-source-menu-\(largeText ? "XXXL" : "normal")"
+            open.lifetime = .keepAlways; add(open)
+            app.terminate()
+        }
     }
 
     func test237RankingHeaderTouchBoundaries() {

@@ -258,6 +258,7 @@ struct RankingsView: View {
         .frame(minWidth: 44, minHeight: 44)
         .contentShape(Capsule())
         .menuOrder(.fixed)
+        .menuIndicator(.hidden)
         .accessibilityLabel("榜单来源，当前 JavDB")
         .accessibilityHint("展开其他来源与全部榜单；选择后打开对应页面")
         .accessibilityIdentifier("ranking-source-menu")
@@ -279,25 +280,15 @@ struct RankingsView: View {
     }
 
     private var sourceMenuLabelContent: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "square.stack.3d.up")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Text(uses235Header ? "榜单来源 · JavDB" : "来源")
-                .foregroundStyle(.primary)
-                .layoutPriority(1)
-            if uses235Header { Text("更多").foregroundStyle(.secondary) }
-            Image(systemName: "chevron.down")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-        }
-        .font(.subheadline.weight(.medium))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .frame(minHeight: 44)
-        .fixedSize(horizontal: false, vertical: true)
-        .contentShape(Capsule())
+        Text("来源")
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: true)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Capsule())
     }
 
     private func reload(force: Bool = false) async {
