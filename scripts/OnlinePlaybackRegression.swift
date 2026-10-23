@@ -209,6 +209,9 @@ actor OnlineRequests {
         check(missavRows.count == 1 && missavRows[0].detailURL?.absoluteString == "https://missav.fans/cn/snos-329","current host rewrite keeps exact slug")
         let missavDetail = "<link rel='canonical' href='https://missav.fans/cn/snos-329'><h1>SNOS-329 Neutral</h1><script>source = \"https:\\/\\/surrit.neutral.media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/playlist.m3u8\";</script>"
         check(try OnlineAdditional.missavMedia(missavDetail).host == "surrit.neutral.media","direct surrit literal only")
+        let missavTag = "<link rel='canonical' href='https://missav.fans/cn/snos-329'><h1>SNOS-329 Neutral</h1><video class='player' src='//surrit.issued.media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/720p/video.m3u8'></video>"
+        check(try OnlineAdditional.missavMedia(missavTag).absoluteString == "https://surrit.issued.media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/720p/video.m3u8","exact page-issued surrit video tag")
+        fails(.unsupported) { _ = try OnlineAdditional.missavMedia(missavTag + "<video class='player' src='https://surrit.other.media/bbbbbbbb-cccc-dddd-eeee-ffffffffffff/720p/video.m3u8'></video>") }
         fails(.unsupported) { _ = try OnlineAdditional.missavMedia("<script>eval(function(p,a,c,k,e,d){return p})</script>") }
         fails(.unsafe) { _ = try OnlineAdditional.missavMedia("<script>var source='https://surrit.neutral.media/not-a-uuid/playlist.m3u8';</script>") }
         let avDetail: [String:Any] = ["id":7,"dvd_id":"SNOS-329","storage_base":"/neutral","hls_layout":["master":"https://media.neutral.media/neutral/master.m3u8"]]

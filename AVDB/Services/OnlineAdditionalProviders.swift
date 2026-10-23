@@ -137,6 +137,13 @@ enum OnlineAdditional {
                   parts.last?.lowercased().hasSuffix(".m3u8") == true else { throw OnlineFailure.unsafe }
             found.insert(url)
         }
+        let dom = try JRHTML.tree(text)
+        for node in dom.all({ $0.tag == "video" || $0.tag == "source" }) {
+            for name in ["src", "data-src"] {
+                guard let raw = node.attrs[name], raw.lowercased().contains("surrit.") else { continue }
+                try consider(raw)
+            }
+        }
         for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
             for match in JRHTML.matches(#"https?:\\?/\\?/(?:surrit\.[^\"'\\/\s]+)/(?:[0-9a-fA-F-]{36})(?:\\?/[^\"'\\<\s]*)?\.m3u8"#, block[1]) {
                 try consider(match[0])
