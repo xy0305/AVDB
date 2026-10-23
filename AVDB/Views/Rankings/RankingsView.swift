@@ -195,6 +195,8 @@ struct RankingsView: View {
                 Image(systemName: "line.3.horizontal.decrease.circle")
                     .frame(minWidth: 44, minHeight: 44)
             }
+            .buttonStyle(.plain)
+            .frame(minWidth: 44, minHeight: 44)
             .accessibilityLabel("筛选排行榜")
             .accessibilityIdentifier("ranking-filter")
         }
@@ -202,6 +204,8 @@ struct RankingsView: View {
             Image(systemName: "magnifyingglass")
                 .frame(minWidth: 44, minHeight: 44)
         }
+        .buttonStyle(.plain)
+        .frame(minWidth: 44, minHeight: 44)
         .accessibilityLabel("搜索")
         .accessibilityIdentifier("ranking-search")
     }

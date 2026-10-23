@@ -63,7 +63,18 @@ final class PosterNavigationTests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait; app.launch()
         defer { app.terminate() }
         let shortcut = app.buttons["TOP250"].firstMatch
-        XCTAssertTrue(shortcut.waitForExistence(timeout: 15)); shortcut.tap()
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 15))
+        // TOP250 is deliberately at the far end of Home's horizontal shortcut
+        // scroller. Reveal the actual existing entry, never tap an offscreen AX node.
+        for _ in 0..<8 {
+            if shortcut.isHittable { break }
+            let window = app.windows.firstMatch
+            let y = min(window.frame.height - 80, max(80, shortcut.frame.midY))
+            let start = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.frame.width * 0.85, dy: y))
+            let end = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.frame.width * 0.15, dy: y))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        XCTAssertTrue(shortcut.isHittable); shortcut.tap()
         let row = app.buttons["ranking-row-0"]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         XCTAssertEqual(app.buttons.matching(identifier: "ranking-source-menu").count, 1)
