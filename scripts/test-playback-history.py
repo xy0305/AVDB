@@ -31,8 +31,8 @@ assert '.reloadIgnoringLocalCacheData' in sdk
 assert 'if actual == status { return actual }' in sdk
 assert 'detail-want-watch' in detail and 'detail-watched' in detail
 assert 'frame(width: 44, height: 44).contentShape(Rectangle())' in detail
-assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='235'
-assert (r/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 235;')==2
+assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='236'
+assert (r/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 236;')==2
 policy='struct PlaybackHistoryStartGate'+stores.split('struct PlaybackHistoryStartGate',1)[1].split('struct DrawRecord',1)[0]
 main='''
 var gate = PlaybackHistoryStartGate()

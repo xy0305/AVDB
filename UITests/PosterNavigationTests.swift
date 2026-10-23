@@ -1,6 +1,103 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func test236RankingHeaderGeometryAndSourceNavigation() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        func launch(_ baseline: Bool) -> CGRect {
+            app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "--rankings235-fixture"]
+            if baseline { app.launchArguments.append("--rankings235-header-baseline") }
+            app.launch()
+            let row = app.buttons["ranking-row-0"]
+            XCTAssertTrue(row.waitForExistence(timeout: 20))
+            XCTAssertTrue(row.isHittable)
+            let menu = app.buttons["ranking-source-menu"]
+            XCTAssertTrue(menu.isHittable)
+            for control in [menu, app.buttons["ranking-search"], app.buttons["ranking-filter"]] {
+                XCTAssertGreaterThanOrEqual(control.frame.height, 44)
+                XCTAssertGreaterThanOrEqual(control.frame.width, 44)
+            }
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = baseline ? "235-neutral-header-baseline" : "236-neutral-header-compact"
+            shot.lifetime = .keepAlways; add(shot)
+            let tabs = app.descendants(matching: .any)["ranking-category-tabs"].firstMatch
+            let tabsFrame = tabs.exists ? tabs.frame : .zero
+            let note = XCTAttachment(string: "baseline=\(baseline) firstPosterTop=\(row.frame.minY) row=\(row.frame) source=\(menu.frame) tabs=\(tabsFrame) nav=\(app.navigationBars.firstMatch.frame)")
+            note.name = baseline ? "235-header-geometry" : "236-header-geometry"; note.lifetime = .keepAlways; add(note)
+            return row.frame
+        }
+        let before = launch(true); app.terminate()
+        let after = launch(false)
+        XCTAssertLessThan(after.minY, before.minY - 60, "Move covers up by removing header rows, never by scaling posters")
+        XCTAssertEqual(after.width, before.width, accuracy: 1)
+        XCTAssertEqual(after.height, before.height, accuracy: 1)
+        XCTAssertTrue(app.navigationBars["排行榜"].exists)
+        let metrics = XCTAttachment(string: "235 firstPosterTop=\(before.minY)pt; 236 firstPosterTop=\(after.minY)pt; upward=\(before.minY-after.minY)pt. Row dimensions unchanged: \(before.size) -> \(after.size).")
+        metrics.name = "236-vs-235-first-poster-top"; metrics.lifetime = .keepAlways; add(metrics)
+        app.buttons["ranking-filter"].tap()
+        XCTAssertTrue(app.staticTexts["篩選"].firstMatch.waitForExistence(timeout: 5))
+        app.swipeDown(); app.terminate(); _ = launch(false)
+        app.buttons["ranking-search"].tap()
+        XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 8))
+        app.terminate(); _ = launch(false)
+        app.buttons["ranking-source-menu"].tap()
+        for id in ["javranking-home-entry", "javranking-topics-shortcut", "missav-ranking-entry", "javlibrary-ranking-entry"] {
+            XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5))
+        }
+        let menuShot = XCTAttachment(screenshot: app.screenshot()); menuShot.name = "236-all-source-menu"; menuShot.lifetime = .keepAlways; add(menuShot)
+        app.buttons["javranking-topics-shortcut"].tap()
+        XCTAssertTrue(app.navigationBars["全部榜单"].waitForExistence(timeout: 10))
+        app.terminate(); _ = launch(false)
+        app.buttons["ranking-source-menu"].tap(); app.buttons["javranking-home-entry"].tap()
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 3) { consent.tap() }
+        XCTAssertTrue(app.buttons["jr-lucky-start"].waitForExistence(timeout: 15))
+    }
+
+    func test236HomeEmbeddedHeaderDoesNotOwnNavigation() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--rankings235-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate() }
+        let shortcut = app.buttons["TOP250"].firstMatch
+        XCTAssertTrue(shortcut.waitForExistence(timeout: 15)); shortcut.tap()
+        let row = app.buttons["ranking-row-0"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        XCTAssertEqual(app.buttons.matching(identifier: "ranking-source-menu").count, 1)
+        XCTAssertEqual(app.buttons.matching(identifier: "ranking-search").count, 1)
+        XCTAssertEqual(app.buttons.matching(identifier: "ranking-filter").count, 1)
+        XCTAssertFalse(app.navigationBars["排行榜"].exists, "Embedded child must not replace Home navigation title")
+        XCTAssertTrue(app.buttons["ranking-source-menu"].isHittable)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "236-actual-home-embedded-header"; shot.lifetime = .keepAlways; add(shot)
+        let sourceFrame = app.buttons["ranking-source-menu"].frame
+        let note = XCTAttachment(string: "Home actual shortcut -> embedded RankingsView: firstPosterTop=\(row.frame.minY)pt source=\(sourceFrame); exactly one search/filter/source; no child navigation title.")
+        note.name = "236-home-embedded-geometry"; note.lifetime = .keepAlways; add(note)
+    }
+
+    func test236AccessibleHeaderTargets() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "--rankings235-fixture", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        defer { app.terminate() }
+        let menu = app.buttons["ranking-source-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15))
+        for control in [menu, app.buttons["ranking-search"], app.buttons["ranking-filter"]] {
+            XCTAssertTrue(control.isHittable)
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44)
+        }
+        XCTAssertLessThanOrEqual(menu.frame.maxX, app.buttons["ranking-filter"].frame.minX + 1)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "236-accessibility-XXXL-header"; shot.lifetime = .keepAlways; add(shot)
+        menu.tap()
+        XCTAssertTrue(app.buttons["javranking-topics-shortcut"].waitForExistence(timeout: 5))
+        app.buttons["javranking-topics-shortcut"].tap()
+        XCTAssertTrue(app.navigationBars["全部榜单"].waitForExistence(timeout: 10))
+    }
+
     func test235NeutralRankingSourceGlassMenu() {
         continueAfterFailure = false
         let app = XCUIApplication()

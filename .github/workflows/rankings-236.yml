@@ -1,0 +1,54 @@
+name: Build236 Compact Rankings Native Geometry
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Views/Rankings/**', 'UITests/PosterNavigationTests.swift', '.github/workflows/rankings-236.yml']
+permissions:
+  contents: read
+concurrency:
+  group: rankings236-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  geometry:
+    runs-on: macos-26
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iPhone, iPad]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare production SwiftUI with neutral fixture
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          ruby scripts/setup-poster-uitests.rb
+          pod install --repo-update
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          python3 - <<'PY'
+          import json,os
+          ds=json.load(open(os.environ['RUNNER_TEMP']+'/devices.json'))['devices']
+          d=next(d for group in ds.values() for d in group if '${{ matrix.device }}' in d['name'])
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('DEVICE_ID='+d['udid']+'\n')
+          print(d['name'],d['udid'])
+          PY
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Measure real 235 versus 236 header and actual Home embedding
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/RankingsDerived" -resultBundlePath "$RUNNER_TEMP/Rankings236.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:PosterNavigationUITests/PosterNavigationTests/test236RankingHeaderGeometryAndSourceNavigation -only-testing:PosterNavigationUITests/PosterNavigationTests/test236HomeEmbeddedHeaderDoesNotOwnNavigation -only-testing:PosterNavigationUITests/PosterNavigationTests/test236AccessibleHeaderTargets 2>&1 | tee "$RUNNER_TEMP/rankings236.log"
+      - name: Export neutral screenshots and geometry attachments
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/rankings236-evidence/attachments"
+          if test -d "$RUNNER_TEMP/Rankings236.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Rankings236.xcresult" --output-path "$RUNNER_TEMP/rankings236-evidence/attachments" || true
+            xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/Rankings236.xcresult" --format json > "$RUNNER_TEMP/rankings236-evidence/summary.json" || true
+          fi
+          cp "$RUNNER_TEMP/rankings236.log" "$RUNNER_TEMP/rankings236-evidence/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build236-native-rankings-${{ matrix.device }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/rankings236-evidence/
+          retention-days: 14

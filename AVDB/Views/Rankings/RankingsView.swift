@@ -53,23 +53,53 @@ struct RankingsView: View {
             if embedded {
                 rankingBody
             } else {
-                NavigationStack { rankingBody }
+                NavigationStack {
+                    rankingBody
+                        .navigationTitle(uses235Header ? "" : "排行榜")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            if !uses235Header {
+                                ToolbarItem(placement: .topBarLeading) { rankingSourceMenu }
+                            }
+                            ToolbarItemGroup(placement: .topBarTrailing) { rankingActions }
+                        }
+                }
             }
         }
     }
 
     private var rankingBody: some View {
         VStack(spacing: 0) {
-            Text("排行榜")
-                .font(.largeTitle.bold())
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if uses235Header {
+                // DEBUG-only A/B reference: exact 235 header, same content and safe areas.
+                Text("排行榜")
+                    .font(.largeTitle.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                    .padding(.vertical, 8)
+                rankingSourceMenu
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                    .padding(.bottom, 4)
+            } else if embedded {
+                // Home owns its navigation stack/title/toolbar. Never publish child
+                // navigation preferences; keep all actions in one adaptive local row.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        Text("排行榜").font(.headline).accessibilityAddTraits(.isHeader)
+                        rankingSourceMenu
+                        Spacer(minLength: 0)
+                        rankingActions
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("排行榜").font(.headline).accessibilityAddTraits(.isHeader)
+                        HStack { rankingSourceMenu; Spacer(minLength: 0); rankingActions }
+                    }
+                }
                 .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                .padding(.vertical, 8)
-            rankingSourceMenu
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                .padding(.bottom, 4)
+            }
             UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
+                .accessibilityIdentifier("ranking-category-tabs")
                 .padding(.top, 4)
 
             if tab == .playback {
@@ -120,22 +150,6 @@ struct RankingsView: View {
         }
         .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
         .frame(maxWidth: .infinity)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if tab == .top250 {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showTopFilter = true } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                    }
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showSearch = true } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-            }
-        }
         .navigationDestination(isPresented: $showSearch) { SearchView() }
         .navigationDestination(item: $sourceDestination) { destination in
             switch destination {
@@ -157,6 +171,39 @@ struct RankingsView: View {
         .onChange(of: playbackPeriod) { _, _ in Task { await reload() } }
         .onChange(of: rankingKind) { _, _ in Task { await reload() } }
         .refreshable { await reload(force: true) }
+    }
+
+    private var uses235Header: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--rankings235-header-baseline")
+        #else
+        return false
+        #endif
+    }
+
+    private var hasRankingAccess: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--rankings235-fixture") { return true }
+        #endif
+        return APIClient.shared.hasToken
+    }
+
+    @ViewBuilder
+    private var rankingActions: some View {
+        if tab == .top250 {
+            Button { showTopFilter = true } label: {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("筛选排行榜")
+            .accessibilityIdentifier("ranking-filter")
+        }
+        Button { showSearch = true } label: {
+            Image(systemName: "magnifyingglass")
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .accessibilityLabel("搜索")
+        .accessibilityIdentifier("ranking-search")
     }
 
     // Only the trigger is glass. The system owns menu placement, dismissal,
@@ -214,11 +261,10 @@ struct RankingsView: View {
             Image(systemName: "square.stack.3d.up")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text("榜单来源 · JavDB")
+            Text(uses235Header ? "榜单来源 · JavDB" : "来源")
                 .foregroundStyle(.primary)
                 .layoutPriority(1)
-            Text("更多")
-                .foregroundStyle(.secondary)
+            if uses235Header { Text("更多").foregroundStyle(.secondary) }
             Image(systemName: "chevron.down")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -253,7 +299,7 @@ struct RankingsView: View {
             }
             .frame(maxHeight: .infinity)
         } else if tab == .top250 {
-            if !APIClient.shared.hasToken {
+            if !hasRankingAccess {
                 ContentUnavailableView {
                     Label("需要登录", systemImage: "person.crop.circle.badge.exclamationmark")
                 } description: {
@@ -297,6 +343,7 @@ struct RankingsView: View {
                     } label: {
                         top250Row(rank: vm.startRank + idx, movie: movie)
                     }
+                    .accessibilityIdentifier("ranking-row-\(idx)")
                     .buttonStyle(.plain)
                     .onAppear {
                         if movie.id == vm.displayed.last?.id {
