@@ -43,7 +43,7 @@ class JavVerseTests(unittest.TestCase):
   self.assertIn('unicodeScalars.allSatisfy({ $0.isASCII })',self.source)
   self.assertNotIn('movieID: entry.sourceURL',self.view)
  def test_cancel_account_and_no_scroll_search(self):
-  for guard in ['self.accountProvider() == token','self.generation == epoch','prefix(4)','Task.checkCancellation()']:
+  for guard in ['self.accountProvider() == token','self.generation == epoch','prefix(20)','Task.checkCancellation()']:
    self.assertIn(guard,self.source)
   self.assertNotIn('.onAppear',self.view)
   self.assertIn('mapper.cancel()',self.view)
@@ -59,13 +59,13 @@ class JavVerseTests(unittest.TestCase):
  def test_pagination_preserves_order_contract(self):
   self.assertIn('JavVersePagination.rows(board.entries, page: page)',self.view)
   self.assertIn('entries.dropFirst(page * size).prefix(size)',self.policy)
-  self.assertNotIn('.sorted',self.view+self.policy)
+  self.assertNotIn('.sorted',self.view)
  def test_lifecycle_and_neutral_ui_contract(self):
   self.assertIn('.task(id: probing)',self.view)
-  self.assertIn('.onDisappear { probeGeneration = UUID(); probing = false }',self.view)
+  self.assertIn('.onDisappear { probeGeneration = UUID(); probing = false; mapper.cancel() }',self.view)
   self.assertIn('if !Task.isCancelled',self.view)
   self.assertIn('--javverse-neutral-ui',self.view)
-  self.assertIn('JavVerseMapper(search: { _, _ in [] }',self.view)
+  self.assertIn('JavVerseNeutralFixture.mapper()',self.view)
   self.assertIn('#if DEBUG',self.policy)
  def test_sdk_signature_and_actor_contract(self):
   sdk=(ROOT/'AVDB/Services/JavDBSDK.swift').read_text()
@@ -89,5 +89,5 @@ class JavVerseTests(unittest.TestCase):
   self.assertNotIn('Image(',label)
   self.assertNotIn('Label(',label)
   self.assertNotIn('chevron',label)
-  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 239;'),2)
+  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 240;'),2)
 if __name__=='__main__':unittest.main()

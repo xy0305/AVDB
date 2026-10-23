@@ -100,20 +100,20 @@ final class JavVerseBehaviorTests: XCTestCase {
             }
         }
     }
-    @MainActor func testManualBatchIsSerialAndLimitedToFour() async {
+    @MainActor func testAutomaticVisiblePageIsSerialAndLimitedToTwenty() async {
         var calls: [String] = []
         let mapper = JavVerseMapper(search: { code, _ in
             calls.append(code); return [Movie(id: "id-\(code)", number: code)]
         }, accountProvider: { "neutral-account" })
-        let entries = rows(8)
+        let entries = rows(25)
         let task = mapper.resolve(entries)
         XCTAssertTrue(mapper.busy)
         XCTAssertNil(mapper.resolve(entries), "Busy guard must reject concurrent manual batches")
         await task?.value
-        XCTAssertEqual(calls, ["TEST-1", "TEST-2", "TEST-3", "TEST-4"])
-        XCTAssertEqual(mapper.movies.count, 4)
+        XCTAssertEqual(calls, (1...20).map { "TEST-\($0)" })
+        XCTAssertEqual(mapper.movies.count, 20)
         XCTAssertFalse(mapper.busy)
-        XCTAssertEqual(entries.map(\.rank), Array(1...8))
+        XCTAssertEqual(entries.map(\.rank), Array(1...25))
     }
     @MainActor func testAccountChangeDuringRequestDiscardsLateResult() async {
         var account = "neutral-a"
@@ -165,5 +165,99 @@ final class JavVerseBehaviorTests: XCTestCase {
     func search(_ code: String) async throws -> [Movie] {
         if immediate { return [Movie(id: "retry", number: code)] }
         return try await withCheckedThrowingContinuation { continuation = $0 }
+    }
+}
+
+// Read-only public SDK integration: textual identities + HEAD metadata only, never image downloads.
+final class JavVerseLive240Tests: XCTestCase {
+    @MainActor func testRealPublicSDKMetadata240() async {
+        var successes = 0
+        for code in ["FKAW-004", "SNOS-489", "SNOS-093", "SIVR-479", "SONE-142", "STCVS-056", "STCV-607"] {
+            do {
+                var pages: [Int] = []
+                let movie = try await JavVerseMovieResolver.resolve(code: code) { source, page in
+                    pages.append(page)
+                    return try await JavDBSDK.shared.search(keyword: source, page: page, type: "movie", limit: 20)
+                }
+                guard var movie else { print("LIVE240 code=\(code) result=notFound pages=\(pages)"); continue }
+                if [movie.coverURL, movie.thumbURL].compactMap({ $0 }).allSatisfy({ $0.isEmpty }) {
+                    let detail = try await JavDBSDK.shared.movieDetail(movie.id)
+                    guard detail.id == movie.id && JavVerseIdentity.code(detail.number ?? "") == code else {
+                        XCTFail("Live detail identity mismatch"); continue
+                    }
+                    movie = detail
+                }
+                XCTAssertEqual(JavVerseIdentity.code(movie.number ?? ""), code)
+                print("LIVE240 code=\(code) id=\(movie.id) result=unique pages=\(pages) cover=\(!(movie.coverURL ?? "").isEmpty) thumb=\(!(movie.thumbURL ?? "").isEmpty)")
+                for (field, raw) in [("cover", movie.coverURL), ("thumb", movie.thumbURL)] {
+                    guard let raw, let url = URL(string: raw), url.scheme == "https" else { continue }
+                    var request = URLRequest(url: url); request.httpMethod = "HEAD"; request.timeoutInterval = 12
+                    request.setValue("https://javdb.com/", forHTTPHeaderField: "Referer")
+                    do {
+                        let (_, response) = try await URLSession.shared.data(for: request)
+                        if let http = response as? HTTPURLResponse {
+                            print("LIVE240 code=\(code) field=\(field) host=\(url.host ?? "") http=\(http.statusCode) type=\(http.value(forHTTPHeaderField: "Content-Type") ?? "") length=\(http.expectedContentLength)")
+                        }
+                    } catch { print("LIVE240 code=\(code) field=\(field) HEAD=blocked error=\(type(of: error))") }
+                }
+                successes += 1
+            } catch { print("LIVE240 code=\(code) result=blocked error=\(error.localizedDescription)") }
+        }
+        if let snapshot = try? JavVerseSnapshot.bundled(), let featured = snapshot.boards.first(where: { $0.id == "featured" }) {
+            for entry in featured.entries.prefix(8) {
+                do {
+                    let actor = try await JavVerseActorResolver.resolve(name: entry.label) { name, page in
+                        try await JavDBSDK.shared.searchActors(keyword: name, page: page, limit: 20)
+                    }
+                    print("LIVE240 actor=\(entry.label) result=\(actor == nil ? "notFound" : "unique") id=\(actor?.id ?? "") avatar=\(!(actor?.avatarURL ?? actor?.coverURL ?? "").isEmpty)")
+                } catch { print("LIVE240 actor=\(entry.label) result=blocked error=\(error.localizedDescription)") }
+            }
+        }
+        print("LIVE240 SUMMARY verifiedIdentities=\(successes)/7 publicSDK=true tokenRequiredBySearch=false imagesDownloaded=false")
+    }
+}
+
+extension JavVerseBehaviorTests {
+    @MainActor func testSharedCacheReusesFullIdentityAcrossViewsAndIsolatesAccount() async {
+        var account = "neutral-shared240-a"
+        var calls = 0
+        let search: JavVerseMovieResolver.Search = { code, _ in calls += 1; return [Movie(id: "neutral-cache", number: code)] }
+        let source = rows(1)
+        let home = JavVerseMapper(search: search, shareCache: true, accountProvider: { account })
+        await home.resolve(source)?.value
+        let board = JavVerseMapper(search: search, shareCache: true, accountProvider: { account })
+        await board.resolve(source)?.value
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(board.movie(for: source[0])?.id, "neutral-cache")
+        account = "neutral-shared240-b"
+        XCTAssertNil(board.movie(for: source[0]))
+        await board.resolve(source)?.value
+        XCTAssertEqual(calls, 2)
+    }
+    @MainActor func testActorParentheticalAliasEvidenceAndAmbiguousIDs() async throws {
+        func actor(_ id: String, _ name: String, _ alias: String) throws -> Actor {
+            try JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: ["id": id, "name": name, "other_name": alias]))
+        }
+        let exact = try actor("neutral-a", "中性名前", "中性別名")
+        XCTAssertTrue(JavVerseActorResolver.matches("中性名前（中性別名）", actor: exact))
+        XCTAssertFalse(JavVerseActorResolver.matches("中性名前（別人）", actor: exact))
+        let other = try actor("neutral-b", "中性名前", "中性別名")
+        do {
+            _ = try await JavVerseActorResolver.resolve(name: "中性名前（中性別名）") { _, _ in [exact, other] }
+            XCTFail("Same-name IDs accepted")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("多个")) }
+    }
+    @MainActor func testAutomaticSecondPageAndRetryStates() async {
+        let mapper = JavVerseMapper(search: { code, _ in
+            if code == "TEST-21" { throw JavVerseFailure.message("中性网络错误") }
+            return []
+        }, accountProvider: { nil })
+        let page = JavVersePagination.rows(rows(45), page: 1)
+        XCTAssertNil(mapper.messages[page[0].id])
+        await mapper.resolve(page)?.value
+        XCTAssertTrue(mapper.messages[page[0].id]?.contains("失败") == true)
+        XCTAssertTrue(mapper.messages[page[1].id]?.contains("未找到") == true)
+        XCTAssertEqual(mapper.completed, 20)
+        XCTAssertEqual(page.map(\.rank), Array(21...40))
     }
 }

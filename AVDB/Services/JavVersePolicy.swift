@@ -31,6 +31,38 @@ import Foundation
     }
 }
 
+// Every supplied full name/parenthetical alias must be evidenced by the same unique SDK ID.
+@MainActor enum JavVerseActorResolver {
+    typealias Search = @MainActor (String, Int) async throws -> [Actor]
+    static func names(_ raw: String) -> Set<String> {
+        let separators = CharacterSet(charactersIn: "()（）,，、/／;；\n")
+        return Set(raw.components(separatedBy: separators).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+    }
+    static func matches(_ source: String, actor: Actor) -> Bool {
+        let wanted = names(source)
+        let evidence = [actor.name, actor.otherName, actor.keyword, actor.nameZht].compactMap { $0 }.reduce(into: Set<String>()) { $0.formUnion(names($1)) }
+        return !wanted.isEmpty && wanted.isSubset(of: evidence)
+    }
+    static func resolve(name: String, search: Search) async throws -> Actor? {
+        var matches: [String: Actor] = [:]
+        let queries = names(name).sorted()
+        guard !queries.isEmpty, queries.count <= 4 else { throw JavVerseFailure.message("演员姓名证据不足或别名过多") }
+        for query in queries {
+            var exhausted = false
+            for page in 1...3 {
+                try Task.checkCancellation()
+                let rows = try await search(query, page)
+                try Task.checkCancellation()
+                for row in rows where !row.id.isEmpty && row.id == row.id.trimmingCharacters(in: .whitespacesAndNewlines) && Self.matches(name, actor: row) { matches[row.id] = row }
+                guard matches.count <= 1 else { throw JavVerseFailure.message("同名演员对应多个 AVDB ID；拒绝猜测") }
+                if rows.count < 20 { exhausted = true; break }
+            }
+            guard exhausted else { throw JavVerseFailure.message("演员搜索3页未穷尽；未自动匹配") }
+        }
+        return matches.values.first
+    }
+}
+
 // Source order is never sorted by AVDB match status; pagination cannot backfill holes.
 enum JavVersePagination {
     static let size = 20
@@ -42,8 +74,23 @@ enum JavVersePagination {
 }
 
 #if DEBUG
+import UIKit
 // Explicit UI-test-only, fabricated neutral data. Never presented as a source capture.
 enum JavVerseNeutralFixture {
+    @MainActor static var artwork: UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 90, height: 120)).image { context in
+            UIColor.systemTeal.setFill(); context.fill(CGRect(x: 0, y: 0, width: 90, height: 120))
+            ("NEUTRAL\n240" as NSString).draw(in: CGRect(x: 10, y: 40, width: 75, height: 60), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 14), .foregroundColor: UIColor.white])
+        }
+    }
+    @MainActor static func mapper() -> JavVerseMapper {
+        JavVerseMapper(search: { code, _ in
+            [Movie(id: "neutral-\(code)", number: code)]
+        }, actorSearch: { name, _ in
+            let json: [String: String] = ["id": "neutral-\(name)", "name": name]
+            return [try JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: json))]
+        }, shareCache: false, accountProvider: { nil })
+    }
     static func snapshot() throws -> JavVerseSnapshot {
         let date = "2026-10-23T17:29:00Z"
         let boards: [[String: Any]] = [("featured", "中性演员测试", 8, "actor"),

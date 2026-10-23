@@ -21,6 +21,12 @@ final class JavVerseNavigationTests: XCTestCase {
         entry.tap()
         XCTAssertTrue(app.navigationBars["JavVerse · 原站名单"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["静态快照，非实时"].firstMatch.exists)
+        let cover = app.images["javverse-neutral-cover-1"].firstMatch
+        XCTAssertTrue(cover.waitForExistence(timeout: 15), "Automatic home mapping must present fabricated neutral artwork")
+        let homeCapture = XCTAttachment(screenshot: app.screenshot())
+        homeCapture.name = "javverse-neutral-auto-home-cover-success"
+        homeCapture.lifetime = .keepAlways
+        add(homeCapture)
         let daily = app.buttons["javverse-board-daily"]
         reach(daily, in: app)
         XCTAssertTrue(daily.isHittable)

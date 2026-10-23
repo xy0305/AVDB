@@ -1,8 +1,51 @@
 import SwiftUI
 
+// AVDB's own loader decrypts tp.spfcas.com image streams. AsyncImage cannot decode them.
+@MainActor private struct JavVerseArtwork: View {
+    let entry: JavVerseEntry
+    @ObservedObject var mapper: JavVerseMapper
+    var body: some View {
+        Group {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui"), mapper.movie(for: entry) != nil || mapper.actor(for: entry) != nil {
+                Image(uiImage: JavVerseNeutralFixture.artwork).resizable().scaledToFit()
+                    .accessibilityIdentifier("javverse-neutral-cover-\(entry.rank)")
+            } else { production }
+            #else
+            production
+            #endif
+        }.clipped()
+    }
+    @ViewBuilder private var production: some View {
+        if let movie = mapper.movie(for: entry) {
+            let source = [movie.coverURL, movie.thumbURL].compactMap { $0 }.first { !$0.isEmpty }
+            if let source {
+                JavDBImage(url: source, fallbackURL: movie.thumbURL, contentMode: .fit, frontPoster: true)
+            } else { Text("已匹配 · AVDB未提供图片").font(.caption2) }
+        } else if let actor = mapper.actor(for: entry) {
+            let source = [actor.avatarURL, actor.coverURL].compactMap { $0 }.first { !$0.isEmpty }
+            if let source { JavDBImage(url: source, contentMode: .fit) }
+            else { Text("已匹配 · AVDB未提供头像").font(.caption2) }
+        } else if mapper.messages[entry.id] == "请求中…" || mapper.messages[entry.id] == "排队中" {
+            ProgressView()
+        } else {
+            Image(systemName: entry.kind == "movie" ? "film" : "person.crop.square")
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 // Independent destination: NavigationLink { JavVerseView() } label: { Text("JavVerse · 原站名单") }
 // Does not replace Home or AVDB rankings. Register all three Swift files and bundled JSON in Xcode.
 @MainActor struct JavVerseView: View {
+    @StateObject private var mapper = JavVerseMapper()
+    init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
+            _mapper = StateObject(wrappedValue: JavVerseNeutralFixture.mapper())
+        }
+        #endif
+    }
     @State private var snapshot: JavVerseSnapshot?
     @State private var failure: String?
     @State private var probe = "未测试设备HTTP；当前仅显示离线快照"
@@ -21,19 +64,26 @@ import SwiftUI
             }
             if let snapshot {
                 Section("首页 · 原站当日内容") {
+                    if mapper.busy { ProgressView("核验首页 \(mapper.completed)/\(mapper.total)") }
+                    Button("重试首页未匹配项") { mapper.resolve(snapshot.boards.filter { ["featured", "recent"].contains($0.id) }.flatMap(\.entries), retry: true) }.disabled(mapper.busy)
                     ForEach(snapshot.boards.filter { ["featured", "recent"].contains($0.id) }) { board in
                         VStack(alignment: .leading, spacing: 10) {
                             NavigationLink { JavVerseBoardView(board: board) } label: { boardLabel(board) }
                                 .accessibilityIdentifier("javverse-board-\(board.id)")
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(alignment: .top, spacing: 12) {
+                                LazyHStack(alignment: .top, spacing: 12) {
                                     ForEach(board.entries) { entry in
                                         VStack(spacing: 6) {
-                                            Image(systemName: entry.kind == "movie" ? "film" : "person.crop.square")
-                                                .font(.title2).foregroundStyle(.secondary)
-                                            Text(entry.label).font(.caption).lineLimit(3)
+                                            JavVerseArtwork(entry: entry, mapper: mapper).frame(width: 84, height: 104)
+                                            Text(entry.label).font(.caption).lineLimit(2)
+                                            Text(mapper.messages[entry.id] ?? "尚未请求").font(.caption2).lineLimit(2)
+                                            if let movie = mapper.movie(for: entry) {
+                                                NavigationLink("AVDB 资料") { MovieDetailView(movieID: movie.id) }
+                                            } else if let actor = mapper.actor(for: entry) {
+                                                NavigationLink("AVDB 演员") { ActorDetailView(actorID: actor.id) }
+                                            }
                                         }
-                                        .frame(width: 100, height: 110, alignment: .top)
+                                        .frame(width: 112, height: 205, alignment: .top)
                                         .padding(8)
                                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
                                     }
@@ -81,7 +131,11 @@ import SwiftUI
                 if !Task.isCancelled && probeGeneration == epoch { probe = "检测失败：\(error.localizedDescription)。仍为静态快照。" }
             }
         }
-        .onDisappear { probeGeneration = UUID(); probing = false }
+        .onDisappear { probeGeneration = UUID(); probing = false; mapper.cancel() }
+        .task(id: snapshot != nil) {
+            guard let snapshot else { return }
+            await mapper.resolve(snapshot.boards.filter { ["featured", "recent"].contains($0.id) }.flatMap(\.entries))?.value
+        }
         .task {
             guard snapshot == nil else { return }
             do {
@@ -112,7 +166,7 @@ import SwiftUI
         self.board = board
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
-            _mapper = StateObject(wrappedValue: JavVerseMapper(search: { _, _ in [] }, accountProvider: { nil }))
+            _mapper = StateObject(wrappedValue: JavVerseNeutralFixture.mapper())
         }
         #endif
     }
@@ -123,37 +177,31 @@ import SwiftUI
                 Text("期间：\(board.period)")
                 Text("采集时间 UTC：\(board.capturedAt)").font(.caption)
                 Text("来源：\(board.sourceURL)").font(.caption).textSelection(.enabled)
-                Text("名次是原站名次，未匹配项保留、不补位。演员/系列仅保留原站名字，未验证AVDB实体，不可直接跳转。")
+                Text("名次是原站名次，未匹配项保留、不补位。每页最多20项串行自动核验；系列未接映射。")
                     .font(.caption).foregroundStyle(.secondary)
-                if rows.contains(where: { $0.kind == "movie" }) {
-                    Button(mapper.busy ? "正在核验…" : "核验本页下一小批（最多4部）") {
-                        mapper.resolve(rows.filter { mapper.messages[$0.id] == nil })
-                    }.disabled(mapper.busy)
-                    if mapper.busy { Button("取消核验") { mapper.cancel() } }
+                if mapper.busy {
+                    ProgressView("核验本页 \(mapper.completed)/\(mapper.total)")
+                    Button("取消核验") { mapper.cancel() }
+                } else {
+                    Button("重试本页未匹配项") { mapper.resolve(rows, retry: true) }
                 }
             }
             Section {
                 ForEach(rows) { entry in
                     HStack(alignment: .top, spacing: 12) {
                         Text(String(format: "%02d", entry.rank)).font(.headline.monospacedDigit()).frame(width: 34)
-                        if let movie = mapper.movie(for: entry), let rawURL = movie.coverURL ?? movie.thumbURL,
-                           let url = URL(string: rawURL), url.scheme == "https" {
-                            AsyncImage(url: url) { image in image.resizable().scaledToFit() } placeholder: {
-                                Image(systemName: "film").foregroundStyle(.secondary)
-                            }.frame(width: 48, height: 64)
-                        } else {
-                            Image(systemName: entry.kind == "movie" ? "film" : "person.crop.square")
-                                .foregroundStyle(.secondary).frame(width: 48, height: 64)
-                        }
+                        JavVerseArtwork(entry: entry, mapper: mapper).frame(width: 64, height: 88)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(entry.label).textSelection(.enabled).accessibilityIdentifier("javverse-row-\(entry.rank)")
                             if let movie = mapper.movie(for: entry) {
                                 NavigationLink("AVDB 资料与播放") { MovieDetailView(movieID: movie.id) }
-                            } else if entry.kind == "movie" {
-                                Text(mapper.messages[entry.id] ?? "未匹配 · 中性占位").font(.caption).foregroundStyle(.secondary)
-                                Button("单独核验 / 重试") { mapper.resolve([entry]) }.disabled(mapper.busy)
+                            } else if let actor = mapper.actor(for: entry) {
+                                NavigationLink("AVDB 演员资料") { ActorDetailView(actorID: actor.id) }
+                            } else if entry.kind == "movie" || entry.kind == "actor" {
+                                Text(mapper.messages[entry.id] ?? "尚未请求").font(.caption).foregroundStyle(.secondary)
+                                Button("单独核验 / 重试") { mapper.resolve([entry], retry: true) }.disabled(mapper.busy)
                             } else {
-                                Text("实体未匹配 · 不使用网站数字ID直达AVDB").font(.caption).foregroundStyle(.secondary)
+                                Text("系列未接映射 · 不使用网站数字ID直达AVDB").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -170,6 +218,7 @@ import SwiftUI
             }
         }
         .navigationTitle(board.title)
+        .task(id: page) { await mapper.resolve(rows)?.value }
         .onDisappear { mapper.cancel() }
     }
 }
