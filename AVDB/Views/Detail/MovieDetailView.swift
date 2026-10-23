@@ -134,6 +134,7 @@ struct MovieDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
             var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
             withTransaction(transaction) { posterAccountEpoch = UUID(); posterPresentation = nil }
+            Task { await vm.reloadReviewForAccount() }
         }
         .alert("操作未完成", isPresented: Binding(
             get: { vm.movie != nil && vm.errorMessage != nil },
@@ -211,7 +212,7 @@ struct MovieDetailView: View {
             }
         }
         .fullScreenCover(isPresented: $play115) {
-            if let movie = vm.movie { Pan115PlayerView(movie: movie) }
+            if let movie = vm.movie { Pan115PlayerView(movie: movie, historyArtwork: posterArtwork?.image ?? activeTPDBArtwork?.image) }
         }
         .fullScreenCover(isPresented: $showTrailer) {
             if let url = vm.movie?.previewVideoURL.flatMap(URL.init) {
@@ -475,7 +476,7 @@ struct MovieDetailView: View {
                 .frame(maxWidth: .infinity, minHeight: 48)
                 // Intentionally no material, glass or white fill on play.
                 .background(.clear, in: Capsule())
-                .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5))
+                .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5).allowsHitTesting(false))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -493,15 +494,23 @@ struct MovieDetailView: View {
             posterAction(vm.reviewStatus == "want_watch" ? "heart.fill" : "heart", label: "想看") {
                 Task { await vm.setReviewStatus("want_watch") }
             }
+            .accessibilityIdentifier("detail-want-watch")
+            .accessibilityValue(vm.reviewPending ? "正在保存" : (vm.reviewStatus == "want_watch" ? "已选中" : "未选中"))
+            .accessibilityHint(vm.reviewStatus == "want_watch" ? "再次轻点取消想看" : "轻点标记想看")
+            .disabled(vm.reviewPending || !vm.reviewLoaded)
             posterAction(vm.reviewStatus == "watched" ? "checkmark.rectangle.fill" : "checkmark.rectangle", label: "看过") {
                 Task { await vm.setReviewStatus("watched") }
             }
+            .accessibilityIdentifier("detail-watched")
+            .accessibilityValue(vm.reviewPending ? "正在保存" : (vm.reviewStatus == "watched" ? "已选中" : "未选中"))
+            .accessibilityHint(vm.reviewStatus == "watched" ? "再次轻点取消看过" : "轻点标记看过")
+            .disabled(vm.reviewPending || !vm.reviewLoaded)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 6).padding(.vertical, 2)
         // Match play: a truly clear capsule, not glass or a material fill.
         .background(.clear, in: Capsule())
-        .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5))
+        .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5).allowsHitTesting(false))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("portrait-hero-actions")
     }
@@ -510,7 +519,9 @@ struct MovieDetailView: View {
         Button(action: action) {
             Image(systemName: icon).font(.system(size: 23, weight: .regular))
                 .frame(width: 44, height: 44).contentShape(Rectangle())
-        }.accessibilityLabel(label)
+        }.buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .accessibilityLabel(label)
     }
 
     #if DEBUG
@@ -585,6 +596,8 @@ struct MovieDetailView: View {
                 ) {
                     Task { await vm.setReviewStatus("want_watch") }
                 }
+                .disabled(vm.reviewPending || !vm.reviewLoaded)
+                .accessibilityValue(vm.reviewPending ? "正在保存" : (vm.reviewStatus == "want_watch" ? "已选中" : "未选中"))
                 GlassActionPill(
                     title: vm.reviewStatus == "watched" ? "已看過" : "看過",
                     icon: vm.reviewStatus == "watched" ? "checkmark.circle.fill" : "checkmark.circle",
@@ -594,6 +607,8 @@ struct MovieDetailView: View {
                 ) {
                     Task { await vm.setReviewStatus("watched") }
                 }
+                .disabled(vm.reviewPending || !vm.reviewLoaded)
+                .accessibilityValue(vm.reviewPending ? "正在保存" : (vm.reviewStatus == "watched" ? "已选中" : "未选中"))
                 NavigationLink {
                     MyListsView(movieID: movie.id)
                 } label: {
@@ -1132,6 +1147,10 @@ final class MovieDetailViewModel: ObservableObject {
     @Published var reviews: [Review] = []
     @Published var relatedLists: [MovieList] = []
     @Published var reviewStatus: String?
+    @Published private(set) var reviewPending = false
+    @Published private(set) var reviewLoaded = false
+    private var reviewRevision = 0
+    private let updateReview: (String, String?) async throws -> String?
     @Published var isLoading = false
     @Published var loadingMagnets = false
     @Published var loadingLists = false
@@ -1141,13 +1160,20 @@ final class MovieDetailViewModel: ObservableObject {
 
     private let sdk = JavDBSDK.shared
 
-    init(movieID: String? = nil) {
+    init(movieID: String? = nil,
+         updateReview: ((String, String?) async throws -> String?)? = nil) {
         self.movieID = movieID ?? ""
+        self.updateReview = updateReview ?? { try await JavDBSDK.shared.updateMovieReview($0, status: $1) }
+        reviewLoaded = updateReview != nil
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { reviewLoaded = true }
+        #endif
     }
 
     func load() async {
         guard !movieID.isEmpty else { return }
         let generation = UUID()
+        let revision = reviewRevision
         loadGeneration = generation
         let account = APIClient.shared.token
         isLoading = true
@@ -1168,7 +1194,11 @@ final class MovieDetailViewModel: ObservableObject {
             actorMovies = full.movie?.actorMovies
                 ?? full.actorMovies
                 ?? []
-            reviewStatus = full.movie?.review?.status
+            let authenticatedStatus = try await sdk.movieReview(movieID)?.status
+            guard !Task.isCancelled, loadGeneration == generation, APIClient.shared.token == account,
+                  reviewRevision == revision, !reviewPending else { return }
+            reviewStatus = authenticatedStatus
+            reviewLoaded = true
         } catch {
             guard !Task.isCancelled, loadGeneration == generation, APIClient.shared.token == account else { return }
             errorMessage = error.localizedDescription
@@ -1224,16 +1254,52 @@ final class MovieDetailViewModel: ObservableObject {
         }
     }
 
-    func setReviewStatus(_ status: String) async {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
-        #endif
-        guard !movieID.isEmpty else { return }
+    func reloadReviewForAccount() async {
+        reviewRevision += 1
+        let revision = reviewRevision
+        let account = APIClient.shared.token
+        reviewStatus = nil; reviewLoaded = false; reviewPending = false
+        guard account?.isEmpty == false else { return }
         do {
-            let review = try await sdk.setMovieReview(movieID, status: status)
-            reviewStatus = review?.status ?? status
+            let status = try await sdk.movieReview(movieID)?.status
+            guard reviewRevision == revision, APIClient.shared.token == account else { return }
+            reviewStatus = status; reviewLoaded = true
         } catch {
+            guard reviewRevision == revision, APIClient.shared.token == account else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func setReviewStatus(_ status: String) async {
+        guard !movieID.isEmpty, reviewLoaded, !reviewPending else { return }
+        // Both controls share one pending lock because the server has ONE review status.
+        let old = reviewStatus
+        let desired: String? = old == status ? nil : status
+        let account = APIClient.shared.token
+        reviewRevision += 1
+        let revision = reviewRevision
+        reviewPending = true
+        reviewStatus = desired
+        defer { if reviewRevision == revision { reviewPending = false } }
+        do {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
+                try await Task.sleep(nanoseconds: 150_000_000)
+                return
+            }
+            #endif
+            let actual = try await updateReview(movieID, desired)
+            guard reviewRevision == revision else { return }
+            guard APIClient.shared.token == account else { reviewStatus = nil; reviewLoaded = false; return }
+            guard actual == desired else {
+                throw JavDBError.apiError(action: nil, message: "状态未确认，请重试")
+            }
+            reviewStatus = actual
+        } catch {
+            guard reviewRevision == revision else { return }
+            guard APIClient.shared.token == account else { reviewStatus = nil; reviewLoaded = false; return }
+            reviewStatus = old
+            errorMessage = "操作未确认，已恢复原显示：\(error.localizedDescription)"
         }
     }
 

@@ -77,9 +77,9 @@ public enum SearchMovieType: String, CaseIterable, Identifiable {
 public final class JavDBSDK {
     public static let shared = JavDBSDK()
 
-    private let client: APIClient = .shared
+    private let client: APIClient
 
-    private init() {}
+    init(client: APIClient = .shared) { self.client = client }
 
     // Memory only, bounded, scoped to the active JavDB account (backend is fixed).
     private var knownMovies: [String: [String: Movie]] = [:]
@@ -730,6 +730,45 @@ public final class JavDBSDK {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
         return resp.data?.review
+    }
+
+    /// Authenticated, uncached read: anonymous detail responses do not identify this user's mark.
+    public func movieReview(_ movieID: String) async throws -> Review? {
+        let resp: JavDBResponse<MovieDetailData> = try await client.get(
+            "/api/v4/movies/\(movieID)", useToken: true, cachePolicy: .reloadIgnoringLocalCacheData)
+        guard resp.isSuccess, let movie = resp.data?.movie else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message ?? "读取作品状态失败")
+        }
+        return movie.review
+    }
+
+    /// Toggle-off is DELETE of the real review ID, not another add-only POST.
+    /// Protocol reference: FlanChanXwO/javdb-cli UserEndpoint.Unmark.
+    public func updateMovieReview(_ movieID: String, status: String?) async throws -> String? {
+        let account = client.token
+        guard account?.isEmpty == false else {
+            throw JavDBError.apiError(action: nil, message: "请先登录")
+        }
+        if let status {
+            _ = try await setMovieReview(movieID, status: status)
+        } else if let reviewID = try await movieReview(movieID)?.id {
+            guard client.token == account else { throw CancellationError() }
+            guard !reviewID.isEmpty, reviewID.allSatisfy({ $0.isNumber }) else {
+                throw JavDBError.apiError(action: nil, message: "无法确认记录标识，请重试")
+            }
+            let resp: JavDBResponse<EmptyData> = try await client.delete(
+                "/api/v1/movies/\(movieID)/reviews/\(reviewID)", useToken: true)
+            guard resp.isSuccess else { throw JavDBError.apiError(action: resp.action, message: resp.message) }
+        }
+        // Read-after-write consistency; never turn nil into the requested ON state.
+        for attempt in 0..<3 {
+            guard client.token == account else { throw CancellationError() }
+            let actual = try await movieReview(movieID)?.status
+            guard client.token == account else { throw CancellationError() }
+            if actual == status { return actual }
+            if attempt < 2 { try await Task.sleep(nanoseconds: 250_000_000) }
+        }
+        throw JavDBError.apiError(action: nil, message: "状态写入后尚未确认，请重试或重新载入详情")
     }
 
     /// 相关片单（GET /api/v1/lists/related?movie_id=）

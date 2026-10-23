@@ -6,6 +6,104 @@
 //
 
 import Foundation
+import UIKit
+
+/// Device-only, account-isolated history. Never stores a stream, cookie or token.
+struct PlaybackHistoryItem: Codable, Identifiable, Hashable {
+    let movieID: String
+    let number: String
+    let title: String
+    let type: String?
+    let coverURL: String?
+    let playedAt: Date
+    var id: String { movieID }
+    var movie: Movie { Movie(id: movieID, type: type, number: number, title: title, coverURL: coverURL) }
+}
+
+@MainActor
+final class PlaybackHistoryStore: ObservableObject {
+    static let shared = PlaybackHistoryStore()
+    @Published private(set) var items: [PlaybackHistoryItem] = []
+    private(set) var scope: String?
+    private let defaults: UserDefaults
+    private let directory: URL
+    init(defaults: UserDefaults = .standard, directory: URL? = nil) {
+        self.defaults = defaults
+        self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PlaybackHistory", isDirectory: true)
+    }
+    private var key: String? { scope.map { "avdb.play.history.v1." + $0 } }
+
+    func activate(accountID: Int?) {
+        let next = accountID.map { "user-\($0)" }
+        guard scope != next else { return }
+        scope = next
+        items = key.flatMap { defaults.data(forKey: $0) }.flatMap { try? JSONDecoder().decode([PlaybackHistoryItem].self, from: $0) } ?? []
+        items.sort { $0.playedAt > $1.playedAt }
+    }
+    /// Public unsigned artwork only. Reject rather than strip signed URLs.
+    static func safeCoverURL(_ value: String?) -> String? {
+        guard let value, let u = URLComponents(string: value), u.scheme == "https",
+              let host = u.host?.lowercased(), !host.isEmpty,
+              u.user == nil, u.password == nil, u.query == nil, u.fragment == nil,
+              !host.contains("115"), !host.contains("localhost"), !host.contains(":") else { return nil }
+        let ext = (u.path as NSString).pathExtension.lowercased()
+        guard ["jpg", "jpeg", "png", "webp", "avif"].contains(ext) else { return nil }
+        return value
+    }
+    private func imageURL(_ movieID: String) -> URL? {
+        guard let scope else { return nil }
+        // UTF8 hex is reversible identity, not a secret; no path traversal.
+        let name = movieID.utf8.map { String(format: "%02x", $0) }.joined()
+        return directory.appendingPathComponent(scope, isDirectory: true).appendingPathComponent(name + ".jpg")
+    }
+    func artwork(for movieID: String) -> UIImage? {
+        guard let url = imageURL(movieID) else { return nil }
+        return UIImage(contentsOfFile: url.path)
+    }
+    func record(_ movie: Movie, artwork: UIImage?, scope expected: String?, at date: Date = Date()) {
+        guard let expected, scope == expected, !movie.id.isEmpty else { return }
+        if let artwork, let url = imageURL(movie.id) {
+            let size = artwork.size
+            if size.width > 0, size.height > 0 {
+                let ratio = min(1, 480 / max(size.width, size.height))
+                let format = UIGraphicsImageRendererFormat(); format.scale = 1
+                let image = UIGraphicsImageRenderer(size: CGSize(width: size.width * ratio, height: size.height * ratio), format: format).image { _ in
+                    artwork.draw(in: CGRect(origin: .zero, size: CGSize(width: size.width * ratio, height: size.height * ratio)))
+                }
+                try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? image.jpegData(compressionQuality: 0.85)?.write(to: url, options: .atomic)
+            }
+        }
+        items.removeAll { $0.movieID == movie.id }
+        items.insert(PlaybackHistoryItem(movieID: movie.id, number: movie.displayNumber, title: movie.displayTitle,
+                                        type: movie.type, coverURL: Self.safeCoverURL(movie.coverURL ?? movie.thumbURL), playedAt: date), at: 0)
+        for item in items.dropFirst(300) { removeImage(item.movieID) }
+        items = Array(items.prefix(300))
+        persist()
+    }
+    private func persist() {
+        guard let key, let data = try? JSONEncoder().encode(items) else { return }
+        defaults.set(data, forKey: key)
+    }
+    private func removeImage(_ id: String) { if let url = imageURL(id) { try? FileManager.default.removeItem(at: url) } }
+    func remove(_ id: String) { removeImage(id); items.removeAll { $0.id == id }; persist() }
+    func clear() { for item in items { removeImage(item.id) }; items = []; persist() }
+}
+
+/// A ready event is not playback. Require an active engine and forward media-time movement.
+struct PlaybackHistoryStartGate {
+    private var previous: TimeInterval?
+    private(set) var recorded = false
+    mutating func sample(time: TimeInterval, playing: Bool, seeking: Bool, failed: Bool) -> Bool {
+        guard !recorded else { return false }
+        guard playing, !seeking, !failed, time.isFinite, time >= 0 else { previous = nil; return false }
+        defer { previous = time }
+        guard let previous, time > previous, time - previous < 2 else { return false }
+        recorded = true
+        return true
+    }
+}
 
 struct DrawRecord: Codable, Identifiable, Hashable {
     let movieID: String

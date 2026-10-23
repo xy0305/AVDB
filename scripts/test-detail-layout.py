@@ -21,7 +21,7 @@ assert 'ViewThatFits(in: .horizontal)' in controls and 'VStack(spacing: 12)' in 
 assert '.accessibilityIdentifier(' not in controls # Must not override child play identity.
 assert 'HStack(spacing: 0)' in actions
 assert '.background(.clear, in: Capsule())' in actions
-assert '.overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5))' in actions
+assert '.overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5).allowsHitTesting(false))' in actions
 assert not any(x in actions for x in ['.liquidGlass(', '.glassEffect(', '.glassSurface(', 'Material', '.background(.white', '.fill('])
 assert '.padding(.horizontal, 6).padding(.vertical, 2)' in actions
 assert '.frame(width: 44, height: 44)' in actions

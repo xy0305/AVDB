@@ -29,7 +29,8 @@ struct PlayerView: View {
                     url: url,
                     title: vm.title,
                     subtitle: vm.currentQuality,
-                    headers: vm.headers
+                    headers: vm.headers,
+                    historyMovie: vm.historyMovie
                 )
             } else if vm.isLoading {
                 ProgressView("加载播放源…")
@@ -60,13 +61,21 @@ struct PlayerView: View {
                 }
             }
         }
-        .task { await vm.load() }
+        .task { await vm.load(); await vm.loadHistoryMovie() }
     }
 }
 
 @MainActor
 final class PlayerViewModel: ObservableObject {
     @Published var playData: PlayData?
+    @Published private(set) var historyMovie: Movie?
+
+    func loadHistoryMovie() async {
+        let account = APIClient.shared.token
+        let movie = try? await sdk.movieDetail(movieID)
+        guard !Task.isCancelled, APIClient.shared.token == account, movie?.id == movieID else { return }
+        historyMovie = movie
+    }
     @Published var currentEpisodeIndex = 1
     @Published var currentQuality = ""
     @Published var isLoading = false
@@ -148,6 +157,11 @@ struct KSChromePlayer: View {
     @StateObject private var seekPreview = SeekPreviewController()
     var publicSubtitleQuery: String = "" // Explicit public metadata only; never infer from URL/title/path.
     var onVideoMetrics: ((URL, PlaybackVideoMetrics?, Bool) -> Void)? = nil
+    var historyMovie: Movie? = nil
+    var historyArtwork: UIImage? = nil
+    @State private var historyGate = PlaybackHistoryStartGate()
+    @State private var historyScope = PlaybackHistoryStore.shared.scope
+    @State private var historyToken = APIClient.shared.token
     @State private var lastVideoMetrics: PlaybackVideoMetrics?
     @State private var metricsSettled = false
     @StateObject private var onlineSubtitles = OnlineSubtitleModel()
@@ -844,6 +858,11 @@ struct KSChromePlayer: View {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled else { return }
                 syncTime()
+                if let movie = historyMovie, APIClient.shared.token == historyToken,
+                   historyGate.sample(time: currentTime, playing: coordinator.playerLayer?.player.isPlaying == true,
+                                      seeking: isSeeking || seekPending, failed: failureReported) {
+                    PlaybackHistoryStore.shared.record(movie, artwork: historyArtwork, scope: historyScope)
+                }
                 publishVideoMetrics(timedOut: Date().timeIntervalSince(start) > 30)
                 if !hasStarted, !failureReported, Date().timeIntervalSince(start) > 30, onPlaybackFailure != nil {
                     failureReported = true

@@ -50,6 +50,58 @@ struct UpdateNoticesView: View {
     }
 }
 
+struct PlaybackHistoryView: View {
+    @ObservedObject private var store = PlaybackHistoryStore.shared
+    @State private var confirmClear = false
+    var body: some View {
+        List {
+            ForEach(store.items) { item in
+                NavigationLink {
+                    MovieDetailView(movieID: item.movieID, seed: item.movie)
+                } label: {
+                    HStack(spacing: 12) {
+                        Group {
+                            if let image = store.artwork(for: item.movieID) {
+                                Image(uiImage: image).resizable().scaledToFit()
+                            } else {
+                                JavDBImage(url: item.coverURL, contentMode: .fit)
+                            }
+                        }
+                        .frame(width: 60, height: 84).clipped()
+                        .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.number).font(.headline)
+                            Text(item.title).font(.caption).lineLimit(2)
+                            Text(item.playedAt, format: .dateTime.year().month().day().hour().minute())
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .swipeActions {
+                    Button("删除", role: .destructive) { store.remove(item.id) }
+                }
+            }
+        }
+        .navigationTitle("播放历史")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("清空", role: .destructive) { confirmClear = true }
+                    .disabled(store.items.isEmpty)
+            }
+        }
+        .confirmationDialog("清空本账户在本机的全部播放历史？", isPresented: $confirmClear, titleVisibility: .visible) {
+            Button("清空播放历史", role: .destructive) { store.clear() }
+            Button("取消", role: .cancel) {}
+        }
+        .overlay {
+            if store.items.isEmpty {
+                ContentUnavailableView("还没有播放历史", systemImage: "play.rectangle",
+                                       description: Text("实际开始播放作品后记录，仅保存在本机，不含视频链接。"))
+            }
+        }
+    }
+}
+
 struct DrawHistoryView: View {
     @ObservedObject private var store = DrawHistoryStore.shared
 

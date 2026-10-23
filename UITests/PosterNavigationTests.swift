@@ -1,6 +1,74 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    func test235NeutralRankingSourceGlassMenu() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "--rankings235-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let menu = app.buttons["ranking-source-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15)); XCTAssertTrue(menu.isHittable)
+        XCTAssertGreaterThanOrEqual(menu.frame.height, 44)
+        XCTAssertLessThanOrEqual(menu.frame.height, 72, "Normal-font source selector must remain compact")
+        XCTAssertFalse(app.staticTexts["新增来源 · MissAV"].exists)
+        let menuFrame = menu.frame
+        let closed = XCTAttachment(screenshot: app.screenshot()); closed.name = "235-neutral-rankings-compact-native-glass"; closed.lifetime = .keepAlways; add(closed)
+        menu.tap()
+        for entry in ["javranking-home-entry", "javranking-topics-shortcut", "missav-ranking-entry", "javlibrary-ranking-entry"] {
+            XCTAssertTrue(app.buttons[entry].waitForExistence(timeout: 5), "Preserve source route \(entry)")
+        }
+        let opened = XCTAttachment(screenshot: app.screenshot()); opened.name = "235-neutral-rankings-all-source-menu-entries"; opened.lifetime = .keepAlways; add(opened)
+        app.buttons["javranking-home-entry"].tap()
+        XCTAssertTrue(app.buttons["jr-lucky-start"].waitForExistence(timeout: 10))
+        let details = XCTAttachment(string: "Native source capsule frame: \(menuFrame). All four original destination buttons present; full-home navigation succeeded. No claimed 17–25/AXXXL/reduced-transparency device result.")
+        details.name = "235-ranking-native-menu-measurement"; details.lifetime = .keepAlways; add(details)
+    }
+
+    func test235NeutralMarkButtonsCoordinateToggleOff() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-hero-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        app.buttons["neutral-portrait-link"].tap()
+        let heart = app.buttons["detail-want-watch"]
+        let watched = app.buttons["detail-watched"]
+        XCTAssertTrue(heart.waitForExistence(timeout: 15)); XCTAssertTrue(watched.exists)
+        for _ in 0..<8 {
+            if heart.isHittable && watched.isHittable { break }
+            app.swipeUp(velocity: 400)
+        }
+        XCTAssertTrue(heart.isHittable); XCTAssertTrue(watched.isHittable)
+        XCTAssertEqual(app.buttons.matching(identifier: "detail-want-watch").count, 1)
+        XCTAssertEqual(app.buttons.matching(identifier: "detail-watched").count, 1)
+        XCTAssertGreaterThanOrEqual(heart.frame.width, 44); XCTAssertGreaterThanOrEqual(heart.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(watched.frame.width, 44); XCTAssertGreaterThanOrEqual(watched.frame.height, 44)
+        XCTAssertLessThanOrEqual(heart.frame.maxX, watched.frame.minX + 0.5)
+        func wait(_ button: XCUIElement, _ value: String) {
+            let condition = NSPredicate { _, _ in button.isEnabled && button.value as? String == value }
+            expectation(for: condition, evaluatedWith: button)
+            waitForExpectations(timeout: 5)
+        }
+        var diagnostics = "heart=\(heart.frame), watched=\(watched.frame)\n"
+        // Corners within each complete 44pt target, not AX .tap() at an inferred centre.
+        for (button, other) in [(heart, watched), (watched, heart)] {
+            for point in [CGVector(dx: 0.12, dy: 0.12), CGVector(dx: 0.88, dy: 0.12), CGVector(dx: 0.12, dy: 0.88), CGVector(dx: 0.88, dy: 0.88)] {
+                wait(button, "未选中")
+                button.coordinate(withNormalizedOffset: point).tap(); wait(button, "已选中")
+                XCTAssertEqual(other.value as? String, "未选中")
+                button.coordinate(withNormalizedOffset: point).tap(); wait(button, "未选中")
+                XCTAssertEqual(other.value as? String, "未选中")
+                diagnostics += "\(button.identifier) \(point) ON -> OFF PASS\n"
+            }
+        }
+        let info = XCTAttachment(string: diagnostics); info.name = "235-neutral-native-coordinate-hit-regions"; info.lifetime = .keepAlways; add(info)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "235-neutral-both-buttons-cancelled"; shot.lifetime = .keepAlways; add(shot)
+    }
     func testStationaryDetailRootDoesNotPop() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -149,6 +217,10 @@ final class PosterNavigationTests: XCTestCase {
     }
 
     private func enterJRHome(_ app: XCUIApplication) {
+        let sourceMenu = app.buttons["ranking-source-menu"]
+        XCTAssertTrue(sourceMenu.waitForExistence(timeout: 15))
+        XCTAssertGreaterThanOrEqual(sourceMenu.frame.height, 44)
+        sourceMenu.tap()
         let route = app.buttons["javranking-home-entry"]
         XCTAssertTrue(route.waitForExistence(timeout: 15)); route.tap()
         let consent = app.buttons["我已满 18 岁，继续"]

@@ -11,6 +11,7 @@ import KSPlayer
 struct Pan115PlayerView: View {
     let movie: Movie
     var magnetURL: String? = nil
+    var historyArtwork: UIImage? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var vm = Pan115PlayerViewModel()
     @State private var showEpisodes = false
@@ -41,7 +42,9 @@ struct Pan115PlayerView: View {
                     publicSubtitleQuery: movie.displayNumber,
                     onVideoMetrics: { sourceURL, metrics, settled in
                         vm.receiveMetrics(metrics, settled: settled, url: sourceURL, generation: metricsGeneration)
-                    }
+                    },
+                    historyMovie: movie,
+                    historyArtwork: historyArtwork
                 )
                 .id(url)
                 .id(metricsGeneration)

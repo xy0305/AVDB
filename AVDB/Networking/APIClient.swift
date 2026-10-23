@@ -71,6 +71,12 @@ public final class APIClient: @unchecked Sendable {
         token = UserDefaults.standard.string(forKey: Self.tokenKey)
     }
 
+    // Isolated transport for deterministic protocol replay; never writes a test token to defaults.
+    init(session: URLSession, token: String?) {
+        self.session = session
+        self.token = token
+    }
+
     // MARK: - Token 管理
 
     public func setToken(_ token: String?) {
@@ -112,12 +118,15 @@ public final class APIClient: @unchecked Sendable {
     public func get<T: Decodable>(
         _ path: String,
         query: [String: String]? = nil,
-        useToken: Bool = false
+        useToken: Bool = false,
+        cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
     ) async throws -> T {
         guard let url = makeURL(path: path, query: query) else {
             throw JavDBError.invalidURL
         }
-        return try await request(url: url, method: "GET", useToken: useToken)
+        var request = URLRequest(url: url, cachePolicy: cachePolicy)
+        request.httpMethod = "GET"
+        return try await perform(request: request, useToken: useToken)
     }
 
     /// 发送 POST 请求并解码（application/x-www-form-urlencoded）

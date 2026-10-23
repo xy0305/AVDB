@@ -4,6 +4,161 @@ import ImageIO
 import SwiftUI
 @testable import AVDB
 
+final class Playback235URLProtocol: URLProtocol {
+    static var handler: ((URLRequest) throws -> Data)?
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        do {
+            let data = try Self.handler!(request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type":"application/json"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data); client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() {}
+}
+
+final class Playback235Tests: XCTestCase {
+    @MainActor func testProductionAuthenticatedPostDeleteReadbackAndRejection() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [Playback235URLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel(); Playback235URLProtocol.handler = nil }
+        let sdk = JavDBSDK(client: APIClient(session: session, token: "neutral-fixture-noncredential"))
+        var stored: String?
+        var requests: [String] = []
+        var reject = false
+        var stale = false
+        Playback235URLProtocol.handler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer neutral-fixture-noncredential")
+            let method = request.httpMethod!
+            let path = request.url!.path
+            requests.append(method + " " + path)
+            if method == "POST" {
+                if reject { return Data(#"{"success":0,"message":"controlled failure"}"#.utf8) }
+                var parts = URLComponents(); parts.percentEncodedQuery = String(data: request.httpBody ?? Data(), encoding: .utf8)
+                let desired = parts.queryItems?.first { $0.name == "status" }?.value
+                if !stale { stored = desired }
+                return Data(#"{"success":1,"data":{"review":null}}"#.utf8) // must not force ON from null
+            }
+            if method == "DELETE" {
+                XCTAssertEqual(path, "/api/v1/movies/neutral/reviews/123456789")
+                stored = nil
+                return Data(#"{"success":1,"data":null}"#.utf8)
+            }
+            XCTAssertEqual(method, "GET"); XCTAssertEqual(path, "/api/v4/movies/neutral")
+            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+            var movie: [String: Any] = ["id":"neutral", "number":"TEST-235"]
+            if let stored { movie["review"] = ["id":123456789, "status":stored] }
+            return try JSONSerialization.data(withJSONObject: ["success":1, "data":["movie":movie]])
+        }
+        let want = try await sdk.updateMovieReview("neutral", status: "want_watch")
+        XCTAssertEqual(want, "want_watch")
+        let off = try await sdk.updateMovieReview("neutral", status: nil); XCTAssertNil(off)
+        let watched = try await sdk.updateMovieReview("neutral", status: "watched"); XCTAssertEqual(watched, "watched")
+        let offAgain = try await sdk.updateMovieReview("neutral", status: nil); XCTAssertNil(offAgain)
+        XCTAssertEqual(requests.filter { $0.hasPrefix("POST") }.count, 2)
+        XCTAssertEqual(requests.filter { $0.hasPrefix("DELETE") }.count, 2)
+        reject = true
+        do { _ = try await sdk.updateMovieReview("neutral", status: "watched"); XCTFail("Rejected POST must not succeed") } catch {}
+        reject = false; stale = true
+        do { _ = try await sdk.updateMovieReview("neutral", status: "want_watch"); XCTFail("Unconfirmed write must not force ON") } catch {}
+    }
+    @MainActor func testHistoryGatePersistenceDedupDeleteAndAccountIsolation() throws {
+        let suite = "avdb.235.test." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+        let store = PlaybackHistoryStore(defaults: defaults, directory: directory)
+        store.activate(accountID: 235)
+        let scope = store.scope
+        let a = Movie(id: "neutral-a", number: "TEST-001", title: "自创中性封面", coverURL: "https://example.test/cover.jpg")
+        let b = Movie(id: "neutral-b", number: "TEST-002", title: "另一个测试作品", coverURL: "https://example.test/cover.jpg?token=DO-NOT-SAVE")
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 60, height: 90)).image { c in
+            UIColor.systemTeal.setFill(); c.fill(CGRect(x: 0, y: 0, width: 60, height: 90))
+        }
+        var gate = PlaybackHistoryStartGate()
+        XCTAssertTrue(store.items.isEmpty) // merely holding movie/detail metadata is not a play
+        XCTAssertFalse(gate.sample(time: 0, playing: false, seeking: false, failed: false))
+        XCTAssertFalse(gate.sample(time: 0, playing: true, seeking: false, failed: false))
+        XCTAssertFalse(gate.sample(time: 0, playing: true, seeking: false, failed: false))
+        XCTAssertFalse(gate.sample(time: 30, playing: true, seeking: true, failed: false))
+        XCTAssertFalse(gate.sample(time: 30, playing: true, seeking: false, failed: true))
+        XCTAssertFalse(gate.sample(time: 0.5, playing: true, seeking: false, failed: false))
+        XCTAssertTrue(gate.sample(time: 1, playing: true, seeking: false, failed: false))
+        store.record(a, artwork: image, scope: scope, at: Date(timeIntervalSince1970: 1))
+        XCTAssertFalse(gate.sample(time: 1.5, playing: true, seeking: false, failed: false))
+        store.record(b, artwork: nil, scope: scope, at: Date(timeIntervalSince1970: 2))
+        store.record(a, artwork: image, scope: scope, at: Date(timeIntervalSince1970: 3))
+        XCTAssertEqual(store.items.map(\.id), [a.id, b.id]); XCTAssertNil(store.items.last?.coverURL)
+        XCTAssertNotNil(store.artwork(for: a.id))
+        let restored = PlaybackHistoryStore(defaults: defaults, directory: directory)
+        restored.activate(accountID: 235)
+        XCTAssertEqual(restored.items, store.items); XCTAssertNotNil(restored.artwork(for: a.id))
+        let encoded = String(data: defaults.data(forKey: "avdb.play.history.v1.user-235")!, encoding: .utf8)!
+        XCTAssertFalse(encoded.contains("token")); XCTAssertFalse(encoded.contains("DO-NOT-SAVE"))
+        restored.activate(accountID: nil); XCTAssertTrue(restored.items.isEmpty)
+        restored.record(a, artwork: nil, scope: scope); XCTAssertTrue(restored.items.isEmpty)
+        restored.activate(accountID: 999); XCTAssertTrue(restored.items.isEmpty)
+        restored.record(a, artwork: nil, scope: scope); XCTAssertTrue(restored.items.isEmpty)
+        restored.activate(accountID: 235); XCTAssertEqual(restored.items.count, 2)
+        restored.remove(a.id); XCTAssertEqual(restored.items.map(\.id), [b.id]); XCTAssertNil(restored.artwork(for: a.id))
+        restored.clear(); XCTAssertTrue(restored.items.isEmpty)
+        let empty = PlaybackHistoryStore(defaults: defaults, directory: directory); empty.activate(accountID: 235)
+        XCTAssertTrue(empty.items.isEmpty)
+        for bad in ["https://115.com/private.jpg", "https://example.test/a.mp4", "https://user:pass@example.test/a.jpg", "https://example.test/a.jpg?sign=x"] {
+            XCTAssertNil(PlaybackHistoryStore.safeCoverURL(bad))
+        }
+    }
+
+    @MainActor func testMarkTrueFalsePendingLateResponseAndFailureRollback() async throws {
+        var calls = 0
+        let model = MovieDetailViewModel(movieID: "neutral") { _, status in
+            calls += 1
+            try await Task.sleep(nanoseconds: 100_000_000)
+            return status
+        }
+        let first = Task { await model.setReviewStatus("want_watch") }
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertTrue(model.reviewPending)
+        await model.setReviewStatus("watched") // explicit pending policy, not concurrent writers
+        XCTAssertEqual(calls, 1)
+        await first.value
+        XCTAssertEqual(model.reviewStatus, "want_watch"); XCTAssertFalse(model.reviewPending)
+        await model.setReviewStatus("want_watch"); XCTAssertNil(model.reviewStatus)
+        await model.setReviewStatus("watched"); XCTAssertEqual(model.reviewStatus, "watched")
+        await model.setReviewStatus("watched"); XCTAssertNil(model.reviewStatus)
+        var fail = false
+        let failing = MovieDetailViewModel(movieID: "neutral") { _, status in
+            if fail { throw URLError(.notConnectedToInternet) }; return status
+        }
+        await failing.setReviewStatus("watched"); fail = true
+        await failing.setReviewStatus("watched")
+        XCTAssertEqual(failing.reviewStatus, "watched"); XCTAssertNotNil(failing.errorMessage)
+        XCTAssertFalse(failing.reviewPending)
+        let inconsistent = MovieDetailViewModel(movieID: "neutral") { _, _ in nil }
+        await inconsistent.setReviewStatus("want_watch")
+        XCTAssertNil(inconsistent.reviewStatus); XCTAssertNotNil(inconsistent.errorMessage)
+    }
+
+    @MainActor func testActualNeutralKSPlayerStartsHistoryNotDetailOrFailure() async throws {
+        let store = PlaybackHistoryStore.shared
+        store.activate(accountID: 23500001); store.clear()
+        defer { store.clear(); store.activate(accountID: nil) }
+        let movie = Movie(id: "neutral-real-play", number: "TEST-235", title: "自创纯色测试短片")
+        XCTAssertTrue(store.items.isEmpty)
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "neutral-subtitle", withExtension: "mp4"))
+        let host = UIHostingController(rootView: KSChromePlayer(url: url, managesOrientation: false, historyMovie: movie))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 700))
+        window.rootViewController = host; window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let deadline = Date().addingTimeInterval(12)
+        while store.items.isEmpty && Date() < deadline { try await Task.sleep(nanoseconds: 100_000_000) }
+        XCTAssertEqual(store.items.map(\.id), [movie.id], "Real bundled neutral media must advance the actual engine clock")
+    }
+}
+
 final class OnlineSubtitleModelTests: XCTestCase {
     @MainActor private func awaitModelState(_ predicate: () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(5)

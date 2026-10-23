@@ -34,6 +34,13 @@ struct RankingsView: View {
     @StateObject private var vm = RankingsViewModel()
     @State private var showSearch = false
     @State private var showTopFilter = false
+    @State private var sourceDestination: RankingSourceDestination?
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private enum RankingSourceDestination: String, Identifiable, Hashable {
+        case javRankingHome, javRankingTopics, missAV, javLibrary
+        var id: String { rawValue }
+    }
 
     init(embedded: Bool = false, initialTab: RankingTab = .top250) {
         self.embedded = embedded
@@ -58,33 +65,10 @@ struct RankingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, AdaptiveLayout.horizontalPadding)
                 .padding(.vertical, 8)
-            HStack {
-                Text("当前来源 · JavDB").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                NavigationLink { JavRankingView(rankingsOnly: true) } label: {
-                    Label("JAV Ranking 完整首页", systemImage: "house")
-                        .font(.subheadline)
-                }.accessibilityIdentifier("javranking-home-entry")
-                NavigationLink { JRBackendView(route: "topics", title: "全部榜单") } label: {
-                    Text("全部榜单").font(.caption)
-                }.accessibilityIdentifier("javranking-topics-shortcut")
-            }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
-            HStack {
-                Text("新增来源 · MissAV").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                NavigationLink { MissAVRankingView() } label: {
-                    Label("MissAV 日 / 周 / 月排行", systemImage: "list.number")
-                        .font(.subheadline)
-                }
-            }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
-            HStack {
-                Text("新增来源 · JAVLibrary").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                NavigationLink { JAVLibraryRankingView() } label: {
-                    Label("JAVLibrary 最想要 / 高评价 / 女优收藏", systemImage: "list.number")
-                        .font(.subheadline)
-                }.accessibilityIdentifier("javlibrary-ranking-entry")
-            }.padding(.horizontal, AdaptiveLayout.horizontalPadding).padding(.bottom, 8)
+            rankingSourceMenu
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                .padding(.bottom, 4)
             UnderlineTabBar(tabs: RankingTab.allCases.map { ($0, $0.title) }, selection: $tab, scrolls: false)
                 .padding(.top, 4)
 
@@ -153,6 +137,14 @@ struct RankingsView: View {
             }
         }
         .navigationDestination(isPresented: $showSearch) { SearchView() }
+        .navigationDestination(item: $sourceDestination) { destination in
+            switch destination {
+            case .javRankingHome: JavRankingView(rankingsOnly: true)
+            case .javRankingTopics: JRBackendView(route: "topics", title: "全部榜单")
+            case .missAV: MissAVRankingView()
+            case .javLibrary: JAVLibraryRankingView()
+            }
+        }
         .sheet(isPresented: $showTopFilter) {
             Top250FilterSheet(vm: vm)
                 .presentationDetents([.large])
@@ -165,6 +157,79 @@ struct RankingsView: View {
         .onChange(of: playbackPeriod) { _, _ in Task { await reload() } }
         .onChange(of: rankingKind) { _, _ in Task { await reload() } }
         .refreshable { await reload(force: true) }
+    }
+
+    // Only the trigger is glass. The system owns menu placement, dismissal,
+    // scrolling and row accessibility on both iPhone and iPad.
+    private var rankingSourceMenu: some View {
+        Menu {
+            Section("当前榜单来源") {
+                Label("JavDB · 当前", systemImage: "checkmark.circle.fill")
+            }
+            Section("JAV Ranking") {
+                Button { sourceDestination = .javRankingHome } label: {
+                    Label("完整首页", systemImage: "house")
+                }
+                .accessibilityIdentifier("javranking-home-entry")
+                Button { sourceDestination = .javRankingTopics } label: {
+                    Label("全部榜单", systemImage: "square.grid.2x2")
+                }
+                .accessibilityIdentifier("javranking-topics-shortcut")
+            }
+            Section("MissAV") {
+                Button { sourceDestination = .missAV } label: {
+                    Label("日 / 周 / 月排行", systemImage: "chart.bar")
+                }
+                .accessibilityIdentifier("missav-ranking-entry")
+            }
+            Section("JAVLibrary") {
+                Button { sourceDestination = .javLibrary } label: {
+                    Label("最想要 / 高评价 / 女优收藏", systemImage: "list.number")
+                }
+                .accessibilityIdentifier("javlibrary-ranking-entry")
+            }
+        } label: {
+            sourceMenuLabel
+        }
+        .buttonStyle(.plain)
+        .menuOrder(.fixed)
+        .accessibilityLabel("榜单来源，当前 JavDB")
+        .accessibilityHint("展开其他来源与全部榜单；选择后打开对应页面")
+        .accessibilityIdentifier("ranking-source-menu")
+    }
+
+    @ViewBuilder
+    private var sourceMenuLabel: some View {
+        if reduceTransparency {
+            sourceMenuLabelContent
+                .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+                .overlay { Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5).allowsHitTesting(false) }
+        } else {
+            sourceMenuLabelContent.liquidGlass(interactive: true)
+        }
+    }
+
+    private var sourceMenuLabelContent: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "square.stack.3d.up")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text("榜单来源 · JavDB")
+                .foregroundStyle(.primary)
+                .layoutPriority(1)
+            Text("更多")
+                .foregroundStyle(.secondary)
+            Image(systemName: "chevron.down")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .frame(minHeight: 44)
+        .fixedSize(horizontal: false, vertical: true)
+        .contentShape(Capsule())
     }
 
     private func reload(force: Bool = false) async {
@@ -553,6 +618,13 @@ final class RankingsViewModel: ObservableObject {
     }
 
     nonisolated static func requestMovies(_ r: Request) async throws -> [Movie] {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--rankings235-fixture") {
+            guard r.page == 1 else { return [] }
+            return (1...8).map { Movie(id: "neutral-ranking-\($0)", type: "0", number: "TEST-\($0)",
+                                      title: "自创中性排行榜封面 \($0)", thumbURL: "fixture://poster/portrait", coverURL: "fixture://poster/portrait") }
+        }
+        #endif
         let sdk = await JavDBSDK.shared
         switch r.tab {
         case .top250:

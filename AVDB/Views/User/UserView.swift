@@ -120,6 +120,9 @@ struct UserView: View {
                         NavigationLink { DownloadQueueView() } label: {
                             Label("下载队列", systemImage: "arrow.down.circle")
                         }
+                        NavigationLink { PlaybackHistoryView() } label: {
+                            Label("播放历史", systemImage: "play.rectangle.on.rectangle")
+                        }
                         NavigationLink { DrawHistoryView() } label: {
                             Label("抽签历史", systemImage: "sparkles")
                         }

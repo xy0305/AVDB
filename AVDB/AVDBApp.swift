@@ -33,6 +33,9 @@ struct AVDBApp: App {
                 .preferredColorScheme(.light)
                 .tint(Color(red: 0.12, green: 0.48, blue: 0.96))
                 .liquidGlassChrome()
+                .onChange(of: appState.currentUser?.id, initial: true) { _, accountID in
+                    PlaybackHistoryStore.shared.activate(accountID: accountID)
+                }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { appState.restoreLogin() }
                 }
