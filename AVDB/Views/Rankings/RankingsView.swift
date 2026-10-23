@@ -3,7 +3,7 @@
 //  AVDB
 //
 //  排行榜：TOP250 / 看熱播 / 有碼 / 無碼 / 歐美 / FC2。
-//  TOP250 底部篩選對齊官方：類型 / 年份 / 起始排名 / 未看過。
+//  TOP250 篩選由頂部工具列開啟：類型 / 年份 / 起始排名 / 未看過。
 //
 
 import SwiftUI
@@ -59,7 +59,13 @@ struct RankingsView: View {
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             if !uses235Header {
-                                ToolbarItem(placement: .topBarLeading) { rankingSourceMenu }
+                                ToolbarItem(placement: .topBarLeading) {
+                                    // Keep Menu inside a custom toolbar view, like the
+                                    // trailing actions. A direct Menu is rewrapped by
+                                    // iOS 26 as a 36pt toolbar button, ignoring its label.
+                                    HStack(spacing: 0) { rankingSourceMenu }
+                                        .frame(minHeight: 44)
+                                }
                             }
                             ToolbarItem(placement: .topBarTrailing) {
                                 // A custom toolbar view preserves the complete 44pt
@@ -249,6 +255,8 @@ struct RankingsView: View {
             sourceMenuLabel
         }
         .buttonStyle(.plain)
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Capsule())
         .menuOrder(.fixed)
         .accessibilityLabel("榜单来源，当前 JavDB")
         .accessibilityHint("展开其他来源与全部榜单；选择后打开对应页面")
@@ -257,7 +265,11 @@ struct RankingsView: View {
 
     @ViewBuilder
     private var sourceMenuLabel: some View {
-        if reduceTransparency {
+        if !embedded && !uses235Header, #available(iOS 26.0, *) {
+            // Native toolbar owns the one glass surface (and Reduce Transparency).
+            // Home / the DEBUG legacy header have no toolbar-owned surface.
+            sourceMenuLabelContent
+        } else if reduceTransparency {
             sourceMenuLabelContent
                 .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
                 .overlay { Capsule().strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5).allowsHitTesting(false) }
@@ -367,25 +379,6 @@ struct RankingsView: View {
             .padding(.vertical, 8)
             .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
             .frame(maxWidth: .infinity)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 8) {
-            Button {
-                GlassHaptic.tap()
-                showTopFilter = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                    Text("篩選")
-                        .font(.headline)
-                }
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-            }
-            .pressableGlass(scale: 0.97)
-            .liquidGlass(interactive: false)
-            .padding(.horizontal, 20)
-            .padding(.bottom, AdaptiveLayout.isPad ? 4 : 6)
         }
     }
 

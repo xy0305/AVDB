@@ -1,8 +1,81 @@
 import XCTest
 
 final class PosterNavigationTests: XCTestCase {
+    // Evidence must precede target assertions: a failing source must not hide the
+    // search/filter geometry. Frames are native AX values, never synthesized.
+    private func captureRankingHeader(_ app: XCUIApplication, name: String) {
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = name + "-neutral"; screenshot.lifetime = .keepAlways; add(screenshot)
+        var lines = ["screen=\(app.windows.firstMatch.frame)"]
+        for id in ["ranking-source-menu", "ranking-search", "ranking-filter", "ranking-row-0"] {
+            let element = app.buttons[id]
+            lines.append("\(id): exists=\(element.exists) AX=\(element.exists ? element.frame : .zero)")
+        }
+        lines.append("nav=\(app.navigationBars.firstMatch.exists ? app.navigationBars.firstMatch.frame : .zero)")
+        lines.append("tabbars=\(app.tabBars.count)")
+        let note = XCTAttachment(string: lines.joined(separator: "\n"))
+        note.name = name + "-all-controls-geometry"; note.lifetime = .keepAlways; add(note)
+    }
+
+    func test237RankingHeaderTouchBoundaries() {
+        continueAfterFailure = true
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        var results: [(String, Bool)] = []
+        var evidence: [String] = []
+        // Probe four edges of at least a 44pt target using real coordinate taps.
+        // In particular, a 36pt AX height is NOT accepted as 44pt; we separately
+        // measure whether the expected 44pt touch boundary actually responds.
+        for id in ["ranking-source-menu", "ranking-search", "ranking-filter"] {
+            for edge in ["top", "bottom", "left", "right"] {
+                app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "--rankings235-fixture"]
+                app.launch()
+                let ready = app.buttons["ranking-row-0"].waitForExistence(timeout: 20)
+                captureRankingHeader(app, name: "237-boundary-\(id)-\(edge)")
+                let control = app.buttons[id]
+                guard ready, control.exists, !control.frame.isEmpty else {
+                    evidence.append("\(id) \(edge): missing control/fixture")
+                    results.append(("\(id) \(edge)", false)); app.terminate(); continue
+                }
+                let ax = control.frame
+                let target = CGRect(x: ax.midX - max(44, ax.width) / 2,
+                                    y: ax.midY - max(44, ax.height) / 2,
+                                    width: max(44, ax.width), height: max(44, ax.height))
+                var point = CGPoint(x: target.midX, y: target.midY)
+                switch edge {
+                case "top": point.y = target.minY + 1
+                case "bottom": point.y = target.maxY - 1
+                case "left": point.x = target.minX + 1
+                default: point.x = target.maxX - 1
+                }
+                let window = app.windows.firstMatch
+                var responded = false
+                if window.frame.contains(point) {
+                    let origin = window.frame.origin
+                    window.coordinate(withNormalizedOffset: .zero)
+                        .withOffset(CGVector(dx: point.x - origin.x, dy: point.y - origin.y)).tap()
+                    switch id {
+                    case "ranking-source-menu":
+                        responded = app.buttons["javranking-topics-shortcut"].waitForExistence(timeout: 5)
+                    case "ranking-search":
+                        responded = app.textFields.firstMatch.waitForExistence(timeout: 5)
+                    default:
+                        responded = app.staticTexts["篩選"].firstMatch.waitForExistence(timeout: 5)
+                    }
+                }
+                evidence.append("\(id) \(edge): AX=\(ax) proposedTouchTarget=\(target) tap=\(point) responded=\(responded)")
+                results.append(("\(id) \(edge)", responded))
+                app.terminate()
+            }
+        }
+        let note = XCTAttachment(string: evidence.joined(separator: "\n"))
+        note.name = "237-real-coordinate-boundary-results"; note.lifetime = .keepAlways; add(note)
+        // Assert only after all 12 probes and all three controls are recorded.
+        for (name, responded) in results { XCTAssertTrue(responded, name) }
+    }
     func test236RankingHeaderGeometryAndSourceNavigation() {
-        continueAfterFailure = false
+        continueAfterFailure = true
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
@@ -11,7 +84,10 @@ final class PosterNavigationTests: XCTestCase {
             if baseline { app.launchArguments.append("--rankings235-header-baseline") }
             app.launch()
             let row = app.buttons["ranking-row-0"]
-            XCTAssertTrue(row.waitForExistence(timeout: 20))
+            let rowExists = row.waitForExistence(timeout: 20)
+            // Collect all three controls before any assertion can abort this launch.
+            captureRankingHeader(app, name: baseline ? "235-header" : "237-header")
+            XCTAssertTrue(rowExists)
             XCTAssertTrue(row.isHittable)
             let menu = app.buttons["ranking-source-menu"]
             XCTAssertTrue(menu.isHittable)
@@ -30,6 +106,9 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertEqual(after.width, before.width, accuracy: 1)
         XCTAssertEqual(after.height, before.height, accuracy: 1)
         XCTAssertTrue(app.navigationBars["排行榜"].exists)
+        XCTAssertEqual(app.buttons.matching(identifier: "ranking-filter").count, 1)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "篩選")).count, 0,
+                       "No duplicate full-width bottom filter trigger")
         let metrics = XCTAttachment(string: "235 firstPosterTop=\(before.minY)pt; 236 firstPosterTop=\(after.minY)pt; upward=\(before.minY-after.minY)pt. Row dimensions unchanged: \(before.size) -> \(after.size).")
         metrics.name = "236-vs-235-first-poster-top"; metrics.lifetime = .keepAlways; add(metrics)
         for control in [app.buttons["ranking-source-menu"], app.buttons["ranking-search"], app.buttons["ranking-filter"]] {
@@ -58,7 +137,7 @@ final class PosterNavigationTests: XCTestCase {
     }
 
     func test236HomeEmbeddedHeaderDoesNotOwnNavigation() {
-        continueAfterFailure = false
+        continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments = ["--poster-navigation-fixture", "--rankings235-fixture"]
         XCUIDevice.shared.orientation = .portrait; app.launch()
@@ -68,21 +147,34 @@ final class PosterNavigationTests: XCTestCase {
         // TOP250 is deliberately at the far end of Home's horizontal shortcut
         // scroller. Reveal the actual existing entry, never tap an offscreen AX node.
         for _ in 0..<8 {
-            if shortcut.isHittable { break }
             let window = app.windows.firstMatch
+            // Query frame first: isHittable on an offscreen Home AX node can throw.
+            let visible = shortcut.exists && window.frame.contains(shortcut.frame) && !shortcut.frame.isEmpty
+            if visible && shortcut.isHittable { break }
             let y = min(window.frame.height - 80, max(80, shortcut.frame.midY))
             let start = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.frame.width * 0.85, dy: y))
             let end = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.frame.width * 0.15, dy: y))
             start.press(forDuration: 0.05, thenDragTo: end)
         }
+        guard app.windows.firstMatch.frame.contains(shortcut.frame), !shortcut.frame.isEmpty else {
+            captureRankingHeader(app, name: "237-home-shortcut-offscreen")
+            XCTFail("Home TOP250 shortcut remains outside the screen after scrolling")
+            return
+        }
         XCTAssertTrue(shortcut.isHittable); shortcut.tap()
         let row = app.buttons["ranking-row-0"]
-        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        let rowExists = row.waitForExistence(timeout: 15)
+        captureRankingHeader(app, name: "237-home-embedded")
+        XCTAssertTrue(rowExists)
         XCTAssertEqual(app.buttons.matching(identifier: "ranking-source-menu").count, 1)
         XCTAssertEqual(app.buttons.matching(identifier: "ranking-search").count, 1)
         XCTAssertEqual(app.buttons.matching(identifier: "ranking-filter").count, 1)
         XCTAssertFalse(app.navigationBars["排行榜"].exists, "Embedded child must not replace Home navigation title")
-        XCTAssertTrue(app.buttons["ranking-source-menu"].isHittable)
+        for control in [app.buttons["ranking-source-menu"], app.buttons["ranking-search"], app.buttons["ranking-filter"]] {
+            XCTAssertTrue(control.isHittable)
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44)
+        }
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "236-actual-home-embedded-header"; shot.lifetime = .keepAlways; add(shot)
         let sourceFrame = app.buttons["ranking-source-menu"].frame
         let note = XCTAttachment(string: "Home actual shortcut -> embedded RankingsView: firstPosterTop=\(row.frame.minY)pt source=\(sourceFrame); exactly one search/filter/source; no child navigation title.")
@@ -90,13 +182,15 @@ final class PosterNavigationTests: XCTestCase {
     }
 
     func test236AccessibleHeaderTargets() {
-        continueAfterFailure = false
+        continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "--rankings235-fixture", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
         defer { app.terminate() }
         let menu = app.buttons["ranking-source-menu"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
+        let menuExists = menu.waitForExistence(timeout: 15)
+        captureRankingHeader(app, name: "237-accessibility-XXXL")
+        XCTAssertTrue(menuExists)
         for control in [menu, app.buttons["ranking-search"], app.buttons["ranking-filter"]] {
             XCTAssertTrue(control.isHittable)
             XCTAssertGreaterThanOrEqual(control.frame.width, 44)
