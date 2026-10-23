@@ -431,11 +431,14 @@ struct OnlineProvider: Sendable {
         for pattern in patterns {
             for match in JRHTML.matches(pattern, html) {
                 guard let json = match[1].data(using: .utf8),
-                      let object = try? JSONSerialization.jsonObject(with: json) as? [String:Any],
-                      let raw = (object["m3u8"] as? String) ?? (object["url"] as? String),
-                      let url = URL(string: raw),
-                      OnlinePolicy.media(url, source: .thirdPartyAVDB) || OnlinePolicy.discoveredMedia(url, source: .thirdPartyAVDB) else { throw OnlineFailure.parse }
-                found.insert(url)
+                      let object = try? JSONSerialization.jsonObject(with: json) as? [String:Any] else { throw OnlineFailure.parse }
+                let raws = [object["m3u8"] as? String, object["url"] as? String].compactMap { $0 }
+                guard !raws.isEmpty else { throw OnlineFailure.parse }
+                for raw in raws {
+                    guard let url = URL(string: raw),
+                          OnlinePolicy.media(url, source: .thirdPartyAVDB) || OnlinePolicy.discoveredMedia(url, source: .thirdPartyAVDB) else { throw OnlineFailure.parse }
+                    found.insert(url)
+                }
             }
         }
         if found.isEmpty {
