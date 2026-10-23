@@ -305,7 +305,7 @@ actor OnlineRequests {
         try await Task.sleep(nanoseconds: 200_000_000)
         check(late.plan == nil && late.states.isEmpty && late.resolutions.isEmpty && late.queryMessages.isEmpty, "account reset defeats late source/line result")
         check(cancelled.queryMessages.isEmpty, "reset clears source-scoped capacity message")
-        print("PASS \(assertions) production online playback assertions; six registry, exact DOM/JSON/identity, bounded safe HLS, independent model and credential isolation")
+        print("PASS \(assertions) production online playback assertions; six registry, exact DOM/JSON/identity, bounded safe HLS, independent model and credential isolation; build 231")
         if ProcessInfo.processInfo.environment["ONLINE_PLAYBACK_LIVE"] == "1" {
             do {
                 let real = OnlineProvider(); let routes = try await OnlinePlaybackModel.bounded { try await real.discover(.memojav,number:"START-642",versions:false) }
