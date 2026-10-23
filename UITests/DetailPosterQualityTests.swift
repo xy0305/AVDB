@@ -280,3 +280,92 @@ final class Amane022RegressionTests: XCTestCase {
         XCTAssertEqual(host.view.frame, frame)
     }
 }
+
+// Build233: exercises production model with deliberately late/cancellation-ignoring replies.
+actor Subtitle233Transport {
+    var downloads: [String: Int] = [:]
+    func count(_ id: String) -> Int { downloads[id, default: 0] }
+    func fetch(_ url: URL, _ kind: OnlineSubtitleRequestKind) async throws -> Data {
+        let key = url.lastPathComponent
+        if kind == .download { downloads[key, default: 0] += 1 }
+        let attempt = downloads[key, default: 0]
+        let delay: Double = kind == .catSearch ? 0.35 : (key.hasPrefix("A") ? 0.7 : 0.07)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().asyncAfter(deadline: .now() + delay) { continuation.resume() }
+        }
+        switch kind {
+        case .xunleiSearch:
+            let rows = ["A", "B", "C"].map { letter in ["name": letter, "ext": "srt", "url": "https://subtitle.v.geilijiasu.com/AA/BB/" + String(repeating: letter, count: 40) + ".srt"] }
+            return try JSONSerialization.data(withJSONObject: ["code": 0, "data": rows])
+        case .catSearch:
+            return Data("<table class='sub-table'><tr><td><a href='/subs/1/neutral.html'>Neutral</a></td></tr></table>".utf8)
+        case .catDetail:
+            return Data("<div class='sub-single'><a id='download_zh-CN' href='/subs/2/neutral-zh-CN.srt'>Download</a></div>".utf8)
+        case .download:
+            if key.hasPrefix("B"), attempt == 1 { return Data("invalid subtitle".utf8) }
+            return Data("1\n00:00:00,000 --> 00:01:00,000\nSelf authored \(key)\n".utf8)
+        }
+    }
+}
+extension OnlineSubtitleModelTests {
+    @MainActor func test233PartialSearchDedupeLastChoiceAndLateBytes() async throws {
+        let transport = Subtitle233Transport()
+        let model = OnlineSubtitleModel(fetch: { url, kind in try await transport.fetch(url, kind) })
+        model.query = "neutral"; model.search()
+        try await awaitModelState { model.results.count == 3 }
+        let a = model.results[0], c = model.results[2]
+        model.choose(a); model.choose(a)
+        XCTAssertEqual(model.pendingID, a.id); XCTAssertNil(model.selected)
+        try await awaitModelState { model.results.count == 4 }
+        XCTAssertTrue(model.status.contains("下载"), "Late search must not overwrite download")
+        let count = await transport.count(a.url.lastPathComponent)
+        XCTAssertEqual(count, 1, "Same pending selection must be deduplicated")
+        model.choose(c)
+        try await awaitModelState { model.selected?.id == c.id }
+        let old = model.cues
+        try await Task.sleep(nanoseconds: 800_000_000)
+        XCTAssertEqual(model.selected?.id, c.id); XCTAssertEqual(model.cues, old)
+        XCTAssertTrue(model.status.contains("已加载"))
+    }
+    @MainActor func test233FailedParsingRetryPreservesOldAndLateSearchStatus() async throws {
+        let transport = Subtitle233Transport()
+        let model = OnlineSubtitleModel(fetch: { url, kind in try await transport.fetch(url, kind) })
+        model.query = "neutral"; model.search()
+        try await awaitModelState { model.results.count == 3 }
+        let b = model.results[1], c = model.results[2]
+        model.choose(c); try await awaitModelState { model.selected?.id == c.id }
+        let old = model.cues
+        model.choose(b); try await awaitModelState { model.pendingID == nil }
+        XCTAssertEqual(model.selected?.id, c.id); XCTAssertEqual(model.cues, old)
+        XCTAssertTrue(model.rowStates[b.id]?.contains("点按重试") == true)
+        try await awaitModelState { model.results.count == 4 }
+        XCTAssertTrue(model.status.contains("加载失败"), "Late search must preserve selection failure")
+        model.choose(b); try await awaitModelState { model.selected?.id == b.id }
+        XCTAssertNil(model.rowStates[b.id]); XCTAssertFalse(model.cues.isEmpty)
+        let count = await transport.count(b.url.lastPathComponent); XCTAssertEqual(count, 2)
+    }
+    @MainActor func test233ExpansionDoesNotCancelSelectionAndCompletionCancelsPending() async throws {
+        let transport = Subtitle233Transport()
+        let model = OnlineSubtitleModel(fetch: { url, kind in try await transport.fetch(url, kind) })
+        model.query = "neutral"; model.search()
+        try await awaitModelState { model.results.count == 4 }
+        let parent = model.results.first { $0.ext == "html" }!
+        let a = model.results.first { $0.name == "A" }!
+        model.choose(a); model.choose(parent); model.choose(parent)
+        try await awaitModelState { model.languages[parent.id] != nil }
+        model.choose(parent)
+        XCTAssertEqual(model.pendingID, a.id)
+        try await awaitModelState { model.selected?.id == a.id }
+        let variant = model.languages[parent.id]![0]
+        model.choose(variant); model.choose(parent)
+        try await awaitModelState { model.selected?.id == variant.id }
+        let old = model.cues
+        model.choose(a); model.cancelPending()
+        XCTAssertNil(model.pendingID); XCTAssertTrue(model.rowStates[a.id]?.contains("已取消") == true)
+        try await Task.sleep(nanoseconds: 800_000_000)
+        XCTAssertEqual(model.selected?.id, variant.id); XCTAssertEqual(model.cues, old)
+        model.choose(a); model.disable()
+        try await Task.sleep(nanoseconds: 800_000_000)
+        XCTAssertNil(model.selected); XCTAssertTrue(model.cues.isEmpty); XCTAssertEqual(model.status, "字幕已关闭")
+    }
+}

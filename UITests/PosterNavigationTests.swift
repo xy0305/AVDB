@@ -1182,3 +1182,68 @@ final class PosterNavigationTests: XCTestCase {
         return posters.firstMatch
     }
 }
+
+// Build233: coordinate taps deliberately hit blank right-hand card space, not its label.
+extension PosterNavigationTests {
+    func testSubtitle233WholeCardPendingRetryLanguagesAndCancel() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--online-subtitle-fixture", "--subtitle-interaction233"]
+        app.launch(); defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let entry = app.buttons["player.subtitle.settings"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+        app.buttons["subtitle.search"].tap()
+        func row(_ text: String) -> XCUIElement {
+            app.buttons.matching(identifier: "subtitle.candidate").matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+        }
+        func reveal(_ element: XCUIElement) {
+            for _ in 0..<12 {
+                if element.exists && element.isHittable { return }
+                app.swipeUp()
+            }
+            XCTFail("Could not reveal subtitle card: \(app.debugDescription)")
+        }
+        func wait(_ predicate: @escaping () -> Bool, _ message: String) {
+            let e = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in predicate() }, object: app)
+            XCTAssertEqual(XCTWaiter.wait(for: [e], timeout: 10), .completed, message)
+        }
+        func blankTap(_ element: XCUIElement) {
+            reveal(element); XCTAssertGreaterThanOrEqual(element.frame.height, 44)
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        }
+        let a = row("延迟字幕 A"), b = row("失败可重试 B"), c = row("快速字幕 C")
+        blankTap(a)
+        wait({ (a.value as? String)?.contains("下载中") == true }, "Blank card tap must start download")
+        XCTAssertFalse(app.staticTexts["subtitle.selection.feedback"].exists, "Pending is never loaded")
+        blankTap(a) // same pending: should not restart or cancel
+        blankTap(c)
+        wait({ (c.value as? String) == "已加载" }, "Latest selection must load")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "233-neutral-coordinate-card-loaded"; shot.lifetime = .keepAlways; add(shot)
+        blankTap(b)
+        wait({ (b.value as? String)?.contains("点按重试") == true }, "Parse failure must be visible in the row")
+        XCTAssertEqual(c.value as? String, "已加载", "Old subtitle must survive failed replacement")
+        blankTap(b)
+        wait({ (b.value as? String) == "已加载" }, "Tap failed row to retry")
+        let parent = row("中性语言父行")
+        blankTap(parent)
+        let language = app.buttons["subtitle.language.简体中文 (zh-CN)"]
+        wait({ language.exists }, "Parent must expand languages, not falsely select")
+        blankTap(language)
+        blankTap(parent) // cached expansion must not cancel language download
+        wait({ (language.value as? String) == "已加载" }, "Whole language row is selectable")
+        let languageShot = XCTAttachment(screenshot: app.screenshot()); languageShot.name = "233-neutral-language-loaded"; languageShot.lifetime = .keepAlways; add(languageShot)
+        // Reload A and finish while pending; re-open must show cancelled, never late-green A.
+        for _ in 0..<5 { if a.isHittable { break }; app.swipeDown() }
+        blankTap(a)
+        app.buttons["subtitle.panel.done"].tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
+        reveal(a)
+        wait({ (a.value as? String)?.contains("已取消") == true }, "Completion explicitly cancels unfinished request")
+        RunLoop.current.run(until: Date().addingTimeInterval(6))
+        XCTAssertTrue((a.value as? String)?.contains("已取消") == true, "Late cancelled bytes cannot select")
+        app.buttons["subtitle.disable"].tap()
+    }
+}

@@ -421,7 +421,7 @@ struct OnlineSubtitlePanel: View {
                         Text("Big5").tag("big5")
                     }.accessibilityIdentifier("subtitle.encoding")
                     if let selected = model.selected { Text("来源：\(selected.source.title) · \(selected.language) · \(selected.name)") }
-                    Text("关闭字幕只关闭本机加载的外置字幕；视频画面内已烧录的文字无法移除。顶部“关闭字幕”同时取消下载并返回播放；“完成”仅关闭设置面板。")
+                    Text("关闭字幕只关闭本机加载的外置字幕；视频画面内已烧录的文字无法移除。顶部“关闭字幕”取消下载并清除字幕；“完成”或滑动关闭面板会取消未完成请求，保留已加载字幕。请等待行内出现“已加载”后再完成。")
                         .font(.footnote)
                     HStack {
                         Button("提前 0.5 秒") { model.offset = max(-120, model.offset - 0.5) }.accessibilityIdentifier("subtitle.earlier")
@@ -444,7 +444,19 @@ struct OnlineSubtitlePanel: View {
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(row.name).lineLimit(3).foregroundStyle(.primary)
-                                    Text("\(row.source.title) · \(row.language) · \(row.ext == "html" ? "点击查看现成语言" : row.ext.uppercased())").font(.caption).foregroundStyle(.secondary)
+                                    Text("\(row.source.title) · \(row.language) · \(row.ext == "html" ? "展开语言（不是选择字幕）" : row.ext.uppercased())").font(.caption).foregroundStyle(.secondary)
+                                    if row.ext == "html", let detail = model.detailStates[row.id] {
+                                        HStack {
+                                            if detail == "读取语言中…" { ProgressView() }
+                                            Text(detail).font(.caption)
+                                        }
+                                    }
+                                    if let feedback = model.rowStates[row.id] {
+                                        HStack {
+                                            if model.pendingID == row.id { ProgressView() }
+                                            Text(feedback).font(.caption).foregroundStyle(.primary)
+                                        }.accessibilityIdentifier("subtitle.row.feedback.\(row.id)")
+                                    }
                                     if isSelected {
                                         Text("已加载 · \(model.selected?.source.title ?? row.source.title) · \(model.selected?.language ?? row.language)").font(.caption.weight(.semibold)).foregroundStyle(.green)
                                             .accessibilityIdentifier("subtitle.selection.feedback")
@@ -454,6 +466,7 @@ struct OnlineSubtitlePanel: View {
                             }
                             .padding(.horizontal, 12).padding(.vertical, 10)
                             .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                            .contentShape(Rectangle())
                             .background(isSelected ? Color.green.opacity(0.10) : Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? Color.green : Color.secondary.opacity(0.35), lineWidth: isSelected ? 2 : 1))
                             .accessibilityIdentifier(isSelected ? "subtitle.selection.box" : "subtitle.selection.outline")
@@ -463,15 +476,30 @@ struct OnlineSubtitlePanel: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .accessibilityIdentifier("subtitle.candidate")
-                        .accessibilityValue(isSelected ? "已选中，\(model.status)" : "未选中")
+                        .accessibilityValue(model.rowStates[row.id] ?? (isSelected ? "已加载" : (row.ext == "html" ? "展开语言" : "未选中")))
                         if row.source == .subtitleCat {
                             if let detailStatus = model.detailStates[row.id] { Text(detailStatus).font(.footnote) }
                             ForEach(model.languages[row.id] ?? []) { variant in
                                 Button { model.choose(variant) } label: {
-                                    Label(variant.language, systemImage: model.selected?.id == variant.id ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(model.selected?.id == variant.id ? .green : .primary)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Label(variant.language, systemImage: model.selected?.id == variant.id ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(model.selected?.id == variant.id ? .green : .primary)
+                                        if let feedback = model.rowStates[variant.id] {
+                                            HStack {
+                                                if model.pendingID == variant.id { ProgressView() }
+                                                Text(feedback).font(.caption)
+                                            }
+                                        }
+                                        if model.selected?.id == variant.id { Text("已加载").font(.caption).foregroundStyle(.green) }
+                                    }
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+                                    .contentShape(Rectangle())
                                 }
+                                .buttonStyle(.plain)
                                 .accessibilityIdentifier("subtitle.language.\(variant.language)")
+                                .accessibilityValue(model.rowStates[variant.id] ?? (model.selected?.id == variant.id ? "已加载" : "点按选择语言"))
                             }
                             Link("在 SubtitleCat 原站查看（外部网页）", destination: row.url).font(.footnote)
                         }
@@ -500,7 +528,10 @@ struct OnlineSubtitlePanel: View {
 #if DEBUG && os(iOS)
 struct OnlineSubtitleFixtureView: View {
     @State private var presented = false
-    @StateObject private var model = OnlineSubtitleModel(fetch: { _, kind in
+    @StateObject private var model = OnlineSubtitleModel(fetch: { url, kind in
+        if ProcessInfo.processInfo.arguments.contains("--subtitle-interaction233") {
+            return try await SubtitleInteraction233Fixture.shared.fetch(url, kind)
+        }
         if kind == .catSearch { return Data("<table class='sub-table'></table>".utf8) }
         if kind == .xunleiSearch {
             return Data(#"{"code":0,"result":"ok","data":[{"name":"自创合法测试字幕","ext":"srt","languages":[""],"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt"}]}"#.utf8)
@@ -511,6 +542,42 @@ struct OnlineSubtitleFixtureView: View {
         Button("在线字幕") { model.query = "公开测试片名"; presented = true }
             .accessibilityIdentifier("player.subtitle.settings")
             .sheet(isPresented: $presented) { OnlineSubtitlePanel(model: model) }
+    }
+}
+#endif
+
+#if DEBUG && os(iOS)
+// Neutral, self-authored native interaction fixture. No external requests or player source changes.
+actor SubtitleInteraction233Fixture {
+    static let shared = SubtitleInteraction233Fixture()
+    private var attempts: [String: Int] = [:]
+    func fetch(_ url: URL, _ kind: OnlineSubtitleRequestKind) async throws -> Data {
+        switch kind {
+        case .xunleiSearch:
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let rows = [("延迟字幕 A", "A"), ("失败可重试 B", "B"), ("快速字幕 C", "C")].map { name, letter in
+                ["name": name, "ext": "srt", "url": "https://subtitle.v.geilijiasu.com/AA/BB/" + String(repeating: letter, count: 40) + ".srt"]
+            }
+            return try JSONSerialization.data(withJSONObject: ["code": 0, "data": rows])
+        case .catSearch:
+            try await Task.sleep(nanoseconds: 3_000_000_000)
+            return Data("<table class='sub-table'><tr><td><a href='/subs/1/neutral.html'>中性语言父行</a></td></tr></table>".utf8)
+        case .catDetail:
+            try await Task.sleep(nanoseconds: 700_000_000)
+            return Data("<div class='sub-single'><a id='download_zh-CN' href='/subs/2/neutral-zh-CN.srt'>Download</a><a id='download_en' href='/subs/2/neutral-en.srt'>Download</a></div>".utf8)
+        case .download:
+            let key = url.lastPathComponent
+            attempts[key, default: 0] += 1
+            let attempt = attempts[key]!
+            let slow = key.hasPrefix("A")
+            // Ignore cancellation: the production generation guard must reject these late bytes.
+            let delay = slow ? 5.0 : (key.hasPrefix("C") ? 0.2 : 1.0)
+            await withCheckedContinuation { continuation in
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) { continuation.resume() }
+            }
+            if key.hasPrefix("B"), attempt == 1 { return Data("not a subtitle".utf8) }
+            return Data("1\n00:00:00,000 --> 00:01:00,000\nSelf-authored neutral subtitle\n".utf8)
+        }
     }
 }
 #endif

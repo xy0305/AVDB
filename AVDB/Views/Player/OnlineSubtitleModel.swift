@@ -13,6 +13,10 @@ import SwiftUI
     @Published var offset: Double = 0
     @Published var encodingHint = "auto"
     @Published var busy = false
+    @Published var rowStates: [String: String] = [:]
+    @Published private(set) var pendingID: String?
+    private var selectionStatus: String?
+    private var details: [String: Task<Void, Never>] = [:]
     private var state = OnlineSubtitleSearchState()
     private var work: Task<Void, Never>?
     private var choice: Task<Void, Never>?
@@ -44,11 +48,14 @@ import SwiftUI
         self.fetch = fetch
     }
     private func cancelChoice() {
-        selectionGeneration += 1; choice?.cancel(); choice = nil; downloading = false; busy = !state.pending.isEmpty || downloading
-        for key in detailStates.keys where detailStates[key] == "读取语言中…" { detailStates[key] = "已取消，请重新选择" }
+        if let id = pendingID { rowStates[id] = "已取消；点按重试（旧字幕保留）"; selectionStatus = rowStates[id]; status = selectionStatus! }
+        pendingID = nil
+        selectionGeneration += 1; choice?.cancel(); choice = nil; downloading = false; busy = !state.pending.isEmpty
     }
     func cancelPending() {
         state.invalidate(); work?.cancel(); work = nil; cancelChoice()
+        for task in details.values { task.cancel() }; details = [:]
+        for key in Array(detailStates.keys) where detailStates[key] == "读取语言中…" { detailStates[key] = "已取消；点按展开语言重试" }
         for source in OnlineSubtitleSource.allCases where sourceStates[source] == "搜索中…" { sourceStates[source] = "已取消" }
         busy = false
         if status == "下载选中字幕…" || status == "搜索中…" { status = "已取消未完成请求；已加载字幕保留" }
@@ -65,7 +72,7 @@ import SwiftUI
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         do { _ = try OnlineSubtitlePolicy.searchURL(q) } catch { status = error.localizedDescription; return }
         let token = state.begin(); results = []; languages = [:]; detailStates = [:]
-        sourceStates = state.states; busy = true; status = "搜索中…"
+        sourceStates = state.states; busy = true; selectionStatus = nil; rowStates = [:]; status = "搜索中…"
         // Bounded cache: source + visible query; expired entries cannot cross providers.
         cache = cache.filter { Date().timeIntervalSince($0.value.date) < 120 }
         if cache.count > 40 { cache = [:] }
@@ -82,46 +89,60 @@ import SwiftUI
         guard state.receive(outcome.source, token: token, result: outcome.result) else { return }
         if case .success(let rows) = outcome.result { cache[outcome.source.rawValue + ":" + q] = .init(date: Date(), rows: rows) }
         results = state.results; sourceStates = state.states; busy = !state.pending.isEmpty || downloading
-        status = busy ? "部分结果已到达，另一来源搜索中…" : "搜索完成；请手选字幕。名称匹配不代表时间轴匹配"
+        if let selectionStatus { status = selectionStatus }
+        else { status = !state.pending.isEmpty ? "部分结果已到达，另一来源搜索中…" : "搜索完成；请手选字幕。名称匹配不代表时间轴匹配" }
     }
     func choose(_ row: OnlineSubtitleCandidate) {
         // A metadata row may ONLY fetch languages. Downloads require explicit variant selection.
         guard results.contains(where: { $0.id == row.id }) || languages.values.contains(where: { $0.contains(row) }) else { return }
-        cancelChoice(); let token = selectionGeneration; let epoch = state.generation
+        let epoch = state.generation
         let fetch = self.fetch; let hint = encodingHint
         if row.ext == "html" {
-            if languages[row.id] != nil { return }
+            // Expansion is independent of selection: cached/repeated parent taps never cancel a download.
+            if languages[row.id] != nil || details[row.id] != nil { return }
             detailStates[row.id] = "读取语言中…"
-            choice = Task { [weak self] in
+            details[row.id] = Task { [weak self] in
                 do {
                     let data = try await fetch(row.url, .catDetail)
                     let variants = try SubtitleCatProvider.languages(data, row: row)
-                    guard let self, self.selectionGeneration == token, self.state.generation == epoch, !Task.isCancelled else { return }
+                    guard let self, self.state.generation == epoch, !Task.isCancelled else { return }
                     self.languages[row.id] = variants
                     self.detailStates[row.id] = variants.isEmpty ? "尚无现成字幕，请到原站处理；不会自动翻译" : "请选择语言（仅现成下载）"
+                    self.details[row.id] = nil
                 } catch {
-                    guard let self, self.selectionGeneration == token, self.state.generation == epoch, !Task.isCancelled else { return }
-                    self.detailStates[row.id] = "读取失败：\(error.localizedDescription)"
+                    guard let self, self.state.generation == epoch, !Task.isCancelled else { return }
+                    self.detailStates[row.id] = "读取失败：\(error.localizedDescription)；点按展开语言重试"
+                    self.details[row.id] = nil
                 }
             }
             return
         }
-        downloading = true; busy = true; status = "下载选中字幕…"
+        guard pendingID != row.id else { return }
+        cancelChoice(); let token = selectionGeneration
+        pendingID = row.id; rowStates[row.id] = "下载中…（旧字幕保留）"
+        downloading = true; busy = true; status = "下载选中字幕…"; selectionStatus = status
         choice = Task { [weak self] in
             do {
                 let data = try await fetch(row.url, .download)
-                let cues = try await Task.detached(priority: .userInitiated) { try OnlineSubtitleParser.parse(data, ext: row.ext, encodingHint: hint) }.value
                 guard let self, self.selectionGeneration == token, self.state.generation == epoch, !Task.isCancelled else { return }
+                self.rowStates[row.id] = "解析中…（旧字幕保留）"
+                self.status = "解析选中字幕…"; self.selectionStatus = self.status
+                let cues = try await Task.detached(priority: .userInitiated) { try OnlineSubtitleParser.parse(data, ext: row.ext, encodingHint: hint) }.value
+                guard self.selectionGeneration == token, self.state.generation == epoch, !Task.isCancelled else { return }
+                self.pendingID = nil; self.choice = nil
+                self.rowStates[row.id] = nil
                 self.downloading = false; self.busy = !self.state.pending.isEmpty
                 self.cues = cues; self.selected = row; self.offset = 0
-                self.status = "已加载（来源：\(row.source.title) · \(row.language)）"
+                self.status = "已加载（来源：\(row.source.title) · \(row.language)）"; self.selectionStatus = self.status
                 #if os(iOS) && !SUBTITLE_CORE_TEST
                 GlassHaptic.tap()
                 #endif
             } catch {
                 guard let self, self.selectionGeneration == token, self.state.generation == epoch, !Task.isCancelled else { return }
                 self.downloading = false; self.busy = !self.state.pending.isEmpty
-                self.status = "加载失败：\(error.localizedDescription)；已加载字幕保留"
+                self.pendingID = nil; self.choice = nil
+                self.rowStates[row.id] = "加载失败：\(error.localizedDescription)；点按重试（旧字幕保留）"
+                self.status = self.rowStates[row.id]!; self.selectionStatus = self.status
             }
         }
     }
