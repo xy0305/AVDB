@@ -123,6 +123,67 @@ enum OnlineAdditional {
         guard !result.contains(where: { $0.isWhitespace || $0.asciiValue.map({ $0 < 32 || $0 == 127 }) == true }) else { throw OnlineFailure.unsafe }
         return result
     }
+    // Direct public playlist only. Packed word-table reconstruction, UUID guessing
+    // and alternate-host polling are not independently validated and stay unsupported.
+    static func missavMedia(_ text: String) throws -> URL {
+        var found = Set<URL>()
+        func consider(_ raw: String) throws {
+            let value = raw.replacingOccurrences(of: "\\/", with: "/")
+            guard value.lowercased().contains("surrit."), let url = URL(string: value.hasPrefix("//") ? "https:" + value : value),
+                  OnlinePolicy.discoveredMedia(url, source: .missav),
+                  url.host?.lowercased().hasPrefix("surrit.") == true else { throw OnlineFailure.unsafe }
+            let parts = url.path.split(separator: "/")
+            guard parts.count >= 2, parts[0].range(of: #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#, options: .regularExpression) != nil,
+                  parts.last?.lowercased().hasSuffix(".m3u8") == true else { throw OnlineFailure.unsafe }
+            found.insert(url)
+        }
+        for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
+            for match in JRHTML.matches(#"https?:\\?/\\?/(?:surrit\.[^\"'\\/\s]+)/(?:[0-9a-fA-F-]{36})(?:\\?/[^\"'\\<\s]*)?\.m3u8"#, block[1]) {
+                try consider(match[0])
+            }
+            for match in JRHTML.matches(#"\b(?:var|let|const)\s+(?:source|hlsUrl)\s*=\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')\s*(?:;|$)"#, block[1]) {
+                try consider(try jsURLLiteral(match[1]))
+            }
+        }
+        guard found.count == 1, let media = found.first else { throw OnlineFailure.unsupported }
+        return media
+    }
+    static func missavLines(_ data: Data, base: URL, number: String, versions: Bool) throws -> [OnlineLine] {
+        let text = try html(data)
+        if text.lowercased().contains("just a moment") || text.contains("cf-chl-") { throw OnlineFailure.blocked }
+        let dom = try JRHTML.tree(text)
+        var seen = Set<URL>()
+        return dom.all { $0.tag == "a" }.compactMap { node in
+            guard let raw = node.attrs["href"],
+                  let url = URL(string: OnlineAdditional.rewriteMissav(raw), relativeTo: base)?.absoluteURL,
+                  OnlinePolicy.metadata(url, source: .missav), !url.path.contains("/search/"),
+                  let slug = url.path.split(separator: "/").last,
+                  let version = OnlineIdentity.version(String(slug), number: number, allowVersions: versions),
+                  seen.insert(url).inserted else { return nil }
+            return OnlineLine(source: .missav, recordID: String(slug), code: String(slug).uppercased(),
+                              version: version, lineKey: "primary", detailURL: url)
+        }.prefix(5).map { $0 }
+    }
+    static func rewriteMissav(_ raw: String) -> String {
+        raw.replacingOccurrences(of: #"^https?://missav\.[a-z0-9.-]+"#, with: "https://missav.fans", options: .regularExpression)
+    }
+    // Only a literal HTTPS playlist already present in the identity-checked public
+    // detail. Short-lived geo authorization is not a media URL and is not rewritten.
+    static func av01Media(_ detail: [String:Any]) throws -> URL {
+        let candidates = [detail["master"], detail["playlist"], detail["m3u8"], detail["hls_url"]]
+        let layout = detail["hls_layout"]
+        var values: [Any?] = candidates
+        if let layout = layout as? [String:Any] { values += [layout["master"], layout["playlist"], layout["url"], layout["m3u8"]] }
+        else if let layout = layout as? String { values.append(layout) }
+        var found = Set<URL>()
+        for value in values {
+            guard let raw = value as? String, !raw.isEmpty, let url = URL(string: raw),
+                  OnlinePolicy.discoveredMedia(url, source: .av01) else { continue }
+            found.insert(url)
+        }
+        guard found.count == 1, let url = found.first else { throw OnlineFailure.incomplete }
+        return url
+    }
     static func jableMedia(_ text: String) throws -> URL {
         var found = Set<URL>()
         for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
@@ -138,13 +199,7 @@ enum OnlineAdditional {
     }
     static func staticMedia(_ text: String, source: OnlineSource) throws -> URL {
         if source == .jable { return try jableMedia(text) }
-        let patterns = [#"(?:source|hlsUrl)\s*=\s*['"](https://[^'"\s<>]+\.m3u8(?:\?[^'"\s<>]*)?)['"]"#, #"https://surrit\.com/[A-Za-z0-9/_-]+/playlist\.m3u8"#]
-        for pattern in patterns {
-            if let m = JRHTML.matches(pattern, text).first, let url = URL(string: m.count > 1 ? m[1] : m[0]) {
-                guard OnlinePolicy.media(url, source: source) else { throw OnlineFailure.unsupported }; return url
-            }
-        }
-        // Packed word-table reconstruction is not verified; no guessed URL or JS execution.
+        if source == .missav { return try missavMedia(text) }
         throw OnlineFailure.unsupported
     }
 }
@@ -157,6 +212,11 @@ extension OnlineProvider {
             let data = try await transport.fetch(search, cap: 2*1024*1024, headers: ["Accept": "text/html,application/xhtml+xml"])
             return try OnlineAdditional.jableLines(data, base: search, number: code, versions: versions)
         }
+        if source == .missav {
+            let search = URL(string: "https://missav.fans/cn/search/" + code)!
+            let data = try await transport.fetch(search, cap: 2*1024*1024, headers: OnlinePolicy.headers(referrer: URL(string: "https://missav.fans/")!))
+            return try OnlineAdditional.missavLines(data, base: search, number: code, versions: versions)
+        }
         if source == .av01 {
             let url = URL(string: "https://www.av01.media/api/v1/videos/search?lang=en&include_facets=true")!
             let body = try JSONSerialization.data(withJSONObject: ["query":code,"pagination":["page":1,"limit":5]])
@@ -164,11 +224,7 @@ extension OnlineProvider {
         }
         let detail: URL
         if source == .memojav { detail = try OnlineAdditional.page(source, code) }
-        else {
-            let search = URL(string:"https://missav.fans/cn/search/" + code)!
-            let links = try OnlineAdditional.searchLinks(try await transport.fetch(search, cap: 2*1024*1024), base: search, source: source, number: code)
-            guard let first = links.first else { return [] }; detail = first
-        }
+        else { throw OnlineFailure.parse }
         let text = try OnlineAdditional.exactDetail(try await transport.fetch(detail, cap: 2*1024*1024), page: detail, code: code, source: source)
         if source == .memojav { _ = try OnlineAdditional.memoID(text, number: code) }
         return [OnlineLine(source:source, recordID:code, code:code, version:"原始版本", lineKey:"primary")]
@@ -189,15 +245,21 @@ extension OnlineProvider {
             let url = URL(string:"https://www.av01.media/api/v1/videos/" + line.recordID)!
             let data = try await transport.fetch(url, cap: 1024*1024)
             guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String:Any], OnlineProvider.identifier(obj) == line.recordID,
-                  let dvd = obj["dvd_id"] as? String, OnlineIdentity.key(dvd) == OnlineIdentity.key(number), obj["storage_base"] is String else { throw OnlineFailure.noMatch }
-            let geo = try await transport.fetch(URL(string:"https://files.iw01.xyz/edge/geo.js?json")!, cap: 64*1024)
-            guard let issued = try? JSONSerialization.jsonObject(with: geo) as? [String:Any] else { throw OnlineFailure.parse }
-            // Observed comp=true, but its policy semantics are unconfirmed. Do not
-            // fabricate a 403, override policy, or invent authorization. Stop explicitly unsupported.
-            if issued["comp"] as? Bool == true { throw OnlineFailure.incomplete }
-            // Public site requires dynamic master rewriting with CDN-issued authorization.
-            // Native scoped adaptation is NOT yet verified; fail closed, never pass embed/API as media.
-            throw OnlineFailure.incomplete
+                  let dvd = obj["dvd_id"] as? String, OnlineIdentity.key(dvd) == OnlineIdentity.key(number),
+                  obj["storage_base"] is String else { throw OnlineFailure.noMatch }
+            // A literal master in the identity-checked public detail can be validated.
+            // Short-lived geo authorization is not guessed, cached or sent cross-source.
+            let media = try OnlineAdditional.av01Media(obj)
+            let referrer = URL(string: "https://www.av01.media/videos/" + line.recordID)!
+            return try await validatedPlan(media: media, referrer: referrer, line: line, number: number, pageIssued: true)
+        }
+        if line.source == .missav {
+            guard let detail = line.detailURL, OnlinePolicy.metadata(detail, source: .missav),
+                  detail.path.split(separator: "/").last.map(String.init)?.uppercased() == line.code.uppercased() else { throw OnlineFailure.noMatch }
+            let text = try OnlineAdditional.exactDetail(try await transport.fetch(detail, cap: 2*1024*1024,
+                headers: OnlinePolicy.headers(referrer: URL(string: "https://missav.fans/")!)), page: detail, code: number, source: .missav)
+            let media = try OnlineAdditional.missavMedia(text)
+            return try await validatedPlan(media: media, referrer: detail, line: line, number: number, pageIssued: true)
         }
         let detail = try OnlineAdditional.page(line.source, number)
         let text = try OnlineAdditional.exactDetail(try await transport.fetch(detail, cap: 2*1024*1024), page: detail, code: number, source: line.source)

@@ -142,12 +142,17 @@ enum OnlinePolicy {
         secure(child) && child.host?.lowercased() == root.host?.lowercased()
     }
     static func discoveredMedia(_ url: URL, source: OnlineSource) -> Bool {
-        source == .jable && secure(url) && OnlineMediaScope.publicHost(url.host ?? "")
-            && url.path.lowercased().hasSuffix(".m3u8")
+        // Exact HTTPS playlist issued by an identity-validated public page.
+        // Not a suffix wildcard and not a substitute for manifest validation.
+        [.jable, .missav, .javmenu, .thirdPartyAVDB, .av01].contains(source)
+            && secure(url) && OnlineMediaScope.publicHost(url.host ?? "")
+            && url.path.lowercased().hasSuffix(".m3u8") && !url.path.contains("..")
     }
     static func headers(referrer: URL) -> [String:String] {
         var value = ["User-Agent": ua, "Referer": referrer.absoluteString]
-        if referrer.host == "jable.tv" { value["Origin"] = "https://jable.tv" }
+        if let host = referrer.host?.lowercased(), host == "jable.tv" || host == "missav.fans" {
+            value["Origin"] = "https://" + host
+        }
         return value // No account cookies or Authorization; never rotate headers after a 403.
     }
 }
@@ -346,7 +351,7 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         }
         request.setValue(OnlinePolicy.ua, forHTTPHeaderField: "User-Agent")
         for (key,value) in headers where ["User-Agent","Referer","Origin","Accept"].contains(key) {
-            if key == "Origin" && value != "https://jable.tv" { throw OnlineFailure.unsafe }
+            if key == "Origin" && !["https://jable.tv", "https://missav.fans"].contains(value) { throw OnlineFailure.unsafe }
             request.setValue(value, forHTTPHeaderField: key)
         }
         if let loader {
@@ -414,11 +419,35 @@ struct OnlineProvider: Sendable {
         }
     }
     static func config(_ data: Data) throws -> URL {
-        guard let html = String(data: data, encoding: .utf8),
-              let match = JRHTML.matches(#"window\.PLAYER_CONFIG\s*=\s*(\{.*?\})\s*;"#, html).first,
-              let json = match[1].data(using: .utf8), let object = try? JSONSerialization.jsonObject(with: json) as? [String:Any],
-              let raw = object["m3u8"] as? String, let url = URL(string: raw), OnlinePolicy.media(url, source: .thirdPartyAVDB) else { throw OnlineFailure.parse }
-        return url // literal JSON only; no JS evaluation, decoders or tokens
+        guard let html = String(data: data, encoding: .utf8) else { throw OnlineFailure.parse }
+        if html.lowercased().contains("just a moment") || html.contains("cf-chl-") { throw OnlineFailure.blocked }
+        // Current public embed uses a literal JSON assignment. Older pages used the
+        // same m3u8 field under PLAYER_CONFIG. No JS evaluation, decoder or token.
+        let patterns = [
+            #"window\.PLAYER_CONFIG\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\})\s*;"#,
+            #"\b(?:var|let|const)\s+(?:player_config|config)\s*=\s*(\{(?:[^{}]|\{[^{}]*\})*\})\s*;"#
+        ]
+        var found = Set<URL>()
+        for pattern in patterns {
+            for match in JRHTML.matches(pattern, html) {
+                guard let json = match[1].data(using: .utf8),
+                      let object = try? JSONSerialization.jsonObject(with: json) as? [String:Any],
+                      let raw = (object["m3u8"] as? String) ?? (object["url"] as? String),
+                      let url = URL(string: raw),
+                      OnlinePolicy.media(url, source: .thirdPartyAVDB) || OnlinePolicy.discoveredMedia(url, source: .thirdPartyAVDB) else { throw OnlineFailure.parse }
+                found.insert(url)
+            }
+        }
+        if found.isEmpty {
+            for match in JRHTML.matches(#"(?:file|source|url)\s*:\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')"#, html) {
+                let raw = try OnlineAdditional.jsURLLiteral(match[1])
+                guard let url = URL(string: raw), url.path.lowercased().hasSuffix(".m3u8"),
+                      OnlinePolicy.media(url, source: .thirdPartyAVDB) || OnlinePolicy.discoveredMedia(url, source: .thirdPartyAVDB) else { continue }
+                found.insert(url)
+            }
+        }
+        guard found.count == 1, let url = found.first else { throw OnlineFailure.parse }
+        return url
     }
     func discover(_ source: OnlineSource, number: String, versions: Bool) async throws -> [OnlineLine] {
         guard let exact = OnlineIdentity.key(number) else { throw OnlineFailure.noMatch }
@@ -443,6 +472,7 @@ struct OnlineProvider: Sendable {
             let fresh = try Self.javmenu(try await transport.fetch(referrer, cap: 2*1024*1024), number: number)
             guard !line.routeDigest.isEmpty, let bound = fresh.first(where: { Self.routeDigest($0) == line.routeDigest }) else { throw OnlineFailure.noMatch }
             media = bound // Changed/expired candidate requires an explicit new query, never another line.
+            return try await validatedPlan(media:media, referrer:referrer, line:line, number:number, pageIssued: !OnlinePolicy.media(media, source: .javmenu))
         } else {
             let records = try Self.records(try await transport.fetch(Self.api(id: line.recordID), cap: 1024*1024))
             guard let record = records.first(where: { Self.identifier($0) == line.recordID }), let code = record["movie_code"] as? String, code == line.code,
@@ -450,8 +480,8 @@ struct OnlineProvider: Sendable {
                   let embed = Self.episodes(record).first(where: { $0.0 == line.lineKey })?.1 else { throw OnlineFailure.noMatch }
             referrer = embed
             media = try Self.config(try await transport.fetch(embed, cap: 2*1024*1024, headers: OnlinePolicy.headers(referrer: URL(string: "https://avdbapi.com/")!)))
+            return try await validatedPlan(media:media, referrer:referrer, line:line, number:number, pageIssued: !OnlinePolicy.media(media, source: .thirdPartyAVDB))
         }
-        return try await validatedPlan(media:media, referrer:referrer, line:line, number:number)
     }
     func validatedPlan(media: URL, referrer: URL, line: OnlineLine, number: String, pageIssued: Bool = false) async throws -> OnlinePlaybackPlan {
         guard OnlinePolicy.media(media, source: line.source) || (pageIssued && OnlinePolicy.discoveredMedia(media, source: line.source)) else { throw OnlineFailure.unsafe }
@@ -514,6 +544,19 @@ enum OnlineNeutralFixture {
             // Deliberately malformed OWN neutral fixture, never a third-party key.
             return Data(repeating: 0, count: 15)
         }
+        if url.host == "missav.fans" {
+            if url.path.hasPrefix("/cn/search/") { return Data("<a href='https://missav.ws/cn/demo-123'>DEMO-123 Neutral</a>".utf8) }
+            return Data("<link rel='canonical' href='https://missav.fans/cn/demo-123'><h1>DEMO-123 Neutral</h1><script>var source = 'https:\\/\\/surrit.example.net/11111111-2222-3333-4444-555555555555/playlist.m3u8';</script>".utf8)
+        }
+        if url.host == "surrit.example.net" {
+            if url.path.hasSuffix("720/index.m3u8") { return Data("#EXTM3U\n#EXTINF:4,\nneutral.ts\n#EXT-X-ENDLIST\n".utf8) }
+            return Data("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\n720/index.m3u8\n".utf8)
+        }
+        if url.host == "www.av01.media" {
+            if url.path.hasSuffix("/search") { return Data("{\"videos\":[{\"id\":7,\"dvd_id\":\"DEMO-123\",\"hls_layout\":{\"master\":\"https://media.example.net/neutral/master.m3u8\"}}]}".utf8) }
+            return Data("{\"id\":7,\"dvd_id\":\"DEMO-123\",\"storage_base\":\"/neutral/demo\",\"hls_layout\":{\"master\":\"https://media.example.net/neutral/master.m3u8\"}}".utf8)
+        }
+        if url.host == "media.example.net" { return Data("#EXTM3U\n#EXTINF:4,\nneutral.ts\n#EXT-X-ENDLIST\n".utf8) }
         if url.host == "javmenu.com" {
             return Data("<link rel='canonical' href='https://javmenu.com/zh/DEMO-123'><h1>DEMO-123 Neutral</h1><a data-m3u8='\(media)'>1</a>".utf8)
         }

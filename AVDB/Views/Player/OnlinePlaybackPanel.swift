@@ -137,7 +137,7 @@ struct OnlinePlaybackPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label("在线播放 · 试验接入", systemImage: "play.rectangle").font(.headline)
-            Text("真实媒体首帧尚未验证；TLS / 失效 / 受保护线路将明确报错，不能保证可播。").font(.caption).foregroundStyle(.secondary)
+            Text("清单验证通过才会交给播放器；来源拒绝、TLS 失败或协议未完成会停在该来源，不能保证六源都可播。").font(.caption).foregroundStyle(.secondary)
             Text("仅查询公开番号：\(number)").font(.subheadline).accessibilityIdentifier("online.public-number")
             Text("点击来源才会向对应第三方发送此番号；选择线路后重新解析并检查清单，不自动播放或替代 115。第三方可用性与内容授权不作保证；请仅使用你有权观看的内容。").font(.caption).foregroundStyle(.secondary)
             Toggle("包含明确标注的其他版本", isOn: $versions).font(.subheadline)

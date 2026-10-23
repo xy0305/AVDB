@@ -11,14 +11,14 @@ assert 'completionHandler(nil)' in core and 'serverTrust' not in core
 assert 'session.bytes(for: request)' in core and 'data.count < cap' in core
 assert '< 120' in panel and 'selectionEpoch == epoch' in panel and 'epochs[source] == epoch' in panel
 assert 'Task.sleep(nanoseconds: 25_000_000_000)' in panel and 'count >= 2' in panel
-assert 'query.queryItems' in extra and 'memoProof' in extra and 'issued["comp"] as? Bool == true' in extra
+assert 'memoProof' in extra and 'missavMedia' in extra and 'av01Media' in extra and 'pageIssued' in core
 assert 'JavDBSDK' not in core+extra+panel and 'APIClient.shared.token' not in core+extra+panel
 assert 'evaluateJavaScript' not in core+extra+panel
 assert 'resolutions[line.source]' in panel and 'queryMessages[source]' in panel
 assert 'resolutionMessage' not in panel and 'online.resolve-state' not in panel
 assert '.accessibilityIdentifier("online.panel")' not in panel, 'Container ID must not propagate over child StaticText identifiers'
 assert '找到候选，待解析' in panel and '尚未确认首帧' in panel
-assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='229'
+assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='230'
 print('PASS six-source production UI wiring/static privacy/size/timeout/cache/cancellation policies (not runtime claim)')
 if platform.system()=='Darwin':
  with tempfile.TemporaryDirectory() as d:

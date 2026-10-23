@@ -199,6 +199,29 @@ actor OnlineRequests {
         let memoRequests = await memoLog.all()
         check(memoRequests.contains { $0.url!.path == "/hls/get_video_info.php" && $0.url!.query?.contains("sig=") == true && $0.url!.query?.contains("sts=") == true },"MemoJav normal public timestamp proof retained")
         check(memoPlan.headers["Origin"] == nil,"Jable Origin never leaks into MemoJav")
+        let missavHTML = Data("<a href='https://missav.ai/cn/snos-329'>SNOS-329 Neutral</a><a href='/cn/snos-329-chinese-subtitle/'>subtitle</a><a href='/cn/snos-3290'>SNOS-3290</a>".utf8)
+        let missavRows = try OnlineAdditional.missavLines(missavHTML, base: URL(string:"https://missav.fans/cn/search/SNOS-329")!, number:"SNOS-329", versions:false)
+        check(missavRows.count == 1 && missavRows[0].detailURL?.absoluteString == "https://missav.fans/cn/snos-329","current host rewrite keeps exact slug")
+        let missavDetail = "<link rel='canonical' href='https://missav.fans/cn/snos-329'><h1>SNOS-329 Neutral</h1><script>source = \"https:\\/\\/surrit.public.example/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/playlist.m3u8\";</script>"
+        check(try OnlineAdditional.missavMedia(missavDetail).host == "surrit.public.example","direct surrit literal only")
+        fails(.unsupported) { _ = try OnlineAdditional.missavMedia("<script>eval(function(p,a,c,k,e,d){return p})</script>") }
+        fails(.unsafe) { _ = try OnlineAdditional.missavMedia("<script>var source='https://surrit.public.example/not-a-uuid/playlist.m3u8';</script>") }
+        let avDetail: [String:Any] = ["id":7,"dvd_id":"SNOS-329","storage_base":"/neutral","hls_layout":["master":"https://media.public.example/neutral/master.m3u8"]]
+        check(try OnlineAdditional.av01Media(avDetail).host == "media.public.example","literal AV01 master accepted")
+        fails(.incomplete) { _ = try OnlineAdditional.av01Media(["hls_layout":["token":"not-a-url"]]) }
+        let issuedAV = Data("<script>window.PLAYER_CONFIG = {\"m3u8\":\"https://issued.public.example/neutral/index.m3u8?opaque=a%2Fb\"};</script>".utf8)
+        check(try OnlineProvider.config(issuedAV).host == "issued.public.example","current embed literal is not limited to stale CDN")
+        fails(.parse) { _ = try OnlineProvider.config(Data("<script>window.PLAYER_CONFIG = {\"m3u8\":\"https://issued.public.example/a.m3u8\",\"url\":\"https://other.example/b.m3u8\"};</script>".utf8)) }
+        let six = OnlineProvider(transport: OnlineTransport(loader: { try OnlineNeutralFixture.response($0.url!) }))
+        for source in [OnlineSource.missav, .av01] {
+            let rows = try await six.discover(source, number:"DEMO-123", versions:false)
+            let plan = try await six.resolve(rows[0], number:"DEMO-123", versions:false)
+            check(plan.source == source && plan.headers["Cookie"] == nil && plan.headers["Authorization"] == nil, "neutral \(source.rawValue) reaches player handoff")
+        }
+        check(try await six.resolve(try await six.discover(.missav, number:"DEMO-123", versions:false)[0], number:"DEMO-123", versions:false).headers["Origin"] == "https://missav.fans","scoped MissAV origin")
+        check(!OnlinePolicy.discoveredMedia(URL(string:"https://user:pass@issued.public.example/a.m3u8")!, source:.thirdPartyAVDB),"issued URL cannot carry userinfo")
+        check(!OnlinePolicy.discoveredMedia(URL(string:"http://issued.public.example/a.m3u8")!, source:.javmenu),"issued media must stay HTTPS")
+        check(!OnlinePolicy.discoveredMedia(URL(string:"https://10.1.2.3/a.m3u8")!, source:.av01),"issued media cannot be a bare IP")
         for expected in [OnlineFailure.keyUnavailable, OnlineFailure.blocked] {
             let keyProvider = OnlineProvider(transport:OnlineTransport(loader:{ request in
                 if request.url!.path == "/hls/neutral/index.m3u8" { return Data("#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key\"\n#EXTINF:4,\na.ts".utf8) }
