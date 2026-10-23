@@ -1254,3 +1254,60 @@ extension PosterNavigationTests {
         app.buttons["subtitle.disable"].tap()
     }
 }
+
+// Same fixture, same gestures, native deceleration/CPU/memory metrics for 233 versus 234.
+extension PosterNavigationTests {
+    func testSubtitle234NativeScrollMetrics() { subtitle234Scroll(baseline: false) }
+    func testSubtitle234Baseline233ScrollMetrics() { subtitle234Scroll(baseline: true) }
+    private func subtitle234Scroll(baseline: Bool) {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--online-subtitle-fixture", "--subtitle-scroll234"]
+        if baseline { app.launchArguments.append("--subtitle-scroll234-baseline") }
+        app.launch(); defer { app.terminate() }
+        let consent = app.buttons["我已满 18 岁，继续"]
+        if consent.waitForExistence(timeout: 2) { consent.tap() }
+        let entry = app.buttons["player.subtitle.settings"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 10)); entry.tap()
+        app.buttons["subtitle.search"].tap()
+        let form = app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.tables.firstMatch
+        let parent = app.buttons.matching(identifier: "subtitle.candidate").matching(NSPredicate(format: "label CONTAINS %@", "中性滚动结果 000")).firstMatch
+        func drag(up: Bool) {
+            let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: up ? 0.78 : 0.25))
+            let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: up ? 0.25 : 0.78))
+            from.press(forDuration: 0.05, thenDragTo: to)
+        }
+        for _ in 0..<8 {
+            if parent.exists && parent.isHittable && form.frame.insetBy(dx: 0, dy: 50).contains(parent.frame) { break }
+            drag(up: true)
+        }
+        XCTAssertTrue(parent.exists && parent.isHittable)
+        XCTAssertGreaterThanOrEqual(parent.frame.height, 44)
+        parent.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in parent.label.contains("请选择语言") }, object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 10), .completed)
+        let options = XCTMeasureOptions(); options.iterationCount = 3
+        measure(metrics: [XCTClockMetric(), XCTCPUMetric(application: app), XCTMemoryMetric(application: app), XCTOSSignpostMetric.scrollDecelerationMetric], options: options) {
+            for _ in 0..<4 { drag(up: true) }
+            for _ in 0..<4 { drag(up: false) }
+        }
+        XCTAssertEqual(app.buttons["subtitle.panel.done"].value as? String, "尚未加载", "Vertical drags must never download/select")
+        // Find a visible expanded language, then tap blank right space after deceleration.
+        let languages = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "subtitle.language."))
+        var visible: XCUIElement?
+        for _ in 0..<15 {
+            visible = languages.allElementsBoundByIndex.first { $0.isHittable && form.frame.insetBy(dx: 0, dy: 50).contains($0.frame) }
+            if visible != nil { break }
+            drag(up: true)
+        }
+        guard let language = visible else { XCTFail("Expanded language never reached after native scrolling"); return }
+        XCTAssertGreaterThanOrEqual(language.frame.height, 44)
+        language.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (app.buttons["subtitle.panel.done"].value as? String) == "已加载"
+        }, object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed, "Tap after scrolling must select")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = baseline ? "233-baseline-scrolled-language" : "234-scrolled-language"; shot.lifetime = .keepAlways; add(shot)
+    }
+}

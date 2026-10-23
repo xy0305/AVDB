@@ -308,6 +308,30 @@ actor Subtitle233Transport {
     }
 }
 extension OnlineSubtitleModelTests {
+    @MainActor func test234FlattenedRowsPreserveIdentityAcrossFeedbackAndExpansion() {
+        let model = OnlineSubtitleModel(fetch: { _, _ in Data() })
+        let parents = (0..<180).map { index in
+            OnlineSubtitleCandidate(id: "parent-\(index)", name: "Neutral \(index)", language: "待选语言", ext: "html", url: URL(string: "https://www.subtitlecat.com/subs/234/neutral-\(index).html")!, source: .subtitleCat)
+        }
+        model.results = parents
+        XCTAssertEqual(model.displayRows.count, 360)
+        let firstID = model.displayRows[0].id
+        let variants = (0..<48).map { index in
+            OnlineSubtitleCandidate(id: "language-\(index)", name: "Neutral", language: "qx-\(index + 10)", ext: "srt", url: URL(string: "https://www.subtitlecat.com/subs/234/neutral-\(index).srt")!, source: .subtitleCat, parentID: parents[0].id)
+        }
+        model.languages[parents[0].id] = variants
+        XCTAssertEqual(model.displayRows.count, 408)
+        XCTAssertEqual(model.displayRows[0].id, firstID)
+        XCTAssertEqual(model.displayRows[1].candidate.id, variants[0].id)
+        XCTAssertEqual(Set(model.displayRows.map(\.id)).count, 408)
+        let ids = model.displayRows.map(\.id)
+        model.rowStates[variants[0].id] = "下载中…（旧字幕保留）"
+        model.selected = variants[1]
+        model.offset = 0.5
+        XCTAssertEqual(model.displayRows.map(\.id), ids, "Non-structural state cannot invalidate row topology")
+        model.clear()
+        XCTAssertTrue(model.displayRows.isEmpty)
+    }
     @MainActor func test233PartialSearchDedupeLastChoiceAndLateBytes() async throws {
         let transport = Subtitle233Transport()
         let model = OnlineSubtitleModel(fetch: { url, kind in try await transport.fetch(url, kind) })
