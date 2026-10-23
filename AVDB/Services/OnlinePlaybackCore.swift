@@ -381,6 +381,14 @@ struct OnlineProvider: Sendable {
     let transport: OnlineTransport
     init(transport: OnlineTransport = OnlineTransport()) { self.transport = transport }
     static func routeDigest(_ url: URL) -> String { SHA256.hash(data: Data(url.absoluteString.utf8)).map { String(format:"%02x",$0) }.joined() }
+    static func issuedPlaylist(_ raw: String, relativeTo page: URL, source: OnlineSource) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 2048,
+              !trimmed.contains(where: { $0.isWhitespace || $0.asciiValue.map({ $0 < 32 || $0 == 127 }) == true }),
+              let parsed = URL(string: trimmed, relativeTo: page)?.absoluteURL.standardized,
+              OnlinePolicy.media(parsed, source: source) || OnlinePolicy.discoveredMedia(parsed, source: source) else { return nil }
+        return parsed
+    }
     static func api(number: String? = nil, id: String? = nil) -> URL {
         var c = URLComponents(string: "https://avdbapi.com/api.php/provide/vod")!
         c.queryItems = [URLQueryItem(name: "ac", value: "detail")]
