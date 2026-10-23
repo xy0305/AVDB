@@ -516,7 +516,7 @@ struct OnlineSubtitlePanel: View {
                         .accessibilityIdentifier("subtitle.disable")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("完成") { model.cancelPending(); dismiss() }
                         .accessibilityIdentifier("subtitle.panel.done")
                 }
             }
