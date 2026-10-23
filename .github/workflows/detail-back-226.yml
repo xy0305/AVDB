@@ -2,7 +2,7 @@ name: Build226 Stationary Detail Back
 on:
   push:
     branches: [fix/subtitle-position-201]
-    paths: ['AVDB/Views/Detail/**', 'UITests/PosterNavigationTests.swift', 'scripts/test-detail-back.py', '.github/workflows/detail-back-226.yml']
+    paths: ['AVDB/Views/Detail/**', 'AVDB/Views/Player/OnlineSubtitle*.swift', 'UITests/PosterNavigationTests.swift', 'UITests/DetailPosterQualityTests.swift', 'scripts/test-detail-back.py', '.github/workflows/detail-back-226.yml']
 permissions:
   contents: read
 concurrency:

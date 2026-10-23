@@ -62,6 +62,7 @@ import SwiftUI
     }
     func clear() {
         cancelPending(); cues = []; selected = nil; results = []; languages = [:]; detailStates = [:]
+        rowStates = [:]; selectionStatus = nil
         offset = 0; cache = [:]; query = ""; encodingHint = "auto"; sourceStates = [:]; status = "尚未搜索"
     }
     func disable() {
