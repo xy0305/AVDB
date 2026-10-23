@@ -546,17 +546,17 @@ enum OnlineNeutralFixture {
         }
         if url.host == "missav.fans" {
             if url.path.hasPrefix("/cn/search/") { return Data("<a href='https://missav.ws/cn/demo-123'>DEMO-123 Neutral</a>".utf8) }
-            return Data("<link rel='canonical' href='https://missav.fans/cn/demo-123'><h1>DEMO-123 Neutral</h1><script>var source = 'https:\\/\\/surrit.example.net/11111111-2222-3333-4444-555555555555/playlist.m3u8';</script>".utf8)
+            return Data("<link rel='canonical' href='https://missav.fans/cn/demo-123'><h1>DEMO-123 Neutral</h1><script>var source = 'https:\\/\\/surrit.neutral.test/11111111-2222-3333-4444-555555555555/playlist.m3u8';</script>".utf8)
         }
-        if url.host == "surrit.example.net" {
+        if url.host == "surrit.neutral.test" {
             if url.path.hasSuffix("720/index.m3u8") { return Data("#EXTM3U\n#EXTINF:4,\nneutral.ts\n#EXT-X-ENDLIST\n".utf8) }
             return Data("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\n720/index.m3u8\n".utf8)
         }
         if url.host == "www.av01.media" {
-            if url.path.hasSuffix("/search") { return Data("{\"videos\":[{\"id\":7,\"dvd_id\":\"DEMO-123\",\"hls_layout\":{\"master\":\"https://media.example.net/neutral/master.m3u8\"}}]}".utf8) }
-            return Data("{\"id\":7,\"dvd_id\":\"DEMO-123\",\"storage_base\":\"/neutral/demo\",\"hls_layout\":{\"master\":\"https://media.example.net/neutral/master.m3u8\"}}".utf8)
+            if url.path.hasSuffix("/search") { return Data("{\"videos\":[{\"id\":7,\"dvd_id\":\"DEMO-123\",\"hls_layout\":{\"master\":\"https://media.neutral.test/neutral/master.m3u8\"}}]}".utf8) }
+            return Data("{\"id\":7,\"dvd_id\":\"DEMO-123\",\"storage_base\":\"/neutral/demo\",\"hls_layout\":{\"master\":\"https://media.neutral.test/neutral/master.m3u8\"}}".utf8)
         }
-        if url.host == "media.example.net" { return Data("#EXTM3U\n#EXTINF:4,\nneutral.ts\n#EXT-X-ENDLIST\n".utf8) }
+        if url.host == "media.neutral.test" { return Data("#EXTM3U\n#EXTINF:4,\nneutral.ts\n#EXT-X-ENDLIST\n".utf8) }
         if url.host == "javmenu.com" {
             return Data("<link rel='canonical' href='https://javmenu.com/zh/DEMO-123'><h1>DEMO-123 Neutral</h1><a data-m3u8='\(media)'>1</a>".utf8)
         }
