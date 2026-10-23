@@ -121,6 +121,8 @@ public final class JavDBSDK {
         movieType: SearchMovieType = .all,
         limit: Int = 20
     ) async throws -> [Movie] {
+        // Bind results/cache writes to the account that issued this request.
+        let requestAccount = client.token
         var query: [String: String] = [
             "q": keyword,
             "page": "\(page)",
@@ -135,6 +137,8 @@ public final class JavDBSDK {
             query["movie_type"] = movieType.rawValue
         }
         let resp: JavDBResponse<MovieListData> = try await client.get("/api/v2/search", query: query)
+        try Task.checkCancellation()
+        guard requestAccount == client.token else { throw CancellationError() }
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }

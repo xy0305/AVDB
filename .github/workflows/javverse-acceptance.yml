@@ -1,0 +1,64 @@
+name: JavVerseAcceptance
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/**', 'AVDB.xcodeproj/**', 'UITests/JavVerse*.swift', 'scripts/register-javverse.rb', '.github/workflows/javverse-acceptance.yml']
+permissions:
+  contents: read
+concurrency:
+  group: javverse-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: macos-26
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iPhone, iPad]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare hosted tests and pinned MediaPipe
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          python3 scripts/test-javverse.py
+          ruby scripts/register-javverse.rb --tests --ui-tests
+          pod install --repo-update
+          xcodebuild -version
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          python3 - <<'PY'
+          import json,os
+          ds=json.load(open(os.environ['RUNNER_TEMP']+'/devices.json'))['devices']
+          d=next(d for group in ds.values() for d in group if '${{ matrix.device }}' in d['name'])
+          with open(os.environ['GITHUB_ENV'],'a') as f:f.write('DEVICE_ID='+d['udid']+'\n')
+          print(d['name'],d['udid'])
+          PY
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Hosted identity and behavior XCTest
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme JavVerseAcceptance -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/JavVerseDerived" -resultBundlePath "$RUNNER_TEMP/Unit.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:JavVerseUnitTests 2>&1 | tee "$RUNNER_TEMP/unit.log"
+      - name: Neutral menu pagination static label and back UI
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme JavVerseAcceptance -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/JavVerseDerived" -resultBundlePath "$RUNNER_TEMP/UI.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:JavVerseUITests 2>&1 | tee "$RUNNER_TEMP/ui.log"
+      - name: Preserve native results including failures
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/javverse-evidence"
+          for kind in Unit UI; do
+            if test -d "$RUNNER_TEMP/$kind.xcresult"; then
+              xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/$kind.xcresult" --format json > "$RUNNER_TEMP/javverse-evidence/$kind-summary.json" || true
+              xcrun xcresulttool export attachments --path "$RUNNER_TEMP/$kind.xcresult" --output-path "$RUNNER_TEMP/javverse-evidence/$kind-attachments" || true
+              mv "$RUNNER_TEMP/$kind.xcresult" "$RUNNER_TEMP/javverse-evidence/"
+            fi
+          done
+          cp "$RUNNER_TEMP/unit.log" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/ui.log" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: javverse-native-${{ matrix.device }}-${{ github.run_number }}
+          path: ${{ runner.temp }}/javverse-evidence/
+          retention-days: 14

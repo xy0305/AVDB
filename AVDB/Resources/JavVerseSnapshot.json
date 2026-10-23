@@ -1,0 +1,3718 @@
+{
+  "schemaVersion": 1,
+  "mode": "staticSnapshot",
+  "origin": "https://javverse.com",
+  "preparedAt": "2026-10-23T17:35:32.728312+00:00",
+  "boards": [
+    {
+      "id": "featured",
+      "title": "首页今日演员精选",
+      "period": "2026-10-24（原站 day 字段）",
+      "capturedAt": "2026-10-23T17:29:03.828Z",
+      "sourceURL": "https://javverse.com/",
+      "coverage": "complete",
+      "entries": [
+        {
+          "rank": 1,
+          "kind": "actor",
+          "label": "青空ひかり",
+          "sourceURL": "https://javverse.com/actress/2138",
+          "code": null
+        },
+        {
+          "rank": 2,
+          "kind": "actor",
+          "label": "百瀬あすか",
+          "sourceURL": "https://javverse.com/actress/524",
+          "code": null
+        },
+        {
+          "rank": 3,
+          "kind": "actor",
+          "label": "神木麗",
+          "sourceURL": "https://javverse.com/actress/2064",
+          "code": null
+        },
+        {
+          "rank": 4,
+          "kind": "actor",
+          "label": "黒島玲衣",
+          "sourceURL": "https://javverse.com/actress/240",
+          "code": null
+        },
+        {
+          "rank": 5,
+          "kind": "actor",
+          "label": "沙月恵奈",
+          "sourceURL": "https://javverse.com/actress/20",
+          "code": null
+        },
+        {
+          "rank": 6,
+          "kind": "actor",
+          "label": "天馬ゆい",
+          "sourceURL": "https://javverse.com/actress/246",
+          "code": null
+        },
+        {
+          "rank": 7,
+          "kind": "actor",
+          "label": "川越にこ",
+          "sourceURL": "https://javverse.com/actress/426",
+          "code": null
+        },
+        {
+          "rank": 8,
+          "kind": "actor",
+          "label": "涼森れむ",
+          "sourceURL": "https://javverse.com/actress/11254",
+          "code": null
+        }
+      ]
+    },
+    {
+      "id": "recent",
+      "title": "首页最近发售",
+      "period": "2026-10-23（首页横栏12部，非全库）",
+      "capturedAt": "2026-10-23T17:29:03.828Z",
+      "sourceURL": "https://javverse.com/",
+      "coverage": "complete",
+      "entries": [
+        {
+          "rank": 1,
+          "kind": "movie",
+          "label": "STCVS-056",
+          "sourceURL": "https://javverse.com/work/395089",
+          "code": "STCVS-056"
+        },
+        {
+          "rank": 2,
+          "kind": "movie",
+          "label": "STCV-607",
+          "sourceURL": "https://javverse.com/work/395084",
+          "code": "STCV-607"
+        },
+        {
+          "rank": 3,
+          "kind": "movie",
+          "label": "VRNC-107",
+          "sourceURL": "https://javverse.com/work/395083",
+          "code": "VRNC-107"
+        },
+        {
+          "rank": 4,
+          "kind": "movie",
+          "label": "VRNC-109",
+          "sourceURL": "https://javverse.com/work/395082",
+          "code": "VRNC-109"
+        },
+        {
+          "rank": 5,
+          "kind": "movie",
+          "label": "ACHJ-094",
+          "sourceURL": "https://javverse.com/work/392217",
+          "code": "ACHJ-094"
+        },
+        {
+          "rank": 6,
+          "kind": "movie",
+          "label": "HMN-905",
+          "sourceURL": "https://javverse.com/work/392207",
+          "code": "HMN-905"
+        },
+        {
+          "rank": 7,
+          "kind": "movie",
+          "label": "HMN-922",
+          "sourceURL": "https://javverse.com/work/392204",
+          "code": "HMN-922"
+        },
+        {
+          "rank": 8,
+          "kind": "movie",
+          "label": "DSOD-068",
+          "sourceURL": "https://javverse.com/work/392196",
+          "code": "DSOD-068"
+        },
+        {
+          "rank": 9,
+          "kind": "movie",
+          "label": "DSOD-094",
+          "sourceURL": "https://javverse.com/work/392194",
+          "code": "DSOD-094"
+        },
+        {
+          "rank": 10,
+          "kind": "movie",
+          "label": "DSOD-095",
+          "sourceURL": "https://javverse.com/work/392193",
+          "code": "DSOD-095"
+        },
+        {
+          "rank": 11,
+          "kind": "movie",
+          "label": "DSOD-116",
+          "sourceURL": "https://javverse.com/work/392191",
+          "code": "DSOD-116"
+        },
+        {
+          "rank": 12,
+          "kind": "movie",
+          "label": "JUR-846",
+          "sourceURL": "https://javverse.com/work/392190",
+          "code": "JUR-846"
+        }
+      ]
+    },
+    {
+      "id": "daily",
+      "title": "FANZA 销量日榜",
+      "period": "2026-10-22",
+      "capturedAt": "2026-10-23T17:29:09.343Z",
+      "sourceURL": "https://javverse.com/rankings/dmm?term=daily",
+      "coverage": "complete",
+      "entries": [
+        {
+          "rank": 1,
+          "kind": "movie",
+          "label": "SONE-371",
+          "sourceURL": "https://javverse.com/work/130033",
+          "code": "SONE-371"
+        },
+        {
+          "rank": 2,
+          "kind": "movie",
+          "label": "FKAW-004",
+          "sourceURL": "https://javverse.com/work/194431",
+          "code": "FKAW-004"
+        },
+        {
+          "rank": 3,
+          "kind": "movie",
+          "label": "SNOS-489",
+          "sourceURL": "https://javverse.com/work/1437",
+          "code": "SNOS-489"
+        },
+        {
+          "rank": 4,
+          "kind": "movie",
+          "label": "SNOS-093",
+          "sourceURL": "https://javverse.com/work/388598",
+          "code": "SNOS-093"
+        },
+        {
+          "rank": 5,
+          "kind": "movie",
+          "label": "SNOS-157",
+          "sourceURL": "https://javverse.com/work/128131",
+          "code": "SNOS-157"
+        },
+        {
+          "rank": 6,
+          "kind": "movie",
+          "label": "SIVR-479",
+          "sourceURL": "https://javverse.com/work/169862",
+          "code": "SIVR-479"
+        },
+        {
+          "rank": 7,
+          "kind": "movie",
+          "label": "HJBB-187",
+          "sourceURL": "https://javverse.com/work/243302",
+          "code": "HJBB-187"
+        },
+        {
+          "rank": 8,
+          "kind": "movie",
+          "label": "SONE-142",
+          "sourceURL": "https://javverse.com/work/182078",
+          "code": "SONE-142"
+        },
+        {
+          "rank": 9,
+          "kind": "movie",
+          "label": "EBVR-130",
+          "sourceURL": "https://javverse.com/work/395005",
+          "code": "EBVR-130"
+        },
+        {
+          "rank": 10,
+          "kind": "movie",
+          "label": "MIDA-368",
+          "sourceURL": "https://javverse.com/work/191716",
+          "code": "MIDA-368"
+        },
+        {
+          "rank": 11,
+          "kind": "movie",
+          "label": "SDNM-554",
+          "sourceURL": "https://javverse.com/work/469456",
+          "code": "SDNM-554"
+        },
+        {
+          "rank": 12,
+          "kind": "movie",
+          "label": "SONE-251",
+          "sourceURL": "https://javverse.com/work/377924",
+          "code": "SONE-251"
+        },
+        {
+          "rank": 13,
+          "kind": "movie",
+          "label": "MIMK-276",
+          "sourceURL": "https://javverse.com/work/183586",
+          "code": "MIMK-276"
+        },
+        {
+          "rank": 14,
+          "kind": "movie",
+          "label": "NHDTC-263",
+          "sourceURL": "https://javverse.com/work/392220",
+          "code": "NHDTC-263"
+        },
+        {
+          "rank": 15,
+          "kind": "movie",
+          "label": "SIVR-518",
+          "sourceURL": "https://javverse.com/work/395008",
+          "code": "SIVR-518"
+        },
+        {
+          "rank": 16,
+          "kind": "movie",
+          "label": "MDVR-450",
+          "sourceURL": "https://javverse.com/work/395028",
+          "code": "MDVR-450"
+        },
+        {
+          "rank": 17,
+          "kind": "movie",
+          "label": "SMCD-013",
+          "sourceURL": "https://javverse.com/work/367519",
+          "code": "SMCD-013"
+        },
+        {
+          "rank": 18,
+          "kind": "movie",
+          "label": "URVRSP-613",
+          "sourceURL": "https://javverse.com/work/391666",
+          "code": "URVRSP-613"
+        },
+        {
+          "rank": 19,
+          "kind": "movie",
+          "label": "HHF-039",
+          "sourceURL": "https://javverse.com/work/158418",
+          "code": "HHF-039"
+        },
+        {
+          "rank": 20,
+          "kind": "movie",
+          "label": "SSIS-925",
+          "sourceURL": "https://javverse.com/work/115265",
+          "code": "SSIS-925"
+        },
+        {
+          "rank": 21,
+          "kind": "movie",
+          "label": "NHDTC-262",
+          "sourceURL": "https://javverse.com/work/392221",
+          "code": "NHDTC-262"
+        },
+        {
+          "rank": 22,
+          "kind": "movie",
+          "label": "MIMK-253",
+          "sourceURL": "https://javverse.com/work/385600",
+          "code": "MIMK-253"
+        },
+        {
+          "rank": 23,
+          "kind": "movie",
+          "label": "DSS-247",
+          "sourceURL": "https://javverse.com/work/184202",
+          "code": "DSS-247"
+        },
+        {
+          "rank": 24,
+          "kind": "movie",
+          "label": "FAVR-010",
+          "sourceURL": "https://javverse.com/work/1859",
+          "code": "FAVR-010"
+        },
+        {
+          "rank": 25,
+          "kind": "movie",
+          "label": "SONE-615",
+          "sourceURL": "https://javverse.com/work/224142",
+          "code": "SONE-615"
+        },
+        {
+          "rank": 26,
+          "kind": "movie",
+          "label": "DVMM-301",
+          "sourceURL": "https://javverse.com/work/192246",
+          "code": "DVMM-301"
+        },
+        {
+          "rank": 27,
+          "kind": "movie",
+          "label": "PRED-716",
+          "sourceURL": "https://javverse.com/work/379353",
+          "code": "PRED-716"
+        },
+        {
+          "rank": 28,
+          "kind": "movie",
+          "label": "PRED-807",
+          "sourceURL": "https://javverse.com/work/191718",
+          "code": "PRED-807"
+        },
+        {
+          "rank": 29,
+          "kind": "movie",
+          "label": "HUNTC-250",
+          "sourceURL": "https://javverse.com/work/137733",
+          "code": "HUNTC-250"
+        },
+        {
+          "rank": 30,
+          "kind": "movie",
+          "label": "FVID-001",
+          "sourceURL": "https://javverse.com/work/194429",
+          "code": "FVID-001"
+        },
+        {
+          "rank": 31,
+          "kind": "movie",
+          "label": "JUVR-315",
+          "sourceURL": "https://javverse.com/work/395104",
+          "code": "JUVR-315"
+        },
+        {
+          "rank": 32,
+          "kind": "movie",
+          "label": "MIZD-493",
+          "sourceURL": "https://javverse.com/work/191750",
+          "code": "MIZD-493"
+        },
+        {
+          "rank": 33,
+          "kind": "movie",
+          "label": "MFYD-204",
+          "sourceURL": "https://javverse.com/work/1274",
+          "code": "MFYD-204"
+        },
+        {
+          "rank": 34,
+          "kind": "movie",
+          "label": "SPONE-001",
+          "sourceURL": "https://javverse.com/work/1153",
+          "code": "SPONE-001"
+        },
+        {
+          "rank": 35,
+          "kind": "movie",
+          "label": "SIVR-525",
+          "sourceURL": "https://javverse.com/work/297809",
+          "code": "SIVR-525"
+        },
+        {
+          "rank": 36,
+          "kind": "movie",
+          "label": "RBB-288",
+          "sourceURL": "https://javverse.com/work/377935",
+          "code": "RBB-288"
+        },
+        {
+          "rank": 37,
+          "kind": "movie",
+          "label": "MIAB-026",
+          "sourceURL": "https://javverse.com/work/373963",
+          "code": "MIAB-026"
+        },
+        {
+          "rank": 38,
+          "kind": "movie",
+          "label": "SNOS-449",
+          "sourceURL": "https://javverse.com/work/392183",
+          "code": "SNOS-449"
+        },
+        {
+          "rank": 39,
+          "kind": "movie",
+          "label": "MIDA-823",
+          "sourceURL": "https://javverse.com/work/1264",
+          "code": "MIDA-823"
+        },
+        {
+          "rank": 40,
+          "kind": "movie",
+          "label": "SAVR-1132",
+          "sourceURL": "https://javverse.com/work/689",
+          "code": "SAVR-1132"
+        },
+        {
+          "rank": 41,
+          "kind": "movie",
+          "label": "NHDTC-265",
+          "sourceURL": "https://javverse.com/work/301152",
+          "code": "NHDTC-265"
+        },
+        {
+          "rank": 42,
+          "kind": "movie",
+          "label": "SONE-165",
+          "sourceURL": "https://javverse.com/work/376254",
+          "code": "SONE-165"
+        },
+        {
+          "rank": 43,
+          "kind": "movie",
+          "label": "MIMK-255",
+          "sourceURL": "https://javverse.com/work/385601",
+          "code": "MIMK-255"
+        },
+        {
+          "rank": 44,
+          "kind": "movie",
+          "label": "KAVR-472",
+          "sourceURL": "https://javverse.com/work/213518",
+          "code": "KAVR-472"
+        },
+        {
+          "rank": 45,
+          "kind": "movie",
+          "label": "HMN-389",
+          "sourceURL": "https://javverse.com/work/369313",
+          "code": "HMN-389"
+        },
+        {
+          "rank": 46,
+          "kind": "movie",
+          "label": "IPZZ-881",
+          "sourceURL": "https://javverse.com/work/168210",
+          "code": "IPZZ-881"
+        },
+        {
+          "rank": 47,
+          "kind": "movie",
+          "label": "SSIS-833",
+          "sourceURL": "https://javverse.com/work/101758",
+          "code": "SSIS-833"
+        },
+        {
+          "rank": 48,
+          "kind": "movie",
+          "label": "HSODA-005",
+          "sourceURL": "https://javverse.com/work/374984",
+          "code": "HSODA-005"
+        },
+        {
+          "rank": 49,
+          "kind": "movie",
+          "label": "YUJ-024",
+          "sourceURL": "https://javverse.com/work/134507",
+          "code": "YUJ-024"
+        },
+        {
+          "rank": 50,
+          "kind": "movie",
+          "label": "MVBD-176",
+          "sourceURL": "https://javverse.com/work/243298",
+          "code": "MVBD-176"
+        },
+        {
+          "rank": 51,
+          "kind": "movie",
+          "label": "SSIS-818",
+          "sourceURL": "https://javverse.com/work/98479",
+          "code": "SSIS-818"
+        },
+        {
+          "rank": 52,
+          "kind": "movie",
+          "label": "SSIS-905",
+          "sourceURL": "https://javverse.com/work/109667",
+          "code": "SSIS-905"
+        },
+        {
+          "rank": 53,
+          "kind": "movie",
+          "label": "FTHTD-227",
+          "sourceURL": "https://javverse.com/work/1902",
+          "code": "FTHTD-227"
+        },
+        {
+          "rank": 54,
+          "kind": "movie",
+          "label": "PBD-503",
+          "sourceURL": "https://javverse.com/work/191760",
+          "code": "PBD-503"
+        },
+        {
+          "rank": 55,
+          "kind": "movie",
+          "label": "PRVR-093",
+          "sourceURL": "https://javverse.com/work/395081",
+          "code": "PRVR-093"
+        },
+        {
+          "rank": 56,
+          "kind": "movie",
+          "label": "ADN-573",
+          "sourceURL": "https://javverse.com/work/213170",
+          "code": "ADN-573"
+        },
+        {
+          "rank": 57,
+          "kind": "movie",
+          "label": "SNOS-331",
+          "sourceURL": "https://javverse.com/work/1385",
+          "code": "SNOS-331"
+        },
+        {
+          "rank": 58,
+          "kind": "movie",
+          "label": "SAVR-1178",
+          "sourceURL": "https://javverse.com/work/391670",
+          "code": "SAVR-1178"
+        },
+        {
+          "rank": 59,
+          "kind": "movie",
+          "label": "ATVR-075",
+          "sourceURL": "https://javverse.com/work/394818",
+          "code": "ATVR-075"
+        },
+        {
+          "rank": 60,
+          "kind": "movie",
+          "label": "SONE-368",
+          "sourceURL": "https://javverse.com/work/130035",
+          "code": "SONE-368"
+        },
+        {
+          "rank": 61,
+          "kind": "movie",
+          "label": "YUJ-066",
+          "sourceURL": "https://javverse.com/work/164548",
+          "code": "YUJ-066"
+        },
+        {
+          "rank": 62,
+          "kind": "movie",
+          "label": "SONE-009",
+          "sourceURL": "https://javverse.com/work/134883",
+          "code": "SONE-009"
+        },
+        {
+          "rank": 63,
+          "kind": "movie",
+          "label": "FNS-256",
+          "sourceURL": "https://javverse.com/work/1876",
+          "code": "FNS-256"
+        },
+        {
+          "rank": 64,
+          "kind": "movie",
+          "label": "OFJE-444",
+          "sourceURL": "https://javverse.com/work/134903",
+          "code": "OFJE-444"
+        },
+        {
+          "rank": 65,
+          "kind": "movie",
+          "label": "URVRSP-601",
+          "sourceURL": "https://javverse.com/work/391733",
+          "code": "URVRSP-601"
+        },
+        {
+          "rank": 66,
+          "kind": "movie",
+          "label": "ATAD-156",
+          "sourceURL": "https://javverse.com/work/354127",
+          "code": "ATAD-156"
+        },
+        {
+          "rank": 67,
+          "kind": "movie",
+          "label": "SSIS-986",
+          "sourceURL": "https://javverse.com/work/126957",
+          "code": "SSIS-986"
+        },
+        {
+          "rank": 68,
+          "kind": "movie",
+          "label": "FNS-257",
+          "sourceURL": "https://javverse.com/work/1877",
+          "code": "FNS-257"
+        },
+        {
+          "rank": 69,
+          "kind": "movie",
+          "label": "JUQ-740",
+          "sourceURL": "https://javverse.com/work/216359",
+          "code": "JUQ-740"
+        },
+        {
+          "rank": 70,
+          "kind": "movie",
+          "label": "VRKM-1658",
+          "sourceURL": "https://javverse.com/work/385524",
+          "code": "VRKM-1658"
+        },
+        {
+          "rank": 71,
+          "kind": "movie",
+          "label": "MBYD-393",
+          "sourceURL": "https://javverse.com/work/377555",
+          "code": "MBYD-393"
+        },
+        {
+          "rank": 72,
+          "kind": "movie",
+          "label": "HNVR-170",
+          "sourceURL": "https://javverse.com/work/247587",
+          "code": "HNVR-170"
+        },
+        {
+          "rank": 73,
+          "kind": "movie",
+          "label": "JUQ-873",
+          "sourceURL": "https://javverse.com/work/130095",
+          "code": "JUQ-873"
+        },
+        {
+          "rank": 74,
+          "kind": "movie",
+          "label": "EYAN-227",
+          "sourceURL": "https://javverse.com/work/1308",
+          "code": "EYAN-227"
+        },
+        {
+          "rank": 75,
+          "kind": "movie",
+          "label": "JUQ-680",
+          "sourceURL": "https://javverse.com/work/201301",
+          "code": "JUQ-680"
+        },
+        {
+          "rank": 76,
+          "kind": "movie",
+          "label": "SIVR-293",
+          "sourceURL": "https://javverse.com/work/108324",
+          "code": "SIVR-293"
+        },
+        {
+          "rank": 77,
+          "kind": "movie",
+          "label": "PFES-107",
+          "sourceURL": "https://javverse.com/work/249744",
+          "code": "PFES-107"
+        },
+        {
+          "rank": 78,
+          "kind": "movie",
+          "label": "MIDA-812",
+          "sourceURL": "https://javverse.com/work/885",
+          "code": "MIDA-812"
+        },
+        {
+          "rank": 79,
+          "kind": "movie",
+          "label": "SSIS-476",
+          "sourceURL": "https://javverse.com/work/363810",
+          "code": "SSIS-476"
+        },
+        {
+          "rank": 80,
+          "kind": "movie",
+          "label": "JUVR-316",
+          "sourceURL": "https://javverse.com/work/395103",
+          "code": "JUVR-316"
+        },
+        {
+          "rank": 81,
+          "kind": "movie",
+          "label": "URVRSP-609",
+          "sourceURL": "https://javverse.com/work/392218",
+          "code": "URVRSP-609"
+        },
+        {
+          "rank": 82,
+          "kind": "movie",
+          "label": "SNOS-242",
+          "sourceURL": "https://javverse.com/work/389482",
+          "code": "SNOS-242"
+        },
+        {
+          "rank": 83,
+          "kind": "movie",
+          "label": "ADN-438",
+          "sourceURL": "https://javverse.com/work/367107",
+          "code": "ADN-438"
+        },
+        {
+          "rank": 84,
+          "kind": "movie",
+          "label": "VRKM-1873",
+          "sourceURL": "https://javverse.com/work/807",
+          "code": "VRKM-1873"
+        },
+        {
+          "rank": 85,
+          "kind": "movie",
+          "label": "MIRD-263",
+          "sourceURL": "https://javverse.com/work/191719",
+          "code": "MIRD-263"
+        },
+        {
+          "rank": 86,
+          "kind": "movie",
+          "label": "OFJE-621",
+          "sourceURL": "https://javverse.com/work/388244",
+          "code": "OFJE-621"
+        },
+        {
+          "rank": 87,
+          "kind": "movie",
+          "label": "ROE-130",
+          "sourceURL": "https://javverse.com/work/91254",
+          "code": "ROE-130"
+        },
+        {
+          "rank": 88,
+          "kind": "movie",
+          "label": "IPZZ-308",
+          "sourceURL": "https://javverse.com/work/216341",
+          "code": "IPZZ-308"
+        },
+        {
+          "rank": 89,
+          "kind": "movie",
+          "label": "IDBD-919",
+          "sourceURL": "https://javverse.com/work/182150",
+          "code": "IDBD-919"
+        },
+        {
+          "rank": 90,
+          "kind": "movie",
+          "label": "OFJE-278",
+          "sourceURL": "https://javverse.com/work/276825",
+          "code": "OFJE-278"
+        },
+        {
+          "rank": 91,
+          "kind": "movie",
+          "label": "CAWD-684",
+          "sourceURL": "https://javverse.com/work/213155",
+          "code": "CAWD-684"
+        },
+        {
+          "rank": 92,
+          "kind": "movie",
+          "label": "JUQ-804",
+          "sourceURL": "https://javverse.com/work/377947",
+          "code": "JUQ-804"
+        },
+        {
+          "rank": 93,
+          "kind": "movie",
+          "label": "EBWH-119",
+          "sourceURL": "https://javverse.com/work/235917",
+          "code": "EBWH-119"
+        },
+        {
+          "rank": 94,
+          "kind": "movie",
+          "label": "MIDA-372",
+          "sourceURL": "https://javverse.com/work/385610",
+          "code": "MIDA-372"
+        },
+        {
+          "rank": 95,
+          "kind": "movie",
+          "label": "EBWH-268",
+          "sourceURL": "https://javverse.com/work/191714",
+          "code": "EBWH-268"
+        },
+        {
+          "rank": 96,
+          "kind": "movie",
+          "label": "ROE-203",
+          "sourceURL": "https://javverse.com/work/374957",
+          "code": "ROE-203"
+        },
+        {
+          "rank": 97,
+          "kind": "movie",
+          "label": "SNOS-146",
+          "sourceURL": "https://javverse.com/work/388331",
+          "code": "SNOS-146"
+        },
+        {
+          "rank": 98,
+          "kind": "movie",
+          "label": "JUQ-838",
+          "sourceURL": "https://javverse.com/work/256060",
+          "code": "JUQ-838"
+        },
+        {
+          "rank": 99,
+          "kind": "movie",
+          "label": "PXVRG-012",
+          "sourceURL": "https://javverse.com/work/469656",
+          "code": "PXVRG-012"
+        },
+        {
+          "rank": 100,
+          "kind": "movie",
+          "label": "JUMS-027",
+          "sourceURL": "https://javverse.com/work/98543",
+          "code": "JUMS-027"
+        }
+      ]
+    },
+    {
+      "id": "weekly",
+      "title": "FANZA 销量周榜",
+      "period": "2026-10-16 — 2026-10-22",
+      "capturedAt": "2026-10-23T17:29:07.091Z",
+      "sourceURL": "https://javverse.com/rankings/dmm",
+      "coverage": "complete",
+      "entries": [
+        {
+          "rank": 1,
+          "kind": "movie",
+          "label": "MFYD-204",
+          "sourceURL": "https://javverse.com/work/1274",
+          "code": "MFYD-204"
+        },
+        {
+          "rank": 2,
+          "kind": "movie",
+          "label": "SONE-269",
+          "sourceURL": "https://javverse.com/work/256024",
+          "code": "SONE-269"
+        },
+        {
+          "rank": 3,
+          "kind": "movie",
+          "label": "SKHB-009",
+          "sourceURL": "https://javverse.com/work/377179",
+          "code": "SKHB-009"
+        },
+        {
+          "rank": 4,
+          "kind": "movie",
+          "label": "EYAN-227",
+          "sourceURL": "https://javverse.com/work/1308",
+          "code": "EYAN-227"
+        },
+        {
+          "rank": 5,
+          "kind": "movie",
+          "label": "NPJB-102",
+          "sourceURL": "https://javverse.com/work/97650",
+          "code": "NPJB-102"
+        },
+        {
+          "rank": 6,
+          "kind": "movie",
+          "label": "SIVR-525",
+          "sourceURL": "https://javverse.com/work/297809",
+          "code": "SIVR-525"
+        },
+        {
+          "rank": 7,
+          "kind": "movie",
+          "label": "SPONE-001",
+          "sourceURL": "https://javverse.com/work/1153",
+          "code": "SPONE-001"
+        },
+        {
+          "rank": 8,
+          "kind": "movie",
+          "label": "SONE-425",
+          "sourceURL": "https://javverse.com/work/130030",
+          "code": "SONE-425"
+        },
+        {
+          "rank": 9,
+          "kind": "movie",
+          "label": "MIDA-823",
+          "sourceURL": "https://javverse.com/work/1264",
+          "code": "MIDA-823"
+        },
+        {
+          "rank": 10,
+          "kind": "movie",
+          "label": "HSODA-004",
+          "sourceURL": "https://javverse.com/work/374521",
+          "code": "HSODA-004"
+        },
+        {
+          "rank": 11,
+          "kind": "movie",
+          "label": "SONE-912",
+          "sourceURL": "https://javverse.com/work/188459",
+          "code": "SONE-912"
+        },
+        {
+          "rank": 12,
+          "kind": "movie",
+          "label": "SDNM-554",
+          "sourceURL": "https://javverse.com/work/469456",
+          "code": "SDNM-554"
+        },
+        {
+          "rank": 13,
+          "kind": "movie",
+          "label": "SONE-400",
+          "sourceURL": "https://javverse.com/work/137657",
+          "code": "SONE-400"
+        },
+        {
+          "rank": 14,
+          "kind": "movie",
+          "label": "FAVR-010",
+          "sourceURL": "https://javverse.com/work/1859",
+          "code": "FAVR-010"
+        },
+        {
+          "rank": 15,
+          "kind": "movie",
+          "label": "SONE-198",
+          "sourceURL": "https://javverse.com/work/376488",
+          "code": "SONE-198"
+        },
+        {
+          "rank": 16,
+          "kind": "movie",
+          "label": "DASS-431",
+          "sourceURL": "https://javverse.com/work/239446",
+          "code": "DASS-431"
+        },
+        {
+          "rank": 17,
+          "kind": "movie",
+          "label": "SONE-312",
+          "sourceURL": "https://javverse.com/work/378175",
+          "code": "SONE-312"
+        },
+        {
+          "rank": 18,
+          "kind": "movie",
+          "label": "FKAW-004",
+          "sourceURL": "https://javverse.com/work/194431",
+          "code": "FKAW-004"
+        },
+        {
+          "rank": 19,
+          "kind": "movie",
+          "label": "SONE-371",
+          "sourceURL": "https://javverse.com/work/130033",
+          "code": "SONE-371"
+        },
+        {
+          "rank": 20,
+          "kind": "movie",
+          "label": "MIDA-791",
+          "sourceURL": "https://javverse.com/work/1270",
+          "code": "MIDA-791"
+        },
+        {
+          "rank": 21,
+          "kind": "movie",
+          "label": "MIDA-821",
+          "sourceURL": "https://javverse.com/work/1265",
+          "code": "MIDA-821"
+        },
+        {
+          "rank": 22,
+          "kind": "movie",
+          "label": "OFJE-426",
+          "sourceURL": "https://javverse.com/work/105918",
+          "code": "OFJE-426"
+        },
+        {
+          "rank": 23,
+          "kind": "movie",
+          "label": "SIVR-492",
+          "sourceURL": "https://javverse.com/work/174301",
+          "code": "SIVR-492"
+        },
+        {
+          "rank": 24,
+          "kind": "movie",
+          "label": "IDBD-894",
+          "sourceURL": "https://javverse.com/work/370870",
+          "code": "IDBD-894"
+        },
+        {
+          "rank": 25,
+          "kind": "movie",
+          "label": "SONE-991",
+          "sourceURL": "https://javverse.com/work/220762",
+          "code": "SONE-991"
+        },
+        {
+          "rank": 26,
+          "kind": "movie",
+          "label": "KTKF-1005",
+          "sourceURL": "https://javverse.com/work/385641",
+          "code": "KTKF-1005"
+        },
+        {
+          "rank": 27,
+          "kind": "movie",
+          "label": "KWBD-376",
+          "sourceURL": "https://javverse.com/work/246366",
+          "code": "KWBD-376"
+        },
+        {
+          "rank": 28,
+          "kind": "movie",
+          "label": "SSIS-760",
+          "sourceURL": "https://javverse.com/work/96616",
+          "code": "SSIS-760"
+        },
+        {
+          "rank": 29,
+          "kind": "movie",
+          "label": "SONE-324",
+          "sourceURL": "https://javverse.com/work/249432",
+          "code": "SONE-324"
+        },
+        {
+          "rank": 30,
+          "kind": "movie",
+          "label": "SNOS-152",
+          "sourceURL": "https://javverse.com/work/122382",
+          "code": "SNOS-152"
+        },
+        {
+          "rank": 31,
+          "kind": "movie",
+          "label": "IPZZ-734",
+          "sourceURL": "https://javverse.com/work/188461",
+          "code": "IPZZ-734"
+        },
+        {
+          "rank": 32,
+          "kind": "movie",
+          "label": "SSIS-308",
+          "sourceURL": "https://javverse.com/work/39638",
+          "code": "SSIS-308"
+        },
+        {
+          "rank": 33,
+          "kind": "movie",
+          "label": "OFJE-545",
+          "sourceURL": "https://javverse.com/work/188507",
+          "code": "OFJE-545"
+        },
+        {
+          "rank": 34,
+          "kind": "movie",
+          "label": "PRPM-001",
+          "sourceURL": "https://javverse.com/work/392255",
+          "code": "PRPM-001"
+        },
+        {
+          "rank": 35,
+          "kind": "movie",
+          "label": "SONE-925",
+          "sourceURL": "https://javverse.com/work/188462",
+          "code": "SONE-925"
+        },
+        {
+          "rank": 36,
+          "kind": "movie",
+          "label": "SNOS-489",
+          "sourceURL": "https://javverse.com/work/1437",
+          "code": "SNOS-489"
+        },
+        {
+          "rank": 37,
+          "kind": "movie",
+          "label": "SONE-316",
+          "sourceURL": "https://javverse.com/work/377681",
+          "code": "SONE-316"
+        },
+        {
+          "rank": 38,
+          "kind": "movie",
+          "label": "DSVR-2035",
+          "sourceURL": "https://javverse.com/rankings/dmm",
+          "code": "DSVR-2035"
+        },
+        {
+          "rank": 39,
+          "kind": "movie",
+          "label": "SIVR-514",
+          "sourceURL": "https://javverse.com/work/301117",
+          "code": "SIVR-514"
+        },
+        {
+          "rank": 40,
+          "kind": "movie",
+          "label": "JUMS-038",
+          "sourceURL": "https://javverse.com/work/107644",
+          "code": "JUMS-038"
+        },
+        {
+          "rank": 41,
+          "kind": "movie",
+          "label": "IPVR-389",
+          "sourceURL": "https://javverse.com/work/301198",
+          "code": "IPVR-389"
+        },
+        {
+          "rank": 42,
+          "kind": "movie",
+          "label": "OFJE-547",
+          "sourceURL": "https://javverse.com/work/385733",
+          "code": "OFJE-547"
+        },
+        {
+          "rank": 43,
+          "kind": "movie",
+          "label": "NAMH-052",
+          "sourceURL": "https://javverse.com/work/237524",
+          "code": "NAMH-052"
+        },
+        {
+          "rank": 44,
+          "kind": "movie",
+          "label": "NAMH-051",
+          "sourceURL": "https://javverse.com/work/386594",
+          "code": "NAMH-051"
+        },
+        {
+          "rank": 45,
+          "kind": "movie",
+          "label": "SNOS-093",
+          "sourceURL": "https://javverse.com/work/388598",
+          "code": "SNOS-093"
+        },
+        {
+          "rank": 46,
+          "kind": "movie",
+          "label": "EBWH-372",
+          "sourceURL": "https://javverse.com/work/1301",
+          "code": "EBWH-372"
+        },
+        {
+          "rank": 47,
+          "kind": "movie",
+          "label": "VRKM-1658",
+          "sourceURL": "https://javverse.com/work/385524",
+          "code": "VRKM-1658"
+        },
+        {
+          "rank": 48,
+          "kind": "movie",
+          "label": "BMW-294",
+          "sourceURL": "https://javverse.com/work/373998",
+          "code": "BMW-294"
+        },
+        {
+          "rank": 49,
+          "kind": "movie",
+          "label": "HHF-033",
+          "sourceURL": "https://javverse.com/work/96671",
+          "code": "HHF-033"
+        },
+        {
+          "rank": 50,
+          "kind": "movie",
+          "label": "SONE-811",
+          "sourceURL": "https://javverse.com/work/384697",
+          "code": "SONE-811"
+        },
+        {
+          "rank": 51,
+          "kind": "movie",
+          "label": "SNOS-384",
+          "sourceURL": "https://javverse.com/work/1151",
+          "code": "SNOS-384"
+        },
+        {
+          "rank": 52,
+          "kind": "movie",
+          "label": "MDVR-394",
+          "sourceURL": "https://javverse.com/work/250819",
+          "code": "MDVR-394"
+        },
+        {
+          "rank": 53,
+          "kind": "movie",
+          "label": "URVRSP-620",
+          "sourceURL": "https://javverse.com/work/1317",
+          "code": "URVRSP-620"
+        },
+        {
+          "rank": 54,
+          "kind": "movie",
+          "label": "SNOS-209",
+          "sourceURL": "https://javverse.com/work/390308",
+          "code": "SNOS-209"
+        },
+        {
+          "rank": 55,
+          "kind": "movie",
+          "label": "SONE-299",
+          "sourceURL": "https://javverse.com/work/256039",
+          "code": "SONE-299"
+        },
+        {
+          "rank": 56,
+          "kind": "movie",
+          "label": "SNOS-334",
+          "sourceURL": "https://javverse.com/work/391451",
+          "code": "SNOS-334"
+        },
+        {
+          "rank": 57,
+          "kind": "movie",
+          "label": "MIDA-826",
+          "sourceURL": "https://javverse.com/work/1262",
+          "code": "MIDA-826"
+        },
+        {
+          "rank": 58,
+          "kind": "movie",
+          "label": "NAMH-079",
+          "sourceURL": "https://javverse.com/work/394595",
+          "code": "NAMH-079"
+        },
+        {
+          "rank": 59,
+          "kind": "movie",
+          "label": "MIDA-808",
+          "sourceURL": "https://javverse.com/work/1269",
+          "code": "MIDA-808"
+        },
+        {
+          "rank": 60,
+          "kind": "movie",
+          "label": "SNOS-003",
+          "sourceURL": "https://javverse.com/work/386121",
+          "code": "SNOS-003"
+        },
+        {
+          "rank": 61,
+          "kind": "movie",
+          "label": "HNDB-250",
+          "sourceURL": "https://javverse.com/work/130105",
+          "code": "HNDB-250"
+        },
+        {
+          "rank": 62,
+          "kind": "movie",
+          "label": "URVRSP-603",
+          "sourceURL": "https://javverse.com/work/391732",
+          "code": "URVRSP-603"
+        },
+        {
+          "rank": 63,
+          "kind": "movie",
+          "label": "DVMM-453",
+          "sourceURL": "https://javverse.com/work/404765",
+          "code": "DVMM-453"
+        },
+        {
+          "rank": 64,
+          "kind": "movie",
+          "label": "PPPE-449",
+          "sourceURL": "https://javverse.com/work/1248",
+          "code": "PPPE-449"
+        },
+        {
+          "rank": 65,
+          "kind": "movie",
+          "label": "ATKD-354",
+          "sourceURL": "https://javverse.com/work/370473",
+          "code": "ATKD-354"
+        },
+        {
+          "rank": 66,
+          "kind": "movie",
+          "label": "SIVR-479",
+          "sourceURL": "https://javverse.com/work/169862",
+          "code": "SIVR-479"
+        },
+        {
+          "rank": 67,
+          "kind": "movie",
+          "label": "MIDA-368",
+          "sourceURL": "https://javverse.com/work/191716",
+          "code": "MIDA-368"
+        },
+        {
+          "rank": 68,
+          "kind": "movie",
+          "label": "EBWH-382",
+          "sourceURL": "https://javverse.com/work/1297",
+          "code": "EBWH-382"
+        },
+        {
+          "rank": 69,
+          "kind": "movie",
+          "label": "MURIKURI-015",
+          "sourceURL": "https://javverse.com/work/391826",
+          "code": "MURIKURI-015"
+        },
+        {
+          "rank": 70,
+          "kind": "movie",
+          "label": "NAMH-053",
+          "sourceURL": "https://javverse.com/work/243176",
+          "code": "NAMH-053"
+        },
+        {
+          "rank": 71,
+          "kind": "movie",
+          "label": "EBWH-385",
+          "sourceURL": "https://javverse.com/work/1296",
+          "code": "EBWH-385"
+        },
+        {
+          "rank": 72,
+          "kind": "movie",
+          "label": "ROE-244",
+          "sourceURL": "https://javverse.com/work/239460",
+          "code": "ROE-244"
+        },
+        {
+          "rank": 73,
+          "kind": "movie",
+          "label": "MIDA-812",
+          "sourceURL": "https://javverse.com/work/885",
+          "code": "MIDA-812"
+        },
+        {
+          "rank": 74,
+          "kind": "movie",
+          "label": "SNOS-157",
+          "sourceURL": "https://javverse.com/work/128131",
+          "code": "SNOS-157"
+        },
+        {
+          "rank": 75,
+          "kind": "movie",
+          "label": "HMN-917",
+          "sourceURL": "https://javverse.com/work/1289",
+          "code": "HMN-917"
+        },
+        {
+          "rank": 76,
+          "kind": "movie",
+          "label": "EBWH-301",
+          "sourceURL": "https://javverse.com/work/255102",
+          "code": "EBWH-301"
+        },
+        {
+          "rank": 77,
+          "kind": "movie",
+          "label": "URVRSP-613",
+          "sourceURL": "https://javverse.com/work/391666",
+          "code": "URVRSP-613"
+        },
+        {
+          "rank": 78,
+          "kind": "movie",
+          "label": "MIKR-129",
+          "sourceURL": "https://javverse.com/work/1258",
+          "code": "MIKR-129"
+        },
+        {
+          "rank": 79,
+          "kind": "movie",
+          "label": "JUVR-281",
+          "sourceURL": "https://javverse.com/work/392551",
+          "code": "JUVR-281"
+        },
+        {
+          "rank": 80,
+          "kind": "movie",
+          "label": "KWBD-355",
+          "sourceURL": "https://javverse.com/work/112817",
+          "code": "KWBD-355"
+        },
+        {
+          "rank": 81,
+          "kind": "movie",
+          "label": "JERA-049",
+          "sourceURL": "https://javverse.com/work/297796",
+          "code": "JERA-049"
+        },
+        {
+          "rank": 82,
+          "kind": "movie",
+          "label": "NAMH-055",
+          "sourceURL": "https://javverse.com/work/291185",
+          "code": "NAMH-055"
+        },
+        {
+          "rank": 83,
+          "kind": "movie",
+          "label": "JFB-337",
+          "sourceURL": "https://javverse.com/work/376146",
+          "code": "JFB-337"
+        },
+        {
+          "rank": 84,
+          "kind": "movie",
+          "label": "NAMH-040",
+          "sourceURL": "https://javverse.com/work/147187",
+          "code": "NAMH-040"
+        },
+        {
+          "rank": 85,
+          "kind": "movie",
+          "label": "OFJE-410",
+          "sourceURL": "https://javverse.com/work/92583",
+          "code": "OFJE-410"
+        },
+        {
+          "rank": 86,
+          "kind": "movie",
+          "label": "ATVR-075",
+          "sourceURL": "https://javverse.com/work/394818",
+          "code": "ATVR-075"
+        },
+        {
+          "rank": 87,
+          "kind": "movie",
+          "label": "SNOS-377",
+          "sourceURL": "https://javverse.com/work/391742",
+          "code": "SNOS-377"
+        },
+        {
+          "rank": 88,
+          "kind": "movie",
+          "label": "MDVR-443",
+          "sourceURL": "https://javverse.com/work/301197",
+          "code": "MDVR-443"
+        },
+        {
+          "rank": 89,
+          "kind": "movie",
+          "label": "MFYD-196",
+          "sourceURL": "https://javverse.com/work/1278",
+          "code": "MFYD-196"
+        },
+        {
+          "rank": 90,
+          "kind": "movie",
+          "label": "HUNTC-137",
+          "sourceURL": "https://javverse.com/work/223622",
+          "code": "HUNTC-137"
+        },
+        {
+          "rank": 91,
+          "kind": "movie",
+          "label": "SONE-969",
+          "sourceURL": "https://javverse.com/work/188458",
+          "code": "SONE-969"
+        },
+        {
+          "rank": 92,
+          "kind": "movie",
+          "label": "JJGG-009",
+          "sourceURL": "https://javverse.com/work/3076",
+          "code": "JJGG-009"
+        },
+        {
+          "rank": 93,
+          "kind": "movie",
+          "label": "SNOS-022",
+          "sourceURL": "https://javverse.com/work/386897",
+          "code": "SNOS-022"
+        },
+        {
+          "rank": 94,
+          "kind": "movie",
+          "label": "IPZZ-677",
+          "sourceURL": "https://javverse.com/work/188468",
+          "code": "IPZZ-677"
+        },
+        {
+          "rank": 95,
+          "kind": "movie",
+          "label": "DANDYA-023",
+          "sourceURL": "https://javverse.com/work/256918",
+          "code": "DANDYA-023"
+        },
+        {
+          "rank": 96,
+          "kind": "movie",
+          "label": "JUMS-010",
+          "sourceURL": "https://javverse.com/work/367868",
+          "code": "JUMS-010"
+        },
+        {
+          "rank": 97,
+          "kind": "movie",
+          "label": "IPZZ-713",
+          "sourceURL": "https://javverse.com/work/188460",
+          "code": "IPZZ-713"
+        },
+        {
+          "rank": 98,
+          "kind": "movie",
+          "label": "CEMD-751",
+          "sourceURL": "https://javverse.com/rankings/dmm",
+          "code": "CEMD-751"
+        },
+        {
+          "rank": 99,
+          "kind": "movie",
+          "label": "ATAD-160",
+          "sourceURL": "https://javverse.com/work/356578",
+          "code": "ATAD-160"
+        },
+        {
+          "rank": 100,
+          "kind": "movie",
+          "label": "EBVR-115",
+          "sourceURL": "https://javverse.com/work/191748",
+          "code": "EBVR-115"
+        }
+      ]
+    },
+    {
+      "id": "monthly",
+      "title": "FANZA 销量月榜",
+      "period": "9月1日 — 30日（原站未显示年份）",
+      "capturedAt": "2026-10-23T17:29:11.616Z",
+      "sourceURL": "https://javverse.com/rankings/dmm?term=monthly",
+      "coverage": "complete",
+      "entries": [
+        {
+          "rank": 1,
+          "kind": "movie",
+          "label": "SNOS-377",
+          "sourceURL": "https://javverse.com/work/391742",
+          "code": "SNOS-377"
+        },
+        {
+          "rank": 2,
+          "kind": "movie",
+          "label": "HOIZ-174",
+          "sourceURL": "https://javverse.com/work/173000",
+          "code": "HOIZ-174"
+        },
+        {
+          "rank": 3,
+          "kind": "movie",
+          "label": "SNOS-313",
+          "sourceURL": "https://javverse.com/work/218",
+          "code": "SNOS-313"
+        },
+        {
+          "rank": 4,
+          "kind": "movie",
+          "label": "SNOS-299",
+          "sourceURL": "https://javverse.com/work/604",
+          "code": "SNOS-299"
+        },
+        {
+          "rank": 5,
+          "kind": "movie",
+          "label": "SNOS-334",
+          "sourceURL": "https://javverse.com/work/391451",
+          "code": "SNOS-334"
+        },
+        {
+          "rank": 6,
+          "kind": "movie",
+          "label": "SQTE-683",
+          "sourceURL": "https://javverse.com/work/156603",
+          "code": "SQTE-683"
+        },
+        {
+          "rank": 7,
+          "kind": "movie",
+          "label": "NPS-472",
+          "sourceURL": "https://javverse.com/work/293656",
+          "code": "NPS-472"
+        },
+        {
+          "rank": 8,
+          "kind": "movie",
+          "label": "OFJE-540",
+          "sourceURL": "https://javverse.com/work/176072",
+          "code": "OFJE-540"
+        },
+        {
+          "rank": 9,
+          "kind": "movie",
+          "label": "OFJE-538",
+          "sourceURL": "https://javverse.com/work/385252",
+          "code": "OFJE-538"
+        },
+        {
+          "rank": 10,
+          "kind": "movie",
+          "label": "MIRD-255",
+          "sourceURL": "https://javverse.com/work/385143",
+          "code": "MIRD-255"
+        },
+        {
+          "rank": 11,
+          "kind": "movie",
+          "label": "OFES-056",
+          "sourceURL": "https://javverse.com/work/178792",
+          "code": "OFES-056"
+        },
+        {
+          "rank": 12,
+          "kind": "movie",
+          "label": "SONE-720",
+          "sourceURL": "https://javverse.com/work/120088",
+          "code": "SONE-720"
+        },
+        {
+          "rank": 13,
+          "kind": "movie",
+          "label": "SAVR-1135",
+          "sourceURL": "https://javverse.com/work/192518",
+          "code": "SAVR-1135"
+        },
+        {
+          "rank": 14,
+          "kind": "movie",
+          "label": "OAE-291",
+          "sourceURL": "https://javverse.com/work/176062",
+          "code": "OAE-291"
+        },
+        {
+          "rank": 15,
+          "kind": "movie",
+          "label": "SNOS-056",
+          "sourceURL": "https://javverse.com/work/244719",
+          "code": "SNOS-056"
+        },
+        {
+          "rank": 16,
+          "kind": "movie",
+          "label": "EBWH-365",
+          "sourceURL": "https://javverse.com/work/391896",
+          "code": "EBWH-365"
+        },
+        {
+          "rank": 17,
+          "kind": "movie",
+          "label": "IDBD-975",
+          "sourceURL": "https://javverse.com/work/385255",
+          "code": "IDBD-975"
+        },
+        {
+          "rank": 18,
+          "kind": "movie",
+          "label": "MKMP-660",
+          "sourceURL": "https://javverse.com/work/154060",
+          "code": "MKMP-660"
+        },
+        {
+          "rank": 19,
+          "kind": "movie",
+          "label": "MIRD-281",
+          "sourceURL": "https://javverse.com/work/391881",
+          "code": "MIRD-281"
+        },
+        {
+          "rank": 20,
+          "kind": "movie",
+          "label": "SNOS-213",
+          "sourceURL": "https://javverse.com/work/390069",
+          "code": "SNOS-213"
+        },
+        {
+          "rank": 21,
+          "kind": "movie",
+          "label": "SONE-846",
+          "sourceURL": "https://javverse.com/work/168409",
+          "code": "SONE-846"
+        },
+        {
+          "rank": 22,
+          "kind": "movie",
+          "label": "SNOS-275",
+          "sourceURL": "https://javverse.com/work/175392",
+          "code": "SNOS-275"
+        },
+        {
+          "rank": 23,
+          "kind": "movie",
+          "label": "SSNI-608",
+          "sourceURL": "https://javverse.com/work/265852",
+          "code": "SSNI-608"
+        },
+        {
+          "rank": 24,
+          "kind": "movie",
+          "label": "SVMGM-054",
+          "sourceURL": "https://javverse.com/work/391734",
+          "code": "SVMGM-054"
+        },
+        {
+          "rank": 25,
+          "kind": "movie",
+          "label": "SNOS-008",
+          "sourceURL": "https://javverse.com/work/386898",
+          "code": "SNOS-008"
+        },
+        {
+          "rank": 26,
+          "kind": "movie",
+          "label": "MIMK-268",
+          "sourceURL": "https://javverse.com/work/261604",
+          "code": "MIMK-268"
+        },
+        {
+          "rank": 27,
+          "kind": "movie",
+          "label": "MIDA-726",
+          "sourceURL": "https://javverse.com/work/183540",
+          "code": "MIDA-726"
+        },
+        {
+          "rank": 28,
+          "kind": "movie",
+          "label": "OFJE-586",
+          "sourceURL": "https://javverse.com/work/212655",
+          "code": "OFJE-586"
+        },
+        {
+          "rank": 29,
+          "kind": "movie",
+          "label": "EBWH-218",
+          "sourceURL": "https://javverse.com/work/259848",
+          "code": "EBWH-218"
+        },
+        {
+          "rank": 30,
+          "kind": "movie",
+          "label": "JUR-093",
+          "sourceURL": "https://javverse.com/work/606",
+          "code": "JUR-093"
+        },
+        {
+          "rank": 31,
+          "kind": "movie",
+          "label": "BONY-191",
+          "sourceURL": "https://javverse.com/work/160037",
+          "code": "BONY-191"
+        },
+        {
+          "rank": 32,
+          "kind": "movie",
+          "label": "OFES-033",
+          "sourceURL": "https://javverse.com/work/389957",
+          "code": "OFES-033"
+        },
+        {
+          "rank": 33,
+          "kind": "movie",
+          "label": "SIVR-444",
+          "sourceURL": "https://javverse.com/work/172160",
+          "code": "SIVR-444"
+        },
+        {
+          "rank": 34,
+          "kind": "movie",
+          "label": "IDBD-967",
+          "sourceURL": "https://javverse.com/work/120112",
+          "code": "IDBD-967"
+        },
+        {
+          "rank": 35,
+          "kind": "movie",
+          "label": "MIMK-271",
+          "sourceURL": "https://javverse.com/work/125170",
+          "code": "MIMK-271"
+        },
+        {
+          "rank": 36,
+          "kind": "movie",
+          "label": "NAMH-076",
+          "sourceURL": "https://javverse.com/work/1972",
+          "code": "NAMH-076"
+        },
+        {
+          "rank": 37,
+          "kind": "movie",
+          "label": "SONE-768",
+          "sourceURL": "https://javverse.com/work/126659",
+          "code": "SONE-768"
+        },
+        {
+          "rank": 38,
+          "kind": "movie",
+          "label": "MUCD-335",
+          "sourceURL": "https://javverse.com/work/385105",
+          "code": "MUCD-335"
+        },
+        {
+          "rank": 39,
+          "kind": "movie",
+          "label": "JERA-006",
+          "sourceURL": "https://javverse.com/work/210422",
+          "code": "JERA-006"
+        },
+        {
+          "rank": 40,
+          "kind": "movie",
+          "label": "SONE-711",
+          "sourceURL": "https://javverse.com/work/383123",
+          "code": "SONE-711"
+        },
+        {
+          "rank": 41,
+          "kind": "movie",
+          "label": "JUR-356",
+          "sourceURL": "https://javverse.com/work/126660",
+          "code": "JUR-356"
+        },
+        {
+          "rank": 42,
+          "kind": "movie",
+          "label": "MIHD-001",
+          "sourceURL": "https://javverse.com/work/155113",
+          "code": "MIHD-001"
+        },
+        {
+          "rank": 43,
+          "kind": "movie",
+          "label": "SQTE-674",
+          "sourceURL": "https://javverse.com/work/135325",
+          "code": "SQTE-674"
+        },
+        {
+          "rank": 44,
+          "kind": "movie",
+          "label": "SNOS-310",
+          "sourceURL": "https://javverse.com/work/219",
+          "code": "SNOS-310"
+        },
+        {
+          "rank": 45,
+          "kind": "movie",
+          "label": "SLN-015",
+          "sourceURL": "https://javverse.com/work/215917",
+          "code": "SLN-015"
+        },
+        {
+          "rank": 46,
+          "kind": "movie",
+          "label": "SAVR-1205",
+          "sourceURL": "https://javverse.com/work/456",
+          "code": "SAVR-1205"
+        },
+        {
+          "rank": 47,
+          "kind": "movie",
+          "label": "SKMJ-719",
+          "sourceURL": "https://javverse.com/work/255570",
+          "code": "SKMJ-719"
+        },
+        {
+          "rank": 48,
+          "kind": "movie",
+          "label": "JUR-031",
+          "sourceURL": "https://javverse.com/work/215759",
+          "code": "JUR-031"
+        },
+        {
+          "rank": 49,
+          "kind": "movie",
+          "label": "MURIKURI-015",
+          "sourceURL": "https://javverse.com/work/391826",
+          "code": "MURIKURI-015"
+        },
+        {
+          "rank": 50,
+          "kind": "movie",
+          "label": "SAVR-1143",
+          "sourceURL": "https://javverse.com/work/200902",
+          "code": "SAVR-1143"
+        },
+        {
+          "rank": 51,
+          "kind": "movie",
+          "label": "MDVR-446",
+          "sourceURL": "https://javverse.com/work/169053",
+          "code": "MDVR-446"
+        },
+        {
+          "rank": 52,
+          "kind": "movie",
+          "label": "FZAA-001",
+          "sourceURL": "https://javverse.com/work/228849",
+          "code": "FZAA-001"
+        },
+        {
+          "rank": 53,
+          "kind": "movie",
+          "label": "URVRSP-618",
+          "sourceURL": "https://javverse.com/work/391632",
+          "code": "URVRSP-618"
+        },
+        {
+          "rank": 54,
+          "kind": "movie",
+          "label": "PRVR-091",
+          "sourceURL": "https://javverse.com/work/247339",
+          "code": "PRVR-091"
+        },
+        {
+          "rank": 55,
+          "kind": "movie",
+          "label": "SAVR-1141",
+          "sourceURL": "https://javverse.com/work/390548",
+          "code": "SAVR-1141"
+        },
+        {
+          "rank": 56,
+          "kind": "movie",
+          "label": "HUNTC-487",
+          "sourceURL": "https://javverse.com/work/387830",
+          "code": "HUNTC-487"
+        },
+        {
+          "rank": 57,
+          "kind": "movie",
+          "label": "NAMH-075",
+          "sourceURL": "https://javverse.com/work/1971",
+          "code": "NAMH-075"
+        },
+        {
+          "rank": 58,
+          "kind": "movie",
+          "label": "SNOS-080",
+          "sourceURL": "https://javverse.com/work/251843",
+          "code": "SNOS-080"
+        },
+        {
+          "rank": 59,
+          "kind": "movie",
+          "label": "SONE-266",
+          "sourceURL": "https://javverse.com/work/239427",
+          "code": "SONE-266"
+        },
+        {
+          "rank": 60,
+          "kind": "movie",
+          "label": "MIAB-677",
+          "sourceURL": "https://javverse.com/work/417",
+          "code": "MIAB-677"
+        },
+        {
+          "rank": 61,
+          "kind": "movie",
+          "label": "MIMK-253",
+          "sourceURL": "https://javverse.com/work/385600",
+          "code": "MIMK-253"
+        },
+        {
+          "rank": 62,
+          "kind": "movie",
+          "label": "KBTK-018",
+          "sourceURL": "https://javverse.com/work/143056",
+          "code": "KBTK-018"
+        },
+        {
+          "rank": 63,
+          "kind": "movie",
+          "label": "BIGC-004",
+          "sourceURL": "https://javverse.com/work/383525",
+          "code": "BIGC-004"
+        },
+        {
+          "rank": 64,
+          "kind": "movie",
+          "label": "MIDA-530",
+          "sourceURL": "https://javverse.com/work/261605",
+          "code": "MIDA-530"
+        },
+        {
+          "rank": 65,
+          "kind": "movie",
+          "label": "EROFV-225",
+          "sourceURL": "https://javverse.com/work/123814",
+          "code": "EROFV-225"
+        },
+        {
+          "rank": 66,
+          "kind": "movie",
+          "label": "SONE-405",
+          "sourceURL": "https://javverse.com/work/379251",
+          "code": "SONE-405"
+        },
+        {
+          "rank": 67,
+          "kind": "movie",
+          "label": "DSVR-2032",
+          "sourceURL": "https://javverse.com/work/1725",
+          "code": "DSVR-2032"
+        },
+        {
+          "rank": 68,
+          "kind": "movie",
+          "label": "MIDA-547",
+          "sourceURL": "https://javverse.com/work/134295",
+          "code": "MIDA-547"
+        },
+        {
+          "rank": 69,
+          "kind": "movie",
+          "label": "YMBP-001",
+          "sourceURL": "https://javverse.com/work/688",
+          "code": "YMBP-001"
+        },
+        {
+          "rank": 70,
+          "kind": "movie",
+          "label": "OFJE-588",
+          "sourceURL": "https://javverse.com/work/220800",
+          "code": "OFJE-588"
+        },
+        {
+          "rank": 71,
+          "kind": "movie",
+          "label": "START-202",
+          "sourceURL": "https://javverse.com/work/149729",
+          "code": "START-202"
+        },
+        {
+          "rank": 72,
+          "kind": "movie",
+          "label": "DVAJ-740",
+          "sourceURL": "https://javverse.com/work/153256",
+          "code": "DVAJ-740"
+        },
+        {
+          "rank": 73,
+          "kind": "movie",
+          "label": "MIDA-533",
+          "sourceURL": "https://javverse.com/work/261596",
+          "code": "MIDA-533"
+        },
+        {
+          "rank": 74,
+          "kind": "movie",
+          "label": "SNOS-260",
+          "sourceURL": "https://javverse.com/work/390071",
+          "code": "SNOS-260"
+        },
+        {
+          "rank": 75,
+          "kind": "movie",
+          "label": "SNOS-367",
+          "sourceURL": "https://javverse.com/work/391744",
+          "code": "SNOS-367"
+        },
+        {
+          "rank": 76,
+          "kind": "movie",
+          "label": "MFYD-099",
+          "sourceURL": "https://javverse.com/work/255105",
+          "code": "MFYD-099"
+        },
+        {
+          "rank": 77,
+          "kind": "movie",
+          "label": "MTAFB-001",
+          "sourceURL": "https://javverse.com/work/179668",
+          "code": "MTAFB-001"
+        },
+        {
+          "rank": 78,
+          "kind": "movie",
+          "label": "MDVR-390",
+          "sourceURL": "https://javverse.com/work/386731",
+          "code": "MDVR-390"
+        },
+        {
+          "rank": 79,
+          "kind": "movie",
+          "label": "SIVR-483",
+          "sourceURL": "https://javverse.com/work/135779",
+          "code": "SIVR-483"
+        },
+        {
+          "rank": 80,
+          "kind": "movie",
+          "label": "RCTD-759",
+          "sourceURL": "https://javverse.com/work/2018",
+          "code": "RCTD-759"
+        },
+        {
+          "rank": 81,
+          "kind": "movie",
+          "label": "ROYD-290",
+          "sourceURL": "https://javverse.com/work/244734",
+          "code": "ROYD-290"
+        },
+        {
+          "rank": 82,
+          "kind": "movie",
+          "label": "JUVR-309",
+          "sourceURL": "https://javverse.com/work/577",
+          "code": "JUVR-309"
+        },
+        {
+          "rank": 83,
+          "kind": "movie",
+          "label": "MIMK-255",
+          "sourceURL": "https://javverse.com/work/385601",
+          "code": "MIMK-255"
+        },
+        {
+          "rank": 84,
+          "kind": "movie",
+          "label": "JUVR-251",
+          "sourceURL": "https://javverse.com/work/172179",
+          "code": "JUVR-251"
+        },
+        {
+          "rank": 85,
+          "kind": "movie",
+          "label": "MIZD-421",
+          "sourceURL": "https://javverse.com/work/174559",
+          "code": "MIZD-421"
+        },
+        {
+          "rank": 86,
+          "kind": "movie",
+          "label": "SONE-969",
+          "sourceURL": "https://javverse.com/work/188458",
+          "code": "SONE-969"
+        },
+        {
+          "rank": 87,
+          "kind": "movie",
+          "label": "CJOD-452",
+          "sourceURL": "https://javverse.com/work/199262",
+          "code": "CJOD-452"
+        },
+        {
+          "rank": 88,
+          "kind": "movie",
+          "label": "SNOS-355",
+          "sourceURL": "https://javverse.com/work/221",
+          "code": "SNOS-355"
+        },
+        {
+          "rank": 89,
+          "kind": "movie",
+          "label": "MIAB-301",
+          "sourceURL": "https://javverse.com/work/260134",
+          "code": "MIAB-301"
+        },
+        {
+          "rank": 90,
+          "kind": "movie",
+          "label": "MIMK-196",
+          "sourceURL": "https://javverse.com/work/195105",
+          "code": "MIMK-196"
+        },
+        {
+          "rank": 91,
+          "kind": "movie",
+          "label": "MBF-059",
+          "sourceURL": "https://javverse.com/work/148807",
+          "code": "MBF-059"
+        },
+        {
+          "rank": 92,
+          "kind": "movie",
+          "label": "SNOS-444",
+          "sourceURL": "https://javverse.com/work/633",
+          "code": "SNOS-444"
+        },
+        {
+          "rank": 93,
+          "kind": "movie",
+          "label": "SONE-817",
+          "sourceURL": "https://javverse.com/work/196426",
+          "code": "SONE-817"
+        },
+        {
+          "rank": 94,
+          "kind": "movie",
+          "label": "SNOS-117",
+          "sourceURL": "https://javverse.com/work/387800",
+          "code": "SNOS-117"
+        },
+        {
+          "rank": 95,
+          "kind": "movie",
+          "label": "MIHD-007",
+          "sourceURL": "https://javverse.com/work/155115",
+          "code": "MIHD-007"
+        },
+        {
+          "rank": 96,
+          "kind": "movie",
+          "label": "HOIZ-173",
+          "sourceURL": "https://javverse.com/work/173002",
+          "code": "HOIZ-173"
+        },
+        {
+          "rank": 97,
+          "kind": "movie",
+          "label": "SONE-272",
+          "sourceURL": "https://javverse.com/work/239432",
+          "code": "SONE-272"
+        },
+        {
+          "rank": 98,
+          "kind": "movie",
+          "label": "SIVR-490",
+          "sourceURL": "https://javverse.com/work/168197",
+          "code": "SIVR-490"
+        },
+        {
+          "rank": 99,
+          "kind": "movie",
+          "label": "EBWH-179",
+          "sourceURL": "https://javverse.com/work/381466",
+          "code": "EBWH-179"
+        },
+        {
+          "rank": 100,
+          "kind": "movie",
+          "label": "EBWH-322",
+          "sourceURL": "https://javverse.com/work/141941",
+          "code": "EBWH-322"
+        }
+      ]
+    },
+    {
+      "id": "actresses",
+      "title": "FANZA 演员月榜",
+      "period": "9月1日 — 30日（原站未显示年份）",
+      "capturedAt": "2026-10-23T17:29:13.714Z",
+      "sourceURL": "https://javverse.com/rankings/dmm-actresses",
+      "coverage": "complete",
+      "entries": [
+        {
+          "rank": 1,
+          "kind": "actor",
+          "label": "逢沢みゆ",
+          "sourceURL": "https://javverse.com/actress/241",
+          "code": null
+        },
+        {
+          "rank": 2,
+          "kind": "actor",
+          "label": "河北彩花（河北彩伽）",
+          "sourceURL": "https://javverse.com/actress/425",
+          "code": null
+        },
+        {
+          "rank": 3,
+          "kind": "actor",
+          "label": "松本いちか",
+          "sourceURL": "https://javverse.com/actress/23",
+          "code": null
+        },
+        {
+          "rank": 4,
+          "kind": "actor",
+          "label": "瀬戸環奈",
+          "sourceURL": "https://javverse.com/actress/322",
+          "code": null
+        },
+        {
+          "rank": 5,
+          "kind": "actor",
+          "label": "美園和花",
+          "sourceURL": "https://javverse.com/actress/24",
+          "code": null
+        },
+        {
+          "rank": 6,
+          "kind": "actor",
+          "label": "波多野結衣",
+          "sourceURL": "https://javverse.com/actress/33",
+          "code": null
+        },
+        {
+          "rank": 7,
+          "kind": "actor",
+          "label": "北岡果林",
+          "sourceURL": "https://javverse.com/actress/243",
+          "code": null
+        },
+        {
+          "rank": 8,
+          "kind": "actor",
+          "label": "天馬ゆい",
+          "sourceURL": "https://javverse.com/actress/246",
+          "code": null
+        },
+        {
+          "rank": 9,
+          "kind": "actor",
+          "label": "木下ひまり（花沢ひまり）",
+          "sourceURL": "https://javverse.com/actress/299",
+          "code": null
+        },
+        {
+          "rank": 10,
+          "kind": "actor",
+          "label": "沙月恵奈",
+          "sourceURL": "https://javverse.com/actress/20",
+          "code": null
+        },
+        {
+          "rank": 11,
+          "kind": "actor",
+          "label": "弥生みづき",
+          "sourceURL": "https://javverse.com/actress/22",
+          "code": null
+        },
+        {
+          "rank": 12,
+          "kind": "actor",
+          "label": "乙アリス",
+          "sourceURL": "https://javverse.com/actress/126",
+          "code": null
+        },
+        {
+          "rank": 13,
+          "kind": "actor",
+          "label": "柏木こなつ",
+          "sourceURL": "https://javverse.com/actress/31",
+          "code": null
+        },
+        {
+          "rank": 14,
+          "kind": "actor",
+          "label": "彩月七緒",
+          "sourceURL": "https://javverse.com/actress/333",
+          "code": null
+        },
+        {
+          "rank": 15,
+          "kind": "actor",
+          "label": "森日向子",
+          "sourceURL": "https://javverse.com/actress/282",
+          "code": null
+        },
+        {
+          "rank": 16,
+          "kind": "actor",
+          "label": "花守夏歩",
+          "sourceURL": "https://javverse.com/actress/278",
+          "code": null
+        },
+        {
+          "rank": 17,
+          "kind": "actor",
+          "label": "北野未奈",
+          "sourceURL": "https://javverse.com/actress/239",
+          "code": null
+        },
+        {
+          "rank": 18,
+          "kind": "actor",
+          "label": "宍戸里帆",
+          "sourceURL": "https://javverse.com/actress/271",
+          "code": null
+        },
+        {
+          "rank": 19,
+          "kind": "actor",
+          "label": "椿りか",
+          "sourceURL": "https://javverse.com/actress/91",
+          "code": null
+        },
+        {
+          "rank": 20,
+          "kind": "actor",
+          "label": "月野かすみ",
+          "sourceURL": "https://javverse.com/actress/267",
+          "code": null
+        },
+        {
+          "rank": 21,
+          "kind": "actor",
+          "label": "うんぱい",
+          "sourceURL": "https://javverse.com/actress/361",
+          "code": null
+        },
+        {
+          "rank": 22,
+          "kind": "actor",
+          "label": "新村あかり",
+          "sourceURL": "https://javverse.com/actress/54",
+          "code": null
+        },
+        {
+          "rank": 23,
+          "kind": "actor",
+          "label": "倉本すみれ",
+          "sourceURL": "https://javverse.com/actress/35",
+          "code": null
+        },
+        {
+          "rank": 24,
+          "kind": "actor",
+          "label": "浅野こころ",
+          "sourceURL": "https://javverse.com/actress/597",
+          "code": null
+        },
+        {
+          "rank": 25,
+          "kind": "actor",
+          "label": "夢乃あいか",
+          "sourceURL": "https://javverse.com/actress/404",
+          "code": null
+        },
+        {
+          "rank": 26,
+          "kind": "actor",
+          "label": "石川澪",
+          "sourceURL": "https://javverse.com/actress/416",
+          "code": null
+        },
+        {
+          "rank": 27,
+          "kind": "actor",
+          "label": "神宮寺ナオ",
+          "sourceURL": "https://javverse.com/actress/421",
+          "code": null
+        },
+        {
+          "rank": 28,
+          "kind": "actor",
+          "label": "皆月ひかる",
+          "sourceURL": "https://javverse.com/actress/254",
+          "code": null
+        },
+        {
+          "rank": 29,
+          "kind": "actor",
+          "label": "倉木華",
+          "sourceURL": "https://javverse.com/actress/596",
+          "code": null
+        },
+        {
+          "rank": 30,
+          "kind": "actor",
+          "label": "三上悠亜",
+          "sourceURL": "https://javverse.com/actress/432",
+          "code": null
+        },
+        {
+          "rank": 31,
+          "kind": "actor",
+          "label": "小野六花",
+          "sourceURL": "https://javverse.com/actress/401",
+          "code": null
+        },
+        {
+          "rank": 32,
+          "kind": "actor",
+          "label": "森沢かな（飯岡かなこ）",
+          "sourceURL": "https://javverse.com/actress/40",
+          "code": null
+        },
+        {
+          "rank": 33,
+          "kind": "actor",
+          "label": "川越にこ",
+          "sourceURL": "https://javverse.com/actress/426",
+          "code": null
+        },
+        {
+          "rank": 34,
+          "kind": "actor",
+          "label": "新井リマ",
+          "sourceURL": "https://javverse.com/actress/51",
+          "code": null
+        },
+        {
+          "rank": 35,
+          "kind": "actor",
+          "label": "羽月乃蒼",
+          "sourceURL": "https://javverse.com/actress/232",
+          "code": null
+        },
+        {
+          "rank": 36,
+          "kind": "actor",
+          "label": "七ツ森りり",
+          "sourceURL": "https://javverse.com/actress/428",
+          "code": null
+        },
+        {
+          "rank": 37,
+          "kind": "actor",
+          "label": "小野坂ゆいか",
+          "sourceURL": "https://javverse.com/actress/295",
+          "code": null
+        },
+        {
+          "rank": 38,
+          "kind": "actor",
+          "label": "胡桃さくら",
+          "sourceURL": "https://javverse.com/actress/251",
+          "code": null
+        },
+        {
+          "rank": 39,
+          "kind": "actor",
+          "label": "月乃ルナ",
+          "sourceURL": "https://javverse.com/actress/402",
+          "code": null
+        },
+        {
+          "rank": 40,
+          "kind": "actor",
+          "label": "八木奈々",
+          "sourceURL": "https://javverse.com/actress/413",
+          "code": null
+        },
+        {
+          "rank": 41,
+          "kind": "actor",
+          "label": "東條なつ",
+          "sourceURL": "https://javverse.com/actress/353",
+          "code": null
+        },
+        {
+          "rank": 42,
+          "kind": "actor",
+          "label": "楓ふうあ",
+          "sourceURL": "https://javverse.com/actress/339",
+          "code": null
+        },
+        {
+          "rank": 43,
+          "kind": "actor",
+          "label": "大槻ひびき",
+          "sourceURL": "https://javverse.com/actress/29",
+          "code": null
+        },
+        {
+          "rank": 44,
+          "kind": "actor",
+          "label": "末広純",
+          "sourceURL": "https://javverse.com/actress/85",
+          "code": null
+        },
+        {
+          "rank": 45,
+          "kind": "actor",
+          "label": "篠田ゆう",
+          "sourceURL": "https://javverse.com/actress/122",
+          "code": null
+        },
+        {
+          "rank": 46,
+          "kind": "actor",
+          "label": "吉根ゆりあ",
+          "sourceURL": "https://javverse.com/actress/467",
+          "code": null
+        },
+        {
+          "rank": 47,
+          "kind": "actor",
+          "label": "春陽モカ",
+          "sourceURL": "https://javverse.com/actress/391",
+          "code": null
+        },
+        {
+          "rank": 48,
+          "kind": "actor",
+          "label": "有岡みう",
+          "sourceURL": "https://javverse.com/actress/139",
+          "code": null
+        },
+        {
+          "rank": 49,
+          "kind": "actor",
+          "label": "石原希望",
+          "sourceURL": "https://javverse.com/actress/617",
+          "code": null
+        },
+        {
+          "rank": 50,
+          "kind": "actor",
+          "label": "尾崎えりか",
+          "sourceURL": "https://javverse.com/actress/242",
+          "code": null
+        },
+        {
+          "rank": 51,
+          "kind": "actor",
+          "label": "鷲尾めい",
+          "sourceURL": "https://javverse.com/actress/445",
+          "code": null
+        },
+        {
+          "rank": 52,
+          "kind": "actor",
+          "label": "七沢みあ",
+          "sourceURL": "https://javverse.com/actress/411",
+          "code": null
+        },
+        {
+          "rank": 53,
+          "kind": "actor",
+          "label": "金松季歩",
+          "sourceURL": "https://javverse.com/actress/427",
+          "code": null
+        },
+        {
+          "rank": 54,
+          "kind": "actor",
+          "label": "miru",
+          "sourceURL": "https://javverse.com/actress/429",
+          "code": null
+        },
+        {
+          "rank": 55,
+          "kind": "actor",
+          "label": "都月るいさ",
+          "sourceURL": "https://javverse.com/actress/25",
+          "code": null
+        },
+        {
+          "rank": 56,
+          "kind": "actor",
+          "label": "葵いぶき",
+          "sourceURL": "https://javverse.com/actress/1083",
+          "code": null
+        },
+        {
+          "rank": 57,
+          "kind": "actor",
+          "label": "小日向みゆう（清原みゆう）",
+          "sourceURL": "https://javverse.com/actress/331",
+          "code": null
+        },
+        {
+          "rank": 58,
+          "kind": "actor",
+          "label": "小宵こなん",
+          "sourceURL": "https://javverse.com/actress/435",
+          "code": null
+        },
+        {
+          "rank": 59,
+          "kind": "actor",
+          "label": "三田真鈴",
+          "sourceURL": "https://javverse.com/actress/326",
+          "code": null
+        },
+        {
+          "rank": 60,
+          "kind": "actor",
+          "label": "姫咲はな",
+          "sourceURL": "https://javverse.com/actress/92",
+          "code": null
+        },
+        {
+          "rank": 61,
+          "kind": "actor",
+          "label": "田野憂",
+          "sourceURL": "https://javverse.com/actress/336",
+          "code": null
+        },
+        {
+          "rank": 62,
+          "kind": "actor",
+          "label": "明日葉みつは",
+          "sourceURL": "https://javverse.com/actress/438",
+          "code": null
+        },
+        {
+          "rank": 63,
+          "kind": "actor",
+          "label": "田中ねね",
+          "sourceURL": "https://javverse.com/actress/234",
+          "code": null
+        },
+        {
+          "rank": 64,
+          "kind": "actor",
+          "label": "黒島玲衣",
+          "sourceURL": "https://javverse.com/actress/240",
+          "code": null
+        },
+        {
+          "rank": 65,
+          "kind": "actor",
+          "label": "美谷朱音（美谷朱里）",
+          "sourceURL": "https://javverse.com/actress/58",
+          "code": null
+        },
+        {
+          "rank": 66,
+          "kind": "actor",
+          "label": "AIKA",
+          "sourceURL": "https://javverse.com/actress/409",
+          "code": null
+        },
+        {
+          "rank": 67,
+          "kind": "actor",
+          "label": "小島みなみ",
+          "sourceURL": "https://javverse.com/actress/436",
+          "code": null
+        },
+        {
+          "rank": 68,
+          "kind": "actor",
+          "label": "七瀬アリス",
+          "sourceURL": "https://javverse.com/actress/608",
+          "code": null
+        },
+        {
+          "rank": 69,
+          "kind": "actor",
+          "label": "美咲かんな",
+          "sourceURL": "https://javverse.com/actress/50",
+          "code": null
+        },
+        {
+          "rank": 70,
+          "kind": "actor",
+          "label": "推川ゆうり",
+          "sourceURL": "https://javverse.com/actress/114",
+          "code": null
+        },
+        {
+          "rank": 71,
+          "kind": "actor",
+          "label": "日向由奈",
+          "sourceURL": "https://javverse.com/actress/244",
+          "code": null
+        },
+        {
+          "rank": 72,
+          "kind": "actor",
+          "label": "有村のぞみ",
+          "sourceURL": "https://javverse.com/actress/259",
+          "code": null
+        },
+        {
+          "rank": 73,
+          "kind": "actor",
+          "label": "幸村泉希",
+          "sourceURL": "https://javverse.com/actress/328",
+          "code": null
+        },
+        {
+          "rank": 74,
+          "kind": "actor",
+          "label": "白上咲花",
+          "sourceURL": "https://javverse.com/actress/600",
+          "code": null
+        },
+        {
+          "rank": 75,
+          "kind": "actor",
+          "label": "小那海あや",
+          "sourceURL": "https://javverse.com/actress/238",
+          "code": null
+        },
+        {
+          "rank": 76,
+          "kind": "actor",
+          "label": "奥田咲",
+          "sourceURL": "https://javverse.com/actress/351",
+          "code": null
+        },
+        {
+          "rank": 77,
+          "kind": "actor",
+          "label": "藤森里穂",
+          "sourceURL": "https://javverse.com/actress/265",
+          "code": null
+        },
+        {
+          "rank": 78,
+          "kind": "actor",
+          "label": "安達夕莉",
+          "sourceURL": "https://javverse.com/actress/337",
+          "code": null
+        },
+        {
+          "rank": 79,
+          "kind": "actor",
+          "label": "蓮実クレア",
+          "sourceURL": "https://javverse.com/actress/356",
+          "code": null
+        },
+        {
+          "rank": 80,
+          "kind": "actor",
+          "label": "由良かな",
+          "sourceURL": "https://javverse.com/actress/685",
+          "code": null
+        },
+        {
+          "rank": 81,
+          "kind": "actor",
+          "label": "さつき芽衣",
+          "sourceURL": "https://javverse.com/actress/18",
+          "code": null
+        },
+        {
+          "rank": 82,
+          "kind": "actor",
+          "label": "浜崎真緒",
+          "sourceURL": "https://javverse.com/actress/303",
+          "code": null
+        },
+        {
+          "rank": 83,
+          "kind": "actor",
+          "label": "黒川すみれ",
+          "sourceURL": "https://javverse.com/actress/610",
+          "code": null
+        },
+        {
+          "rank": 84,
+          "kind": "actor",
+          "label": "橘メアリー",
+          "sourceURL": "https://javverse.com/actress/86",
+          "code": null
+        },
+        {
+          "rank": 85,
+          "kind": "actor",
+          "label": "小花のん",
+          "sourceURL": "https://javverse.com/actress/81",
+          "code": null
+        },
+        {
+          "rank": 86,
+          "kind": "actor",
+          "label": "宮城りえ",
+          "sourceURL": "https://javverse.com/actress/264",
+          "code": null
+        },
+        {
+          "rank": 87,
+          "kind": "actor",
+          "label": "山岸あや花（山岸逢花）",
+          "sourceURL": "https://javverse.com/actress/412",
+          "code": null
+        },
+        {
+          "rank": 88,
+          "kind": "actor",
+          "label": "山手梨愛",
+          "sourceURL": "https://javverse.com/actress/431",
+          "code": null
+        },
+        {
+          "rank": 89,
+          "kind": "actor",
+          "label": "深田えいみ",
+          "sourceURL": "https://javverse.com/actress/406",
+          "code": null
+        },
+        {
+          "rank": 90,
+          "kind": "actor",
+          "label": "花狩まい",
+          "sourceURL": "https://javverse.com/actress/554",
+          "code": null
+        },
+        {
+          "rank": 91,
+          "kind": "actor",
+          "label": "水卜さくら",
+          "sourceURL": "https://javverse.com/actress/744",
+          "code": null
+        },
+        {
+          "rank": 92,
+          "kind": "actor",
+          "label": "小倉七海",
+          "sourceURL": "https://javverse.com/actress/601",
+          "code": null
+        },
+        {
+          "rank": 93,
+          "kind": "actor",
+          "label": "松井日奈子",
+          "sourceURL": "https://javverse.com/actress/252",
+          "code": null
+        },
+        {
+          "rank": 94,
+          "kind": "actor",
+          "label": "宮西ひかる",
+          "sourceURL": "https://javverse.com/actress/281",
+          "code": null
+        },
+        {
+          "rank": 95,
+          "kind": "actor",
+          "label": "松本菜奈実",
+          "sourceURL": "https://javverse.com/actress/714",
+          "code": null
+        },
+        {
+          "rank": 96,
+          "kind": "actor",
+          "label": "宮下玲奈",
+          "sourceURL": "https://javverse.com/actress/1007",
+          "code": null
+        },
+        {
+          "rank": 97,
+          "kind": "actor",
+          "label": "辻井ほのか",
+          "sourceURL": "https://javverse.com/actress/89",
+          "code": null
+        },
+        {
+          "rank": 98,
+          "kind": "actor",
+          "label": "希島あいり",
+          "sourceURL": "https://javverse.com/actress/400",
+          "code": null
+        },
+        {
+          "rank": 99,
+          "kind": "actor",
+          "label": "水原みその",
+          "sourceURL": "https://javverse.com/actress/145",
+          "code": null
+        },
+        {
+          "rank": 100,
+          "kind": "actor",
+          "label": "東雲みれい",
+          "sourceURL": "https://javverse.com/actress/24113",
+          "code": null
+        }
+      ]
+    },
+    {
+      "id": "series",
+      "title": "FANZA 系列月榜",
+      "period": "FANZA 未公布；原站采集 10月18日",
+      "capturedAt": "2026-10-23T17:29:17.187Z",
+      "sourceURL": "https://javverse.com/rankings/dmm-series",
+      "coverage": "complete",
+      "entries": [
+        {
+          "rank": 1,
+          "kind": "series",
+          "label": "S1 GIRLS COLLECTION",
+          "sourceURL": "https://javverse.com/series/412",
+          "code": null
+        },
+        {
+          "rank": 2,
+          "kind": "series",
+          "label": "unfinished VR",
+          "sourceURL": "https://javverse.com/series/685",
+          "code": null
+        },
+        {
+          "rank": 3,
+          "kind": "series",
+          "label": "S1 VR",
+          "sourceURL": "https://javverse.com/series/470",
+          "code": null
+        },
+        {
+          "rank": 4,
+          "kind": "series",
+          "label": "MOODYZ 8KVR",
+          "sourceURL": "https://javverse.com/series/321",
+          "code": null
+        },
+        {
+          "rank": 5,
+          "kind": "series",
+          "label": "新人NO.1 STYLE",
+          "sourceURL": "https://javverse.com/series/837",
+          "code": null
+        },
+        {
+          "rank": 6,
+          "kind": "series",
+          "label": "マジックミラー号",
+          "sourceURL": "https://javverse.com/series/4",
+          "code": null
+        },
+        {
+          "rank": 7,
+          "kind": "series",
+          "label": "VR BEST",
+          "sourceURL": "https://javverse.com/series/15",
+          "code": null
+        },
+        {
+          "rank": 8,
+          "kind": "series",
+          "label": "SOD女子社員",
+          "sourceURL": "https://javverse.com/series/1",
+          "code": null
+        },
+        {
+          "rank": 9,
+          "kind": "series",
+          "label": "kawaii*VR",
+          "sourceURL": "https://javverse.com/series/13",
+          "code": null
+        },
+        {
+          "rank": 10,
+          "kind": "series",
+          "label": "一般男女モニタリングAV",
+          "sourceURL": "https://javverse.com/series/777",
+          "code": null
+        },
+        {
+          "rank": 11,
+          "kind": "series",
+          "label": "いつでも使えるオナホ後輩",
+          "sourceURL": "https://javverse.com/series/758",
+          "code": null
+        },
+        {
+          "rank": 12,
+          "kind": "series",
+          "label": "アイデアポケットBEST",
+          "sourceURL": "https://javverse.com/series/414",
+          "code": null
+        },
+        {
+          "rank": 13,
+          "kind": "series",
+          "label": "バコバコバスツアー",
+          "sourceURL": "https://javverse.com/series/6660",
+          "code": null
+        },
+        {
+          "rank": 14,
+          "kind": "series",
+          "label": "ガチナンパ！（ピーターズ）",
+          "sourceURL": "https://javverse.com/series/723",
+          "code": null
+        },
+        {
+          "rank": 15,
+          "kind": "series",
+          "label": "初生中解禁",
+          "sourceURL": "https://javverse.com/series/382",
+          "code": null
+        },
+        {
+          "rank": 16,
+          "kind": "series",
+          "label": "○○の凄テク我慢",
+          "sourceURL": "https://javverse.com/series/1199",
+          "code": null
+        },
+        {
+          "rank": 17,
+          "kind": "series",
+          "label": "ホイホイチャンプ",
+          "sourceURL": "https://javverse.com/series/37894",
+          "code": null
+        },
+        {
+          "rank": 18,
+          "kind": "series",
+          "label": "アイポケ8KVR",
+          "sourceURL": "https://javverse.com/series/360",
+          "code": null
+        },
+        {
+          "rank": 19,
+          "kind": "series",
+          "label": "E-BODY専属デビュー",
+          "sourceURL": "https://javverse.com/series/465",
+          "code": null
+        },
+        {
+          "rank": 20,
+          "kind": "series",
+          "label": "ハンターブラック",
+          "sourceURL": "https://javverse.com/series/7542",
+          "code": null
+        },
+        {
+          "rank": 21,
+          "kind": "series",
+          "label": "KMP Special VR",
+          "sourceURL": "https://javverse.com/series/1607",
+          "code": null
+        },
+        {
+          "rank": 22,
+          "kind": "series",
+          "label": "本中-VR",
+          "sourceURL": "https://javverse.com/series/888",
+          "code": null
+        },
+        {
+          "rank": 23,
+          "kind": "series",
+          "label": "First Impression",
+          "sourceURL": "https://javverse.com/series/77",
+          "code": null
+        },
+        {
+          "rank": 24,
+          "kind": "series",
+          "label": "女優BEST（ムーディーズ）",
+          "sourceURL": "https://javverse.com/series/790",
+          "code": null
+        },
+        {
+          "rank": 25,
+          "kind": "series",
+          "label": "ノーカット真正中出し",
+          "sourceURL": "https://javverse.com/series/962",
+          "code": null
+        },
+        {
+          "rank": 26,
+          "kind": "series",
+          "label": "Madonna8KVR",
+          "sourceURL": "https://javverse.com/series/718",
+          "code": null
+        },
+        {
+          "rank": 27,
+          "kind": "series",
+          "label": "放課後ラブホで何度も、何度も、セックスしてしまった…",
+          "sourceURL": "https://javverse.com/series/1286",
+          "code": null
+        },
+        {
+          "rank": 28,
+          "kind": "series",
+          "label": "ザ・マジックミラー（MM号）",
+          "sourceURL": "https://javverse.com/series/2078",
+          "code": null
+        },
+        {
+          "rank": 29,
+          "kind": "series",
+          "label": "マジックミラー便（MM便）",
+          "sourceURL": "https://javverse.com/series/1224",
+          "code": null
+        },
+        {
+          "rank": 30,
+          "kind": "series",
+          "label": "kawaii*新人デビュ→",
+          "sourceURL": "https://javverse.com/series/1259",
+          "code": null
+        },
+        {
+          "rank": 31,
+          "kind": "series",
+          "label": "男はボク一人",
+          "sourceURL": "https://javverse.com/series/7900",
+          "code": null
+        },
+        {
+          "rank": 32,
+          "kind": "series",
+          "label": "ムーハメ",
+          "sourceURL": "https://javverse.com/series/483",
+          "code": null
+        },
+        {
+          "rank": 33,
+          "kind": "series",
+          "label": "天井特化アングル",
+          "sourceURL": "https://javverse.com/series/333",
+          "code": null
+        },
+        {
+          "rank": 34,
+          "kind": "series",
+          "label": "淫乱絶頂生徒指導",
+          "sourceURL": "https://javverse.com/series/44696",
+          "code": null
+        },
+        {
+          "rank": 35,
+          "kind": "series",
+          "label": "特化VR",
+          "sourceURL": "https://javverse.com/series/1053",
+          "code": null
+        },
+        {
+          "rank": 36,
+          "kind": "series",
+          "label": "エロス覚醒",
+          "sourceURL": "https://javverse.com/series/87673",
+          "code": null
+        },
+        {
+          "rank": 37,
+          "kind": "series",
+          "label": "担任教師のコトが大好きな生徒の私は放課後ラブホへ先生拉致って、ビッタンビッタン杭打ちまたがり何度も、何度も、中出しさせるの",
+          "sourceURL": "https://javverse.com/series/97344",
+          "code": null
+        },
+        {
+          "rank": 38,
+          "kind": "series",
+          "label": "SODSTAR総集編",
+          "sourceURL": "https://javverse.com/series/280",
+          "code": null
+        },
+        {
+          "rank": 39,
+          "kind": "series",
+          "label": "マジックミラーの向こうには○○",
+          "sourceURL": "https://javverse.com/series/774",
+          "code": null
+        },
+        {
+          "rank": 40,
+          "kind": "series",
+          "label": "裸神",
+          "sourceURL": "https://javverse.com/series/629",
+          "code": null
+        },
+        {
+          "rank": 41,
+          "kind": "series",
+          "label": "アイポケ VR",
+          "sourceURL": "https://javverse.com/series/2026",
+          "code": null
+        },
+        {
+          "rank": 42,
+          "kind": "series",
+          "label": "休日に彼女と。",
+          "sourceURL": "https://javverse.com/series/781",
+          "code": null
+        },
+        {
+          "rank": 43,
+          "kind": "series",
+          "label": "ホイホイロード",
+          "sourceURL": "https://javverse.com/series/30872",
+          "code": null
+        },
+        {
+          "rank": 44,
+          "kind": "series",
+          "label": "脅迫スイートルーム",
+          "sourceURL": "https://javverse.com/series/1146",
+          "code": null
+        },
+        {
+          "rank": 45,
+          "kind": "series",
+          "label": "妻には口が裂けても言えません、義母さんを孕ませてしまったなんて…。",
+          "sourceURL": "https://javverse.com/series/335",
+          "code": null
+        },
+        {
+          "rank": 46,
+          "kind": "series",
+          "label": "マニア倶楽部プレミアム",
+          "sourceURL": "https://javverse.com/series/19987",
+          "code": null
+        },
+        {
+          "rank": 47,
+          "kind": "series",
+          "label": "人妻秘書、汗と接吻に満ちた社長室中出し性交",
+          "sourceURL": "https://javverse.com/series/2975",
+          "code": null
+        },
+        {
+          "rank": 48,
+          "kind": "series",
+          "label": "人妻湯恋旅行",
+          "sourceURL": "https://javverse.com/series/376",
+          "code": null
+        },
+        {
+          "rank": 49,
+          "kind": "series",
+          "label": "女優BEST（アイデアポケット）",
+          "sourceURL": "https://javverse.com/series/1578",
+          "code": null
+        },
+        {
+          "rank": 50,
+          "kind": "series",
+          "label": "E-BODY BEST PROPORTIONS",
+          "sourceURL": "https://javverse.com/series/755",
+          "code": null
+        },
+        {
+          "rank": 51,
+          "kind": "series",
+          "label": "初体験○本番スペシャル",
+          "sourceURL": "https://javverse.com/series/9811",
+          "code": null
+        },
+        {
+          "rank": 52,
+          "kind": "series",
+          "label": "この子ヤバイ！",
+          "sourceURL": "https://javverse.com/series/1509",
+          "code": null
+        },
+        {
+          "rank": 53,
+          "kind": "series",
+          "label": "How to学園",
+          "sourceURL": "https://javverse.com/series/35254",
+          "code": null
+        },
+        {
+          "rank": 54,
+          "kind": "series",
+          "label": "AIリマスター版",
+          "sourceURL": "https://javverse.com/series/463",
+          "code": null
+        },
+        {
+          "rank": 55,
+          "kind": "series",
+          "label": "母子交尾",
+          "sourceURL": "https://javverse.com/series/41321",
+          "code": null
+        },
+        {
+          "rank": 56,
+          "kind": "series",
+          "label": "超カワイイ同期女子の一日彼氏になったボク",
+          "sourceURL": "https://javverse.com/series/946",
+          "code": null
+        },
+        {
+          "rank": 57,
+          "kind": "series",
+          "label": "E-BODY VR",
+          "sourceURL": "https://javverse.com/series/1408",
+          "code": null
+        },
+        {
+          "rank": 58,
+          "kind": "series",
+          "label": "交わる体液、濃密セックス",
+          "sourceURL": "https://javverse.com/series/3273",
+          "code": null
+        },
+        {
+          "rank": 59,
+          "kind": "series",
+          "label": "●●で、ヌキまくりの●●分！",
+          "sourceURL": "https://javverse.com/series/7012",
+          "code": null
+        },
+        {
+          "rank": 60,
+          "kind": "series",
+          "label": "熟女の浮気は本気のSEX",
+          "sourceURL": "https://javverse.com/series/63",
+          "code": null
+        },
+        {
+          "rank": 61,
+          "kind": "series",
+          "label": "kawaii*ベスト",
+          "sourceURL": "https://javverse.com/series/1016",
+          "code": null
+        },
+        {
+          "rank": 62,
+          "kind": "series",
+          "label": "人妻の浮気心",
+          "sourceURL": "https://javverse.com/series/46",
+          "code": null
+        },
+        {
+          "rank": 63,
+          "kind": "series",
+          "label": "「もうイッてるってばぁ！」状態で何度も中出し！",
+          "sourceURL": "https://javverse.com/series/10484",
+          "code": null
+        },
+        {
+          "rank": 64,
+          "kind": "series",
+          "label": "GETシリーズ",
+          "sourceURL": "https://javverse.com/series/12",
+          "code": null
+        },
+        {
+          "rank": 65,
+          "kind": "series",
+          "label": "スペンス乳腺開発クリニック",
+          "sourceURL": "https://javverse.com/series/690",
+          "code": null
+        },
+        {
+          "rank": 66,
+          "kind": "series",
+          "label": "うちの妻○○を寝取ってください",
+          "sourceURL": "https://javverse.com/series/2",
+          "code": null
+        },
+        {
+          "rank": 67,
+          "kind": "series",
+          "label": "まんキャパオーバー無制限中出し",
+          "sourceURL": "https://javverse.com/series/927",
+          "code": null
+        },
+        {
+          "rank": 68,
+          "kind": "series",
+          "label": "初撮り人妻ドキュメント",
+          "sourceURL": "https://javverse.com/series/251",
+          "code": null
+        },
+        {
+          "rank": 69,
+          "kind": "series",
+          "label": "完ナマSTYLE@○○",
+          "sourceURL": "https://javverse.com/series/3037",
+          "code": null
+        },
+        {
+          "rank": 70,
+          "kind": "series",
+          "label": "PREMIUM 8KVR",
+          "sourceURL": "https://javverse.com/series/1072",
+          "code": null
+        },
+        {
+          "rank": 71,
+          "kind": "series",
+          "label": "初撮り五十路妻ドキュメント",
+          "sourceURL": "https://javverse.com/series/249",
+          "code": null
+        },
+        {
+          "rank": 72,
+          "kind": "series",
+          "label": "タオル一枚男湯入ってみませんか？",
+          "sourceURL": "https://javverse.com/series/3",
+          "code": null
+        },
+        {
+          "rank": 73,
+          "kind": "series",
+          "label": "勃起見せつけシチュエーション",
+          "sourceURL": "https://javverse.com/series/2097",
+          "code": null
+        },
+        {
+          "rank": 74,
+          "kind": "series",
+          "label": "ドリームウーマン",
+          "sourceURL": "https://javverse.com/series/34",
+          "code": null
+        },
+        {
+          "rank": 75,
+          "kind": "series",
+          "label": "BEST（作品集）",
+          "sourceURL": "https://javverse.com/series/11",
+          "code": null
+        },
+        {
+          "rank": 76,
+          "kind": "series",
+          "label": "金玉からっぽにしてあげる",
+          "sourceURL": "https://javverse.com/series/1542",
+          "code": null
+        },
+        {
+          "rank": 77,
+          "kind": "series",
+          "label": "素人参加バラエティー",
+          "sourceURL": "https://javverse.com/series/9677",
+          "code": null
+        },
+        {
+          "rank": 78,
+          "kind": "series",
+          "label": "隣人のゴミ部屋で異臭中年おやじに抜かずの連撃中出し",
+          "sourceURL": "https://javverse.com/series/100318",
+          "code": null
+        },
+        {
+          "rank": 79,
+          "kind": "series",
+          "label": "沼",
+          "sourceURL": "https://javverse.com/series/504",
+          "code": null
+        },
+        {
+          "rank": 80,
+          "kind": "series",
+          "label": "人妻の花びらめくり",
+          "sourceURL": "https://javverse.com/series/780",
+          "code": null
+        },
+        {
+          "rank": 81,
+          "kind": "series",
+          "label": "部活帰りの汗だく美少女と",
+          "sourceURL": "https://javverse.com/series/208067",
+          "code": null
+        },
+        {
+          "rank": 82,
+          "kind": "series",
+          "label": "やっぱり、妻が好きだ！",
+          "sourceURL": "https://javverse.com/series/3192",
+          "code": null
+        },
+        {
+          "rank": 83,
+          "kind": "series",
+          "label": "※台本一切無し！一ヶ月禁欲した○○を焦らして寸止めを繰り返し極限まで感度を高めた後のケダモノ大乱交",
+          "sourceURL": "https://javverse.com/series/1256",
+          "code": null
+        },
+        {
+          "rank": 84,
+          "kind": "series",
+          "label": "MADOOOON！！！！ ハメ撮り",
+          "sourceURL": "https://javverse.com/series/16886",
+          "code": null
+        },
+        {
+          "rank": 85,
+          "kind": "series",
+          "label": "出張先が記録的豪雨で童貞部下と突然相部屋に…",
+          "sourceURL": "https://javverse.com/series/1284",
+          "code": null
+        },
+        {
+          "rank": 86,
+          "kind": "series",
+          "label": "キスだけ…兄妹なんだから…",
+          "sourceURL": "https://javverse.com/series/209301",
+          "code": null
+        },
+        {
+          "rank": 87,
+          "kind": "series",
+          "label": "あなた、許して…。",
+          "sourceURL": "https://javverse.com/series/1209",
+          "code": null
+        },
+        {
+          "rank": 88,
+          "kind": "series",
+          "label": "回春アジアンメンズエステ",
+          "sourceURL": "https://javverse.com/series/933",
+          "code": null
+        },
+        {
+          "rank": 89,
+          "kind": "series",
+          "label": "AVdebut（女子社員）",
+          "sourceURL": "https://javverse.com/series/3504",
+          "code": null
+        },
+        {
+          "rank": 90,
+          "kind": "series",
+          "label": "『週3日、妻とSEXをしている。』と自慢してきた友人から週5日、毎回〇発、合計〇〇発中出ししてそいつの妻を寝取ってやった。",
+          "sourceURL": "https://javverse.com/series/806",
+          "code": null
+        },
+        {
+          "rank": 91,
+          "kind": "series",
+          "label": "すれてない",
+          "sourceURL": "https://javverse.com/series/30083",
+          "code": null
+        },
+        {
+          "rank": 92,
+          "kind": "series",
+          "label": "死ぬほど大嫌いな上司と出張先の温泉旅館でまさかの相部屋に…",
+          "sourceURL": "https://javverse.com/series/115932",
+          "code": null
+        },
+        {
+          "rank": 93,
+          "kind": "series",
+          "label": "完全プライベート映像",
+          "sourceURL": "https://javverse.com/series/55",
+          "code": null
+        },
+        {
+          "rank": 94,
+          "kind": "series",
+          "label": "イッてもイッてもイカされガクブルエクスタシー！はじめての追撃絶頂",
+          "sourceURL": "https://javverse.com/series/72780",
+          "code": null
+        },
+        {
+          "rank": 95,
+          "kind": "series",
+          "label": "だれとでも定額挿れ放題！",
+          "sourceURL": "https://javverse.com/series/3255",
+          "code": null
+        },
+        {
+          "rank": 96,
+          "kind": "series",
+          "label": "美少女コスプレイヤー人格矯正シリーズ",
+          "sourceURL": "https://javverse.com/series/75571",
+          "code": null
+        },
+        {
+          "rank": 97,
+          "kind": "series",
+          "label": "寝取られ種付けプレス",
+          "sourceURL": "https://javverse.com/series/2987",
+          "code": null
+        },
+        {
+          "rank": 98,
+          "kind": "series",
+          "label": "○○NTR",
+          "sourceURL": "https://javverse.com/series/461",
+          "code": null
+        },
+        {
+          "rank": 99,
+          "kind": "series",
+          "label": "S1専属女優共演",
+          "sourceURL": "https://javverse.com/series/71215",
+          "code": null
+        },
+        {
+          "rank": 100,
+          "kind": "series",
+          "label": "AIリマスター（SODクリエイト）",
+          "sourceURL": "https://javverse.com/series/274",
+          "code": null
+        }
+      ]
+    }
+  ]
+}

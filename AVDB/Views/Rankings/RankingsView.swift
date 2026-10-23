@@ -38,7 +38,7 @@ struct RankingsView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private enum RankingSourceDestination: String, Identifiable, Hashable {
-        case javRankingHome, javRankingTopics, missAV, javLibrary
+        case javRankingHome, javRankingTopics, missAV, javLibrary, javVerse
         var id: String { rawValue }
     }
 
@@ -169,6 +169,7 @@ struct RankingsView: View {
             case .javRankingTopics: JRBackendView(route: "topics", title: "全部榜单")
             case .missAV: MissAVRankingView()
             case .javLibrary: JAVLibraryRankingView()
+            case .javVerse: JavVerseView()
             }
         }
         .sheet(isPresented: $showTopFilter) {
@@ -238,6 +239,12 @@ struct RankingsView: View {
                     Label("全部榜单", systemImage: "square.grid.2x2")
                 }
                 .accessibilityIdentifier("javranking-topics-shortcut")
+            }
+            Section("JavVerse") {
+                Button { sourceDestination = .javVerse } label: {
+                    Label("原站名单 · 静态快照", systemImage: "list.number")
+                }
+                .accessibilityIdentifier("javverse-source-entry")
             }
             Section("MissAV") {
                 Button { sourceDestination = .missAV } label: {
