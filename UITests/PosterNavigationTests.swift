@@ -1199,10 +1199,17 @@ extension PosterNavigationTests {
         func row(_ text: String) -> XCUIElement {
             app.buttons.matching(identifier: "subtitle.candidate").matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
         }
-        func reveal(_ element: XCUIElement) {
+        func reveal(_ element: XCUIElement, towardTop: Bool = false) {
+            // iPad sheets virtualize language rows below the visible Form, even when
+            // the parent is hittable. Scroll the Form, not the full-screen backdrop.
+            let form = app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.tables.firstMatch
             for _ in 0..<12 {
-                if element.exists && element.isHittable { return }
-                app.swipeUp()
+                let viewport = form.frame.insetBy(dx: 0, dy: 55)
+                if element.exists && element.isHittable && viewport.contains(element.frame) { return }
+                let down = element.exists ? element.frame.midY < viewport.minY : towardTop
+                let start = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.35 : 0.75))
+                let end = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: down ? 0.75 : 0.35))
+                start.press(forDuration: 0.05, thenDragTo: end)
             }
             XCTFail("Could not reveal subtitle card: \(app.debugDescription)")
         }
@@ -1210,8 +1217,8 @@ extension PosterNavigationTests {
             let e = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in predicate() }, object: app)
             XCTAssertEqual(XCTWaiter.wait(for: [e], timeout: 10), .completed, message)
         }
-        func blankTap(_ element: XCUIElement) {
-            reveal(element); XCTAssertGreaterThanOrEqual(element.frame.height, 44)
+        func blankTap(_ element: XCUIElement, towardTop: Bool = false) {
+            reveal(element, towardTop: towardTop); XCTAssertGreaterThanOrEqual(element.frame.height, 44)
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         }
         let a = row("延迟字幕 A"), b = row("失败可重试 B"), c = row("快速字幕 C")
@@ -1230,14 +1237,14 @@ extension PosterNavigationTests {
         let parent = row("中性语言父行")
         blankTap(parent)
         let language = app.buttons["subtitle.language.简体中文 (zh-CN)"]
-        wait({ language.exists }, "Parent must expand languages, not falsely select")
+        wait({ parent.label.contains("请选择语言") }, "Parent must expand languages, not falsely select")
         blankTap(language)
-        blankTap(parent) // cached expansion must not cancel language download
+        blankTap(parent, towardTop: true) // cached expansion must not cancel language download
+        reveal(language)
         wait({ (language.value as? String) == "已加载" }, "Whole language row is selectable")
         let languageShot = XCTAttachment(screenshot: app.screenshot()); languageShot.name = "233-neutral-language-loaded"; languageShot.lifetime = .keepAlways; add(languageShot)
         // Reload A and finish while pending; re-open must show cancelled, never late-green A.
-        for _ in 0..<5 { if a.isHittable { break }; app.swipeDown() }
-        blankTap(a)
+        blankTap(a, towardTop: true)
         app.buttons["subtitle.panel.done"].tap()
         XCTAssertTrue(entry.waitForExistence(timeout: 5)); entry.tap()
         reveal(a)
