@@ -312,7 +312,9 @@ actor OnlineRequests {
                 guard let line = routes.first else { throw OnlineFailure.noMatch }
                 let result = try await OnlinePlaybackModel.bounded { try await real.resolve(line,number:"START-642",versions:false) }
                 print("LIVE MemoJav exact discovery + literal public flow + unprotected validated HLS: PASS; host=\(result.url.host ?? ""); no segments; first-frame UNVERIFIED")
-            } catch { print("LIVE MemoJav: \(OnlineFailure.classify(error).localizedDescription); no bypass; first-frame UNVERIFIED") }
+            } catch {
+                print("LIVE MemoJav: \(OnlineFailure.classify(error).localizedDescription); no bypass; first-frame UNVERIFIED")
+            }
         }
     }
 }
