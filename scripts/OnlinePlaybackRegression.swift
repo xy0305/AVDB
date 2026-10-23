@@ -308,8 +308,63 @@ actor OnlineRequests {
         try await Task.sleep(nanoseconds: 200_000_000)
         check(late.plan == nil && late.states.isEmpty && late.resolutions.isEmpty && late.queryMessages.isEmpty, "account reset defeats late source/line result")
         check(cancelled.queryMessages.isEmpty, "reset clears source-scoped capacity message")
-        print("PASS \(assertions) production online playback assertions; six registry, exact DOM/JSON/identity, bounded safe HLS, independent model and credential isolation; build 231 path-graph")
+        // FNS-249 raw public HTML has no literal playlist, only this word table.
+        // The function body is deliberately never evaluated.
+        let fnsPacked = #"eval(function(p,a,c,k,e,d){/* never execute */return p}('f=\'8://7.6/5-4-3-2-1/e.0\';d=\'8://7.6/5-4-3-2-1/c/9.0\';b=\'8://7.6/5-4-3-2-1/a/9.0\';',16,16,'m3u8|1769e38e302b|919c|4986|fcd3|57b8359e|mrstcdn.store|surrit|https|video|1080p|source1280|720p|source842|playlist|source'.split('|'),0,{}))"#
+        let fnsPrimary = "https://surrit.mrstcdn.store/57b8359e-fcd3-4986-919c-1769e38e302b/playlist.m3u8"
+        check(try OnlineAdditional.missavMedia("<script>" + fnsPacked + "</script>").absoluteString == fnsPrimary, "FNS-249 actual raw packed source resolves primary, not another version")
+        fails(.unsupported) { _ = try OnlineAdditional.missavMedia("<script>" + fnsPacked.replacingOccurrences(of: "f=\\'8:", with: "alert(1);f=\\'8:") + "</script>") }
+        fails(.unsupported) { _ = try OnlineAdditional.missavMedia("<script>" + fnsPacked + fnsPacked + "</script>") }
+        fails(.tooLarge) { _ = try OnlineAdditional.missavMedia("<script>" + fnsPacked.replacingOccurrences(of: ",16,16,", with: ",16,99999,") + "</script>") }
+        fails(.unsafe) { _ = try OnlineAdditional.missavMedia("<script>" + fnsPacked.replacingOccurrences(of: "mrstcdn.store", with: "local") + "</script>") }
+        fails(.unsupported) { _ = try OnlineAdditional.missavMedia("<script>" + fnsPacked + "</script><video class='player' src='https://surrit.other.media/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/playlist.m3u8'></video>") }
+        let fnsRoot = URL(string:fnsPrimary)!
+        let fnsMaster = Data("#EXTM3U\n#EXT-X-TOKEN=opaque-public-extension\n#EXT-X-STREAM-INF:BANDWIDTH=3850890\n720p/video.m3u8\n".utf8)
+        let fnsLeaf = Data("#EXTM3U\n#EXT-X-TOKEN=opaque-public-extension\n#EXTINF:4.004000,\nvideo0.jpeg\n#EXT-X-ENDLIST\n".utf8)
+        check(try OnlineManifest.parse(fnsMaster, at:fnsRoot, root:fnsRoot).variants.count == 1, "FNS-249 token comment retains standard variant graph")
+        check(try OnlineManifest.parse(fnsLeaf, at:fnsRoot, root:fnsRoot).variants.isEmpty, "FNS-249 .jpeg TS segments allowed by origin, not extension")
+        let fnsLine = OnlineLine(source:.missav,recordID:"fns-249",code:"FNS-249",version:"原始版本",lineKey:"primary",detailURL:URL(string:"https://missav.fans/cn/fns-249")!)
+        let fnsLog = OnlineRequests()
+        let fnsProvider = OnlineProvider(transport:OnlineTransport(loader:{ request in
+            await fnsLog.add(request)
+            let u = request.url!
+            if u.host == "missav.fans" { return Data(("<link rel='canonical' href='https://missav.fans/cn/fns-249'><h1>FNS-249 Neutral</h1><script>" + fnsPacked + "</script>").utf8) }
+            if u == fnsRoot { return fnsMaster }
+            if u.path.hasSuffix("/720p/video.m3u8") { return fnsLeaf }
+            throw OnlineFailure.unsafe
+        }))
+        check(try await fnsProvider.resolve(fnsLine,number:"FNS-249",versions:true).url == fnsRoot, "FNS-249 actual raw shape reaches production validated plan")
+        check(await fnsLog.count() == 3, "only selected detail, master, leaf; no key guessing or media download")
+        for address in ["10.0.0.1", "192.168.1.1", "198.18.8.68", "198.19.0.3", "fd27:712::c612:844", "127.0.0.1"] {
+            check(!OnlineMediaScope.publicAddress(address), "private and fake-IP DNS stays blocked, never a CDN allowlist")
+        }
+        fails(.unsafe) { _ = try OnlineManifest.parse(Data("#EXTM3U\n#EXTINF:4,\nhttps://other.example.net/video0.jpeg".utf8),at:fnsRoot,root:fnsRoot) }
+        print("PASS \(assertions) production online playback assertions; build 232 FNS-249 static public assignments, manifest graph, private-DNS negatives")
         if ProcessInfo.processInfo.environment["ONLINE_PLAYBACK_LIVE"] == "1" {
+            for source in [OnlineSource.jable, .missav, .av01] {
+                var stage = "exact-search"
+                do {
+                    let real = OnlineProvider()
+                    let routes = try await OnlinePlaybackModel.bounded { try await real.discover(source, number:"FNS-249", versions:true) }
+                    print("LIVE FNS-249 \(source.rawValue) exact candidates=\(routes.map { $0.version }.joined(separator:","))")
+                    guard let line = routes.first(where: { $0.version == "原始版本" }) else { throw OnlineFailure.noMatch }
+                    if source != .av01, let page = line.detailURL {
+                        stage = "identity-detail"
+                        let html = try OnlineAdditional.exactDetail(try await real.transport.fetch(page,cap:2*1024*1024),page:page,code:"FNS-249",source:source)
+                        stage = "static-player-source"
+                        let url = try OnlineAdditional.staticMedia(html,source:source)
+                        print("LIVE FNS-249 \(source.rawValue) page-issued-host=\(url.host ?? "")")
+                        stage = "public-DNS-preflight"
+                        try await OnlineMediaScope(root:url).validateDNS()
+                        print("LIVE FNS-249 \(source.rawValue) DNS=public")
+                    }
+                    stage = "production-resolve-all-manifests-and-identity-keys"
+                    let result = try await OnlinePlaybackModel.bounded { try await real.resolve(line,number:"FNS-249",versions:true) }
+                    print("LIVE FNS-249 \(source.rawValue) validated-plan=PASS host=\(result.url.host ?? ""); no segments, first-frame UNVERIFIED")
+                } catch {
+                    print("LIVE FNS-249 \(source.rawValue) stage=\(stage) result=\(OnlineFailure.classify(error).localizedDescription); no bypass, first-frame UNVERIFIED")
+                }
+            }
             do {
                 let real = OnlineProvider(); let routes = try await OnlinePlaybackModel.bounded { try await real.discover(.memojav,number:"START-642",versions:false) }
                 guard let line = routes.first else { throw OnlineFailure.noMatch }

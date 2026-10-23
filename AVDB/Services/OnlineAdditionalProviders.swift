@@ -123,8 +123,40 @@ enum OnlineAdditional {
         guard !result.contains(where: { $0.isWhitespace || $0.asciiValue.map({ $0 < 32 || $0 == 127 }) == true }) else { throw OnlineFailure.unsafe }
         return result
     }
-    // Direct public playlist only. Packed word-table reconstruction, UUID guessing
-    // and alternate-host polling are not independently validated and stay unsupported.
+    // A small static data decoder for the observed public word-table container.
+    // Never evaluate its function body. The decoded result must consist ENTIRELY
+    // of three known URL assignments; executable statements cannot be returned.
+    static func missavPackedSource(_ script: String) throws -> String? {
+        let pattern = #"return\s+p\}\('((?:\\.|[^'\\])*)',(\d+),(\d+),'([^'\\]*)'\.split\('\|'\),0,\{\}\)\)"#
+        let blocks = JRHTML.matches(pattern, script)
+        guard !blocks.isEmpty else { return nil }
+        guard blocks.count == 1 else { throw OnlineFailure.unsupported }
+        let m = blocks[0]
+        guard let radix = Int(m[2]), (2...36).contains(radix), let count = Int(m[3]), (1...128).contains(count),
+              m[1].count <= 8192, m[4].count <= 8192 else { throw OnlineFailure.tooLarge }
+        let words = m[4].components(separatedBy: "|")
+        guard words.count == count, words.allSatisfy({ $0.count <= 256 && $0.utf8.allSatisfy { (33...126).contains($0) && $0 != 39 && $0 != 92 } }) else { throw OnlineFailure.parse }
+        var decoded = try jsURLLiteral("'" + m[1] + "'")
+        // One pass, bounded replacements, not the remote Packer function.
+        let regex = try NSRegularExpression(pattern: #"\b[0-9a-z]+\b"#)
+        for token in regex.matches(in: decoded, range: NSRange(decoded.startIndex..., in: decoded)).reversed() {
+            guard let range = Range(token.range, in: decoded), let index = Int(decoded[range], radix: radix),
+                  index < words.count, !words[index].isEmpty else { continue }
+            decoded.replaceSubrange(range, with: words[index])
+        }
+        let assignments = JRHTML.matches(#"(source(?:842|1280)?)='([^'\s]+)';"#, decoded)
+        guard (1...3).contains(assignments.count), assignments.map({ $0[0] }).joined() == decoded,
+              Set(assignments.map { $0[1] }).count == assignments.count,
+              let primary = assignments.first(where: { $0[1] == "source" }),
+              let root = URL(string: primary[2]) else { throw OnlineFailure.unsupported }
+        guard OnlinePolicy.discoveredMedia(root, source: .missav) else { throw OnlineFailure.unsafe }
+        for row in assignments {
+            guard let url = URL(string: row[2]), OnlinePolicy.discoveredMedia(url, source: .missav),
+                  OnlinePolicy.bound(url, to: root), url.path.split(separator: "/").first == root.path.split(separator: "/").first else { throw OnlineFailure.unsafe }
+        }
+        return primary[2] // Page-issued master, never a guessed UUID or rendition.
+    }
+    // Literal player source or the strictly bounded public assignment container.
     static func missavMedia(_ text: String) throws -> URL {
         var found = Set<URL>()
         func consider(_ raw: String) throws {
@@ -145,10 +177,8 @@ enum OnlineAdditional {
             }
         }
         for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
-            for match in JRHTML.matches(#"https?:\\?/\\?/(?:surrit\.[^\"'\\/\s]+)/(?:[0-9a-fA-F-]{36})(?:\\?/[^\"'\\<\s]*)?\.m3u8"#, block[1]) {
-                try consider(match[0])
-            }
-            for match in JRHTML.matches(#"\b(?:var|let|const)\s+(?:source|hlsUrl)\s*=\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')\s*(?:;|$)"#, block[1]) {
+            if let raw = try missavPackedSource(block[1]) { try consider(raw) }
+            for match in JRHTML.matches(#"\b(?:(?:var|let|const)\s+)?(?:source|hlsUrl)\s*=\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')\s*(?:;|$)"#, block[1]) {
                 try consider(try jsURLLiteral(match[1]))
             }
         }

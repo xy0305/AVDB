@@ -124,6 +124,9 @@ jobs:
           set -euo pipefail
           app_path="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/AVDB.app"
           test -d "$app_path"
+          # Bind the delivered IPA to the exact checkout (not just a build number).
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceCommit string $GITHUB_SHA" "$app_path/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app_path/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$app_path" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
           find "$RUNNER_TEMP/ipa/Payload" -name '*.xcent' -delete

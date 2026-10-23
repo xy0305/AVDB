@@ -210,7 +210,7 @@ struct OnlineMediaScope: Sendable {
         try await Task.detached(priority: .utility) {
             #if canImport(Darwin)
             var result: UnsafeMutablePointer<addrinfo>?
-            guard getaddrinfo(host, nil, nil, &result) == 0, let first = result else { throw OnlineFailure.unsafe }
+            guard getaddrinfo(host, nil, nil, &result) == 0, let first = result else { throw OnlineFailure.resolver }
             defer { freeaddrinfo(first) }
             var cursor: UnsafeMutablePointer<addrinfo>? = first; var count = 0
             while let item = cursor {
