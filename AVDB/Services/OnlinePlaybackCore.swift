@@ -506,7 +506,7 @@ struct OnlineProvider: Sendable {
         while !pending.isEmpty {
             let (url,depth) = pending.removeFirst()
             guard !seen.contains(url) else { continue }
-            guard seen.count < 8, depth <= 3 else { throw OnlineFailure.tooLarge }
+            guard seen.count < 12, depth <= 3 else { throw OnlineFailure.tooLarge }
             seen.insert(url)
             let manifest = try OnlineManifest.parse(try await transport.fetch(url, cap: 512*1024, headers: headers, scope: scope), at: url, root: media)
             for key in manifest.keys { keys.insert(key) }
