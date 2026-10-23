@@ -3,10 +3,10 @@ import Foundation
 import SwiftUI
 @MainActor final class OnlineSubtitleModel: ObservableObject {
     @Published var query = "" { didSet { if query != oldValue { cancelPending(); results = []; languages = [:]; detailStates = [:] } } }
-    @Published var results: [OnlineSubtitleCandidate] = [] { didSet { rebuildDisplayRows() } }
+    @Published var results: [OnlineSubtitleCandidate] = []
     @Published var status = "尚未搜索"
     @Published var sourceStates: [OnlineSubtitleSource: String] = [:]
-    @Published var languages: [String: [OnlineSubtitleCandidate]] = [:] { didSet { rebuildDisplayRows() } }
+    @Published var languages: [String: [OnlineSubtitleCandidate]] = [:]
     @Published var detailStates: [String: String] = [:]
     @Published var selected: OnlineSubtitleCandidate?
     @Published var cues: [OnlineSubtitleCue] = []
@@ -15,17 +15,6 @@ import SwiftUI
     @Published var busy = false
     @Published var rowStates: [String: String] = [:]
     @Published private(set) var pendingID: String?
-    @Published private(set) var displayRows: [SubtitleDisplayRow] = []
-    private func rebuildDisplayRows() {
-        displayRows = results.flatMap { row -> [SubtitleDisplayRow] in
-            var items = [SubtitleDisplayRow(candidate: row, kind: .candidate)]
-            if row.source == .subtitleCat {
-                items += (languages[row.id] ?? []).map { SubtitleDisplayRow(candidate: $0, kind: .language) }
-                items.append(SubtitleDisplayRow(candidate: row, kind: .link))
-            }
-            return items
-        }
-    }
     private var selectionStatus: String?
     private var details: [String: Task<Void, Never>] = [:]
     private var state = OnlineSubtitleSearchState()
@@ -116,10 +105,7 @@ import SwiftUI
             details[row.id] = Task { [weak self] in
                 do {
                     let data = try await fetch(row.url, .catDetail)
-                    // Detail Task inherits MainActor. Parsing up to 1 MB of HTML must not.
-                    let variants = try await Task.detached(priority: .userInitiated) {
-                        try SubtitleCatProvider.languages(data, row: row)
-                    }.value
+                    let variants = try SubtitleCatProvider.languages(data, row: row)
                     guard let self, self.state.generation == epoch, !Task.isCancelled else { return }
                     self.languages[row.id] = variants
                     self.detailStates[row.id] = variants.isEmpty ? "尚无现成字幕，请到原站处理；不会自动翻译" : "请选择语言（仅现成下载）"

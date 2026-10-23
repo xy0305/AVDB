@@ -17,14 +17,6 @@ struct OnlineSubtitleCandidate: Identifiable, Equatable {
     var source: OnlineSubtitleSource = .xunlei
     var parentID: String? = nil
 }
-// Cached topology shared by native presentation and model/core regression tests.
-struct SubtitleDisplayRow: Identifiable, Equatable {
-    enum Kind: Equatable { case candidate, language, link }
-    let candidate: OnlineSubtitleCandidate
-    let kind: Kind
-    var id: String { "\(kind):\(candidate.id)" }
-}
-
 struct OnlineSubtitleCue: Equatable {
     let start: Double
     let end: Double
@@ -401,127 +393,10 @@ struct SubtitlePresentationOverlay: View {
     }
 }
 
-// Flat, cached row topology keeps Form lazy even with many expanded languages.
-// Value-only Equatable rows do not observe playback/model-wide publishers.
-private struct SubtitleResultRow: View, Equatable {
-    let item: SubtitleDisplayRow
-    let selected: OnlineSubtitleCandidate?
-    let feedback: String?
-    let detail: String?
-    let pending: Bool
-    let choose: (OnlineSubtitleCandidate) -> Void
-    private var isSelected: Bool { selected?.id == item.candidate.id || selected?.parentID == item.candidate.id }
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.item == rhs.item && lhs.isSelected == rhs.isSelected &&
-        (lhs.isSelected ? lhs.selected : nil) == (rhs.isSelected ? rhs.selected : nil) &&
-        lhs.feedback == rhs.feedback && lhs.detail == rhs.detail && lhs.pending == rhs.pending
-    }
-    var body: some View {
-        // A single Group branch is a single Form row; identity never depends on selection.
-        Group {
-            switch item.kind {
-            case .candidate:
-                let row = item.candidate
-                        Button { choose(row) } label: {
-                            HStack(alignment: .center, spacing: 12) {
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(.title3).foregroundStyle(isSelected ? .green : .secondary)
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(row.name).lineLimit(3).foregroundStyle(.primary)
-                                    Text("\(row.source.title) · \(row.language) · \(row.ext == "html" ? "展开语言（不是选择字幕）" : row.ext.uppercased())").font(.caption).foregroundStyle(.secondary)
-                                    if row.ext == "html", let detail = detail {
-                                        HStack {
-                                            if detail == "读取语言中…" { ProgressView() }
-                                            Text(detail).font(.caption)
-                                        }
-                                    }
-                                    if let feedback = feedback {
-                                        HStack {
-                                            if pending { ProgressView() }
-                                            Text(feedback).font(.caption).foregroundStyle(.primary)
-                                        }.accessibilityIdentifier("subtitle.row.feedback.\(row.id)")
-                                    }
-                                    if isSelected {
-                                        Text("已加载 · \(selected?.source.title ?? row.source.title) · \(selected?.language ?? row.language)").font(.caption.weight(.semibold)).foregroundStyle(.green)
-                                            .accessibilityIdentifier("subtitle.selection.feedback")
-                                    }
-                                }
-                                Spacer(minLength: 8)
-                            }
-                            .padding(.horizontal, 12).padding(.vertical, 10)
-                            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-                            .contentShape(Rectangle())
-                            .background(isSelected ? Color.green.opacity(0.10) : Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? Color.green : Color.secondary.opacity(0.35), lineWidth: isSelected ? 2 : 1))
-                            .accessibilityIdentifier(isSelected ? "subtitle.selection.box" : "subtitle.selection.outline")
-                        }
-                        .buttonStyle(.plain)
-                        .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .accessibilityIdentifier("subtitle.candidate")
-                        .accessibilityValue(feedback ?? (isSelected ? "已加载" : (row.ext == "html" ? "展开语言" : "未选中")))
-
-            case .language:
-                let variant = item.candidate
-                                Button { choose(variant) } label: {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Label(variant.language, systemImage: selected?.id == variant.id ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(selected?.id == variant.id ? .green : .primary)
-                                        if let feedback = feedback {
-                                            HStack {
-                                                if pending { ProgressView() }
-                                                Text(feedback).font(.caption)
-                                            }
-                                        }
-                                        if selected?.id == variant.id { Text("已加载").font(.caption).foregroundStyle(.green) }
-                                    }
-                                    .padding(12)
-                                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("subtitle.language.\(variant.language)")
-                                .accessibilityValue(feedback ?? (selected?.id == variant.id ? "已加载" : "点按选择语言"))
-            case .link:
-                Link("在 SubtitleCat 原站查看（外部网页）", destination: item.candidate.url)
-                    .font(.footnote).frame(minHeight: 44)
-            }
-        }
-    }
-}
-
 struct OnlineSubtitlePanel: View {
     @ObservedObject var model: OnlineSubtitleModel
     var adjustPosition: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
-    @ViewBuilder private var resultsSection: some View {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--subtitle-scroll234-baseline") {
-            SubtitleLegacy233Results(model: model)
-        } else {
-            modernResults
-        }
-        #else
-        modernResults
-        #endif
-    }
-    private var modernResults: some View {
-                Section("搜索结果（不会自动选择）") {
-                    ForEach(model.displayRows) { item in
-                        SubtitleResultRow(item: item,
-                            selected: model.selected,
-                            feedback: model.rowStates[item.candidate.id],
-                            detail: model.detailStates[item.candidate.id],
-                            pending: model.pendingID == item.candidate.id,
-                            choose: model.choose)
-                            .equatable()
-                    }
-                }
-
-    }
     var body: some View {
         NavigationStack {
             Form {
@@ -559,93 +434,7 @@ struct OnlineSubtitlePanel: View {
                     Text("正值延后，负值提前。时长和名称仅供参考，需手动校准。SRT / VTT / 基本 ASS 文本；不支持 ASS 复杂特效。仅本机播放器叠层，PiP / AirPlay 外部屏幕不保证显示。切换视频或播放 URL（含清晰度）会清除字幕，以免串片。")
                         .font(.footnote)
                 }
-                resultsSection
-                SubtitleAppearanceControls(adjustPosition: adjustPosition)
-            }
-            .navigationTitle("在线字幕")
-            .onDisappear { model.cancelPending() }
-            .toolbar {
-                // Pinned outside Form: scrolling must never hide the only off switch.
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭字幕") { model.disable(); dismiss() }
-                        .accessibilityIdentifier("subtitle.disable")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { model.cancelPending(); dismiss() }
-                        .accessibilityIdentifier("subtitle.panel.done")
-                        .accessibilityValue(model.selected == nil ? "尚未加载" : "已加载")
-                }
-            }
-        }
-    }
-}
-#endif
-
-#if DEBUG && os(iOS)
-struct OnlineSubtitleFixtureView: View {
-    @State private var presented = false
-    @StateObject private var model = OnlineSubtitleModel(fetch: { url, kind in
-        if ProcessInfo.processInfo.arguments.contains("--subtitle-scroll234") {
-            return try await SubtitleScroll234Fixture.fetch(url, kind)
-        }
-        if ProcessInfo.processInfo.arguments.contains("--subtitle-interaction233") {
-            return try await SubtitleInteraction233Fixture.shared.fetch(url, kind)
-        }
-        if kind == .catSearch { return Data("<table class='sub-table'></table>".utf8) }
-        if kind == .xunleiSearch {
-            return Data(#"{"code":0,"result":"ok","data":[{"name":"自创合法测试字幕","ext":"srt","languages":[""],"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt"}]}"#.utf8)
-        }
-        return Data("1\n00:00:00,000 --> 00:00:10,000\n自创测试对白\n".utf8)
-    })
-    var body: some View {
-        Button("在线字幕") { model.query = "公开测试片名"; presented = true }
-            .accessibilityIdentifier("player.subtitle.settings")
-            .sheet(isPresented: $presented) { OnlineSubtitlePanel(model: model) }
-    }
-}
-#endif
-
-#if DEBUG && os(iOS)
-// Neutral, self-authored native interaction fixture. No external requests or player source changes.
-actor SubtitleInteraction233Fixture {
-    static let shared = SubtitleInteraction233Fixture()
-    private var attempts: [String: Int] = [:]
-    func fetch(_ url: URL, _ kind: OnlineSubtitleRequestKind) async throws -> Data {
-        switch kind {
-        case .xunleiSearch:
-            try await Task.sleep(nanoseconds: 100_000_000)
-            let rows = [("延迟字幕 A", "A"), ("失败可重试 B", "B"), ("快速字幕 C", "C")].map { name, letter in
-                ["name": name, "ext": "srt", "url": "https://subtitle.v.geilijiasu.com/AA/BB/" + String(repeating: letter, count: 40) + ".srt"]
-            }
-            return try JSONSerialization.data(withJSONObject: ["code": 0, "data": rows])
-        case .catSearch:
-            try await Task.sleep(nanoseconds: 3_000_000_000)
-            return Data("<table class='sub-table'><tr><td><a href='/subs/1/neutral.html'>中性语言父行</a></td></tr></table>".utf8)
-        case .catDetail:
-            try await Task.sleep(nanoseconds: 700_000_000)
-            return Data("<div class='sub-single'><a id='download_zh-CN' href='/subs/2/neutral-zh-CN.srt'>Download</a><a id='download_en' href='/subs/2/neutral-en.srt'>Download</a></div>".utf8)
-        case .download:
-            let key = url.lastPathComponent
-            attempts[key, default: 0] += 1
-            let attempt = attempts[key]!
-            let slow = key.hasPrefix("A")
-            // Ignore cancellation: the production generation guard must reject these late bytes.
-            let delay = slow ? 5.0 : (key.hasPrefix("C") ? 0.2 : 1.0)
-            await withCheckedContinuation { continuation in
-                DispatchQueue.global().asyncAfter(deadline: .now() + delay) { continuation.resume() }
-            }
-            if key.hasPrefix("B"), attempt == 1 { return Data("not a subtitle".utf8) }
-            return Data("1\n00:00:00,000 --> 00:01:00,000\nSelf-authored neutral subtitle\n".utf8)
-        }
-    }
-}
-#endif
-
-#if DEBUG && os(iOS)
-private struct SubtitleLegacy233Results: View {
-    @ObservedObject var model: OnlineSubtitleModel
-    var body: some View {
-        Section("搜索结果（不会自动选择）") {
+                Section("搜索结果（不会自动选择）") {
                     ForEach(model.results) { row in
                         let isSelected = model.selected?.id == row.id || model.selected?.parentID == row.id
                         Button { model.choose(row) } label: {
@@ -716,30 +505,78 @@ private struct SubtitleLegacy233Results: View {
                         }
                     }
                 }
+                SubtitleAppearanceControls(adjustPosition: adjustPosition)
+            }
+            .navigationTitle("在线字幕")
+            .onDisappear { model.cancelPending() }
+            .toolbar {
+                // Pinned outside Form: scrolling must never hide the only off switch.
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭字幕") { model.disable(); dismiss() }
+                        .accessibilityIdentifier("subtitle.disable")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { model.cancelPending(); dismiss() }
+                        .accessibilityIdentifier("subtitle.panel.done")
+                }
+            }
+        }
     }
 }
 #endif
 
 #if DEBUG && os(iOS)
-// Only self-authored neutral content; the shipping parser and model remain in the path.
-enum SubtitleScroll234Fixture {
-    static func fetch(_ url: URL, _ kind: OnlineSubtitleRequestKind) async throws -> Data {
+struct OnlineSubtitleFixtureView: View {
+    @State private var presented = false
+    @StateObject private var model = OnlineSubtitleModel(fetch: { url, kind in
+        if ProcessInfo.processInfo.arguments.contains("--subtitle-interaction233") {
+            return try await SubtitleInteraction233Fixture.shared.fetch(url, kind)
+        }
+        if kind == .catSearch { return Data("<table class='sub-table'></table>".utf8) }
+        if kind == .xunleiSearch {
+            return Data(#"{"code":0,"result":"ok","data":[{"name":"自创合法测试字幕","ext":"srt","languages":[""],"url":"https://subtitle.v.geilijiasu.com/AA/BB/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.srt"}]}"#.utf8)
+        }
+        return Data("1\n00:00:00,000 --> 00:00:10,000\n自创测试对白\n".utf8)
+    })
+    var body: some View {
+        Button("在线字幕") { model.query = "公开测试片名"; presented = true }
+            .accessibilityIdentifier("player.subtitle.settings")
+            .sheet(isPresented: $presented) { OnlineSubtitlePanel(model: model) }
+    }
+}
+#endif
+
+#if DEBUG && os(iOS)
+// Neutral, self-authored native interaction fixture. No external requests or player source changes.
+actor SubtitleInteraction233Fixture {
+    static let shared = SubtitleInteraction233Fixture()
+    private var attempts: [String: Int] = [:]
+    func fetch(_ url: URL, _ kind: OnlineSubtitleRequestKind) async throws -> Data {
         switch kind {
         case .xunleiSearch:
-            return Data(#"{"code":0,"data":[]}"#.utf8)
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let rows = [("延迟字幕 A", "A"), ("失败可重试 B", "B"), ("快速字幕 C", "C")].map { name, letter in
+                ["name": name, "ext": "srt", "url": "https://subtitle.v.geilijiasu.com/AA/BB/" + String(repeating: letter, count: 40) + ".srt"]
+            }
+            return try JSONSerialization.data(withJSONObject: ["code": 0, "data": rows])
         case .catSearch:
-            let rows = (0..<180).map {
-                "<tr><td><a href='/subs/234/item-\($0).html'>中性滚动结果 \(String(format: "%03d", $0))</a></td></tr>"
-            }.joined()
-            return Data(("<table class='sub-table'>" + rows + "</table>").utf8)
+            try await Task.sleep(nanoseconds: 3_000_000_000)
+            return Data("<table class='sub-table'><tr><td><a href='/subs/1/neutral.html'>中性语言父行</a></td></tr></table>".utf8)
         case .catDetail:
-            let parent = url.deletingPathExtension().lastPathComponent
-            let rows = (10..<58).map {
-                "<a id='download_qx-\($0)' href='/subs/234/\(parent)-qx-\($0).srt'>Download</a>"
-            }.joined()
-            return Data(("<div class='sub-single'>" + rows + "</div>").utf8)
+            try await Task.sleep(nanoseconds: 700_000_000)
+            return Data("<div class='sub-single'><a id='download_zh-CN' href='/subs/2/neutral-zh-CN.srt'>Download</a><a id='download_en' href='/subs/2/neutral-en.srt'>Download</a></div>".utf8)
         case .download:
-            return Data("1\n00:00:00,000 --> 00:01:00,000\nSelf-authored neutral scrolling fixture\n".utf8)
+            let key = url.lastPathComponent
+            attempts[key, default: 0] += 1
+            let attempt = attempts[key]!
+            let slow = key.hasPrefix("A")
+            // Ignore cancellation: the production generation guard must reject these late bytes.
+            let delay = slow ? 5.0 : (key.hasPrefix("C") ? 0.2 : 1.0)
+            await withCheckedContinuation { continuation in
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) { continuation.resume() }
+            }
+            if key.hasPrefix("B"), attempt == 1 { return Data("not a subtitle".utf8) }
+            return Data("1\n00:00:00,000 --> 00:01:00,000\nSelf-authored neutral subtitle\n".utf8)
         }
     }
 }
