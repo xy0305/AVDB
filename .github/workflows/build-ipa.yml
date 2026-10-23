@@ -15,6 +15,7 @@ on:
       - ".github/workflows/build-ipa.yml"
       - ".github/workflows/poster-navigation.yml"
       - "scripts/test-*.py"
+      - "scripts/OnlinePlaybackRegression.swift"
       - "scripts/GestureRegression.swift"
       - "scripts/SeekPreviewRegression.swift"
       - "scripts/ExternalLibraryRegression.swift"

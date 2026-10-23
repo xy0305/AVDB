@@ -2,7 +2,7 @@ name: Build229 Online Playback Native Acceptance
 on:
   push:
     branches: [fix/subtitle-position-201]
-    paths: ['AVDB/Services/OnlinePlaybackCore.swift', 'AVDB/Services/OnlineAdditionalProviders.swift', 'AVDB/Views/Player/OnlinePlaybackPanel.swift', 'UITests/PosterNavigationTests.swift', '.github/workflows/online-playback-228.yml']
+    paths: ['AVDB/Services/OnlinePlaybackCore.swift', 'AVDB/Services/OnlineAdditionalProviders.swift', 'AVDB/Views/Player/OnlinePlaybackPanel.swift', 'UITests/PosterNavigationTests.swift', 'scripts/OnlinePlaybackRegression.swift', 'scripts/test-online-playback.py', '.github/workflows/online-playback-228.yml']
 permissions:
   contents: read
 concurrency:
