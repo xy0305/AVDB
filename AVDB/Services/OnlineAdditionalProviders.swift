@@ -22,7 +22,7 @@ enum OnlineAdditional {
             + dom.all { $0.tag == "meta" && $0.attrs["property"] == "og:title" }.compactMap { $0.attrs["content"] } : []
         let headings = dom.all { $0.tag == "h1" }.map(\.text) + jableHeadings
         let slug = page.lastPathComponent.uppercased()
-        let exactVersionHeading = source == .jable && OnlineIdentity.version(slug, number: code, allowVersions: true) != nil
+        let exactVersionHeading = OnlineIdentity.version(slug, number: code, allowVersions: true) != nil
             && headings.contains { !JRHTML.matches("(?<![A-Z0-9_-])" + NSRegularExpression.escapedPattern(for: slug) + "(?![A-Z0-9_-])", $0).isEmpty }
         guard urls.contains(page.absoluteString), headings.contains(where: { OnlineIdentity.heading($0, number: code) }) || exactVersionHeading else {
             if text.lowercased().contains("just a moment") || text.contains("cf-chl-") { throw OnlineFailure.blocked }
