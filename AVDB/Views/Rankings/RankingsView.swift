@@ -61,7 +61,13 @@ struct RankingsView: View {
                             if !uses235Header {
                                 ToolbarItem(placement: .topBarLeading) { rankingSourceMenu }
                             }
-                            ToolbarItemGroup(placement: .topBarTrailing) { rankingActions }
+                            ToolbarItem(placement: .topBarTrailing) {
+                                // A custom toolbar view preserves the complete 44pt
+                                // buttons; ToolbarItemGroup rewraps them at 36pt on 26.
+                                HStack(spacing: 0) { rankingActions }
+                                    .buttonStyle(.plain)
+                                    .frame(minHeight: 44)
+                            }
                         }
                 }
             }

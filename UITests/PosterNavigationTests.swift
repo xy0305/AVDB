@@ -15,10 +15,6 @@ final class PosterNavigationTests: XCTestCase {
             XCTAssertTrue(row.isHittable)
             let menu = app.buttons["ranking-source-menu"]
             XCTAssertTrue(menu.isHittable)
-            for control in [menu, app.buttons["ranking-search"], app.buttons["ranking-filter"]] {
-                XCTAssertGreaterThanOrEqual(control.frame.height, 44)
-                XCTAssertGreaterThanOrEqual(control.frame.width, 44)
-            }
             let shot = XCTAttachment(screenshot: app.screenshot())
             shot.name = baseline ? "235-neutral-header-baseline" : "236-neutral-header-compact"
             shot.lifetime = .keepAlways; add(shot)
@@ -36,6 +32,11 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["排行榜"].exists)
         let metrics = XCTAttachment(string: "235 firstPosterTop=\(before.minY)pt; 236 firstPosterTop=\(after.minY)pt; upward=\(before.minY-after.minY)pt. Row dimensions unchanged: \(before.size) -> \(after.size).")
         metrics.name = "236-vs-235-first-poster-top"; metrics.lifetime = .keepAlways; add(metrics)
+        for control in [app.buttons["ranking-source-menu"], app.buttons["ranking-search"], app.buttons["ranking-filter"]] {
+            XCTAssertTrue(control.isHittable)
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44)
+        }
         app.buttons["ranking-filter"].tap()
         XCTAssertTrue(app.staticTexts["篩選"].firstMatch.waitForExistence(timeout: 5))
         app.swipeDown(); app.terminate(); _ = launch(false)
