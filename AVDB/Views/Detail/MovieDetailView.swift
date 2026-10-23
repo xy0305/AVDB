@@ -121,7 +121,6 @@ struct MovieDetailView: View {
                     ScrollView {
                         VStack(spacing: 24) {
                             playSection(movie)
-                            OnlinePlaybackPanel(number: movie.displayNumber)
                             magnetsSection(movie)
                         }.padding(.vertical)
                     }
@@ -486,7 +485,6 @@ struct MovieDetailView: View {
     private func portraitActionGroup(_ movie: Movie) -> some View {
         HStack(spacing: 0) {
             posterAction("arrow.down.circle", label: "下载资源") { showPosterResources = true }
-                .accessibilityIdentifier("detail.playback-resources")
             NavigationLink { MyListsView(movieID: movie.id) } label: {
                 Image(systemName: "rectangle.stack.badge.plus")
                     .font(.system(size: 21, weight: .regular))

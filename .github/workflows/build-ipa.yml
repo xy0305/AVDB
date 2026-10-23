@@ -15,7 +15,6 @@ on:
       - ".github/workflows/build-ipa.yml"
       - ".github/workflows/poster-navigation.yml"
       - "scripts/test-*.py"
-      - "scripts/OnlinePlaybackRegression.swift"
       - "scripts/GestureRegression.swift"
       - "scripts/SeekPreviewRegression.swift"
       - "scripts/ExternalLibraryRegression.swift"
@@ -47,7 +46,6 @@ jobs:
       - name: Check poster identity, latency and shared regressions
         run: |
           set -euo pipefail
-          ONLINE_PLAYBACK_LIVE=1 python3 scripts/test-online-playback.py | tee online-playback-tests.txt
           python3 scripts/test-detail-back.py
           python3 scripts/test-catalog-lifecycle.py
           python3 scripts/test-front-posters.py
@@ -124,9 +122,6 @@ jobs:
           set -euo pipefail
           app_path="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/AVDB.app"
           test -d "$app_path"
-          # Bind the delivered IPA to the exact checkout (not just a build number).
-          /usr/libexec/PlistBuddy -c "Add :AVDBSourceCommit string $GITHUB_SHA" "$app_path/Info.plist"
-          /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app_path/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$app_path" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
           find "$RUNNER_TEMP/ipa/Payload" -name '*.xcent' -delete
@@ -166,7 +161,6 @@ jobs:
           path: |
             javranking-performance.txt
             detail-delivery-performance.txt
-            online-playback-tests.txt
           if-no-files-found: ignore
 
       - name: Upload build log on failure

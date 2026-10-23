@@ -7,9 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-        D22800000000000000000005 /* OnlineAdditionalProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = D22800000000000000000006; };
-        D22800000000000000000002 /* OnlinePlaybackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D22800000000000000000004; };
-        D22800000000000000000001 /* OnlinePlaybackCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D22800000000000000000003; };
         D2190000000000000000000B /* CatalogueMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21900000000000000000001; };
         D2160000000000000000000B /* SubtitleCatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21600000000000000000001; };
         D2160000000000000000000C /* OnlineSubtitleModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21600000000000000000002; };
@@ -80,9 +77,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-        D22800000000000000000006 /* OnlineAdditionalProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineAdditionalProviders.swift; sourceTree = "<group>"; };
-        D22800000000000000000004 /* OnlinePlaybackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlinePlaybackPanel.swift; sourceTree = "<group>"; };
-        D22800000000000000000003 /* OnlinePlaybackCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlinePlaybackCore.swift; sourceTree = "<group>"; };
         D21900000000000000000001 /* CatalogueMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogueMetadata.swift; sourceTree = "<group>"; };
         D21600000000000000000001 /* SubtitleCatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleCatProvider.swift; sourceTree = "<group>"; };
         D21600000000000000000002 /* OnlineSubtitleModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineSubtitleModel.swift; sourceTree = "<group>"; };
@@ -210,8 +204,6 @@
 		A1B9B43015237F5437EE30F3 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-                D22800000000000000000003 /* OnlinePlaybackCore.swift */,
-                D22800000000000000000006 /* OnlineAdditionalProviders.swift */,
 				A16700000000000000000002 /* JavRankingCore.swift */,
 				B17400000000000000000000 /* MissAVCore.swift */,
 				A16700000000000000000004 /* JavRankingSource.swift */,
@@ -297,7 +289,6 @@
                 A18900000000000000000002 /* OnlineSubtitle.swift */,
                 D21600000000000000000001 /* SubtitleCatProvider.swift */,
                 D21600000000000000000002 /* OnlineSubtitleModel.swift */,
-                D22800000000000000000004 /* OnlinePlaybackPanel.swift */,
 				B08C58091094C960D502C7F8 /* PlayerView.swift */,
                 D21500000000000000000001 /* PlaybackVideoMetrics.swift */,
 				A16600000000000000000002 /* SeekPreview.swift */,
@@ -462,9 +453,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-                D22800000000000000000005 /* OnlineAdditionalProviders.swift in Sources */,
-                D22800000000000000000002 /* OnlinePlaybackPanel.swift in Sources */,
-                D22800000000000000000001 /* OnlinePlaybackCore.swift in Sources */,
 				A16700000000000000000001 /* JavRankingCore.swift in Sources */,
 				A17400000000000000000000 /* MissAVCore.swift in Sources */,
 				A16700000000000000000003 /* JavRankingSource.swift in Sources */,
@@ -589,7 +577,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 232;
+				CURRENT_PROJECT_VERSION = 226;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -612,7 +600,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 232;
+				CURRENT_PROJECT_VERSION = 226;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;

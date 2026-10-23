@@ -29,7 +29,7 @@ assert 'state.receive(outcome.source' in model and 'self.state.generation == epo
 assert 'source.rawValue + ":" + q' in model and '< 120' in model
 assert 'self.languages[row.id] = variants' in model
 assert 'if row.ext == "html"' in model and 'fetch(row.url, .catDetail)' in model
-assert 'model.cancelPending()' in source and '迅雷 + SubtitleCat + 海南鸡字幕池（同时搜索）' in source and 'subtitle.chickenRice.enabled' in source
+assert 'model.cancelPending()' in source and '迅雷 + SubtitleCat（同时搜索）' in source
 assert '不会发送私人文件名' in source
 assert 'JRHTML.tree(html)' in provider
 assert 'boundDownloadURL == url' in source and 'redirects <= 5' in source
@@ -38,8 +38,6 @@ print('PASS subtitle static privacy/wiring and no-background presentation contra
 if platform.system()=='Darwin':
  with tempfile.TemporaryDirectory() as d:
   binary=str(Path(d)/'subtitle-tests')
-  identity=Path(d)/'CatalogueIdentity.swift'
-  identity.write_text('import Foundation\n' + (root/'AVDB/Services/CatalogueMetadata.swift').read_text().split('enum CatalogueIdentity {',1)[1].split('\nstruct ScrapedMetadata:',1)[0].join(['enum CatalogueIdentity {','']))
-  subprocess.run(['swiftc','-swift-version','5','-D','SUBTITLE_CORE_TEST',str(identity),str(root/'scripts/ChickenRiceRegression.swift'),str(root/'AVDB/Services/JavRankingCore.swift'),str(root/'AVDB/Views/Player/SubtitleCatProvider.swift'),str(root/'AVDB/Views/Player/OnlineSubtitleModel.swift'),str(root/'AVDB/Views/Player/OnlineSubtitle.swift'),str(root/'scripts/DualSubtitleRegression.swift'),str(root/'scripts/DualSubtitleTransportRegression.swift'),str(root/'scripts/OnlineSubtitleRegression.swift'),'-o',binary],check=True)
+  subprocess.run(['swiftc','-swift-version','5','-D','SUBTITLE_CORE_TEST',str(root/'AVDB/Services/JavRankingCore.swift'),str(root/'AVDB/Views/Player/SubtitleCatProvider.swift'),str(root/'AVDB/Views/Player/OnlineSubtitleModel.swift'),str(root/'AVDB/Views/Player/OnlineSubtitle.swift'),str(root/'scripts/DualSubtitleRegression.swift'),str(root/'scripts/DualSubtitleTransportRegression.swift'),str(root/'scripts/OnlineSubtitleRegression.swift'),'-o',binary],check=True)
   subprocess.run([binary],check=True,timeout=45)
 else: print('SKIP native Swift on Linux; macOS CI compiles production source')

@@ -19,11 +19,10 @@ final class FixtureProtocol: URLProtocol {
     override func stopLoading() {}
 }
 @main struct SubtitleRegression {
-    static func reject(file: StaticString = #filePath, line: UInt = #line, _ body: () throws -> Void) {
-        do { try body(); fatalError("Expected rejection", file: file, line: line) } catch {}
+    static func reject(_ body: () throws -> Void) {
+        do { try body(); fatalError("Expected rejection") } catch {}
     }
     @MainActor static func main() async throws {
-        try await ChickenRiceRegression.run()
         try await DualSourceRegression.run()
         try await DualSubtitleTransportRegression.run()
         let cdn = "https://subtitle.v.geilijiasu.com/AB/CD/" + String(repeating: "A", count: 40) + ".srt"
