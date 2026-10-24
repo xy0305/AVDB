@@ -76,6 +76,7 @@ jobs:
           python3 scripts/test-enhancement-pixels.py
           python3 scripts/test-actor-alias243.py
           python3 scripts/test-tmdb-avatar244.py
+          python3 scripts/test-javverse244.py
 
       - name: Test scrub preview policy and real AVFoundation frames
         run: python3 scripts/test-seek-preview.py

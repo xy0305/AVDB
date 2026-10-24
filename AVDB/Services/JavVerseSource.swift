@@ -55,6 +55,17 @@ struct JavVerseSnapshot: Decodable {
         }
     }
     private static func timestamp(_ text: String) -> Bool {
+        // 243 rejected fractional offsets such as 2026-10-24T03:58:55.413884+00:00.
+        // Fractional or whole seconds are valid with Z or ±HH:MM. A zone is required.
+        guard let separator = text.firstIndex(of: "T") else { return false }
+        let clock = text[text.index(after: separator)...]
+        guard clock.contains(":") else { return false }
+        let zone = clock.suffix(6)
+        let numericZone = zone.count == 6 && (zone.hasPrefix("+") || zone.hasPrefix("-"))
+            && zone.dropFirst(1).dropLast(3).allSatisfy(\.isNumber)
+            && zone.dropFirst(3).first == ":"
+            && zone.suffix(2).allSatisfy(\.isNumber)
+        guard clock.hasSuffix("Z") || numericZone else { return false }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if formatter.date(from: text) != nil { return true }

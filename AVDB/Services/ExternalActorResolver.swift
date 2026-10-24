@@ -1,4 +1,6 @@
 import Foundation
+import Security
+import SwiftUI
 
 // Cross-board actor identity. AVDB IDs are never invented or merged here.
 // A unique SDK row must evidence the canonical name or a mapped alias exactly.
