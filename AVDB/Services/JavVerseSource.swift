@@ -380,6 +380,8 @@ enum JavVerseIdentity {
         return task
     }
     private func verify(_ entry: JavVerseEntry, epoch: UUID, token: String?) async {
+        var choices: [Actor] = []
+        let started = Date()
         do {
             try Task.checkCancellation()
             guard generation == epoch, accountProvider() == token else { throw CancellationError() }
