@@ -144,5 +144,5 @@ with tempfile.TemporaryDirectory() as temp:
     path=Path(temp)
     swift='import Foundation\nimport Combine\n'+read('AVDB/Services/JavRankingCore.swift')+read('AVDB/Services/MissAVCore.swift')+client+source+read('AVDB/Services/MissAVMetadata.swift')+stubs
     (path/'Replay.swift').write_text(swift)
-    subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(path/'Replay.swift'),'-o',str(path/'replay')],check=True)
+    subprocess.run(['swiftc','-swift-version','5','-parse-as-library','-D','STANDALONE_METADATA_REPLAY',str(path/'Replay.swift'),'-o',str(path/'replay')],check=True)
     subprocess.run([str(path/'replay')],check=True,timeout=30)

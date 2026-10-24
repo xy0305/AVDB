@@ -67,5 +67,5 @@ RunLoop.main.run(until:Date().addingTimeInterval(5));fatalError("queue timeout")
 '''
 with tempfile.TemporaryDirectory() as d:
  p=Path(d);(p/'main.swift').write_text(stubs+(root/'AVDB/Services/MissAVMetadata.swift').read_text()+tests)
- subprocess.run(['swiftc','-swift-version','5',str(p/'main.swift'),'-o',str(p/'queue')],check=True)
+ subprocess.run(['swiftc','-swift-version','5','-D','STANDALONE_METADATA_REPLAY',str(p/'main.swift'),'-o',str(p/'queue')],check=True)
  subprocess.run([str(p/'queue')],check=True,timeout=10)

@@ -8,6 +8,7 @@ import Combine
     struct Result {
         var movie: Movie?
         var actor: Actor?
+        var avatarURL: String?
         var candidates: [Actor] = []
         var message = "等待 AVDB 核验…"
         var loading = true
@@ -90,8 +91,8 @@ import Combine
             return Result(movie: match, message: match == nil ? "未匹配：AVDB 前 3 页无唯一完整番号，点击核对 / 重试" : "AVDB 资料 · \(sourceName) 顺序", loading: false)
         case .actor(let actor):
             var aliases = actor.aliases
-            let identity = ExternalActorIdentity.resolve(sourceName: actor.name, aliases: aliases, catalog: .bundled())
-            if identity.unified { aliases = identity.queries }
+            let identity = externalIdentity(actor.name, aliases)
+            if identity?.unified == true { aliases = identity?.queries ?? aliases }
             var result = try await searchActor(aliases, identity: identity)
             if enrichMissAV && result.actor == nil && result.candidates.isEmpty {
                 let extra = try await MissAVSource.shared.actressAliases(actor)
@@ -101,7 +102,20 @@ import Combine
             return result
         }
     }
-    private func searchActor(_ aliases: [String], identity: ExternalActorIdentity) async throws -> Result {
+    private func externalIdentity(_ name: String, _ aliases: [String]) -> ExternalActorIdentity? {
+        #if !STANDALONE_METADATA_REPLAY
+        return ExternalActorIdentity.resolve(sourceName: name, aliases: aliases, catalog: .bundled())
+        #else
+        return nil
+        #endif
+    }
+    private func matched(_ identity: ExternalActorIdentity?, _ aliases: [String], _ item: Actor) -> Bool {
+        #if !STANDALONE_METADATA_REPLAY
+        if let identity { return ExternalActorResolver.match(identity, actor: item) }
+        #endif
+        return MissAVIdentity.exact(aliases, [item.name, item.nameZht, item.otherName])
+    }
+    private func searchActor(_ aliases: [String], identity: ExternalActorIdentity?) async throws -> Result {
         let owner = APIClient.shared.token
         var exact: [String: Actor] = [:], suggestions: [String: Actor] = [:]
         var complete = true
@@ -113,17 +127,25 @@ import Combine
                 guard owner == APIClient.shared.token else { throw CancellationError() }
                 for item in found where !item.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     if suggestions.count < 20 { suggestions[item.id] = item }
-                    if ExternalActorResolver.match(identity, actor: item) { exact[item.id] = item }
+                    if matched(identity, aliases, item) { exact[item.id] = item }
                 }
                 if found.count < 20 { break }
                 if page == 3 { complete = false }
             }
         }
         if exact.count == 1 && complete, let actor = exact.values.first {
-            let avatar = await ActorAvatarFallback.resolveMissing(actor: actor, names: identity.queries)
-            return Result(actor: actor, avatarURL: avatar.status == .matched ? avatar.url : nil, message: avatar.status == .matched ? "AVDB 演员资料 · 公开头像已唯一匹配" : "AVDB 演员资料 · \(sourceName) 顺序", loading: false)
+            let avatar = await missingAvatar(actor, identity?.queries ?? aliases)
+            return Result(actor: actor, avatarURL: avatar?.url, message: avatar?.status == .matched ? "AVDB 演员资料 · 公开头像已唯一匹配" : "AVDB 演员资料 · \(sourceName) 顺序", loading: false)
         }
         let choices = (exact.isEmpty ? suggestions : exact).values.sorted { $0.id < $1.id }
         return Result(candidates: choices, message: exact.count > 1 ? "多个精确姓名候选，待手动确认" : (complete ? "未匹配唯一精确别名，待手动核对" : "搜索达到分页上限，待手动核对"), loading: false)
+    }
+    private func missingAvatar(_ actor: Actor, _ names: [String]) async -> ActorAvatarLookup? {
+        #if !STANDALONE_METADATA_REPLAY
+        let lookup = await ActorAvatarFallback.resolveMissing(actor: actor, names: names)
+        return lookup.status == .matched ? lookup : nil
+        #else
+        return nil
+        #endif
     }
 }
