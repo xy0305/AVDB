@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile actual production SDK and probe actor text metadata only
-        run: python3 scripts/actor-live248.py
+        run: python3 scripts/actor-probe249.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
