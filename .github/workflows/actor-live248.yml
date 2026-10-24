@@ -1,0 +1,21 @@
+name: ActorLive248
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['scripts/actor-live248.py', 'scripts/ActorLive248.swift', '.github/workflows/actor-live248.yml']
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile actual production SDK and probe actor text metadata only
+        run: python3 scripts/actor-live248.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actor-live248
+          path: actor-live248.json
+          retention-days: 14
