@@ -8,7 +8,7 @@ struct JavVerseSnapshot: Decodable {
     let preparedAt: String
     let boards: [JavVerseBoard]
     let grok: JavVerseGrokSnapshot?
-    // 246 stamps bundled bytes so an overlay install replaces a stale snapshot.
+    // Informational stamp only; bundle replacement is not a decoding strategy.
     // The field is optional and is not a rank or source signal.
     let resourceRevision: Int?
     enum CodingKeys: String, CodingKey {
@@ -30,23 +30,18 @@ struct JavVerseSnapshot: Decodable {
     static func bundled(in bundle: Bundle = .main) throws -> Self {
         if bundle == .main, let cachedBundle { return cachedBundle }
         guard let url = bundle.url(forResource: "JavVerseSnapshot", withExtension: "json") else {
-            throw JavVerseFailure.message("缺少 JavVerseSnapshot.json 离线资源")
+            throw JavVerseFailure.missingResource
         }
-        let value = try decode(Data(contentsOf: url))
+        let data: Data
+        do { data = try Data(contentsOf: url) }
+        catch { throw JavVerseFailure.unreadableResource }
+        let value = try decode(data)
         if bundle == .main { cachedBundle = value }
         return value
     }
     static func decode(_ data: Data) throws -> Self {
-        // Keep only keys this build models. resourceRevision is optional; other stamps are ignored.
-        let object = try JSONSerialization.jsonObject(with: data)
-        guard let root = object as? [String: Any] else {
-            throw JavVerseFailure.message("不支持的快照格式或时间")
-        }
-        let known = ["schemaVersion", "mode", "origin", "preparedAt", "boards", "grok", "resourceRevision"]
-        var normalized: [String: Any] = [:]
-        for key in known where root[key] != nil { normalized[key] = root[key] }
-        let bytes = try JSONSerialization.data(withJSONObject: normalized)
-        let value = try JSONDecoder().decode(Self.self, from: bytes)
+        // JSONDecoder ignores unknown keys but preserves precise DecodingError paths.
+        let value = try JSONDecoder().decode(Self.self, from: data)
         try value.validate()
         return value
     }
@@ -192,8 +187,52 @@ struct JavVerseEntry: Decodable, Identifiable {
     var aliases: [String] = []
     var id: String { "\(rank)|\(kind)|\(sourceURL)|\(label)" }
 }
+// An extension keeps Swift's memberwise initializer (including aliases' default).
+// Missing and null aliases mean no extra names; a wrong type still throws.
+extension JavVerseEntry {
+    private enum CodingKeys: String, CodingKey { case rank, kind, label, sourceURL, code, aliases }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rank = try c.decode(Int.self, forKey: .rank)
+        kind = try c.decode(String.self, forKey: .kind)
+        label = try c.decode(String.self, forKey: .label)
+        sourceURL = try c.decode(String.self, forKey: .sourceURL)
+        code = try c.decodeIfPresent(String.self, forKey: .code)
+        aliases = try c.decodeIfPresent([String].self, forKey: .aliases) ?? []
+    }
+}
 enum JavVerseFailure: LocalizedError {
     case message(String)
+    case missingResource, unreadableResource
+    static func diagnostic(_ error: Error) -> String {
+        func path(_ keys: [CodingKey]) -> String {
+            var result = ""
+            for key in keys {
+                if let index = key.intValue { result += "[\(index)]" }
+                else { result += (result.isEmpty ? "" : ".") + key.stringValue }
+            }
+            return result.isEmpty ? "$" : result
+        }
+        switch error {
+        case DecodingError.keyNotFound(let key, let c):
+            return "快照字段缺失 [keyNotFound]：\(path(c.codingPath + [key]))"
+        case DecodingError.typeMismatch(_, let c):
+            return "快照字段类型错误 [typeMismatch]：\(path(c.codingPath))"
+        case DecodingError.valueNotFound(_, let c):
+            return "快照字段为空 [valueNotFound]：\(path(c.codingPath))"
+        case DecodingError.dataCorrupted(let c):
+            return "快照JSON或字段损坏 [dataCorrupted]：\(path(c.codingPath))"
+        case JavVerseFailure.missingResource:
+            return "快照资源不存在 [resourceMissing]：JavVerseSnapshot.json"
+        case JavVerseFailure.unreadableResource:
+            return "快照资源读取失败 [resourceRead]：JavVerseSnapshot.json"
+        case let failure as JavVerseFailure:
+            return "快照业务校验 [validation]：\(failure.localizedDescription)"
+        default:
+            // Never display NSError userInfo, paths, response bodies or credentials.
+            return "快照资源读取或JSON解析失败 [resourceOrJSON]"
+        }
+    }
     var errorDescription: String? { if case let .message(text) = self { return text }; return nil }
 }
 // Strict number identity: uppercase and surrounding whitespace ONLY.

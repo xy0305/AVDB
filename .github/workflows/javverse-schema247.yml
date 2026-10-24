@@ -1,0 +1,22 @@
+name: JavVerseSchema247
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Services/JavVerseSource.swift', 'AVDB/Resources/JavVerseSnapshot.json', 'scripts/test-javverse247.py', '.github/workflows/javverse-schema247.yml']
+permissions:
+  contents: read
+jobs:
+  schema:
+    runs-on: macos-26
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Exact production Swift schema before and after against actual 246 IPA bytes
+        run: python3 scripts/test-javverse247.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: javverse-schema247
+          path: schema247.json
