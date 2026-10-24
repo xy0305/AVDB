@@ -1,6 +1,17 @@
 import Foundation
 import Combine
 
+// Simulator-only Release acceptance: real bundle data, no account or image network.
+enum JavVerseReleaseProbe {
+    static var enabled: Bool {
+        #if targetEnvironment(simulator)
+        return ProcessInfo.processInfo.arguments.contains("--javverse-release-bundle-ui")
+        #else
+        return false
+        #endif
+    }
+}
+
 struct JavVerseSnapshot: Decodable {
     let schemaVersion: Int
     let mode: String
@@ -318,6 +329,7 @@ enum JavVerseIdentity {
     }
     @discardableResult
     func resolve(_ entries: [JavVerseEntry], retry: Bool = false) -> Task<Void, Never>? {
+        guard !JavVerseReleaseProbe.enabled else { return nil }
         guard !busy else { return nil }
         if account != accountProvider() { clear() }
         let epoch = generation, token = account

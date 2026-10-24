@@ -89,7 +89,7 @@ enum ExternalLibraryError: Error { case invalidToken, keychain(Int32) }
     func currentKey() -> String? { nil }
 }
 '''
-main = "import Foundation\n" + stubs + source + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
+main = "import Foundation\n" + stubs + source + "\n@main struct Runner {\n static func main() async throws {\n" + fixture + "\n }\n}\n"
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     (path / "main.swift").write_text(main)

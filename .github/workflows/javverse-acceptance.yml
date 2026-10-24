@@ -18,6 +18,8 @@ jobs:
         device: [iPhone, iPad]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Prepare hosted tests and pinned MediaPipe
         run: |
           gem install cocoapods -v 1.16.2 --no-document
@@ -43,6 +45,11 @@ jobs:
           PY
           xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
           xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Release cold launch actual bundle with neutral artwork and mapper disabled
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme JavVerseAcceptance -configuration Release -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/JavVerseDerived" -resultBundlePath "$RUNNER_TEMP/ReleaseUI.xcresult" CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES -parallel-testing-enabled NO -only-testing:JavVerseUITests/JavVerseNavigationTests/testReleaseBundleColdLaunchRealSnapshot 2>&1 | tee "$RUNNER_TEMP/release-ui.log"
+          SCHEMA_REPORT="$RUNNER_TEMP/release-schema247.json" python3 scripts/test-javverse247.py "$RUNNER_TEMP/JavVerseDerived/Build/Products/Release-iphonesimulator/AVDB.app/JavVerseSnapshot.json"
       - name: Hosted identity and behavior XCTest
         run: |
           set -o pipefail
@@ -55,13 +62,15 @@ jobs:
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/javverse-evidence"
-          for kind in Unit UI; do
+          for kind in ReleaseUI Unit UI; do
             if test -d "$RUNNER_TEMP/$kind.xcresult"; then
               xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/$kind.xcresult" --format json > "$RUNNER_TEMP/javverse-evidence/$kind-summary.json" || true
               xcrun xcresulttool export attachments --path "$RUNNER_TEMP/$kind.xcresult" --output-path "$RUNNER_TEMP/javverse-evidence/$kind-attachments" || true
               mv "$RUNNER_TEMP/$kind.xcresult" "$RUNNER_TEMP/javverse-evidence/"
             fi
           done
+          cp "$RUNNER_TEMP/release-ui.log" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/release-schema247.json" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
           cp "$RUNNER_TEMP/unit.log" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
           cp "$RUNNER_TEMP/ui.log" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
       - uses: actions/upload-artifact@v4

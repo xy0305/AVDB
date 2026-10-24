@@ -61,6 +61,27 @@ static func main() throws {
     do { _ = try JavVerseSnapshot.decode(mutated(key,value)); fatalError("bad business value accepted") }
     catch { precondition(error is JavVerseFailure) }
  }
+ #if FIXED
+ do { _ = try JavVerseSnapshot.decode(mutated("rank",nil)); fatalError("missing rank accepted") }
+ catch { precondition(JavVerseFailure.diagnostic(error).contains("[keyNotFound]：boards[0].entries[0].rank")) }
+ do { _ = try JavVerseSnapshot.decode(mutated("aliases","SECRET_SENTINEL")); fatalError("bad aliases accepted") }
+ catch {
+   let text=JavVerseFailure.diagnostic(error)
+   precondition(text.contains("[typeMismatch]：boards[0].entries[0].aliases") && !text.contains("SECRET_SENTINEL"))
+ }
+ do { _ = try JavVerseSnapshot.decode(Data("{broken".utf8)); fatalError("bad JSON accepted") }
+ catch { precondition(JavVerseFailure.diagnostic(error).contains("[dataCorrupted]")) }
+ precondition(JavVerseFailure.diagnostic(JavVerseFailure.missingResource).contains("[resourceMissing]"))
+ precondition(JavVerseFailure.diagnostic(JavVerseFailure.unreadableResource).contains("[resourceRead]"))
+ var bad=root; bad["preparedAt"]="2026-10-24T03:58:55"
+ do { _ = try JavVerseSnapshot.decode(JSONSerialization.data(withJSONObject:bad)); fatalError("timezone-less accepted") }
+ catch { precondition(JavVerseFailure.diagnostic(error).contains("[validation]")) }
+ bad=root; var grok=bad["grok"] as! [String:Any]; var people=grok["people"] as! [[String:Any]]
+ var scores=people[0]["scores"] as! [String:Int]; scores["total"]=10001
+ people[0]["scores"]=scores; grok["people"]=people; bad["grok"]=grok
+ do { _ = try JavVerseSnapshot.decode(JSONSerialization.data(withJSONObject:bad)); fatalError("bad score accepted") }
+ catch { precondition(error is JavVerseFailure) }
+ #endif
  // Other newly defaulted board fields are Optional: prove missing keys work.
  var bs=root["boards"] as! [[String:Any]]
  for i in bs.indices { for key in ["term","periodKey","periodEnd","selectionTitle"] { bs[i].removeValue(forKey:key) } }
@@ -78,7 +99,7 @@ with tempfile.TemporaryDirectory() as temp:
     results={'snapshot246SHA256':SHA,'exactProductionPrefix':True,'stubs':False}
     for mode,source in [('before',old('AVDB/Services/JavVerseSource.swift').decode()),('after',(root/'AVDB/Services/JavVerseSource.swift').read_text())]:
         (p/'main.swift').write_text(prefix(source)+runner)
-        subprocess.run(['swiftc','-swift-version','5','-parse-as-library',str(p/'main.swift'),'-o',str(p/'probe')],check=True)
+        subprocess.run(['swiftc']+(['-D','FIXED'] if mode=='after' else [])+['-swift-version','5','-parse-as-library',str(p/'main.swift'),'-o',str(p/'probe')],check=True)
         out=subprocess.check_output([str(p/'probe'),str(p/'snapshot.json'),mode],text=True)
         print(mode,out.strip()); results[mode]=json.loads(out)
         if mode=='after':

@@ -117,6 +117,9 @@ jobs:
             clean build \
             | tee "$RUNNER_TEMP/xcodebuild.log"
 
+      - name: Real Release Bundle schema (not fixture)
+        run: python3 scripts/test-javverse247.py "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/AVDB.app/JavVerseSnapshot.json"
+
       - name: Probe optional third-party with system URLSession TLS
         continue-on-error: true
         run: SUBTITLE_LIVE_PROBE=1 python3 scripts/test-online-subtitles.py
@@ -148,6 +151,13 @@ jobs:
               if p.exists():
                   print(str(p)); print(p.read_text())
           PY
+
+      - name: Upload actual Release schema evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: javverse-release-schema247
+          path: schema247.json
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4

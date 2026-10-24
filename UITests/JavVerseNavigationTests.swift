@@ -2,6 +2,35 @@ import XCTest
 import UIKit
 
 final class JavVerseNavigationTests: XCTestCase {
+    func testReleaseBundleColdLaunchRealSnapshot() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--javverse-release-bundle-ui"]
+        app.launch()
+        defer { app.terminate() }
+        let first = app.staticTexts["javverse-row-1"]
+        XCTAssertTrue(first.waitForExistence(timeout: 20), "Real Release bundle must decode on cold launch")
+        XCTAssertEqual(first.label, "SONE-371")
+        XCTAssertFalse(app.staticTexts["javverse-load-failure"].exists)
+        XCTAssertTrue(app.images["javverse-release-neutral-1"].firstMatch.waitForExistence(timeout: 5))
+        for (tab, expected) in [("周榜", "MFYD-204"), ("月榜", "SNOS-377"), ("日榜", "SONE-371")] {
+            app.buttons[tab].firstMatch.tap()
+            XCTAssertTrue(first.waitForExistence(timeout: 5))
+            XCTAssertEqual(first.label, expected)
+            XCTAssertFalse(app.staticTexts["javverse-load-failure"].exists)
+        }
+        app.buttons["javverse-period-menu"].tap()
+        app.buttons["javverse-period-2026-10-21"].tap()
+        XCTAssertEqual(first.label, "SONE-269", "Actual historical period must remain selectable")
+        app.buttons["Grok Top250"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["javverse-grok-yui-hatano"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["javverse-load-failure"].exists)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "javverse247-release-real-bundle-neutral-no-image-network"
+        capture.lifetime = .keepAlways
+        add(capture)
+        print("JAVVERSE247 Release real Bundle cold launch daily weekly monthly history Grok visible; mapper disabled; neutral artwork")
+    }
     private func reach(_ element: XCUIElement, in app: XCUIApplication, upward: Bool = true) {
         for _ in 0..<12 {
             if element.exists && element.isHittable { return }

@@ -6,6 +6,10 @@ import SwiftUI
     @ObservedObject var mapper: JavVerseMapper
     var body: some View {
         Group {
+            if JavVerseReleaseProbe.enabled {
+                Image(systemName: "square.grid.3x3.fill").resizable().scaledToFit()
+                    .accessibilityIdentifier("javverse-release-neutral-\(entry.rank)")
+            } else {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui"), mapper.movie(for: entry) != nil || mapper.actor(for: entry) != nil {
                 Image(uiImage: JavVerseNeutralFixture.artwork).resizable().scaledToFit()
@@ -14,6 +18,7 @@ import SwiftUI
             #else
             production
             #endif
+            }
         }.clipped()
     }
     @ViewBuilder private var production: some View {
@@ -89,7 +94,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                     // Identity replacement cancels old image work and resets paging before a new period renders.
                     JavVerseBoardView(board: selected).id(selected.selectionKey)
                 } else { Text("该期暂无已核实快照"); Spacer() }
-            } else if let failure { Text(failure).foregroundStyle(.red); Spacer() }
+            } else if let failure { Text(failure).foregroundStyle(.red).accessibilityIdentifier("javverse-load-failure"); Spacer() }
             else { ProgressView("读取本地榜单…"); Spacer() }
         }
         .navigationTitle("JavVerse 榜单")
@@ -107,7 +112,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 #if DEBUG
                 print("JAVVERSE241 metadataReadyMs=\((ProcessInfo.processInfo.systemUptime-start)*1000) rows=\(snapshot?.boards.reduce(0) { $0+$1.entries.count } ?? 0) noArtworkWait=true")
                 #endif
-            } catch { failure = error.localizedDescription }
+            } catch { failure = JavVerseFailure.diagnostic(error) }
         }
     }
 }
@@ -193,7 +198,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
         .navigationTitle("JavVerse · 原站名单")
         // Do not tag the parent container: SwiftUI propagates its identifier over child controls.
         .task(id: probing) {
-            guard probing else { return }
+            guard probing, !JavVerseReleaseProbe.enabled else { return }
             #if DEBUG
             guard !ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") else { probing = false; return }
             #endif
@@ -229,7 +234,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 }
                 #endif
                 snapshot = try JavVerseSnapshot.bundled()
-            } catch { failure = error.localizedDescription }
+            } catch { failure = JavVerseFailure.diagnostic(error) }
         }
     }
     private func boardLabel(_ board: JavVerseBoard) -> some View {

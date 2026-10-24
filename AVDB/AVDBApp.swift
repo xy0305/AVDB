@@ -28,7 +28,13 @@ struct AVDBApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if JavVerseReleaseProbe.enabled {
+                    NavigationStack { JavVerseView() }
+                } else {
+                    ContentView()
+                }
+            }
                 .environmentObject(appState)
                 .preferredColorScheme(.light)
                 .tint(Color(red: 0.12, green: 0.48, blue: 0.96))
@@ -68,6 +74,7 @@ final class AppState: ObservableObject {
         self.readToken = readToken
         self.fetchProfile = fetchProfile
         self.pause = pause
+        guard !JavVerseReleaseProbe.enabled else { return }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") { return }
         #endif
@@ -118,6 +125,7 @@ final class AppState: ObservableObject {
     }
 
     func restoreLogin() {
+        guard !JavVerseReleaseProbe.enabled else { return }
         let token = readToken().flatMap { $0.isEmpty ? nil : $0 }
         if token != activeToken {
             restoreTask?.cancel(); restoreTask = nil; epoch = UUID()
