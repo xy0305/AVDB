@@ -56,6 +56,8 @@ class JavVerseTimestamp244(unittest.TestCase):
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
         self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 244;"), 2)
         self.assertEqual(project.count("MARKETING_VERSION = 1.0.2;"), 2)
+        replay = (R / "scripts/test-actor-avatar243.py").read_text()
+        self.assertIn('source.split("struct TMDBAvatarTokenStore", 1)[0]', replay)
 
 if __name__ == "__main__":
     unittest.main()
