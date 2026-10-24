@@ -359,4 +359,41 @@ extension JavVerseBehaviorTests {
         // HTTP failure cannot mutate immutable bundled metadata: no fake live refresh exists.
         XCTAssertEqual(try JavVerseSnapshot.bundled().boards.first { $0.id == "daily" }?.entries.first?.code, "SONE-371")
     }
+    @MainActor func testCurrentPageActorVerificationIsBoundedAndCached() async throws {
+        func actor(_ name: String) throws -> Actor {
+            try JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: ["id": "id-\(name)", "name": name]))
+        }
+        let entries = (1...4).map { JavVerseEntry(rank: $0, kind: "actor", label: "中性演员\($0)", sourceURL: "https://javverse.com/neutral/\($0)", code: nil) }
+        let gate = ActorPageGate()
+        let mapper = JavVerseMapper(actorSearch: { name, _ in try await gate.search(name) }, shareCache: true, accountProvider: { "neutral-249" })
+        let running = mapper.resolve(entries)
+        for _ in 0..<200 where gate.started.count < 2 { await Task.yield() }
+        XCTAssertEqual(gate.started.count, 2, "Visible-page verification must not exceed two concurrent requests")
+        XCTAssertTrue(entries.dropFirst(2).allSatisfy { mapper.messages[$0.id] == "排队中" })
+        gate.releaseAll()
+        await running?.value
+        XCTAssertTrue(entries.allSatisfy { mapper.actor(for: $0)?.id == "id-" + $0.label })
+        var repeated = 0
+        let other = JavVerseMapper(actorSearch: { _, _ in repeated += 1; return [] }, shareCache: true, accountProvider: { "neutral-249" })
+        await other.resolve([entries[0]])?.value
+        XCTAssertEqual(repeated, 0)
+        XCTAssertEqual(other.actor(for: entries[0])?.id, "id-中性演员1")
+    }
+}
+
+@MainActor private final class ActorPageGate {
+    var started: [String] = []
+    private var waiters: [String: CheckedContinuation<[Actor], Error>] = [:]
+    func search(_ name: String) async throws -> [Actor] {
+        started.append(name)
+        return try await withCheckedThrowingContinuation { waiters[name] = $0 }
+    }
+    func releaseAll() {
+        let pending = waiters
+        waiters.removeAll()
+        for (name, continuation) in pending {
+            let actor = try! JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: ["id": "id-\(name)", "name": name]))
+            continuation.resume(returning: [actor])
+        }
+    }
 }

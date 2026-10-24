@@ -90,40 +90,9 @@ import Foundation
         let jessicaActor = try actor("dxne", "希崎潔西卡")
         let jessicaResult = try await ExternalActorResolver.inspect(identity: jessica, search: { _, _ in [jessicaActor] })
         if case .matched(let match) = jessicaResult { check(match.actor.id == "dxne", "希崎 unique traditional name matches") } else { preconditionFailure("希崎 rejected") }
-        let actors = (1...4).map { JavVerseEntry(rank: $0, kind: "actor", label: "中性演员\($0)", sourceURL: "https://javverse.com/neutral/\($0)", code: nil) }
-        let gate = CurrentPageGate()
-        let mapper = JavVerseMapper(actorSearch: { name, _ in try await gate.search(name) }, shareCache: true, accountProvider: { "neutral-249" })
-        let running = mapper.resolve(actors)
-        for _ in 0..<200 where gate.started.count < 2 { await Task.yield() }
-        check(gate.started.count == 2, "current page starts at most two actor requests")
-        check(actors.dropFirst(2).allSatisfy { mapper.messages[$0.id] == "排队中" }, "remaining current-page actors stay queued")
-        gate.releaseAll()
-        await running?.value
-        check(actors.allSatisfy { mapper.actor(for: $0)?.id == "id-" + $0.label }, "all current-page actors resolve without a first-six cutoff")
-        var repeatCalls = 0
-        let repeatMapper = JavVerseMapper(actorSearch: { _, _ in repeatCalls += 1; return [] }, shareCache: true, accountProvider: { "neutral-249" })
-        await repeatMapper.resolve([actors[0]])?.value
-        check(repeatCalls == 0 && repeatMapper.actor(for: actors[0])?.id == "id-中性演员1", "successful actor identity is reused across views")
         let status: [String: Any] = ["passed": passed.count, "assertions": passed, "live": false, "productionCandidatePatchApplied": true, "adultImagesDownloaded": false]
         let data = try JSONSerialization.data(withJSONObject: status, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: URL(fileURLWithPath: "actor-regression248.json")); print(String(decoding: data, as: UTF8.self))
     }
 }
 
-
-@MainActor private final class CurrentPageGate {
-    var started: [String] = []
-    private var waiters: [String: CheckedContinuation<[Actor], Error>] = [:]
-    func search(_ name: String) async throws -> [Actor] {
-        started.append(name)
-        return try await withCheckedThrowingContinuation { waiters[name] = $0 }
-    }
-    func releaseAll() {
-        let pending = waiters
-        waiters.removeAll()
-        for (name, continuation) in pending {
-            let actor = try! JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: ["id": "id-\(name)", "name": name]))
-            continuation.resume(returning: [actor])
-        }
-    }
-}
