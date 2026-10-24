@@ -698,6 +698,7 @@ struct JRBackendView: View {
     private func entities(_ values: [JRBackendEntity]) -> some View {
         ForEach(Array(values.enumerated()), id: \.offset) { _, entity in
             VStack(alignment: .leading, spacing: 12) {
+                RankingActorMatchLink(entity: entity)
                 NavigationLink { JRBackendView(route: "page", title: entity.name, fixedQuery: [.init(name: "path", value: entity.sourcePath)]) } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "person.crop.circle").font(.title).accessibilityHidden(true)
@@ -742,6 +743,41 @@ struct JRBackendView: View {
             self.error = error.localizedDescription
         }
         if key == requestKey { loading = false }
+    }
+}
+
+private struct RankingActorMatchLink: View {
+    let entity: JRBackendEntity
+    @State private var actor: Actor?
+    @State private var message = "尚未核验 AVDB 演员身份"
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let actor {
+                NavigationLink { ActorDetailView(actorID: actor.id) } label: {
+                    Label("AVDB 演员资料", systemImage: "person.crop.circle")
+                }.accessibilityIdentifier("jr-actor-\(entity.sourceID)")
+            }
+            Text(message).font(.caption).foregroundStyle(JRPalette.muted)
+        }
+        .task(id: entity.sourcePath) {
+            let identity = ExternalActorIdentity.resolve(sourceName: entity.name, aliases: entity.aliases ?? [], catalog: .bundled())
+            guard identity.queries.count <= 4 else { message = "别名过多，保留来源人物页"; return }
+            do {
+                let match = try await ExternalActorResolver.resolve(identity: identity) { name, page in
+                    try await JavDBSDK.shared.searchActors(keyword: name, page: page, limit: 20)
+                }
+                actor = match?.actor
+                if let actor, ActorAvatarFallback.existing(actor) == nil {
+                    let lookup = await ActorAvatarFallback.resolveMissing(actor: actor, names: identity.queries)
+                    avatarURL = lookup.status == .matched ? lookup.url : nil
+                }
+                message = match == nil ? "未唯一匹配；来源名次与人物页保留" : "已核验唯一 AVDB 演员"
+            } catch is CancellationError {
+                return
+            } catch {
+                message = "演员核验失败；来源人物页保留"
+            }
+        }
     }
 }
 

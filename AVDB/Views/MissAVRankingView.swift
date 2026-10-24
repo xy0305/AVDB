@@ -329,7 +329,7 @@ struct MissAVActressGrid: View {
                     if let actor = result.actor {
                         NavigationLink { ActorDetailView(actorID: actor.id) } label: {
                             VStack(alignment: .leading, spacing: 8) {
-                                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                                JavDBImage(url: actor.avatarURL ?? actor.coverURL ?? result.avatarURL)
                                     .frame(height: 150).clipped().clipShape(RoundedRectangle(cornerRadius: 16))
                                 Text(actor.displayName).font(.headline)
                             }

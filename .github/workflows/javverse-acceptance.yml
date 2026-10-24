@@ -24,7 +24,10 @@ jobs:
           python3 scripts/test-javverse.py
           python3 scripts/test-javverse241.py
           python3 scripts/test-javverse242.py
-          echo "Build242: original22 hosted checks retained; three-column neutral geometry and date/Grok UI; no adult image downloads"
+          python3 scripts/test-actor-alias243.py
+          python3 scripts/test-actor-alias-exec243.py
+          python3 scripts/test-actor-avatar243.py
+          echo "Build243: alias/avatar fixtures only; original hosted checks retained; no adult image downloads"
           ruby scripts/register-javverse.rb --tests --ui-tests
           pod install --repo-update
           xcodebuild -version

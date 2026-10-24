@@ -23,9 +23,9 @@ class Grid242(unittest.TestCase):
    self.assertIn(s,t)
  def test_version_and_ios(self):
   p=plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())
-  self.assertEqual(p['CFBundleVersion'],'242')
+  self.assertEqual(p['CFBundleVersion'],'243')
   self.assertEqual(p['CFBundleShortVersionString'],'1.0.2')
   b=(R/'AVDB.xcodeproj/project.pbxproj').read_text()
-  self.assertEqual(b.count('CURRENT_PROJECT_VERSION = 242;'),2)
+  self.assertEqual(b.count('CURRENT_PROJECT_VERSION = 243;'),2)
   self.assertIn('IPHONEOS_DEPLOYMENT_TARGET = 17.0;',b)
 if __name__=='__main__':unittest.main()

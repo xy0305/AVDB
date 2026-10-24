@@ -73,6 +73,9 @@
 		EFF87D779EDE9E4D336E6CFF /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0CA06C662C216213639A15 /* ImageLoader.swift */; };
 		EXTLIB000000000000000001 /* ExternalLibraryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = EXTLIB000000000000000002 /* ExternalLibraryClient.swift */; };
 		F922D9525067B54E6ED5E3C6 /* JavVerseSnapshot.json in Resources */ = {isa = PBXBuildFile; fileRef = E052588B357DFB38D46096A4 /* JavVerseSnapshot.json */; };
+		A24300000000000000000001 /* ActorAliasIndex.json in Resources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000002 /* ActorAliasIndex.json */; };
+		A24300000000000000000003 /* ActorAliasCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000004 /* ActorAliasCatalog.swift */; };
+		A24300000000000000000005 /* ExternalActorResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000006 /* ExternalActorResolver.swift */; };
 		FEATSTORE000000000000001 /* FeatureStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEATSTORE000000000000002 /* FeatureStores.swift */; };
 		FOLLOWTAG001E253E75F82001 /* FollowingTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLOWTAG001E253E75F82002 /* FollowingTagsView.swift */; };
 		FOLLTAGS0000000000000001 /* FollowingTagsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLTAGS0000000000000002 /* FollowingTagsStore.swift */; };
@@ -145,6 +148,9 @@
 		DA8A6DDD7AACE6897F060AED /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		DRAWVIEW0000000000000002 /* DailyDrawView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDrawView.swift; sourceTree = "<group>"; };
 		E052588B357DFB38D46096A4 /* JavVerseSnapshot.json */ = {isa = PBXFileReference; includeInIndex = 1; path = JavVerseSnapshot.json; sourceTree = "<group>"; };
+		A24300000000000000000002 /* ActorAliasIndex.json */ = {isa = PBXFileReference; includeInIndex = 1; path = ActorAliasIndex.json; sourceTree = "<group>"; };
+		A24300000000000000000004 /* ActorAliasCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActorAliasCatalog.swift; sourceTree = "<group>"; };
+		A24300000000000000000006 /* ExternalActorResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalActorResolver.swift; sourceTree = "<group>"; };
 		E21E8365384D35AB1B1B4C52 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		EXTLIB000000000000000002 /* ExternalLibraryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLibraryClient.swift; sourceTree = "<group>"; };
 		FEATSTORE000000000000002 /* FeatureStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureStores.swift; sourceTree = "<group>"; };
@@ -183,6 +189,7 @@
 				A15500000000000000000002 /* face_landmarker.task */,
 				A115C11E7A7B115C11E7A108 /* Assets.xcassets */,
 				E052588B357DFB38D46096A4 /* JavVerseSnapshot.json */,
+				A24300000000000000000002 /* ActorAliasIndex.json */,
 			);
 			name = Resources;
 			path = Resources;
@@ -291,6 +298,8 @@
 				B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */,
 				93251B289069D6793D7D2AA0 /* JavVerseSource.swift */,
 				450A8F7803A4C0CFA750A829 /* JavVersePolicy.swift */,
+				A24300000000000000000004 /* ActorAliasCatalog.swift */,
+				A24300000000000000000006 /* ExternalActorResolver.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -456,6 +465,8 @@
 				A15500000000000000000001 /* face_landmarker.task in Resources */,
 				A115C11E7A7B115C11E7A008 /* Assets.xcassets in Resources */,
 				F922D9525067B54E6ED5E3C6 /* JavVerseSnapshot.json in Resources */,
+				A24300000000000000000001 /* ActorAliasIndex.json in Resources */,
+				A24300000000000000000001 /* ActorAliasIndex.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -530,6 +541,8 @@
 				A115C11E7A7B115C11E7A007 /* Pan115PlayerView.swift in Sources */,
 				A260FA56C9E849806C494C71 /* JavVerseSource.swift in Sources */,
 				33136AA2770006FEACFADEE1 /* JavVersePolicy.swift in Sources */,
+				A24300000000000000000003 /* ActorAliasCatalog.swift in Sources */,
+				A24300000000000000000005 /* ExternalActorResolver.swift in Sources */,
 				86BA9E8AB49F38CB2A94AE95 /* JavVerseView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -543,7 +556,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 242;
+				CURRENT_PROJECT_VERSION = 243;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -566,7 +579,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 242;
+				CURRENT_PROJECT_VERSION = 243;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

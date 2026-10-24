@@ -23,9 +23,11 @@ import SwiftUI
                 JavDBImage(url: source, fallbackURL: movie.thumbURL, contentMode: .fit, frontPoster: true)
             } else { Text("已匹配 · AVDB未提供图片").font(.caption2) }
         } else if let actor = mapper.actor(for: entry) {
-            let source = [actor.avatarURL, actor.coverURL].compactMap { $0 }.first { !$0.isEmpty }
-            if let source { JavDBImage(url: source, contentMode: .fit) }
-            else { Text("已匹配 · AVDB未提供头像").font(.caption2) }
+            if let source = [actor.avatarURL, actor.coverURL].compactMap({ $0 }).first(where: { !$0.isEmpty }) {
+                JavDBImage(url: source, contentMode: .fit)
+            } else if let source = mapper.avatars[entry.id] {
+                JavDBImage(url: source, contentMode: .fit)
+            } else { Text("已匹配 · AVDB未提供头像").font(.caption2) }
         } else if mapper.messages[entry.id] == "请求中…" || mapper.messages[entry.id] == "排队中" {
             ProgressView()
         } else {

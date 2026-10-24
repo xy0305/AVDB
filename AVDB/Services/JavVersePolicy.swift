@@ -31,35 +31,23 @@ import Foundation
     }
 }
 
-// Every supplied full name/parenthetical alias must be evidenced by the same unique SDK ID.
+// External ranking names stay visible. AVDB navigation requires one exact identity.
 @MainActor enum JavVerseActorResolver {
     typealias Search = @MainActor (String, Int) async throws -> [Actor]
     static func names(_ raw: String) -> Set<String> {
         let separators = CharacterSet(charactersIn: "()（）,，、/／;；\n")
         return Set(raw.components(separatedBy: separators).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
     }
-    static func matches(_ source: String, actor: Actor) -> Bool {
-        let wanted = names(source)
-        let evidence = [actor.name, actor.otherName, actor.keyword, actor.nameZht].compactMap { $0 }.reduce(into: Set<String>()) { $0.formUnion(names($1)) }
-        return !wanted.isEmpty && wanted.isSubset(of: evidence)
+    static func identity(name: String, aliases: [String] = [], catalog: ActorAliasCatalog = .bundled()) -> ExternalActorIdentity {
+        ExternalActorIdentity.resolve(sourceName: name, aliases: aliases, catalog: catalog)
     }
-    static func resolve(name: String, search: Search) async throws -> Actor? {
-        var matches: [String: Actor] = [:]
-        let queries = names(name).sorted()
-        guard !queries.isEmpty, queries.count <= 4 else { throw JavVerseFailure.message("演员姓名证据不足或别名过多") }
-        for query in queries {
-            var exhausted = false
-            for page in 1...3 {
-                try Task.checkCancellation()
-                let rows = try await search(query, page)
-                try Task.checkCancellation()
-                for row in rows where !row.id.isEmpty && row.id == row.id.trimmingCharacters(in: .whitespacesAndNewlines) && Self.matches(name, actor: row) { matches[row.id] = row }
-                guard matches.count <= 1 else { throw JavVerseFailure.message("同名演员对应多个 AVDB ID；拒绝猜测") }
-                if rows.count < 20 { exhausted = true; break }
-            }
-            guard exhausted else { throw JavVerseFailure.message("演员搜索3页未穷尽；未自动匹配") }
-        }
-        return matches.values.first
+    static func matches(_ source: String, actor: Actor) -> Bool {
+        ExternalActorResolver.match(identity(name: source), actor: actor)
+    }
+    static func resolve(name: String, aliases: [String] = [], catalog: ActorAliasCatalog = .bundled(), search: Search) async throws -> Actor? {
+        let identity = identity(name: name, aliases: aliases, catalog: catalog)
+        guard identity.queries.count <= 4 else { throw JavVerseFailure.message("演员别名查询超过4项；未自动匹配") }
+        return try await ExternalActorResolver.resolve(identity: identity, search: search, queryLimit: 4)?.actor
     }
 }
 

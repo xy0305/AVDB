@@ -105,8 +105,8 @@ struct JavVerseGrokPerson: Decodable, Identifiable {
     let scoreText: [String: String]
     let actressId: Int
     func entry(rank: Int) -> JavVerseEntry {
-        JavVerseEntry(rank: rank, kind: "actor", label: nameJa,
-                      sourceURL: "https://javverse.com/actress/\(actressId)", code: nil)
+        // Japanese stays the visible source label. Chinese is evidence, not a rewritten rank row.
+        JavVerseEntry(rank: rank, kind: "actor", label: nameJa, sourceURL: "https://javverse.com/actress/\(actressId)", code: nil, aliases: nameZh == nameJa ? [] : [nameZh])
     }
 }
 struct JavVerseGrokRow: Identifiable {
@@ -152,6 +152,7 @@ struct JavVerseEntry: Decodable, Identifiable {
     let label: String
     let sourceURL: String
     let code: String?
+    var aliases: [String] = []
     var id: String { "\(rank)|\(kind)|\(sourceURL)|\(label)" }
 }
 enum JavVerseFailure: LocalizedError {
@@ -220,7 +221,7 @@ enum JavVerseIdentity {
             } }
     }
     func clear() {
-        cancel(); movies.removeAll(); actors.removeAll(); messages.removeAll(); account = accountProvider()
+        cancel(); movies.removeAll(); actors.removeAll(); avatars.removeAll(); messages.removeAll(); account = accountProvider()
     }
     func waitUntilIdle() async { await task?.value }
     func cancel() {
@@ -280,13 +281,17 @@ enum JavVerseIdentity {
                                 movie = detail
                             }
                         } else {
-                            actor = try await JavVerseActorResolver.resolve(name: entry.label, search: self.actorSearch)
+                            actor = try await JavVerseActorResolver.resolve(name: entry.label, aliases: entry.aliases, search: self.actorSearch)
                             if self.actorHydration, let found = actor, (found.avatarURL ?? found.coverURL ?? "").isEmpty {
                                 let detail = try await self.hydrateActor(found.id)
                                 guard let detail, detail.id == found.id, JavVerseActorResolver.matches(entry.label, actor: detail) else {
                                     throw JavVerseFailure.message("演员详情身份未通过；拒绝替换")
                                 }
                                 actor = detail
+                            }
+                            if let found = actor {
+                                let lookup = await ActorAvatarFallback.resolveMissing(actor: found, names: JavVerseActorResolver.identity(name: entry.label, aliases: entry.aliases).queries)
+                                if lookup.status == .matched { self.avatars[entry.id] = lookup.url }
                             }
                         }
                     }
