@@ -262,7 +262,7 @@ extension JavVerseBehaviorTests {
             XCTFail("Equal videos_count must not auto-select")
         } catch ExternalActorResolver.Failure.ambiguous {}
         do {
-            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try counted("neutral-a", 9), try counted("neutral-b", nil)] }
+            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try withVideos("neutral-a", 9), try withVideos("neutral-b", nil)] }
             XCTFail("Unknown videos_count must not lose automatically")
         } catch ExternalActorResolver.Failure.ambiguous {}
         let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("AVDB/Views/JavVerseView.swift"), encoding: .utf8)
