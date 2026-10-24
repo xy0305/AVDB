@@ -1,0 +1,133 @@
+--- a/AVDB/Services/ActorAliasCatalog.swift
++++ b/AVDB/Services/ActorAliasCatalog.swift
+@@ -27,6 +27,16 @@
+ }
+ 
+ enum ActorNameNormalizer {
++    static func orderedUnique(_ values: [String]) -> [String] {
++        var seen = Set<String>()
++        return values.compactMap { value in
++            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
++            let normalized = key(trimmed)
++            guard !normalized.isEmpty, seen.insert(normalized).inserted else { return nil }
++            return trimmed
++        }
++    }
++
+     // NFKC + casefold + collapsed whitespace. No translation, romanization, or substring match.
+     static func key(_ value: String) -> String {
+         value.precomposedStringWithCompatibilityMapping
+@@ -98,8 +108,10 @@
+         let visible = sourceName.trimmingCharacters(in: .whitespacesAndNewlines)
+         let supplied = ([visible] + aliases).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+         guard let record = catalog.lookup(supplied) else {
+-            return ExternalActorIdentity(sourceName: visible, canonical: nil, display: visible.isEmpty ? (aliases.first ?? "") : visible, mapID: nil, queries: Array(Set(supplied)).sorted())
++            return ExternalActorIdentity(sourceName: visible, canonical: nil, display: visible.isEmpty ? (aliases.first ?? "") : visible, mapID: nil, queries: ActorNameNormalizer.orderedUnique(supplied))
+         }
+-        return ExternalActorIdentity(sourceName: visible, canonical: record.canonical, display: record.display, mapID: record.id, queries: record.aliases)
++        let known = Set(record.aliases.map(ActorNameNormalizer.key))
++        let priority = ([record.canonical] + supplied).filter { known.contains(ActorNameNormalizer.key($0)) }
++        return ExternalActorIdentity(sourceName: visible, canonical: record.canonical, display: record.display, mapID: record.id, queries: ActorNameNormalizer.orderedUnique(priority + record.aliases))
+     }
+ }
+--- a/AVDB/Services/ExternalActorResolver.swift
++++ b/AVDB/Services/ExternalActorResolver.swift
+@@ -20,11 +20,41 @@
+         return !wanted.isEmpty && !wanted.isDisjoint(with: Set(evidence))
+     }
+ 
+-    static func resolve(identity: ExternalActorIdentity, search: Search, queryLimit: Int = 4) async throws -> Match? {
+-        let queries = Array(Set(identity.queries.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
+-        guard !queries.isEmpty else { return nil }
++    enum Failure: Error, LocalizedError {
++        case ambiguous([Actor])
++        case incomplete([Actor])
++        var errorDescription: String? {
++            switch self {
++            case .ambiguous(let actors):
++                return "身份待确认：多个 AVDB 候选（" + actors.prefix(8).map { "\($0.displayName) [\($0.id)]" }.joined(separator: "；") + "）；请在原生演员搜索核对"
++            case .incomplete(let actors):
++                let candidates = actors.isEmpty ? "" : "；已有候选 " + actors.prefix(8).map { "\($0.displayName) [\($0.id)]" }.joined(separator: "；")
++                return "查询未完成：达到别名或分页上限" + candidates + "；未自动选择，可重试或在原生演员搜索核对"
++            }
++        }
++    }
++
++    enum Resolution: Sendable {
++        case matched(Match)
++        case notFound
++        case ambiguous([Actor])
++        case incomplete(candidates: [Actor], queries: [String])
++    }
++
++    // Compatibility for callers that only consume verified identities. Diagnostics
++    // are available through inspect; absence is never proof of a missing actor.
++    static func resolve(identity: ExternalActorIdentity, search: Search, queryLimit: Int = 12) async throws -> Match? {
++        if case .matched(let match) = try await inspect(identity: identity, search: search, queryLimit: queryLimit) { return match }
++        return nil
++    }
++
++    static func inspect(identity: ExternalActorIdentity, search: Search, queryLimit: Int = 12) async throws -> Resolution {
++        let queries = ActorNameNormalizer.orderedUnique(identity.queries)
++        guard !queries.isEmpty else { return .notFound }
++        let limit = min(12, max(1, queryLimit))
++        var unfinished = Array(queries.dropFirst(limit))
+         var matches: [String: Actor] = [:]
+-        for query in queries.prefix(max(1, queryLimit)) {
++        for query in queries.prefix(limit) {
+             var exhausted = false
+             for page in 1...3 {
+                 try Task.checkCancellation()
+@@ -33,13 +63,17 @@
+                 for row in rows where !row.id.isEmpty && row.id == row.id.trimmingCharacters(in: .whitespacesAndNewlines) && match(identity, actor: row) {
+                     matches[row.id] = row
+                 }
+-                guard matches.count <= 1 else { return nil }
+                 if rows.count < 20 { exhausted = true; break }
+             }
+-            guard exhausted else { return nil }
+-        }
+-        guard let actor = matches.values.first else { return nil }
+-        return Match(actor: actor, identity: identity)
++            // An unrelated broad query must not erase an exact candidate or stop
++            // the remaining mapped aliases. Keep incomplete distinct from absent.
++            if !exhausted { unfinished.append(query) }
++        }
++        let candidates = matches.values.sorted { $0.id < $1.id } // display only; never chooses an ID
++        if candidates.count > 1 { return .ambiguous(candidates) }
++        if !unfinished.isEmpty { return .incomplete(candidates: candidates, queries: unfinished) }
++        guard let actor = candidates.first else { return .notFound }
++        return .matched(Match(actor: actor, identity: identity))
+     }
+ }
+ 
+--- a/AVDB/Services/JavVersePolicy.swift
++++ b/AVDB/Services/JavVersePolicy.swift
+@@ -46,8 +46,12 @@
+     }
+     static func resolve(name: String, aliases: [String] = [], catalog: ActorAliasCatalog = .bundled(), search: Search) async throws -> Actor? {
+         let identity = identity(name: name, aliases: aliases, catalog: catalog)
+-        guard identity.queries.count <= 4 else { throw JavVerseFailure.message("演员别名查询超过4项；未自动匹配") }
+-        return try await ExternalActorResolver.resolve(identity: identity, search: search, queryLimit: 4)?.actor
++        switch try await ExternalActorResolver.inspect(identity: identity, search: search, queryLimit: 12) {
++        case .matched(let match): return match.actor
++        case .notFound: return nil
++        case .ambiguous(let candidates): throw ExternalActorResolver.Failure.ambiguous(candidates)
++        case .incomplete(let candidates, _): throw ExternalActorResolver.Failure.incomplete(candidates)
++        }
+     }
+ }
+ 
+--- a/AVDB/Services/JavVerseSource.swift
++++ b/AVDB/Services/JavVerseSource.swift
+@@ -399,6 +399,10 @@
+                     self.completed += 1
+                     try await Task.sleep(nanoseconds: 180_000_000)
+                 } catch is CancellationError { return }
++                catch let failure as ExternalActorResolver.Failure {
++                    guard !Task.isCancelled, self.generation == epoch, self.accountProvider() == token else { return }
++                    self.messages[entry.id] = failure.localizedDescription; self.completed += 1
++                }
+                 catch {
+                     guard !Task.isCancelled, self.generation == epoch, self.accountProvider() == token else { return }
+                     self.messages[entry.id] = "请求/核验失败：\(error.localizedDescription)"; self.completed += 1

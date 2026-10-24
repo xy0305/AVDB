@@ -2,10 +2,29 @@ name: ActorLive248
 on:
   push:
     branches: [fix/subtitle-position-201]
-    paths: ['scripts/actor-live248.py', 'scripts/ActorLive248.swift', '.github/workflows/actor-live248.yml']
+    paths: ['scripts/actor-live248.py', 'scripts/ActorLive248.swift', 'scripts/ActorResolverRegression248.swift', 'scripts/actor-fix248.patch', 'scripts/actor-live248-replay.json', '.github/workflows/actor-live248.yml']
 permissions:
   contents: read
 jobs:
+  candidate-regression:
+    runs-on: macos-26
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply minimal candidate patch without changing published app
+        run: |
+          git apply --check scripts/actor-fix248.patch
+          git apply scripts/actor-fix248.patch
+      - name: Actual Swift production candidate regression and real metadata replay (not live)
+        env:
+          ACTOR_REGRESSION: '1'
+        run: python3 scripts/actor-live248.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actor-regression248
+          path: actor-regression248.json
+          retention-days: 14
   metadata:
     runs-on: macos-26
     timeout-minutes: 12

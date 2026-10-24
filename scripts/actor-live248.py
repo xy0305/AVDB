@@ -13,7 +13,9 @@ header=sdk[sdk.index('@MainActor\npublic final class JavDBSDK'):sdk.index('    /
 parts.append(header+decl(sdk,'    public func searchActors(')+'\n}')
 resolver=read('AVDB/Services/ExternalActorResolver.swift').split('enum ActorAvatarLookupStatus:')[0].replace('import Security','').replace('import SwiftUI','')
 parts.append(resolver)
-parts.append(read('scripts/ActorLive248.swift'))
-p=pathlib.Path(os.environ.get('RUNNER_TEMP','/tmp'))/'ActorLive248.swift';p.write_text('\n'.join(parts));binary=p.with_suffix('')
+regression = os.environ.get('ACTOR_REGRESSION') == '1'
+if regression: parts.append(decl(read('AVDB/Services/JavVersePolicy.swift'),'@MainActor enum JavVerseActorResolver'))
+parts.append(read('scripts/ActorResolverRegression248.swift' if regression else 'scripts/ActorLive248.swift'))
+p=pathlib.Path(os.environ.get('RUNNER_TEMP','/tmp'))/('ActorRegression248.swift' if regression else 'ActorLive248.swift');p.write_text('\n'.join(parts));binary=p.with_suffix('')
 subprocess.run(['swiftc','-parse-as-library',str(p),'-o',str(binary)],check=True)
-subprocess.run([str(binary),str(R/'AVDB/Resources/ActorAliasIndex.json')],check=True)
+subprocess.run([str(binary),str(R/'AVDB/Resources/ActorAliasIndex.json'),str(R/'scripts/actor-live248-replay.json')],check=True)
