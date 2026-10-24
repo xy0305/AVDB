@@ -78,7 +78,7 @@ import Foundation
             return query == "美谷朱里" ? [akane, secondary] : [akari]
         })
         if case .ambiguous(let choices) = mitaniResult {
-            check(Set(choices.map(\.id)) == ["PQJKe", "gyRE"], "same canonical name stays ambiguous")
+            precondition(Set(choices.map(\.id)) == ["PQJKe", "gyRE"], "same canonical name stays ambiguous ids=\(choices.map(\.id)) calls=\(mitaniCalls)")
         } else if case .matched(let match) = mitaniResult {
             preconditionFailure("美谷朱里 auto-selected \(match.actor.id) calls=\(mitaniCalls)")
         } else if case .incomplete(let choices, let queries) = mitaniResult {
