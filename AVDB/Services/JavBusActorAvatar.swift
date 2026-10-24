@@ -105,23 +105,25 @@ private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unc
         let aliases = (mapped.map { [$0.canonical] + $0.aliases } ?? []).filter { !catalog.isConflict($0) }
         return ActorNameNormalizer.orderedUnique(source + aliases)
     }
-    static func lookup(actor: Actor, numbers: [String], existingFailed: Bool = false, fetch: Fetch? = nil) async throws -> String? {
+    static func lookup(actor: Actor, numbers: [String], existingFailed: Bool = false, budget: TimeInterval = 25, fetch: Fetch? = nil) async throws -> String? {
         guard existingFailed || ActorAvatarFallback.existing(actor) == nil else { return nil }
         synchronize(); let generation = epoch, startingScope = currentScope
         let candidates = Array(ActorNameNormalizer.orderedUnique(numbers.compactMap(JavBusPoster.number)).prefix(maxWorks))
-        let deadline = Date().addingTimeInterval(25)
+        let deadline = Date().addingTimeInterval(min(25, max(0, budget)))
         for number in candidates {
             guard Date() < deadline else { break }
             try Task.checkCancellation()
             let key = scope + "|" + number
             // Awaiting callers share the completed page, not uncancellable detached tasks.
             while busy.contains(key) || active >= 2 {
+                guard Date() < deadline else { return nil }
                 try await Task.sleep(nanoseconds: 50_000_000)
                 try Task.checkCancellation()
                 guard generation == epoch, startingScope == currentScope else { throw CancellationError() }
                 if !busy.contains(key), let cached = cache[key], cached.expiry > Date() { break }
             }
             guard generation == epoch, startingScope == currentScope else { throw CancellationError() }
+            guard Date() < deadline else { return nil }
             let page: Page
             if let cached = cache[key], cached.expiry > Date() { page = cached.page }
             else {

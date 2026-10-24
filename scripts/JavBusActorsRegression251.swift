@@ -120,6 +120,16 @@ import ImageIO
         JavBusActorService.remember(actorID:"A",numbers:["DSOD-071"])
         JavBusActorService.remember(actorID:"A",numbers:["DSOD-071","DSOD-070"])
         expect(JavBusActorService.knownNumbers(actorID:"A").count == 2,"already loaded work update changes revision inputs")
+        JavBusActorService.reset(); calls = 0
+        let noBudget = try await JavBusActorService.lookup(actor:a,numbers:["DSOD-070"],budget:0,fetch:fetch)
+        expect(noBudget == nil && calls == 0,"zero budget starts no request")
+        let holding: JavBusActorService.Fetch = { _ in calls += 1; try await Task.sleep(nanoseconds:200_000_000); return .init(entries:entries,status:200) }
+        async let slotA = JavBusActorService.lookup(actor:a,numbers:["DSOD-071"],fetch:holding)
+        async let slotB = JavBusActorService.lookup(actor:b,numbers:["DSOD-072"],fetch:holding)
+        try await Task.sleep(nanoseconds:30_000_000)
+        let queued = try await JavBusActorService.lookup(actor:a,numbers:["DSOD-073"],budget:0.01,fetch:fetch)
+        expect(queued == nil && calls == 2,"queue budget does not start third request")
+        _ = try await (slotA,slotB)
         print("PASS JavBus actors252: \(checks) neutral production Swift assertions")
         if CommandLine.arguments.contains("--live") {
             var object:[String:Any] = ["transport":"production native URLSession no cookies", "onlineSuccess":false]
