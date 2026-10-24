@@ -209,7 +209,7 @@ final class JavVerseLive240Tests: XCTestCase {
         if let snapshot = try? JavVerseSnapshot.bundled(), let featured = snapshot.boards.first(where: { $0.id == "featured" }) {
             for entry in featured.entries.prefix(8) {
                 do {
-                    let actor = try await JavVerseActorResolver.resolve(name: entry.label) { name, page in
+                    let actor = try await JavVerseActorResolver.resolveActor(name: entry.label) { name, page in
                         try await JavDBSDK.shared.searchActors(keyword: name, page: page, limit: 20)
                     }
                     print("LIVE240 actor=\(entry.label) result=\(actor == nil ? "notFound" : "unique") id=\(actor?.id ?? "") avatar=\(!(actor?.avatarURL ?? actor?.coverURL ?? "").isEmpty)")
@@ -249,16 +249,16 @@ extension JavVerseBehaviorTests {
         XCTAssertFalse(JavVerseActorResolver.matches("中性名前（中性別名）", actor: exact))
         let unique = try await JavVerseActorResolver.resolveActor(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact] }
         XCTAssertEqual(unique?.id, "neutral-a", "Explicit alias evidence must retain the unique real SDK identity")
-        func counted(_ id: String, _ videos: Int?) throws -> Actor {
+        func withVideos(_ id: String, _ videos: Int?) throws -> Actor {
             var object: [String: Any] = ["id": id, "name": "中性名前", "other_name": "中性別名"]
             if let videos { object["videos_count"] = videos }
             return try JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: object))
         }
-        let counted = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try counted("neutral-b", 2), try counted("neutral-a", 9)] }
+        let counted = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try withVideos("neutral-b", 2), try withVideos("neutral-a", 9)] }
         XCTAssertEqual(counted?.actor.id, "neutral-a")
         XCTAssertEqual(counted?.byVideoCount, 9)
         do {
-            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try counted("neutral-a", 4), try counted("neutral-b", 4)] }
+            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try withVideos("neutral-a", 4), try withVideos("neutral-b", 4)] }
             XCTFail("Equal videos_count must not auto-select")
         } catch ExternalActorResolver.Failure.ambiguous {}
         do {
