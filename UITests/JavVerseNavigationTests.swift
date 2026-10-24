@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class JavVerseNavigationTests: XCTestCase {
     private func reach(_ element: XCUIElement, in app: XCUIApplication, upward: Bool = true) {
@@ -6,6 +7,29 @@ final class JavVerseNavigationTests: XCTestCase {
             if element.exists && element.isHittable { return }
             if upward { app.swipeUp() } else { app.swipeDown() }
         }
+    }
+    func testThreeColumnsAtLargeDynamicType() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--jr-design-fixture", "--rankings235-fixture", "--javverse-neutral-ui", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["ranking-source-menu"].waitForExistence(timeout: 20))
+        app.buttons["ranking-source-menu"].tap()
+        app.buttons["javverse-source-entry"].tap()
+        let images = (1...4).map { app.images["javverse-neutral-cover-\($0)"].firstMatch }
+        for image in images { XCTAssertTrue(image.waitForExistence(timeout: 15)) }
+        let f = images.map(\.frame)
+        XCTAssertLessThan(f[0].midX, f[1].midX)
+        XCTAssertLessThan(f[1].midX, f[2].midX)
+        XCTAssertEqual(f[0].minY, f[2].minY, accuracy: 2)
+        XCTAssertGreaterThan(f[3].minY, f[0].maxY)
+        XCTAssertEqual(app.staticTexts["javverse-row-4"].label, "TEST-004")
+        print("JAVVERSE242 largeTypeGridGeometry frames=\(f) columns=3")
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "javverse242-neutral-large-dynamic-type-three-columns"
+        capture.lifetime = .keepAlways
+        add(capture)
     }
     func testIndependentEntryStaticLabelPaginationAndReturn() {
         continueAfterFailure = false
@@ -29,10 +53,39 @@ final class JavVerseNavigationTests: XCTestCase {
         for tab in tabs.dropFirst() { XCTAssertLessThan(abs(tab.frame.midY-tabs[0].frame.midY), 3, "Four tabs must occupy one compact underline row") }
         let cover = app.images["javverse-neutral-cover-1"].firstMatch
         XCTAssertTrue(cover.waitForExistence(timeout: 15), "Automatic visible-page mapping must present fabricated neutral artwork")
+        var frames: [CGRect] = []
+        for rank in 1...4 {
+            let image = app.images["javverse-neutral-cover-\(rank)"].firstMatch
+            XCTAssertTrue(image.waitForExistence(timeout: 15))
+            frames.append(image.frame)
+            XCTAssertEqual(app.staticTexts["javverse-row-\(rank)"].label, String(format: "TEST-%03d", rank))
+        }
+        XCTAssertLessThan(frames[0].midX, frames[1].midX)
+        XCTAssertLessThan(frames[1].midX, frames[2].midX)
+        XCTAssertEqual(frames[0].minY, frames[1].minY, accuracy: 2)
+        XCTAssertEqual(frames[1].minY, frames[2].minY, accuracy: 2)
+        XCTAssertGreaterThan(frames[3].minY, frames[0].maxY)
+        XCTAssertEqual(frames[3].minX, frames[0].minX, accuracy: 2)
+        for frame in frames {
+            XCTAssertEqual(frame.width / frame.height, 0.7, accuracy: 0.06)
+            XCTAssertGreaterThan(frame.width, 70)
+        }
+        print("JAVVERSE242 gridGeometry device=\(UIDevice.current.userInterfaceIdiom.rawValue) frames=\(frames) sourceRanks=1,2,3,4")
         let homeCapture = XCTAttachment(screenshot: app.screenshot())
-        homeCapture.name = "javverse241-neutral-four-tabs-date-first-cover"
+        homeCapture.name = "javverse242-neutral-three-column-first-four"
         homeCapture.lifetime = .keepAlways
         add(homeCapture)
+        first.tap()
+        XCTAssertTrue(app.staticTexts["javverse-detail-1"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["javverse-detail-1"].label, "Neutral detail TEST-001")
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        let seventh = app.staticTexts["javverse-row-7"]
+        reach(seventh, in: app)
+        XCTAssertTrue(app.staticTexts["javverse-state-7"].label.contains("尚未核验"), "Nonautomatic entries must explain the bounded queue")
+        seventh.tap()
+        XCTAssertTrue(app.images["javverse-neutral-cover-7"].firstMatch.waitForExistence(timeout: 15), "Whole-card action must resolve entries beyond the automatic first six")
+        reach(first, in: app, upward: false)
         app.buttons["javverse-period-menu"].tap()
         app.buttons["javverse-period-neutral-previous-day"].tap()
         XCTAssertTrue(first.waitForExistence(timeout: 5))
@@ -49,6 +102,10 @@ final class JavVerseNavigationTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["javverse-selected-period"].label.contains("unknown-year"))
         tabs[3].tap()
         XCTAssertTrue(app.staticTexts["javverse-grok-neutral-1"].waitForExistence(timeout: 5))
+        let secondGrok = app.staticTexts["javverse-grok-neutral-2"]
+        XCTAssertTrue(secondGrok.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["javverse-grok-neutral-1"].frame.minX, secondGrok.frame.minX, accuracy: 3, "Grok must remain a vertical actor list")
+        XCTAssertGreaterThan(secondGrok.frame.minY, app.staticTexts["javverse-grok-neutral-1"].frame.minY)
         app.buttons["颜值"].tap()
         XCTAssertTrue(app.staticTexts["javverse-grok-neutral-250"].waitForExistence(timeout: 5), "Metric must reorder actual rows")
         app.buttons["作品"].tap()

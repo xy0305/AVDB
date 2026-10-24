@@ -394,11 +394,19 @@ struct ClippedAspectFill<Content: View>: View {
 struct MoviePosterCard: View {
     let movie: Movie
     var rank: Int? = nil
+    // Optional JavVerse presentation only; all existing callers retain their original layout.
+    var artwork: AnyView? = nil
+    var expandsTitle = false
+    var sourceNumber: String? = nil
+    var numberIdentifier = "movie-poster-number"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ClippedAspectFill(aspectRatio: 0.7) {
-                MoviePosterImage(movie: movie)
+                Group {
+                    if let artwork { artwork }
+                    else { MoviePosterImage(movie: movie) }
+                }
                     .overlay {
                         LinearGradient(
                             colors: [.white.opacity(0.10), .clear],
@@ -465,15 +473,17 @@ struct MoviePosterCard: View {
             Text(movie.displayTitle)
                 .font(.subheadline)
                 .foregroundStyle(.primary)
-                .lineLimit(2)
+                .lineLimit(expandsTitle ? 3 : 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 36, alignment: .top)
+                .frame(height: expandsTitle ? nil : 36, alignment: .top)
+                .fixedSize(horizontal: false, vertical: expandsTitle)
 
-            Text(movie.displayNumber)
+            Text(sourceNumber ?? movie.displayNumber)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tint)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier(numberIdentifier)
 
             if let date = movie.releaseDate, !date.isEmpty {
                 Text(date)

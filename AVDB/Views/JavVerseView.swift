@@ -141,6 +141,13 @@ private enum JavVerseRankingTab: String, CaseIterable {
                         VStack(alignment: .leading, spacing: 10) {
                             NavigationLink { JavVerseBoardView(board: board) } label: { boardLabel(board) }
                                 .accessibilityIdentifier("javverse-board-\(board.id)")
+                            if board.entries.allSatisfy({ $0.kind == "movie" }) {
+                                LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3), spacing: 16) {
+                                    ForEach(board.entries) { entry in
+                                        JavVerseMovieCard(entry: entry, mapper: mapper)
+                                    }
+                                }.frame(maxWidth: 728).frame(maxWidth: .infinity)
+                            } else {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(alignment: .top, spacing: 12) {
                                     ForEach(board.entries) { entry in
@@ -159,6 +166,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
                                     }
                                 }
+                            }
                             }
                             Text("采集 UTC：\(board.capturedAt) · 仅原站首页横栏")
                                 .font(.caption2).foregroundStyle(.secondary)
@@ -242,59 +250,105 @@ private enum JavVerseRankingTab: String, CaseIterable {
         }
         #endif
     }
+    private var isMovieBoard: Bool { board.entries.allSatisfy { $0.kind == "movie" } }
     var body: some View {
-        List {
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("静态快照，非实时").font(.caption).foregroundStyle(.orange)
                 Text("期间：\(board.period)").font(.subheadline)
                     .accessibilityIdentifier("javverse-selected-period")
                 DisclosureGroup("采集时间与来源") {
                     Text("采集时间 UTC：\(board.capturedAt)").font(.caption)
                     Text("来源：\(board.sourceURL)").font(.caption).textSelection(.enabled)
-                    Text("保留原站名次，不补位。先显示文字名单；仅首6项异步核验AVDB图片，其余可单独核验，系列不猜映射。")
+                    Text("保留原站名次，不补位。先显示名单；首6项自动依次核验，其余点击卡片或重试本页，最多20项串行处理。系列不猜映射。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if mapper.busy {
-                    ProgressView("核验本页 \(mapper.completed)/\(mapper.total)")
-                    Button("取消核验") { mapper.cancel() }
+                    HStack {
+                        ProgressView("核验本批 \(mapper.completed)/\(mapper.total)").font(.caption)
+                        Spacer()
+                        Button("取消核验") { mapper.cancel() }.font(.caption)
+                    }
                 } else {
-                    Button("重试本页未匹配项") { mapper.resolve(rows, retry: true) }
+                    Button("重试本页未匹配项（最多20项，依次核验）") { mapper.resolve(rows, retry: true) }
+                        .font(.caption)
                 }
-            }
-            Section {
-                ForEach(rows) { entry in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(String(format: "%02d", entry.rank)).font(.headline.monospacedDigit()).frame(width: 34)
-                        JavVerseArtwork(entry: entry, mapper: mapper).frame(width: 64, height: 88)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(entry.label).textSelection(.enabled).accessibilityIdentifier("javverse-row-\(entry.rank)")
-                            if let movie = mapper.movie(for: entry) {
-                                NavigationLink("AVDB 资料与播放") { MovieDetailView(movieID: movie.id) }
-                            } else if let actor = mapper.actor(for: entry) {
-                                NavigationLink("AVDB 演员资料") { ActorDetailView(actorID: actor.id) }
-                            } else if entry.kind == "movie" || entry.kind == "actor" {
-                                Text(mapper.messages[entry.id] ?? "尚未请求").font(.caption).foregroundStyle(.secondary)
-                                Button("单独核验 / 重试") { mapper.resolve([entry], retry: true) }.disabled(mapper.busy)
-                            } else {
-                                Text("系列未接映射 · 不使用网站数字ID直达AVDB").font(.caption).foregroundStyle(.secondary)
+                if isMovieBoard {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3), alignment: .leading, spacing: 16) {
+                        ForEach(rows) { entry in
+                            JavVerseMovieCard(entry: entry, mapper: mapper)
+                        }
+                    }
+                } else {
+                    ForEach(rows) { entry in
+                        HStack(alignment: .top, spacing: 12) {
+                            Text(String(format: "%02d", entry.rank)).font(.headline.monospacedDigit()).frame(width: 34)
+                            JavVerseArtwork(entry: entry, mapper: mapper).frame(width: 64, height: 88)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(entry.label).textSelection(.enabled).accessibilityIdentifier("javverse-row-\(entry.rank)")
+                                if let actor = mapper.actor(for: entry) {
+                                    NavigationLink("AVDB 演员资料") { ActorDetailView(actorID: actor.id) }
+                                } else if entry.kind == "actor" {
+                                    Text(mapper.messages[entry.id] ?? "尚未请求").font(.caption).foregroundStyle(.secondary)
+                                    Button("单独核验 / 重试") { mapper.resolve([entry], retry: true) }.disabled(mapper.busy)
+                                } else {
+                                    Text("系列未接映射 · 不使用网站数字ID直达AVDB").font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
                 }
-            }
-            Section {
                 HStack {
                     Button("上一页") { mapper.cancel(); page -= 1 }.disabled(page == 0)
                     Spacer()
                     Text("\(page + 1) / \(JavVersePagination.count(board.entries))").font(.caption)
                     Spacer()
                     Button("下一页") { mapper.cancel(); page += 1 }.disabled((page + 1) * 20 >= board.entries.count)
-                }
+                }.padding(.vertical, 8)
             }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle(board.title)
         .task(id: page) { await mapper.resolve(Array(rows.prefix(6)))?.value }
         .onDisappear { mapper.cancel() }
+    }
+}
+
+// Same production poster/rank/resource badges as JAVLibrary, with JavVerse-owned identity and queue.
+@MainActor private struct JavVerseMovieCard: View {
+    let entry: JavVerseEntry
+    @ObservedObject var mapper: JavVerseMapper
+    private var movie: Movie? { mapper.movie(for: entry) }
+    private var state: String {
+        mapper.messages[entry.id] ?? "尚未核验 · 点击卡片核验（首6项自动）"
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if let movie {
+                NavigationLink {
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
+                        Text("Neutral detail \(entry.label)").accessibilityIdentifier("javverse-detail-\(entry.rank)")
+                    } else { MovieDetailView(movieID: movie.id) }
+                    #else
+                    MovieDetailView(movieID: movie.id)
+                    #endif
+                } label: { poster }.buttonStyle(.plain)
+            } else {
+                Button { mapper.resolve([entry], retry: true) } label: { poster }
+                    .buttonStyle(.plain).disabled(mapper.busy)
+            }
+            Text(state).font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("javverse-state-\(entry.rank)")
+        }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+    }
+    private var poster: some View {
+        MoviePosterCard(movie: movie ?? Movie(id: "javverse:\(entry.id)", number: entry.label, title: entry.label),
+                        rank: entry.rank, artwork: AnyView(JavVerseArtwork(entry: entry, mapper: mapper)),
+                        expandsTitle: true, sourceNumber: entry.label, numberIdentifier: "javverse-row-\(entry.rank)")
     }
 }
 

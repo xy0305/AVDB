@@ -23,7 +23,8 @@ jobs:
           gem install cocoapods -v 1.16.2 --no-document
           python3 scripts/test-javverse.py
           python3 scripts/test-javverse241.py
-          echo "Build241: original LIVE240 public SDK checks retained; history/Grok and neutral four-tab UI acceptance; no adult image downloads"
+          python3 scripts/test-javverse242.py
+          echo "Build242: original22 hosted checks retained; three-column neutral geometry and date/Grok UI; no adult image downloads"
           ruby scripts/register-javverse.rb --tests --ui-tests
           pod install --repo-update
           xcodebuild -version
@@ -58,6 +59,16 @@ jobs:
           done
           cp "$RUNNER_TEMP/unit.log" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
           cp "$RUNNER_TEMP/ui.log" "$RUNNER_TEMP/javverse-evidence/" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: javverse-preview-${{ matrix.device }}-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/javverse-evidence/*-attachments/**/*.png
+            ${{ runner.temp }}/javverse-evidence/*-attachments/**/manifest.json
+            ${{ runner.temp }}/javverse-evidence/*-summary.json
+            ${{ runner.temp }}/javverse-evidence/*.log
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always()
         with:
