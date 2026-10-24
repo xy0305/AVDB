@@ -53,7 +53,23 @@ struct RawActors: Decodable { let actors: [RawActor]? }
             }
             report["allAliasProbes"] = probes; reports.append(report)
         }
-        let data = try JSONSerialization.data(withJSONObject: ["transport": "unmodified production APIClient + signature + searchActors declaration", "adultImagesDownloaded": false, "reports": reports], options: [.prettyPrinted, .sortedKeys])
+        struct Detail: Decodable { let actor: Actor? }
+        struct Work: Decodable { let id: String?; let number: String?; let actors: [Actor]? }
+        struct Works: Decodable { let movies: [Work]? }
+        var details: [[String: Any]] = []
+        for id in ["R2Vg", "mdRn", "1KBW", "YXKx", "ex3z", "RJM8"] {
+            var item: [String: Any] = ["requestedID": id]
+            do {
+                let d: JavDBResponse<Detail> = try await APIClient.shared.get("/api/v1/actors/\(id)", query: ["from_rankings": "false"])
+                if let a = d.data?.actor {
+                    item["actor"] = ["id": a.id, "name": a.name ?? "", "other_name": a.otherName ?? "", "name_zht": a.nameZht ?? "", "type": a.type ?? -1, "gender": a.gender ?? -1, "birthday": a.birthday ?? "", "height": a.height ?? -1, "twitter_id": a.twitterID ?? "", "instagram_id": a.instagramID ?? "", "videos_count": a.videosCount ?? -1, "photo_present": !(a.avatarURL ?? "").isEmpty || !(a.coverURL ?? "").isEmpty] as [String: Any]
+                    let w: JavDBResponse<Works> = try await APIClient.shared.get("/api/v1/movies/tags", query: ["filter_by": "\(a.type ?? 0):a:\(id):", "page": "1", "limit": "5", "sort_by": "release", "order_by": "desc"])
+                    item["works"] = (w.data?.movies ?? []).map { ["id": $0.id ?? "", "number": $0.number ?? "", "actor_ids": ($0.actors ?? []).map(\.id)] as [String: Any] }
+                }
+            } catch { item["errorType"] = String(describing: type(of: error)) }
+            details.append(item)
+        }
+        let data = try JSONSerialization.data(withJSONObject: ["transport": "unmodified production APIClient + signature + searchActors declaration", "adultImagesDownloaded": false, "reports": reports, "details": details], options: [.prettyPrinted, .sortedKeys])
         try data.write(to: URL(fileURLWithPath: "actor-live248.json"))
         print(String(decoding: data, as: UTF8.self))
     }
