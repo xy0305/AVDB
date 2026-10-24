@@ -65,3 +65,5 @@ if __name__ == "__main__":
     unittest.main()
 
 # replay stubs stay local to the standalone avatar test
+
+# missing-key replay stub is test-only

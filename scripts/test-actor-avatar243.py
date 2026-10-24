@@ -84,6 +84,10 @@ protocol ExternalTokenStore {
     func clear() throws
 }
 enum ExternalLibraryError: Error { case invalidToken, keychain(Int32) }
+@MainActor final class TMDBAvatarSettings {
+    static let shared = TMDBAvatarSettings()
+    func currentKey() -> String? { nil }
+}
 '''
 main = "import Foundation\n" + stubs + source + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
 with tempfile.TemporaryDirectory() as directory:
