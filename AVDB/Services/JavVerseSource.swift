@@ -8,6 +8,23 @@ struct JavVerseSnapshot: Decodable {
     let preparedAt: String
     let boards: [JavVerseBoard]
     let grok: JavVerseGrokSnapshot?
+    // 246 stamps bundled bytes so an overlay install replaces a stale snapshot.
+    // The field is optional and is not a rank or source signal.
+    let resourceRevision: Int?
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion, mode, origin, preparedAt, boards, grok, resourceRevision
+    }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        mode = try container.decode(String.self, forKey: .mode)
+        origin = try container.decode(String.self, forKey: .origin)
+        preparedAt = try container.decode(String.self, forKey: .preparedAt)
+        boards = try container.decode([JavVerseBoard].self, forKey: .boards)
+        grok = try container.decodeIfPresent(JavVerseGrokSnapshot.self, forKey: .grok)
+        resourceRevision = try container.decodeIfPresent(Int.self, forKey: .resourceRevision)
+        // Keys outside CodingKeys are not decoded, so an extra stamp cannot reject the snapshot.
+    }
     // Resource decoding is independent from image/network mapping; warm navigation reuses metadata.
     private static var cachedBundle: Self?
     static func bundled(in bundle: Bundle = .main) throws -> Self {
@@ -20,7 +37,16 @@ struct JavVerseSnapshot: Decodable {
         return value
     }
     static func decode(_ data: Data) throws -> Self {
-        let value = try JSONDecoder().decode(Self.self, from: data)
+        // Keep only keys this build models. resourceRevision is optional; other stamps are ignored.
+        let object = try JSONSerialization.jsonObject(with: data)
+        guard let root = object as? [String: Any] else {
+            throw JavVerseFailure.message("不支持的快照格式或时间")
+        }
+        let known = ["schemaVersion", "mode", "origin", "preparedAt", "boards", "grok", "resourceRevision"]
+        var normalized: [String: Any] = [:]
+        for key in known where root[key] != nil { normalized[key] = root[key] }
+        let bytes = try JSONSerialization.data(withJSONObject: normalized)
+        let value = try JSONDecoder().decode(Self.self, from: bytes)
         try value.validate()
         return value
     }
