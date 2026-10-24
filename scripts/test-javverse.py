@@ -11,7 +11,10 @@ class JavVerseTests(unittest.TestCase):
   cls.view=(ROOT/'AVDB/Views/JavVerseView.swift').read_text()
  def test_all_real_boards_complete(self):
   b={b['id']:b for b in self.data['boards']}
-  self.assertEqual(len(b),7)
+  self.assertEqual(len(b),13)
+  self.assertEqual(sum(len(x['entries']) for x in self.data['boards'][:7]),520)
+  self.assertEqual(sum(len(x['entries']) for x in self.data['boards']),1120)
+  self.assertEqual(len(self.data['grok']['people']),250)
   for key in ['daily','weekly','monthly','actresses','series']:
    self.assertEqual([e['rank'] for e in b[key]['entries']],list(range(1,101)))
   self.assertEqual(len(b['featured']['entries']),8)
@@ -25,7 +28,8 @@ class JavVerseTests(unittest.TestCase):
   self.assertEqual(b['monthly']['entries'][0]['code'],'SNOS-377')
  def test_period_and_timestamp(self):
   self.assertEqual(self.data['mode'],'staticSnapshot')
-  for b in self.data['boards']:self.assertRegex(b['capturedAt'],r'^2026-10-23T17:29:')
+  for b in self.data['boards'][:7]:self.assertRegex(b['capturedAt'],r'^2026-10-23T17:29:')
+  for b in self.data['boards'][7:]:self.assertRegex(b['capturedAt'],r'^2026-10-24T03:5')
   b={b['id']:b for b in self.data['boards']}
   self.assertIn('未显示年份',b['monthly']['period'])
   self.assertIn('未公布',b['series']['period'])
@@ -89,5 +93,5 @@ class JavVerseTests(unittest.TestCase):
   self.assertNotIn('Image(',label)
   self.assertNotIn('Label(',label)
   self.assertNotIn('chevron',label)
-  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 240;'),2)
+  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 241;'),2)
 if __name__=='__main__':unittest.main()

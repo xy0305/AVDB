@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import AVDB
 
 final class JavVerseBehaviorTests: XCTestCase {
@@ -23,7 +24,7 @@ final class JavVerseBehaviorTests: XCTestCase {
         let snapshot = try decode(neutralJSON())
         XCTAssertEqual(snapshot.boards[0].period, "原站未显示年份")
         XCTAssertEqual(snapshot.boards[0].capturedAt, "2026-10-23T17:29:00Z")
-        for (key, value) in [("schemaVersion", 2 as Any), ("mode", "live" as Any),
+        for (key, value) in [("schemaVersion", 99 as Any), ("mode", "live" as Any),
                              ("origin", "https://other.invalid" as Any), ("preparedAt", "yesterday" as Any)] {
             var invalid = neutralJSON(); invalid[key] = value
             XCTAssertThrowsError(try decode(invalid), key)
@@ -60,8 +61,10 @@ final class JavVerseBehaviorTests: XCTestCase {
     }
     func testBundledRealSnapshotRegisteredInHostedApp() throws {
         let snapshot = try JavVerseSnapshot.bundled()
-        XCTAssertEqual(snapshot.boards.count, 7)
-        XCTAssertEqual(snapshot.boards.reduce(0) { $0 + $1.entries.count }, 520)
+        XCTAssertEqual(snapshot.boards.count, 13)
+        XCTAssertEqual(snapshot.boards.prefix(7).reduce(0) { $0 + $1.entries.count }, 520, "Original seven boards must be preserved")
+        XCTAssertEqual(snapshot.boards.reduce(0) { $0 + $1.entries.count }, 1120)
+        XCTAssertEqual(snapshot.grok?.people.count, 250)
         XCTAssertEqual(snapshot.mode, "staticSnapshot")
     }
     @MainActor func testOnlyFullNumberUniqueIDMatches() async throws {
@@ -259,5 +262,91 @@ extension JavVerseBehaviorTests {
         XCTAssertTrue(mapper.messages[page[1].id]?.contains("未找到") == true)
         XCTAssertEqual(mapper.completed, 20)
         XCTAssertEqual(page.map(\.rank), Array(21...40))
+    }
+}
+
+extension JavVerseBehaviorTests {
+    func test241RealHistoryIdentityDiffersAndUnknownYearPreserved() throws {
+        let snapshot = try JavVerseSnapshot.bundled()
+        let daily = snapshot.boards.filter { ($0.term ?? $0.id) == "daily" }
+        XCTAssertEqual(daily.compactMap(\.periodKey), ["2026-10-22", "2026-10-21", "2026-10-20", "2026-10-19", "2026-10-18", "2026-10-17"])
+        let recent = try XCTUnwrap(daily.first { $0.periodKey == "2026-10-18" })
+        let prior = try XCTUnwrap(daily.first { $0.periodKey == "2026-10-17" })
+        XCTAssertNotEqual(recent.entries.map(\.code), prior.entries.map(\.code), "Never relabel a single snapshot as another date")
+        XCTAssertNotEqual(recent.selectionKey, prior.selectionKey)
+        let weeks = snapshot.boards.filter { ($0.term ?? $0.id) == "weekly" }
+        XCTAssertEqual(weeks.compactMap(\.periodKey), ["2026-10-16", "2026-10-09"])
+        XCTAssertNotEqual(weeks[0].entries.map(\.code), weeks[1].entries.map(\.code))
+        let month = try XCTUnwrap(snapshot.boards.first { $0.id == "monthly" })
+        XCTAssertEqual(month.periodKey, "year-unknown-09")
+        XCTAssertNil(month.periodEnd)
+        XCTAssertTrue(month.period.contains("未显示年份"))
+    }
+    func test241GrokAllFiveMetricsMatchPublicSortEvidence() throws {
+        let grok = try XCTUnwrap(JavVerseSnapshot.bundled().grok)
+        // Comprehensive hash independently checked against all 42 public DOM pages.
+        // Others bind original scores to the public client comparator, not model preference.
+        let hashes = ["total": "087f6f8b972c73b2af13f4b729e39a99e7bc1e3d2857101de15b7ef036b7ea64",
+                      "works": "ee79aa0a2681f391abe9153eb58c56cbc2bafa0fc9c5398696a5d3724649eb0e",
+                      "pop": "3901d039b594d14e89e0223fd5600b2732885a254852989ba391f90cec5b1197",
+                      "face": "d3fe2dbfa573cff8aaf29a28f03883962ff225ce531758a6f4f6fb09912b7618",
+                      "body": "702420b98b2ce2e3e0ad66fa5ed3deedc1b223e34d2544238e7223a5d438c58d"]
+        for metric in JavVerseGrokMetric.allCases {
+            let rows = grok.rows(metric: metric, status: .all)
+            XCTAssertEqual(rows.count, 250)
+            XCTAssertEqual(Set(rows.map(\.id)).count, 250)
+            let input = Data(rows.map(\.id).joined(separator: "|").utf8)
+            let hash = SHA256.hash(data: input).map { String(format: "%02x", $0) }.joined()
+            XCTAssertEqual(hash, hashes[metric.rawValue], metric.rawValue)
+            if metric == .total { XCTAssertEqual(rows.map(\.rank), Array(1...250)) }
+            else {
+                for index in 1..<rows.count {
+                    let same = rows[index].person.scores[metric.rawValue] == rows[index-1].person.scores[metric.rawValue]
+                    XCTAssertEqual(rows[index].rank, same ? rows[index-1].rank : index+1)
+                }
+            }
+        }
+        XCTAssertEqual(grok.rows(metric: .total, status: .all).first?.person.scoreText["total"], "8.84")
+        for status in [JavVerseGrokStatus.active, .retired] {
+            let rows = grok.rows(metric: .total, status: status)
+            XCTAssertTrue(rows.allSatisfy { $0.person.status == status.title })
+            XCTAssertEqual(rows.map(\.rank), Array(1...rows.count))
+        }
+    }
+    @MainActor func test241PeriodRaceCancelsLateMappingWithoutReplacingNewRows() async {
+        let gate = JavVerseSearchGate()
+        let old = JavVerseMapper(scope: "javverse|sales|sales|daily|old|all", search: { code, _ in try await gate.search(code) }, accountProvider: { nil })
+        let oldRows = rows(1)
+        let task = old.resolve(oldRows)
+        for _ in 0..<100 where gate.continuation == nil { await Task.yield() }
+        guard let continuation = gate.continuation else { XCTFail("Old request not started"); task?.cancel(); return }
+        old.cancel()
+        let latest = JavVerseMapper(scope: "javverse|sales|sales|daily|new|all", search: { code, _ in [Movie(id: "new-period", number: code)] }, accountProvider: { nil })
+        await latest.resolve(oldRows)?.value
+        continuation.resume(returning: [Movie(id: "old-period", number: "TEST-1")]); gate.continuation = nil
+        await task?.value
+        XCTAssertNil(old.movie(for: oldRows[0]))
+        XCTAssertEqual(latest.movie(for: oldRows[0])?.id, "new-period")
+    }
+    @MainActor func test241MetadataImmediatelyAvailableBeforeImageRequestsComplete() async throws {
+        let start = ProcessInfo.processInfo.systemUptime
+        let snapshot = try JavVerseSnapshot.bundled()
+        let cold = (ProcessInfo.processInfo.systemUptime-start)*1000
+        let warmStart = ProcessInfo.processInfo.systemUptime
+        _ = try JavVerseSnapshot.bundled()
+        let warm = (ProcessInfo.processInfo.systemUptime-warmStart)*1000
+        let daily = try XCTUnwrap(snapshot.boards.first { $0.id == "daily" })
+        let gate = JavVerseSearchGate()
+        let mapper = JavVerseMapper(search: { code, _ in try await gate.search(code) }, accountProvider: { nil })
+        let task = mapper.resolve(Array(daily.entries.prefix(6)))
+        XCTAssertEqual(daily.entries.count, 100)
+        XCTAssertEqual(daily.entries.first?.code, "SONE-371")
+        XCTAssertTrue(mapper.movies.isEmpty)
+        print("JAVVERSE241 metadataCacheProbeMs first=\(cold) warm=\(warm) rows=\(daily.entries.count) imagesAwaited=false")
+        for _ in 0..<100 where gate.continuation == nil { await Task.yield() }
+        mapper.cancel(); gate.continuation?.resume(returning: []); gate.continuation = nil
+        await task?.value
+        // HTTP failure cannot mutate immutable bundled metadata: no fake live refresh exists.
+        XCTAssertEqual(try JavVerseSnapshot.bundled().boards.first { $0.id == "daily" }?.entries.first?.code, "SONE-371")
     }
 }

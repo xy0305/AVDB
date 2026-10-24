@@ -107,8 +107,36 @@ enum JavVerseNeutralFixture {
                     "capturedAt": date, "sourceURL": "https://javverse.com/neutral-test",
                     "coverage": "complete", "entries": rows]
         }
-        let value: [String: Any] = ["schemaVersion": 1, "mode": "staticSnapshot",
+        var value: [String: Any] = ["schemaVersion": 2, "mode": "staticSnapshot",
             "origin": "https://javverse.com", "preparedAt": date, "boards": boards]
+        var expanded = boards
+        // Distinct fabricated periods test selection; never represented as source evidence.
+        for (id, term, key, code) in [("daily-old", "daily", "neutral-previous-day", "PAST"),
+                                      ("weekly", "weekly", "neutral-week-current", "WEEK"),
+                                      ("weekly-old", "weekly", "neutral-week-previous", "OLDWEEK"),
+                                      ("monthly", "monthly", "unknown-year", "MONTH")] {
+            var board = boards[2]
+            board["id"] = id; board["term"] = term; board["periodKey"] = key
+            board["selectionTitle"] = key; board["period"] = key
+            board["entries"] = (1...45).map { rank -> [String: Any] in
+                let label = "\(code)-\(String(format: "%03d", rank))"
+                return ["rank": rank, "kind": "movie", "label": label, "code": label,
+                        "sourceURL": "https://javverse.com/neutral-test/\(id)/\(rank)"]
+            }
+            expanded.append(board)
+        }
+        value["boards"] = expanded
+        let people: [[String: Any]] = (1...250).map { index in
+            let name = String(format: "中性演员%03d", index)
+            let scores = ["total": 10000-index, "works": 9000-index/2, "pop": 8000-index,
+                          "face": 7000+index, "body": 6000+index, "award": 5000, "years": 4000]
+            let texts = scores.mapValues { String(format: "%.2f", Double($0)/1000) }
+            return ["id": "neutral-\(index)", "nameJa": name, "nameZh": name,
+                    "years": "年份未公布", "status": index % 2 == 0 ? "现役" : "引退",
+                    "scores": scores, "scoreText": texts, "actressId": index]
+        }
+        value["grok"] = ["capturedAt": date, "sourceURL": "https://javverse.com/neutral-test",
+                         "sortEvidence": "fabricated neutral UI fixture only", "people": people]
         return try JavVerseSnapshot.decode(JSONSerialization.data(withJSONObject: value))
     }
 }

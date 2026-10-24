@@ -2,7 +2,7 @@ name: JavVerseAcceptance
 on:
   push:
     branches: [fix/subtitle-position-201]
-    paths: ['AVDB/**', 'AVDB.xcodeproj/**', 'UITests/JavVerse*.swift', 'scripts/register-javverse.rb', '.github/workflows/javverse-acceptance.yml']
+    paths: ['AVDB/**', 'AVDB.xcodeproj/**', 'UITests/JavVerse*.swift', 'scripts/register-javverse.rb', 'scripts/test-javverse*.py', '.github/workflows/javverse-acceptance.yml']
 permissions:
   contents: read
 concurrency:
@@ -22,7 +22,8 @@ jobs:
         run: |
           gem install cocoapods -v 1.16.2 --no-document
           python3 scripts/test-javverse.py
-          echo "Build240: public SDK integration logs LIVE240; no adult images fetched by live test"
+          python3 scripts/test-javverse241.py
+          echo "Build241: original LIVE240 public SDK checks retained; history/Grok and neutral four-tab UI acceptance; no adult image downloads"
           ruby scripts/register-javverse.rb --tests --ui-tests
           pod install --repo-update
           xcodebuild -version

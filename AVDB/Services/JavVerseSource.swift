@@ -7,11 +7,17 @@ struct JavVerseSnapshot: Decodable {
     let origin: String
     let preparedAt: String
     let boards: [JavVerseBoard]
+    let grok: JavVerseGrokSnapshot?
+    // Resource decoding is independent from image/network mapping; warm navigation reuses metadata.
+    private static var cachedBundle: Self?
     static func bundled(in bundle: Bundle = .main) throws -> Self {
+        if bundle == .main, let cachedBundle { return cachedBundle }
         guard let url = bundle.url(forResource: "JavVerseSnapshot", withExtension: "json") else {
             throw JavVerseFailure.message("缺少 JavVerseSnapshot.json 离线资源")
         }
-        return try decode(Data(contentsOf: url))
+        let value = try decode(Data(contentsOf: url))
+        if bundle == .main { cachedBundle = value }
+        return value
     }
     static func decode(_ data: Data) throws -> Self {
         let value = try JSONDecoder().decode(Self.self, from: data)
@@ -19,10 +25,17 @@ struct JavVerseSnapshot: Decodable {
         return value
     }
     func validate() throws {
-        guard schemaVersion == 1, mode == "staticSnapshot", origin == "https://javverse.com",
+        guard [1, 2].contains(schemaVersion), mode == "staticSnapshot", origin == "https://javverse.com",
               Self.timestamp(preparedAt), !boards.isEmpty,
               Set(boards.map(\.id)).count == boards.count else {
             throw JavVerseFailure.message("不支持的快照格式或时间")
+        }
+        if let grok {
+            guard Self.timestamp(grok.capturedAt), Self.sourceURL(grok.sourceURL),
+                  grok.people.count == 250, Set(grok.people.map(\.id)).count == 250,
+                  grok.people.allSatisfy({ !$0.nameJa.isEmpty && !$0.nameZh.isEmpty && ["现役", "引退"].contains($0.status) && $0.scores.count == 7 && $0.scores.values.allSatisfy({ (0...10000).contains($0) }) }) else {
+                throw JavVerseFailure.message("Grok公开快照不完整；拒绝推测名次")
+            }
         }
         for board in boards {
             guard !board.id.isEmpty, !board.title.isEmpty, !board.period.isEmpty,
@@ -62,6 +75,76 @@ struct JavVerseBoard: Decodable, Identifiable {
     let sourceURL: String
     let coverage: String
     let entries: [JavVerseEntry]
+    var term: String? = nil
+    var periodKey: String? = nil
+    var periodEnd: String? = nil
+    var selectionTitle: String? = nil
+    // Includes all source dimensions; mapping cache remains separately account/backend scoped.
+    var selectionKey: String { "javverse|sales|sales|\(term ?? id)|\(periodKey ?? period)|all" }
+}
+
+enum JavVerseGrokMetric: String, CaseIterable, Identifiable {
+    case total, works, pop, face, body
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .total: return "综合"; case .works: return "作品"; case .pop: return "人气"; case .face: return "颜值"; case .body: return "身材" }
+    }
+}
+enum JavVerseGrokStatus: String, CaseIterable, Identifiable {
+    case all, active, retired
+    var id: String { rawValue }
+    var title: String { self == .all ? "全部" : self == .active ? "现役" : "引退" }
+}
+struct JavVerseGrokPerson: Decodable, Identifiable {
+    let id: String
+    let nameJa: String
+    let nameZh: String
+    let years: String
+    let status: String
+    let scores: [String: Int]
+    let scoreText: [String: String]
+    let actressId: Int
+    func entry(rank: Int) -> JavVerseEntry {
+        JavVerseEntry(rank: rank, kind: "actor", label: nameJa,
+                      sourceURL: "https://javverse.com/actress/\(actressId)", code: nil)
+    }
+}
+struct JavVerseGrokRow: Identifiable {
+    let person: JavVerseGrokPerson
+    let rank: Int
+    var id: String { person.id }
+    var entry: JavVerseEntry { person.entry(rank: rank) }
+}
+struct JavVerseGrokSnapshot: Decodable {
+    let capturedAt: String
+    let sourceURL: String
+    let sortEvidence: String
+    let people: [JavVerseGrokPerson]
+    // Exact comparator from public 1958-5dff65ae7b330f9f.js function S.
+    // JS < compares UTF-16 code units, not locale-aware name collation.
+    private static func jsLess(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.utf16.lexicographicallyPrecedes(rhs.utf16)
+    }
+    func rows(metric: JavVerseGrokMetric, status: JavVerseGrokStatus) -> [JavVerseGrokRow] {
+        let sorted = people.filter { status == .all || $0.status == status.title }.sorted { lhs, rhs in
+            let a = lhs.scores[metric.rawValue] ?? -1, b = rhs.scores[metric.rawValue] ?? -1
+            if a != b { return a > b }
+            if metric == .total {
+                let x = lhs.scores["works"] ?? -1, y = rhs.scores["works"] ?? -1
+                if x != y { return x > y }
+            }
+            if lhs.nameJa != rhs.nameJa { return Self.jsLess(lhs.nameJa, rhs.nameJa) }
+            return Self.jsLess(lhs.id, rhs.id)
+        }
+        var previous: Int?; var rank = 0
+        return sorted.enumerated().map { index, person in
+            let score = person.scores[metric.rawValue]
+            // Comprehensive ranks are unique. Submetrics use competition ranking (1,1,3).
+            if metric == .total || score != previous { rank = index + 1 }
+            previous = score
+            return JavVerseGrokRow(person: person, rank: rank)
+        }
+    }
 }
 struct JavVerseEntry: Decodable, Identifiable {
     let rank: Int
@@ -110,12 +193,14 @@ enum JavVerseIdentity {
     private let movieHydration: Bool
     private let actorHydration: Bool
     private let accountProvider: @MainActor () -> String?
-    init(search: JavVerseMovieResolver.Search? = nil,
+    private let scope: String
+    init(scope: String = "javverse|legacy", search: JavVerseMovieResolver.Search? = nil,
          actorSearch: JavVerseActorResolver.Search? = nil,
          hydrateMovie: (@MainActor (String) async throws -> Movie)? = nil,
          hydrateActor: (@MainActor (String) async throws -> Actor?)? = nil,
          shareCache: Bool? = nil,
          accountProvider: @escaping @MainActor () -> String? = { APIClient.shared.token }) {
+        self.scope = scope
         self.search = search ?? { source, page in
             try await JavDBSDK.shared.search(keyword: source, page: page, type: "movie", limit: 20)
         }
@@ -150,7 +235,7 @@ enum JavVerseIdentity {
     }
     private func key(_ entry: JavVerseEntry) -> String {
         let identity = entry.kind == "movie" ? (entry.code.flatMap(JavVerseIdentity.code) ?? entry.label) : entry.label
-        return "\(JavDBConstants.baseURL)|\(account ?? "<anonymous>")|\(entry.kind)|\(identity)"
+        return "\(scope)|\(JavDBConstants.baseURL)|\(account ?? "<anonymous>")|\(entry.kind)|\(identity)"
     }
     @discardableResult
     func resolve(_ entries: [JavVerseEntry], retry: Bool = false) -> Task<Void, Never>? {
