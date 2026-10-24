@@ -79,6 +79,10 @@ import Foundation
         })
         if case .ambiguous(let choices) = mitaniResult {
             check(Set(choices.map(\.id)) == ["PQJKe", "gyRE"], "same canonical name stays ambiguous")
+        } else if case .matched(let match) = mitaniResult {
+            preconditionFailure("美谷朱里 auto-selected \(match.actor.id) calls=\(mitaniCalls)")
+        } else if case .incomplete(let choices, let queries) = mitaniResult {
+            preconditionFailure("美谷朱里 incomplete ids=\(choices.map(\.id)) queries=\(queries) calls=\(mitaniCalls)")
             check(mitaniCalls == mitani.queries, "unprioritized source name cannot skip mapped aliases")
             check(ExternalActorResolver.Failure.ambiguous(choices).localizedDescription.contains("美谷朱里 [PQJKe]") && ExternalActorResolver.Failure.ambiguous(choices).localizedDescription.contains("美谷朱里 [gyRE]"), "candidate copy uses each ID name")
         } else { preconditionFailure("美谷朱里 must not merge") }
