@@ -6,7 +6,6 @@ if not shutil.which("swiftc"):
     print("Avatar Swift execution requires macOS CI")
     raise SystemExit(0)
 fixture = r'''
-import Foundation
 let names = ["中性演员甲", "Neutral Actor A"]
 let unique = [TMDBPerson(id: 7, name: "Neutral Actor A", alsoKnownAs: ["中性演员甲"], gender: 1, profilePath: "/neutral.png")]
 let selected = TMDBPersonSelector.select(unique, names: names)
@@ -48,7 +47,7 @@ print("PASS actor avatar boundaries")
 '''
 source = (root / "AVDB/Services/ExternalActorResolver.swift").read_text()
 source = source.split("struct TMDBAvatarTokenStore", 1)[0]
-main = source + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
+main = "import Foundation\n" + source + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     (path / "main.swift").write_text(main)
