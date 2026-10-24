@@ -47,6 +47,9 @@ class HistoryGrok241(unittest.TestCase):
   self.assertIn('rows.prefix(6)',view)
   self.assertIn('selection: $tab, scrolls: false',view)
   self.assertNotIn('AsyncImage(',view)
+  self.assertNotIn('.accessibilityIdentifier("javverse-home")',view, 'Container identifiers override real menu/button IDs in native SwiftUI')
+  self.assertIn('.accessibilityIdentifier("javverse-period-menu")',view)
+  self.assertIn('.accessibilityIdentifier("javverse-other-boards")',view)
  def test_native_registration_and_test_content(self):
   tests=(R/'UITests/JavVerseBehaviorTests.swift').read_text();ui=(R/'UITests/JavVerseNavigationTests.swift').read_text()
   for name in ['test241RealHistory','test241GrokAllFive','test241PeriodRace','test241MetadataImmediately']:self.assertIn(name,tests)

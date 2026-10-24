@@ -89,7 +89,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
             else { ProgressView("读取本地榜单…"); Spacer() }
         }
         .navigationTitle("JavVerse 榜单")
-        .accessibilityIdentifier("javverse-home")
+        // Do not tag the parent container: SwiftUI propagates its identifier over child controls.
         .task {
             guard snapshot == nil else { return }
             let start = ProcessInfo.processInfo.systemUptime
@@ -179,7 +179,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
             if let failure { Text(failure).foregroundStyle(.red) }
         }
         .navigationTitle("JavVerse · 原站名单")
-        .accessibilityIdentifier("javverse-home")
+        // Do not tag the parent container: SwiftUI propagates its identifier over child controls.
         .task(id: probing) {
             guard probing else { return }
             #if DEBUG
