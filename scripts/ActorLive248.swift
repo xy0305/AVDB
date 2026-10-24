@@ -30,7 +30,7 @@ struct RawActors: Decodable { let actors: [RawActor]? }
             var report: [String: Any] = ["source": source, "actualSourceName": sourceName, "actualSourceAliases": sourceAliases, "canonical": identity.canonical ?? "", "queries": identity.queries, "policy247_rejects_before_network": identity.queries.count > 4]
             var policyRequests: [[String: Any]] = []
             do {
-                let actor = try await JavVerseActorResolver.resolve(name: sourceName, aliases: sourceAliases, catalog: catalog) { q, page in
+                let actor = try await JavVerseActorResolver.resolveActor(name: sourceName, aliases: sourceAliases, catalog: catalog) { q, page in
                     let rows = try await JavDBSDK.shared.searchActors(keyword: q, page: page)
                     policyRequests.append(["query": q, "page": page, "ids": rows.map(\.id), "count": rows.count]); return rows
                 }

@@ -1,0 +1,44 @@
+name: ActorCount250
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths:
+      - AVDB/Services/ExternalActorResolver.swift
+      - AVDB/Services/JavVersePolicy.swift
+      - AVDB/Services/JavVerseSource.swift
+      - scripts/ActorResolverRegression248.swift
+      - scripts/ActorCountProbe250.swift
+      - scripts/actor-count-probe250.py
+      - scripts/actor-live248.py
+      - .github/workflows/actor-count250.yml
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Existing macOS Swift actor regression plus strict count assertions
+        env:
+          ACTOR_REGRESSION: '1'
+        run: python3 scripts/actor-live248.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actor-regression250
+          path: actor-regression248.json
+          retention-days: 14
+  readonly-search:
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unmodified production searchActors text metadata only
+        run: python3 scripts/actor-count-probe250.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actor-count-probe250
+          path: actor-count-probe250.json
+          retention-days: 14

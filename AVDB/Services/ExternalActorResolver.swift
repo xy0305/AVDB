@@ -9,6 +9,13 @@ import SwiftUI
     struct Match: Sendable {
         let actor: Actor
         let identity: ExternalActorIdentity
+        /// Present only when several exact-name candidates were reduced by a strict videos_count lead.
+        let byVideoCount: Int?
+        init(actor: Actor, identity: ExternalActorIdentity, byVideoCount: Int? = nil) {
+            self.actor = actor
+            self.identity = identity
+            self.byVideoCount = byVideoCount
+        }
     }
 
     static func match(_ identity: ExternalActorIdentity, actor: Actor) -> Bool {
@@ -26,15 +33,16 @@ import SwiftUI
         static func label(_ actor: Actor) -> String {
             let name = (actor.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let shown = name.isEmpty ? actor.displayName : name
-            return "\(shown) [\(actor.id)]"
+            let works = actor.videosCount.map { "\($0)部" } ?? "作品数未知"
+            return "\(shown) [\(actor.id)] · \(works)"
         }
         var errorDescription: String? {
             switch self {
             case .ambiguous(let actors):
-                return "身份待确认：多个 AVDB 候选（" + actors.prefix(8).map(Self.label).joined(separator: "；") + "）；可点进候选核对，未自动合并"
+                return "身份待确认：多个 AVDB 候选（" + actors.prefix(8).map(Self.label).joined(separator: "；") + "）；作品数未严格分出最多者，未自动选择"
             case .incomplete(let actors):
                 let candidates = actors.isEmpty ? "" : "；已有候选 " + actors.prefix(8).map(Self.label).joined(separator: "；")
-                return "查询未完成：该别名分页未穷尽" + candidates + "；未自动选择，可点进候选或重试"
+                return "查询未完成：该别名分页未穷尽" + candidates + "；未自动选择，可重试或进入候选确认"
             }
         }
     }
@@ -81,16 +89,34 @@ import SwiftUI
             // A full page marks only this alias incomplete. It cannot erase an exact candidate.
             if !exhausted { unfinished.append(query) }
             let candidates = matches.values.sorted { $0.id < $1.id } // display only; never chooses an ID
+            // Count evidence already collected. Do not wait for unrelated aliases, and do not invent an ID.
+            if let actor = mostVideos(candidates), candidates.count > 1 {
+                return .matched(Match(actor: actor, identity: identity, byVideoCount: actor.videosCount))
+            }
             let priority = Set(planned.prefix(index + 1).map(ActorNameNormalizer.key))
             if exhausted, let actor = uniquePreferred(candidates, priority: priority, canonical: identity.canonical, source: identity.sourceName) {
                 return .matched(Match(actor: actor, identity: identity))
             }
         }
         let candidates = matches.values.sorted { $0.id < $1.id }
+        // Same-name evidence only. A strict work-count lead may choose; ties and unknown counts never do.
+        if candidates.count > 1, let actor = mostVideos(candidates) {
+            return .matched(Match(actor: actor, identity: identity, byVideoCount: actor.videosCount))
+        }
         if candidates.count > 1 { return .ambiguous(candidates) }
         if !unfinished.isEmpty { return .incomplete(candidates: candidates, queries: unfinished) }
         guard let actor = candidates.first else { return .notFound }
         return .matched(Match(actor: actor, identity: identity))
+    }
+
+    // nil is unknown, never zero. The leader must be known and strictly greater than every other known count.
+    static func mostVideos(_ candidates: [Actor]) -> Actor? {
+        let known = candidates.compactMap { actor -> (Actor, Int)? in
+            guard let count = actor.videosCount else { return nil }
+            return (actor, count)
+        }
+        guard known.count == candidates.count, let best = known.max(by: { $0.1 < $1.1 }) else { return nil }
+        return known.filter { $0.1 == best.1 }.count == 1 ? best.0 : nil
     }
 
     // Canonical or source name must itself be unique. Broad aliases are not queried afterwards.

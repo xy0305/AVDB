@@ -311,7 +311,7 @@ enum JavVerseIdentity {
             } }
     }
     func clear() {
-        cancel(); movies.removeAll(); actors.removeAll(); avatars.removeAll(); candidates.removeAll(); messages.removeAll(); account = accountProvider()
+        cancel(); movies.removeAll(); actors.removeAll(); avatars.removeAll(); candidates.removeAll(); videoCounts.removeAll(); messages.removeAll(); account = accountProvider()
     }
     func waitUntilIdle() async { await task?.value }
     func cancel() {
@@ -408,7 +408,9 @@ enum JavVerseIdentity {
                     }
                 } else {
                     do {
-                        actor = try await JavVerseActorResolver.resolve(name: entry.label, aliases: entry.aliases, search: actorSearch)
+                        let match = try await JavVerseActorResolver.resolve(name: entry.label, aliases: entry.aliases, search: actorSearch)
+                        actor = match?.actor
+                        if let count = match?.byVideoCount { videoCounts[entry.id] = count }
                     } catch let failure as ExternalActorResolver.Failure {
                         switch failure {
                         case .ambiguous(let found), .incomplete(let found): choices = found
@@ -433,7 +435,11 @@ enum JavVerseIdentity {
             guard generation == epoch, accountProvider() == token else { throw CancellationError() }
             movies[entry.id] = movie; actors[entry.id] = actor
             candidates[entry.id] = choices.isEmpty ? nil : choices
-            let message = movie != nil || actor != nil ? "已核验 AVDB 唯一身份" : "未找到：AVDB 无完整身份匹配"
+            let message: String
+            if movie != nil { message = "已核验 AVDB 唯一身份" }
+            else if let count = videoCounts[entry.id] { message = "已按作品数最多匹配（\(count)部）" }
+            else if actor != nil { message = "已核验 AVDB 唯一身份" }
+            else { message = "未找到：AVDB 无完整身份匹配" }
             messages[entry.id] = message
             remember(entry, movie: movie, actor: actor, choices: choices, message: message)
             completed += 1

@@ -44,14 +44,18 @@ import Foundation
     static func matches(_ source: String, actor: Actor) -> Bool {
         ExternalActorResolver.match(identity(name: source), actor: actor)
     }
-    static func resolve(name: String, aliases: [String] = [], catalog: ActorAliasCatalog = .bundled(), search: Search) async throws -> Actor? {
+    static func resolve(name: String, aliases: [String] = [], catalog: ActorAliasCatalog = .bundled(), search: Search) async throws -> ExternalActorResolver.Match? {
         let identity = identity(name: name, aliases: aliases, catalog: catalog)
         switch try await ExternalActorResolver.inspect(identity: identity, search: search, queryLimit: 12) {
-        case .matched(let match): return match.actor
+        case .matched(let match): return match
         case .notFound: return nil
         case .ambiguous(let candidates): throw ExternalActorResolver.Failure.ambiguous(candidates)
         case .incomplete(let candidates, _): throw ExternalActorResolver.Failure.incomplete(candidates)
         }
+    }
+    /// Compatibility for callers that only need the actor. Video-count reason stays on Match.
+    static func resolveActor(name: String, aliases: [String] = [], catalog: ActorAliasCatalog = .bundled(), search: Search) async throws -> Actor? {
+        try await resolve(name: name, aliases: aliases, catalog: catalog, search: search)?.actor
     }
 }
 

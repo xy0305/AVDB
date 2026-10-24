@@ -296,13 +296,18 @@ private enum JavVerseRankingTab: String, CaseIterable {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(entry.label).textSelection(.enabled).accessibilityIdentifier("javverse-row-\(entry.rank)")
                                 if let actor = mapper.actor(for: entry) {
+                                    Text(mapper.messages[entry.id] ?? "已匹配").font(.caption).foregroundStyle(.secondary)
                                     NavigationLink("AVDB 演员资料") { ActorDetailView(actorID: actor.id) }
+                                        .accessibilityIdentifier("javverse-actor-open-\(entry.rank)")
                                 } else if entry.kind == "actor" {
                                     Text(mapper.messages[entry.id] ?? "尚未请求").font(.caption).foregroundStyle(.secondary)
-                                    ForEach(mapper.candidates(for: entry)) { actor in
-                                        NavigationLink("\(ExternalActorResolver.Failure.label(actor))") { ActorDetailView(actorID: actor.id) }
-                                            .font(.caption)
-                                            .accessibilityIdentifier("javverse-candidate-\(entry.rank)-\(actor.id)")
+                                    let choices = mapper.candidates(for: entry)
+                                    if !choices.isEmpty {
+                                        NavigationLink("确认候选（\(choices.count)）") {
+                                            JavVerseActorConfirmView(title: entry.label, actors: choices)
+                                        }
+                                        .font(.caption)
+                                        .accessibilityIdentifier("javverse-confirm-\(entry.rank)")
                                     }
                                     Button("单独核验 / 重试") { mapper.resolve([entry], retry: true) }.disabled(mapper.busy)
                                 } else {
@@ -327,6 +332,26 @@ private enum JavVerseRankingTab: String, CaseIterable {
         .navigationTitle(board.title)
         .task(id: page) { await mapper.resolve(rows)?.value }
         .onDisappear { mapper.cancel() }
+    }
+}
+
+// One push from a ranking row. Actor pages are reached only by an explicit choice inside this page.
+@MainActor private struct JavVerseActorConfirmView: View {
+    let title: String
+    let actors: [Actor]
+    var body: some View {
+        List(actors) { actor in
+            NavigationLink { ActorDetailView(actorID: actor.id) } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(actor.name ?? actor.displayName)
+                    Text(actor.videosCount.map { "ID \(actor.id) · \($0)部" } ?? "ID \(actor.id) · 作品数未知")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier("javverse-confirm-choice-\(actor.id)")
+        }
+        .navigationTitle(title)
+        .accessibilityIdentifier("javverse-actor-confirm")
     }
 }
 
@@ -441,14 +466,19 @@ private enum JavVerseRankingTab: String, CaseIterable {
                             Text("Grok \(metric.title)：\(row.person.scoreText[metric.rawValue] ?? "—")").font(.subheadline.monospacedDigit())
                                 .accessibilityIdentifier("javverse-grok-score-\(row.person.id)")
                             if let actor = mapper.actor(for: row.entry) {
+                                Text(mapper.messages[row.entry.id] ?? "已匹配").font(.caption).foregroundStyle(.secondary)
                                 NavigationLink("AVDB 演员资料") { ActorDetailView(actorID: actor.id) }
+                                    .accessibilityIdentifier("javverse-actor-open-\(row.rank)")
                             } else {
                                 Text(mapper.messages[row.entry.id] ?? "尚未核验AVDB身份；无头像不代表榜单缺项")
                                     .font(.caption).foregroundStyle(.secondary)
-                                ForEach(mapper.candidates(for: row.entry)) { actor in
-                                    NavigationLink("\(ExternalActorResolver.Failure.label(actor))") { ActorDetailView(actorID: actor.id) }
-                                        .font(.caption)
-                                        .accessibilityIdentifier("javverse-candidate-\(row.rank)-\(actor.id)")
+                                let choices = mapper.candidates(for: row.entry)
+                                if !choices.isEmpty {
+                                    NavigationLink("确认候选（\(choices.count)）") {
+                                        JavVerseActorConfirmView(title: row.person.nameZh, actors: choices)
+                                    }
+                                    .font(.caption)
+                                    .accessibilityIdentifier("javverse-confirm-\(row.rank)")
                                 }
                                 Button("单独核验 / 重试") { mapper.resolve([row.entry], retry: true) }.disabled(mapper.busy)
                             }

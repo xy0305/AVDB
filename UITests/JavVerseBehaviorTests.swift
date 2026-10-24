@@ -247,11 +247,30 @@ extension JavVerseBehaviorTests {
         XCTAssertTrue(JavVerseActorResolver.matches("中性別名", actor: exact))
         XCTAssertFalse(JavVerseActorResolver.matches("中性名前（別人）", actor: exact))
         XCTAssertFalse(JavVerseActorResolver.matches("中性名前（中性別名）", actor: exact))
-        let unique = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact] }
+        let unique = try await JavVerseActorResolver.resolveActor(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact] }
         XCTAssertEqual(unique?.id, "neutral-a", "Explicit alias evidence must retain the unique real SDK identity")
+        func counted(_ id: String, _ videos: Int?) throws -> Actor {
+            var object: [String: Any] = ["id": id, "name": "中性名前", "other_name": "中性別名"]
+            if let videos { object["videos_count"] = videos }
+            return try JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: object))
+        }
+        let counted = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try counted("neutral-b", 2), try counted("neutral-a", 9)] }
+        XCTAssertEqual(counted?.actor.id, "neutral-a")
+        XCTAssertEqual(counted?.byVideoCount, 9)
+        do {
+            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try counted("neutral-a", 4), try counted("neutral-b", 4)] }
+            XCTFail("Equal videos_count must not auto-select")
+        } catch ExternalActorResolver.Failure.ambiguous {}
+        do {
+            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [try counted("neutral-a", 9), try counted("neutral-b", nil)] }
+            XCTFail("Unknown videos_count must not lose automatically")
+        } catch ExternalActorResolver.Failure.ambiguous {}
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("AVDB/Views/JavVerseView.swift"), encoding: .utf8)
+        XCTAssertFalse(source.contains("javverse-candidate-"))
+        XCTAssertTrue(source.contains("struct JavVerseActorConfirmView"))
         let other = try actor("neutral-b", "中性名前", "中性別名")
         do {
-            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact, other] }
+            _ = try await JavVerseActorResolver.resolveActor(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact, other] }
             XCTFail("Same-name IDs must never yield a navigable identity")
         } catch ExternalActorResolver.Failure.ambiguous(let candidates) {
             XCTAssertEqual(Set(candidates.map(\.id)), ["neutral-a", "neutral-b"])
