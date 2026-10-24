@@ -52,8 +52,8 @@ import Foundation
         let incomplete = try await ExternalActorResolver.inspect(identity: identity, search: { q, page in
             incompleteCalls.append((q, page)); return q == "Neutral" ? Array(repeating: filler, count: 20) : [exact]
         })
-        if case .incomplete(let c, let queries) = incomplete { check(c.count == 1 && queries == ["Neutral"], "incomplete keeps later exact candidate; never notFound") } else { preconditionFailure() }
-        check(incompleteCalls.map { $0.0 } == ["Neutral", "Neutral", "Neutral", "Second"], "full query does not stop remaining aliases")
+        if case .matched(let match) = incomplete { check(match.actor.id == "valid", "exact canonical success survives one incomplete alias") } else { preconditionFailure() }
+        check(incompleteCalls.map { $0.0 } == ["Neutral", "Neutral", "Neutral", "Second"], "exact result stops remaining broad aliases")
         let cappedIdentity = ExternalActorIdentity(sourceName: "Neutral", canonical: nil, display: "Neutral", mapID: nil, queries: (0..<13).map { "Alias\($0)" })
         var cappedCalls = 0
         let capped = try await ExternalActorResolver.inspect(identity: cappedIdentity, search: { _, _ in cappedCalls += 1; return [] })
@@ -68,8 +68,62 @@ import Foundation
         catch Expected.network { check(true, "request error propagates; never notFound") }
         do { _ = try await ExternalActorResolver.inspect(identity: identity, search: { _, _ in throw CancellationError() }); preconditionFailure() }
         catch is CancellationError { check(true, "cancellation propagates") }
+        let mitani = ExternalActorIdentity.resolve(sourceName: "美谷朱里", aliases: [], catalog: catalog)
+        let akane = try actor("gyRE", "美谷朱里", other: "美谷あかり,谷坂かな,吉見いりあ,仁科璃々,三上江里,美谷朱音")
+        let secondary = try actor("PQJKe", "美谷朱里")
+        let akari = try actor("other-akari", "美谷あかり")
+        var mitaniCalls = [String]()
+        let mitaniResult = try await ExternalActorResolver.inspect(identity: mitani, search: { query, _ in
+            mitaniCalls.append(query)
+            return query == "美谷朱里" ? [akane, secondary] : [akari]
+        })
+        if case .ambiguous(let choices) = mitaniResult {
+            check(Set(choices.map(\.id)) == ["PQJKe", "gyRE"] && mitaniCalls == ["美谷朱里"], "same canonical name stays ambiguous; broad aliases not queried")
+            check(ExternalActorResolver.Failure.ambiguous(choices).localizedDescription.contains("美谷朱里 [PQJKe]") && ExternalActorResolver.Failure.ambiguous(choices).localizedDescription.contains("美谷朱里 [gyRE]"), "candidate copy uses each ID name")
+        } else { preconditionFailure("美谷朱里 must not merge") }
+        let akiho = ExternalActorIdentity.resolve(sourceName: "吉沢明歩", aliases: ["吉泽明步"], catalog: catalog)
+        let censored = try actor("0yVv", "吉沢明歩", other: "吉澤明步")
+        let uncensored = try actor("AdNn", "吉沢明歩")
+        let akihoResult = try await ExternalActorResolver.inspect(identity: akiho, search: { _, _ in [censored, uncensored] })
+        if case .ambiguous(let choices) = akihoResult { check(Set(choices.map(\.id)) == ["0yVv", "AdNn"], "吉沢明歩 records stay separate") } else { preconditionFailure("吉沢明歩 must not merge") }
+        let jessica = ExternalActorIdentity.resolve(sourceName: "希崎ジェシカ", aliases: ["希崎杰西卡"], catalog: catalog)
+        let jessicaActor = try actor("dxne", "希崎潔西卡")
+        let jessicaResult = try await ExternalActorResolver.inspect(identity: jessica, search: { _, _ in [jessicaActor] })
+        if case .matched(let match) = jessicaResult { check(match.actor.id == "dxne", "希崎 unique traditional name matches") } else { preconditionFailure("希崎 rejected") }
+        let actors = (1...4).map { JavVerseEntry(rank: $0, kind: "actor", label: "中性演员\($0)", sourceURL: "https://javverse.com/neutral/\($0)", code: nil) }
+        let gate = CurrentPageGate()
+        let mapper = JavVerseMapper(actorSearch: { name, _ in try await gate.search(name) }, shareCache: true, accountProvider: { "neutral-249" })
+        let running = mapper.resolve(actors)
+        for _ in 0..<200 where gate.started.count < 2 { await Task.yield() }
+        check(gate.started.count == 2, "current page starts at most two actor requests")
+        check(actors.dropFirst(2).allSatisfy { mapper.messages[$0.id] == "排队中" }, "remaining current-page actors stay queued")
+        gate.releaseAll()
+        await running?.value
+        check(actors.allSatisfy { mapper.actor(for: $0)?.id == "id-" + $0.label }, "all current-page actors resolve without a first-six cutoff")
+        var repeatCalls = 0
+        let repeatMapper = JavVerseMapper(actorSearch: { _, _ in repeatCalls += 1; return [] }, shareCache: true, accountProvider: { "neutral-249" })
+        await repeatMapper.resolve([actors[0]])?.value
+        check(repeatCalls == 0 && repeatMapper.actor(for: actors[0])?.id == "id-中性演员1", "successful actor identity is reused across views")
         let status: [String: Any] = ["passed": passed.count, "assertions": passed, "live": false, "productionCandidatePatchApplied": true, "adultImagesDownloaded": false]
         let data = try JSONSerialization.data(withJSONObject: status, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: URL(fileURLWithPath: "actor-regression248.json")); print(String(decoding: data, as: UTF8.self))
+    }
+}
+
+
+@MainActor private final class CurrentPageGate {
+    var started: [String] = []
+    private var waiters: [String: CheckedContinuation<[Actor], Error>] = [:]
+    func search(_ name: String) async throws -> [Actor] {
+        started.append(name)
+        return try await withCheckedThrowingContinuation { waiters[name] = $0 }
+    }
+    func releaseAll() {
+        let pending = waiters
+        waiters.removeAll()
+        for (name, continuation) in pending {
+            let actor = try! JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: ["id": "id-\(name)", "name": name]))
+            continuation.resume(returning: [actor])
+        }
     }
 }

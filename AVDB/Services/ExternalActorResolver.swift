@@ -23,13 +23,18 @@ import SwiftUI
     enum Failure: Error, LocalizedError {
         case ambiguous([Actor])
         case incomplete([Actor])
+        static func label(_ actor: Actor) -> String {
+            let name = (actor.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let shown = name.isEmpty ? actor.displayName : name
+            return "\(shown) [\(actor.id)]"
+        }
         var errorDescription: String? {
             switch self {
             case .ambiguous(let actors):
-                return "身份待确认：多个 AVDB 候选（" + actors.prefix(8).map { "\($0.displayName) [\($0.id)]" }.joined(separator: "；") + "）；请在原生演员搜索核对"
+                return "身份待确认：多个 AVDB 候选（" + actors.prefix(8).map(Self.label).joined(separator: "；") + "）；可点进候选核对，未自动合并"
             case .incomplete(let actors):
-                let candidates = actors.isEmpty ? "" : "；已有候选 " + actors.prefix(8).map { "\($0.displayName) [\($0.id)]" }.joined(separator: "；")
-                return "查询未完成：达到别名或分页上限" + candidates + "；未自动选择，可重试或在原生演员搜索核对"
+                let candidates = actors.isEmpty ? "" : "；已有候选 " + actors.prefix(8).map(Self.label).joined(separator: "；")
+                return "查询未完成：该别名分页未穷尽" + candidates + "；未自动选择，可点进候选或重试"
             }
         }
     }
@@ -52,9 +57,16 @@ import SwiftUI
         let queries = ActorNameNormalizer.orderedUnique(identity.queries)
         guard !queries.isEmpty else { return .notFound }
         let limit = min(12, max(1, queryLimit))
+        let planned = Array(queries.prefix(limit))
         var unfinished = Array(queries.dropFirst(limit))
         var matches: [String: Actor] = [:]
-        for query in queries.prefix(limit) {
+        var seen: [String: Bool] = [:]
+        for (index, query) in planned.enumerated() {
+            let queryKey = ActorNameNormalizer.key(query)
+            if let exhausted = seen[queryKey] {
+                if !exhausted { unfinished.append(query) }
+                continue
+            }
             var exhausted = false
             for page in 1...3 {
                 try Task.checkCancellation()
@@ -65,15 +77,31 @@ import SwiftUI
                 }
                 if rows.count < 20 { exhausted = true; break }
             }
-            // An unrelated broad query must not erase an exact candidate or stop
-            // the remaining mapped aliases. Keep incomplete distinct from absent.
+            seen[queryKey] = exhausted
+            // A full page marks only this alias incomplete. It cannot erase an exact candidate.
             if !exhausted { unfinished.append(query) }
+            let candidates = matches.values.sorted { $0.id < $1.id } // display only; never chooses an ID
+            let priority = Set(planned.prefix(index + 1).map(ActorNameNormalizer.key))
+            if let actor = uniquePreferred(candidates, priority: priority, canonical: identity.canonical, source: identity.sourceName) {
+                return .matched(Match(actor: actor, identity: identity))
+            }
         }
-        let candidates = matches.values.sorted { $0.id < $1.id } // display only; never chooses an ID
+        let candidates = matches.values.sorted { $0.id < $1.id }
         if candidates.count > 1 { return .ambiguous(candidates) }
         if !unfinished.isEmpty { return .incomplete(candidates: candidates, queries: unfinished) }
         guard let actor = candidates.first else { return .notFound }
         return .matched(Match(actor: actor, identity: identity))
+    }
+
+    // Canonical or source name must itself be unique. Broad aliases are not queried afterwards.
+    private static func uniquePreferred(_ candidates: [Actor], priority: Set<String>, canonical: String?, source: String) -> Actor? {
+        let preferred = Set([canonical, source].compactMap { $0 }.map(ActorNameNormalizer.key).filter { !$0.isEmpty && priority.contains($0) })
+        guard !preferred.isEmpty else { return nil }
+        let hits = candidates.filter { actor in
+            let evidence = [actor.name, actor.nameZht].compactMap { $0 }.map(ActorNameNormalizer.key)
+            return !preferred.isDisjoint(with: Set(evidence))
+        }
+        return hits.count == 1 ? hits[0] : nil
     }
 }
 

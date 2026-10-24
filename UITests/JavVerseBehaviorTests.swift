@@ -348,7 +348,7 @@ extension JavVerseBehaviorTests {
         let daily = try XCTUnwrap(snapshot.boards.first { $0.id == "daily" })
         let gate = JavVerseSearchGate()
         let mapper = JavVerseMapper(search: { code, _ in try await gate.search(code) }, accountProvider: { nil })
-        let task = mapper.resolve(Array(daily.entries.prefix(6)))
+        let task = mapper.resolve(daily.entries.prefix(20).map { $0 })
         XCTAssertEqual(daily.entries.count, 100)
         XCTAssertEqual(daily.entries.first?.code, "SONE-371")
         XCTAssertTrue(mapper.movies.isEmpty)

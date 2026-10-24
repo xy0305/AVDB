@@ -2,20 +2,35 @@ name: ActorLive248
 on:
   push:
     branches: [fix/subtitle-position-201]
-    paths: ['scripts/actor-probe249.py', 'scripts/ActorProbe249.swift', '.github/workflows/actor-live248.yml']
+    paths: ['AVDB/Services/ActorAliasCatalog.swift', 'AVDB/Services/ExternalActorResolver.swift', 'AVDB/Services/JavVersePolicy.swift', 'AVDB/Services/JavVerseSource.swift', 'scripts/actor-live248.py', 'scripts/ActorLive248.swift', 'scripts/ActorResolverRegression248.swift', 'scripts/actor-fix248.patch', 'scripts/actor-live248-replay.json', '.github/workflows/actor-live248.yml']
 permissions:
   contents: read
 jobs:
+  candidate-regression:
+    runs-on: macos-26
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Actual Swift production regression and real metadata replay (not live)
+        env:
+          ACTOR_REGRESSION: '1'
+        run: python3 scripts/actor-live248.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actor-regression248
+          path: actor-regression248.json
+          retention-days: 14
   metadata:
     runs-on: macos-26
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Compile actual production SDK and probe screenshot actor text metadata only
-        run: python3 scripts/actor-probe249.py
+      - name: Compile actual production SDK and probe actor text metadata only
+        run: python3 scripts/actor-live248.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: actor-probe249
-          path: actor-probe249.json
+          name: actor-live248
+          path: actor-live248.json
           retention-days: 14

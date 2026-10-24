@@ -10,7 +10,7 @@ class Grid242(unittest.TestCase):
   self.assertIn('rank: entry.rank',v)
   self.assertIn('sourceNumber: entry.label',v)
   self.assertIn('frontPoster: true',v)
-  self.assertIn('rows.prefix(6)',v)
+  self.assertIn('mapper.resolve(rows)',v)
   self.assertNotIn('AsyncImage(',v)
   self.assertNotIn('.onAppear',v)
  def test_grok_stays_list(self):
@@ -23,9 +23,10 @@ class Grid242(unittest.TestCase):
    self.assertIn(s,t)
  def test_version_and_ios(self):
   p=plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())
-  self.assertEqual(p['CFBundleVersion'],'248')
+  self.assertEqual(p['CFBundleVersion'],'249')
   self.assertEqual(p['CFBundleShortVersionString'],'1.0.2')
   b=(R/'AVDB.xcodeproj/project.pbxproj').read_text()
-  self.assertEqual(b.count('CURRENT_PROJECT_VERSION = 248;'),2)
+  self.assertEqual(b.count('CURRENT_PROJECT_VERSION = 249;'),2)
   self.assertIn('IPHONEOS_DEPLOYMENT_TARGET = 17.0;',b)
 if __name__=='__main__':unittest.main()
+ain()

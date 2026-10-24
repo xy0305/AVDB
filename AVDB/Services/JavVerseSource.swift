@@ -264,10 +264,11 @@ enum JavVerseIdentity {
     @Published private(set) var avatars: [String: String] = [:]
     @Published private(set) var avatarStatus: [String: String] = [:]
     @Published private(set) var messages: [String: String] = [:]
+    @Published private(set) var candidates: [String: [Actor]] = [:]
     @Published private(set) var busy = false
     @Published private(set) var completed = 0
     @Published private(set) var total = 0
-    private struct Cached { let movie: Movie?; let actor: Actor?; let date: Date }
+    private struct Cached { let movie: Movie?; let actor: Actor?; let candidates: [Actor]; let message: String?; let date: Date }
     // In-memory only, bounded and account/backend scoped; no credentials persisted or logged.
     private static var cache: [String: Cached] = [:]
     private static var order: [String] = []
@@ -310,7 +311,7 @@ enum JavVerseIdentity {
             } }
     }
     func clear() {
-        cancel(); movies.removeAll(); actors.removeAll(); avatars.removeAll(); messages.removeAll(); account = accountProvider()
+        cancel(); movies.removeAll(); actors.removeAll(); avatars.removeAll(); candidates.removeAll(); messages.removeAll(); account = accountProvider()
     }
     func waitUntilIdle() async { await task?.value }
     func cancel() {
@@ -323,6 +324,21 @@ enum JavVerseIdentity {
     func actor(for entry: JavVerseEntry) -> Actor? {
         guard account == accountProvider() else { return nil }; return actors[entry.id]
     }
+    func candidates(for entry: JavVerseEntry) -> [Actor] {
+        guard account == accountProvider() else { return [] }
+        return candidates[entry.id] ?? []
+    }
+    private func remember(_ entry: JavVerseEntry, movie: Movie?, actor: Actor?, choices: [Actor], message: String) {
+        guard sharedCache, movie != nil || actor != nil || !choices.isEmpty else { return }
+        let cacheKey = key(entry)
+        Self.cache[cacheKey] = Cached(movie: movie, actor: actor, candidates: choices, message: message, date: Date())
+        Self.order.removeAll { $0 == cacheKey }; Self.order.append(cacheKey)
+        while Self.order.count > 160 { Self.cache.removeValue(forKey: Self.order.removeFirst()) }
+    }
+    private func pace(since start: Date) async throws {
+        let elapsed = Date().timeIntervalSince(start)
+        if elapsed < 0.05 { try await Task.sleep(nanoseconds: UInt64((0.05 - elapsed) * 1_000_000_000)) }
+    }
     private func key(_ entry: JavVerseEntry) -> String {
         let identity = entry.kind == "movie" ? (entry.code.flatMap(JavVerseIdentity.code) ?? entry.label) : entry.label
         return "\(scope)|\(JavDBConstants.baseURL)|\(account ?? "<anonymous>")|\(entry.kind)|\(identity)"
@@ -333,7 +349,7 @@ enum JavVerseIdentity {
         guard !busy else { return nil }
         if account != accountProvider() { clear() }
         let epoch = generation, token = account
-        // A finite visible page/home section only, serial, never append an infinite scroll queue.
+        // Current visible page only. At most two requests run together; paging cancels this generation.
         let batch = Array(entries.filter { ($0.kind == "movie" || $0.kind == "actor") && movies[$0.id] == nil && actors[$0.id] == nil && (retry || messages[$0.id] == nil) }.prefix(20))
         guard !batch.isEmpty else { return nil }
         busy = true; completed = 0; total = batch.count
@@ -346,71 +362,95 @@ enum JavVerseIdentity {
                     for (key, value) in self.messages where value == "排队中" || value == "请求中…" { self.messages.removeValue(forKey: key) }
                 }
             }
-            for entry in batch {
-                do {
-                    try Task.checkCancellation()
-                    guard self.generation == epoch, self.accountProvider() == token else { throw CancellationError() }
-                    let cacheKey = self.key(entry)
-                    var cached = self.sharedCache ? Self.cache[cacheKey] : nil
-                    if let value = cached, Date().timeIntervalSince(value.date) > 600 { cached = nil }
-                    self.messages[entry.id] = "请求中…"
-                    var movie = cached?.movie; var actor = cached?.actor
-                    if cached == nil {
-                        if entry.kind == "movie" {
-                            guard let source = entry.code else { throw JavVerseFailure.message("原始完整番号不可核验") }
-                            movie = try await JavVerseMovieResolver.resolve(code: source) { source, page in
-                                try Task.checkCancellation()
-                                guard self.generation == epoch, self.accountProvider() == token else { throw CancellationError() }
-                                return try await self.search(source, page)
-                            }
-                            if self.movieHydration, let found = movie, (found.coverURL ?? "").isEmpty && (found.thumbURL ?? "").isEmpty {
-                                let detail = try await self.hydrateMovie(found.id)
-                                guard detail.id == found.id, JavVerseIdentity.code(detail.number ?? "") == JavVerseIdentity.code(source) else {
-                                    throw JavVerseFailure.message("详情身份不一致；拒绝替换")
-                                }
-                                movie = detail
-                            }
-                        } else {
-                            actor = try await JavVerseActorResolver.resolve(name: entry.label, aliases: entry.aliases, search: self.actorSearch)
-                            if self.actorHydration, let found = actor, (found.avatarURL ?? found.coverURL ?? "").isEmpty {
-                                let detail = try await self.hydrateActor(found.id)
-                                guard let detail, detail.id == found.id, JavVerseActorResolver.matches(entry.label, actor: detail) else {
-                                    throw JavVerseFailure.message("演员详情身份未通过；拒绝替换")
-                                }
-                                actor = detail
-                            }
-                            if let found = actor {
-                                let lookup = await ActorAvatarFallback.resolveMissing(actor: found, names: JavVerseActorResolver.identity(name: entry.label, aliases: entry.aliases).queries)
-                                if lookup.status == .matched { self.avatars[entry.id] = lookup.url }
-                                else if lookup.status == .missingKey { self.avatarStatus[entry.id] = "未设置" }
-                            }
-                        }
-                    }
-                    try Task.checkCancellation()
-                    guard self.generation == epoch, self.accountProvider() == token else { throw CancellationError() }
-                    self.movies[entry.id] = movie; self.actors[entry.id] = actor
-                    self.messages[entry.id] = movie != nil || actor != nil ? "已核验 AVDB 唯一身份" : "未找到：AVDB 无完整身份匹配"
-                    // Only successful identities cached; errors/absence explicitly retryable.
-                    if self.sharedCache && (movie != nil || actor != nil) {
-                        Self.cache[cacheKey] = Cached(movie: movie, actor: actor, date: Date())
-                        Self.order.removeAll { $0 == cacheKey }; Self.order.append(cacheKey)
-                        while Self.order.count > 160 { Self.cache.removeValue(forKey: Self.order.removeFirst()) }
-                    }
-                    self.completed += 1
-                    try await Task.sleep(nanoseconds: 180_000_000)
-                } catch is CancellationError { return }
-                catch let failure as ExternalActorResolver.Failure {
-                    guard !Task.isCancelled, self.generation == epoch, self.accountProvider() == token else { return }
-                    self.messages[entry.id] = failure.localizedDescription; self.completed += 1
+            await withTaskGroup(of: Void.self) { group in
+                var index = 0
+                func startNext() {
+                    guard index < batch.count else { return }
+                    let entry = batch[index]
+                    index += 1
+                    group.addTask { @MainActor in await self.verify(entry, epoch: epoch, token: token) }
                 }
-                catch {
-                    guard !Task.isCancelled, self.generation == epoch, self.accountProvider() == token else { return }
-                    self.messages[entry.id] = "请求/核验失败：\(error.localizedDescription)"; self.completed += 1
+                startNext(); startNext()
+                while await group.next() != nil {
+                    if Task.isCancelled || self.generation != epoch { break }
+                    startNext()
                 }
             }
         }
         return task
     }
+    private func verify(_ entry: JavVerseEntry, epoch: UUID, token: String?) async {
+        do {
+            try Task.checkCancellation()
+            guard generation == epoch, accountProvider() == token else { throw CancellationError() }
+            let cacheKey = key(entry)
+            var cached = sharedCache ? Self.cache[cacheKey] : nil
+            if let value = cached, Date().timeIntervalSince(value.date) > 600 { cached = nil }
+            messages[entry.id] = "请求中…"
+            var movie = cached?.movie; var actor = cached?.actor
+            choices = cached?.candidates ?? []
+            if cached == nil {
+                if entry.kind == "movie" {
+                    guard let source = entry.code else { throw JavVerseFailure.message("原始完整番号不可核验") }
+                    movie = try await JavVerseMovieResolver.resolve(code: source) { source, page in
+                        try Task.checkCancellation()
+                        guard self.generation == epoch, self.accountProvider() == token else { throw CancellationError() }
+                        return try await self.search(source, page)
+                    }
+                    if movieHydration, let found = movie, (found.coverURL ?? "").isEmpty && (found.thumbURL ?? "").isEmpty {
+                        let detail = try await hydrateMovie(found.id)
+                        guard detail.id == found.id, JavVerseIdentity.code(detail.number ?? "") == JavVerseIdentity.code(source) else {
+                            throw JavVerseFailure.message("详情身份不一致；拒绝替换")
+                        }
+                        movie = detail
+                    }
+                } else {
+                    do {
+                        actor = try await JavVerseActorResolver.resolve(name: entry.label, aliases: entry.aliases, search: actorSearch)
+                    } catch let failure as ExternalActorResolver.Failure {
+                        switch failure {
+                        case .ambiguous(let found), .incomplete(let found): choices = found
+                        }
+                        throw failure
+                    }
+                    if actorHydration, let found = actor, (found.avatarURL ?? found.coverURL ?? "").isEmpty {
+                        let detail = try await hydrateActor(found.id)
+                        guard let detail, detail.id == found.id, JavVerseActorResolver.matches(entry.label, actor: detail) else {
+                            throw JavVerseFailure.message("演员详情身份未通过；拒绝替换")
+                        }
+                        actor = detail
+                    }
+                    if let found = actor {
+                        let lookup = await ActorAvatarFallback.resolveMissing(actor: found, names: JavVerseActorResolver.identity(name: entry.label, aliases: entry.aliases).queries)
+                        if lookup.status == .matched { avatars[entry.id] = lookup.url }
+                        else if lookup.status == .missingKey { avatarStatus[entry.id] = "未设置" }
+                    }
+                }
+            }
+            try Task.checkCancellation()
+            guard generation == epoch, accountProvider() == token else { throw CancellationError() }
+            movies[entry.id] = movie; actors[entry.id] = actor
+            candidates[entry.id] = choices.isEmpty ? nil : choices
+            let message = movie != nil || actor != nil ? "已核验 AVDB 唯一身份" : "未找到：AVDB 无完整身份匹配"
+            messages[entry.id] = message
+            remember(entry, movie: movie, actor: actor, choices: choices, message: message)
+            completed += 1
+            if cached == nil { try await pace(since: started) }
+        } catch is CancellationError { return }
+        catch let failure as ExternalActorResolver.Failure {
+            guard !Task.isCancelled, generation == epoch, accountProvider() == token else { return }
+            candidates[entry.id] = choices.isEmpty ? nil : choices
+            messages[entry.id] = failure.localizedDescription
+            remember(entry, movie: nil, actor: nil, choices: choices, message: failure.localizedDescription)
+            completed += 1
+            try? await pace(since: started)
+        }
+        catch {
+            guard !Task.isCancelled, generation == epoch, accountProvider() == token else { return }
+            messages[entry.id] = "请求/核验失败：\(error.localizedDescription)"; completed += 1
+        }
+    }
+
 }
 
 // Diagnostic only, never interpreted as a live data API. No cookies, authentication or challenge solver.

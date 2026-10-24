@@ -44,7 +44,7 @@ class HistoryGrok241(unittest.TestCase):
   self.assertIn('cachedBundle',source);self.assertIn('scope',source)
   self.assertIn('JavVerseMapper(scope: board.selectionKey)',view)
   self.assertIn('.id(selected.selectionKey)',view)
-  self.assertIn('rows.prefix(6)',view)
+  self.assertIn('mapper.resolve(rows)',view)
   self.assertIn('selection: $tab, scrolls: false',view)
   self.assertNotIn('AsyncImage(',view)
   self.assertNotIn('.accessibilityIdentifier("javverse-home")',view, 'Container identifiers override real menu/button IDs in native SwiftUI')

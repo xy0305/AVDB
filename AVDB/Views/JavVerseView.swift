@@ -269,7 +269,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 DisclosureGroup("采集时间与来源") {
                     Text("采集时间 UTC：\(board.capturedAt)").font(.caption)
                     Text("来源：\(board.sourceURL)").font(.caption).textSelection(.enabled)
-                    Text("保留原站名次，不补位。先显示名单；首6项自动依次核验，其余点击卡片或重试本页，最多20项串行处理。系列不猜映射。")
+                    Text("保留原站名次，不补位。先显示名单；当前页全部自动核验，最多20项、同时最多2项。系列不猜映射。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if mapper.busy {
@@ -279,7 +279,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                         Button("取消核验") { mapper.cancel() }.font(.caption)
                     }
                 } else {
-                    Button("重试本页未匹配项（最多20项，依次核验）") { mapper.resolve(rows, retry: true) }
+                    Button("重试本页未匹配项（当前页全部，最多20项）") { mapper.resolve(rows, retry: true) }
                         .font(.caption)
                 }
                 if isMovieBoard {
@@ -299,6 +299,11 @@ private enum JavVerseRankingTab: String, CaseIterable {
                                     NavigationLink("AVDB 演员资料") { ActorDetailView(actorID: actor.id) }
                                 } else if entry.kind == "actor" {
                                     Text(mapper.messages[entry.id] ?? "尚未请求").font(.caption).foregroundStyle(.secondary)
+                                    ForEach(mapper.candidates(for: entry)) { actor in
+                                        NavigationLink("\(ExternalActorResolver.Failure.label(actor))") { ActorDetailView(actorID: actor.id) }
+                                            .font(.caption)
+                                            .accessibilityIdentifier("javverse-candidate-\(entry.rank)-\(actor.id)")
+                                    }
                                     Button("单独核验 / 重试") { mapper.resolve([entry], retry: true) }.disabled(mapper.busy)
                                 } else {
                                     Text("系列未接映射 · 不使用网站数字ID直达AVDB").font(.caption).foregroundStyle(.secondary)
@@ -320,7 +325,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
             .frame(maxWidth: .infinity)
         }
         .navigationTitle(board.title)
-        .task(id: page) { await mapper.resolve(Array(rows.prefix(6)))?.value }
+        .task(id: page) { await mapper.resolve(rows)?.value }
         .onDisappear { mapper.cancel() }
     }
 }
@@ -331,7 +336,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
     @ObservedObject var mapper: JavVerseMapper
     private var movie: Movie? { mapper.movie(for: entry) }
     private var state: String {
-        mapper.messages[entry.id] ?? "尚未核验 · 点击卡片核验（首6项自动）"
+        mapper.messages[entry.id] ?? "尚未核验 · 点击卡片核验"
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -440,6 +445,11 @@ private enum JavVerseRankingTab: String, CaseIterable {
                             } else {
                                 Text(mapper.messages[row.entry.id] ?? "尚未核验AVDB身份；无头像不代表榜单缺项")
                                     .font(.caption).foregroundStyle(.secondary)
+                                ForEach(mapper.candidates(for: row.entry)) { actor in
+                                    NavigationLink("\(ExternalActorResolver.Failure.label(actor))") { ActorDetailView(actorID: actor.id) }
+                                        .font(.caption)
+                                        .accessibilityIdentifier("javverse-candidate-\(row.rank)-\(actor.id)")
+                                }
                                 Button("单独核验 / 重试") { mapper.resolve([row.entry], retry: true) }.disabled(mapper.busy)
                             }
                         }
@@ -447,7 +457,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 }
             }
         }
-        .task { await mapper.resolve(Array(rows.prefix(6)).map(\.entry))?.value }
+        .task { await mapper.resolve(rows.map(\.entry))?.value }
         .onDisappear { mapper.cancel() }
     }
 }

@@ -113,7 +113,7 @@ final class JavVerseNavigationTests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 5))
         let seventh = app.staticTexts["javverse-row-7"]
         reach(seventh, in: app)
-        XCTAssertTrue(app.staticTexts["javverse-state-7"].label.contains("尚未核验"), "Nonautomatic entries must explain the bounded queue")
+        XCTAssertTrue(app.staticTexts["javverse-state-7"].label.contains("已核验") || app.staticTexts["javverse-state-7"].label.contains("请求"), "Current page must automatically verify beyond the first six")
         seventh.tap()
         XCTAssertTrue(app.images["javverse-neutral-cover-7"].firstMatch.waitForExistence(timeout: 15), "Whole-card action must resolve entries beyond the automatic first six")
         reach(first, in: app, upward: false)
