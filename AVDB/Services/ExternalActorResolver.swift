@@ -82,7 +82,7 @@ import SwiftUI
             if !exhausted { unfinished.append(query) }
             let candidates = matches.values.sorted { $0.id < $1.id } // display only; never chooses an ID
             let priority = Set(planned.prefix(index + 1).map(ActorNameNormalizer.key))
-            if let actor = uniquePreferred(candidates, priority: priority, canonical: identity.canonical, source: identity.sourceName) {
+            if exhausted, let actor = uniquePreferred(candidates, priority: priority, canonical: identity.canonical, source: identity.sourceName) {
                 return .matched(Match(actor: actor, identity: identity))
             }
         }
