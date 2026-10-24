@@ -443,7 +443,7 @@ private struct CollectedActorGrid: View {
                     } label: {
                         VStack(spacing: 8) {
                             ZStack(alignment: .topTrailing) {
-                                JavDBImage(url: actor.avatarURL, contentMode: .fill)
+                                ActorAvatarArtwork(actor: actor, contentMode: .fill)
                                     .frame(width: 110, height: 110)
                                     .clipped()
                                     .liquidCover(cornerRadius: 12)

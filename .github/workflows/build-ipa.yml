@@ -78,6 +78,9 @@ jobs:
           python3 scripts/test-tmdb-avatar244.py
           python3 scripts/test-javverse244.py
 
+      - name: JavBus neutral Swift parser and shared cache regression
+        run: python3 scripts/test-javbus-actors251.py
+
       - name: Integrated production actor regression (195 assertions)
         env:
           ACTOR_REGRESSION: '1'

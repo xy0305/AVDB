@@ -1,0 +1,25 @@
+name: JavBusActors251
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Services/JavBusActorAvatar.swift', 'scripts/JavBusActorsRegression251.swift', 'scripts/test-javbus-actors251.py', '.github/workflows/javbus-actors251.yml']
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: macos-26
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Neutral fixtures exact production parser and shared service, then public text-only URLSession probe
+        env:
+          JAVBUS_LIVE_PROBE: '1'
+        run: python3 scripts/test-javbus-actors251.py | tee javbus-actors251.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: javbus-actors251
+          path: |
+            javbus-actors251.log
+            javbus-native251.json
+          retention-days: 14

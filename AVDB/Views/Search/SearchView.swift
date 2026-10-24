@@ -420,7 +420,7 @@ struct SearchActorResultView: View {
                         ActorDetailView(actorID: actor.id)
                     } label: {
                         VStack(spacing: 6) {
-                            JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                            ActorAvatarArtwork(actor: actor)
                                 .frame(width: 90, height: 90)
                                 .clipped()
                                 .clipShape(Circle())

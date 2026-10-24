@@ -874,7 +874,7 @@ struct MovieDetailView: View {
                         ActorDetailView(actorID: actor.id)
                     } label: {
                         VStack(spacing: 4) {
-                            JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                            ActorAvatarArtwork(actor: actor, numbers: [vm.movie?.number].compactMap { $0 })
                                 .frame(width: 70, height: 70)
                                 .clipShape(Circle())
                             Text(actor.name ?? "")

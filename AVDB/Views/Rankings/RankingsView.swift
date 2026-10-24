@@ -530,7 +530,7 @@ private struct ActorRankingGridContent: View {
                         VStack(spacing: 8) {
                             ZStack(alignment: .topLeading) {
                                 ClippedAspectFill(aspectRatio: 1) {
-                                    JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                                    ActorAvatarArtwork(actor: actor)
                                 }
                                 .liquidCover(cornerRadius: 8)
                                 GlassChip(

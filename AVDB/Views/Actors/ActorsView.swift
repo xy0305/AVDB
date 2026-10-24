@@ -173,7 +173,7 @@ struct ActorsView: View {
     private func actorCell(_ actor: Actor) -> some View {
         VStack(spacing: 8) {
             ClippedAspectFill(aspectRatio: 1) {
-                JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+                ActorAvatarArtwork(actor: actor)
             }
             .liquidCover(cornerRadius: 12)
             Text(actor.name ?? "")
@@ -504,7 +504,7 @@ struct ActorDetailView: View {
 
     private func actorHeader(_ actor: Actor) -> some View {
         HStack(alignment: .top, spacing: 16) {
-            JavDBImage(url: actor.avatarURL ?? actor.coverURL)
+            ActorAvatarArtwork(actor: actor, numbers: Array(vm.movies.compactMap(\.number).prefix(2)))
                 .frame(width: 88, height: 88)
                 .liquidCover(cornerRadius: 12)
             VStack(alignment: .leading, spacing: 6) {
@@ -743,6 +743,7 @@ final class ActorDetailViewModel: ObservableObject {
             let ids = Set(movies.map(\.id))
             movies.append(contentsOf: next.filter { !ids.contains($0.id) })
         }
+        JavBusActorService.remember(actorID: actorID, numbers: movies.compactMap(\.number))
     }
 }
 
