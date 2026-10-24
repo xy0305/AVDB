@@ -399,6 +399,10 @@ enum JavVerseIdentity {
                     self.completed += 1
                     try await Task.sleep(nanoseconds: 180_000_000)
                 } catch is CancellationError { return }
+                catch let failure as ExternalActorResolver.Failure {
+                    guard !Task.isCancelled, self.generation == epoch, self.accountProvider() == token else { return }
+                    self.messages[entry.id] = failure.localizedDescription; self.completed += 1
+                }
                 catch {
                     guard !Task.isCancelled, self.generation == epoch, self.accountProvider() == token else { return }
                     self.messages[entry.id] = "请求/核验失败：\(error.localizedDescription)"; self.completed += 1

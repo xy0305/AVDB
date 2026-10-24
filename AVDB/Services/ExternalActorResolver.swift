@@ -20,11 +20,41 @@ import SwiftUI
         return !wanted.isEmpty && !wanted.isDisjoint(with: Set(evidence))
     }
 
-    static func resolve(identity: ExternalActorIdentity, search: Search, queryLimit: Int = 4) async throws -> Match? {
-        let queries = Array(Set(identity.queries.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
-        guard !queries.isEmpty else { return nil }
+    enum Failure: Error, LocalizedError {
+        case ambiguous([Actor])
+        case incomplete([Actor])
+        var errorDescription: String? {
+            switch self {
+            case .ambiguous(let actors):
+                return "身份待确认：多个 AVDB 候选（" + actors.prefix(8).map { "\($0.displayName) [\($0.id)]" }.joined(separator: "；") + "）；请在原生演员搜索核对"
+            case .incomplete(let actors):
+                let candidates = actors.isEmpty ? "" : "；已有候选 " + actors.prefix(8).map { "\($0.displayName) [\($0.id)]" }.joined(separator: "；")
+                return "查询未完成：达到别名或分页上限" + candidates + "；未自动选择，可重试或在原生演员搜索核对"
+            }
+        }
+    }
+
+    enum Resolution: Sendable {
+        case matched(Match)
+        case notFound
+        case ambiguous([Actor])
+        case incomplete(candidates: [Actor], queries: [String])
+    }
+
+    // Compatibility for callers that only consume verified identities. Diagnostics
+    // are available through inspect; absence is never proof of a missing actor.
+    static func resolve(identity: ExternalActorIdentity, search: Search, queryLimit: Int = 12) async throws -> Match? {
+        if case .matched(let match) = try await inspect(identity: identity, search: search, queryLimit: queryLimit) { return match }
+        return nil
+    }
+
+    static func inspect(identity: ExternalActorIdentity, search: Search, queryLimit: Int = 12) async throws -> Resolution {
+        let queries = ActorNameNormalizer.orderedUnique(identity.queries)
+        guard !queries.isEmpty else { return .notFound }
+        let limit = min(12, max(1, queryLimit))
+        var unfinished = Array(queries.dropFirst(limit))
         var matches: [String: Actor] = [:]
-        for query in queries.prefix(max(1, queryLimit)) {
+        for query in queries.prefix(limit) {
             var exhausted = false
             for page in 1...3 {
                 try Task.checkCancellation()
@@ -33,13 +63,17 @@ import SwiftUI
                 for row in rows where !row.id.isEmpty && row.id == row.id.trimmingCharacters(in: .whitespacesAndNewlines) && match(identity, actor: row) {
                     matches[row.id] = row
                 }
-                guard matches.count <= 1 else { return nil }
                 if rows.count < 20 { exhausted = true; break }
             }
-            guard exhausted else { return nil }
+            // An unrelated broad query must not erase an exact candidate or stop
+            // the remaining mapped aliases. Keep incomplete distinct from absent.
+            if !exhausted { unfinished.append(query) }
         }
-        guard let actor = matches.values.first else { return nil }
-        return Match(actor: actor, identity: identity)
+        let candidates = matches.values.sorted { $0.id < $1.id } // display only; never chooses an ID
+        if candidates.count > 1 { return .ambiguous(candidates) }
+        if !unfinished.isEmpty { return .incomplete(candidates: candidates, queries: unfinished) }
+        guard let actor = candidates.first else { return .notFound }
+        return .matched(Match(actor: actor, identity: identity))
     }
 }
 

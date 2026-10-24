@@ -27,6 +27,16 @@ struct ActorAliasIndex: Decodable, Sendable {
 }
 
 enum ActorNameNormalizer {
+    static func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.compactMap { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = key(trimmed)
+            guard !normalized.isEmpty, seen.insert(normalized).inserted else { return nil }
+            return trimmed
+        }
+    }
+
     // NFKC + casefold + collapsed whitespace. No translation, romanization, or substring match.
     static func key(_ value: String) -> String {
         value.precomposedStringWithCompatibilityMapping
@@ -98,8 +108,10 @@ struct ExternalActorIdentity: Hashable, Sendable {
         let visible = sourceName.trimmingCharacters(in: .whitespacesAndNewlines)
         let supplied = ([visible] + aliases).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard let record = catalog.lookup(supplied) else {
-            return ExternalActorIdentity(sourceName: visible, canonical: nil, display: visible.isEmpty ? (aliases.first ?? "") : visible, mapID: nil, queries: Array(Set(supplied)).sorted())
+            return ExternalActorIdentity(sourceName: visible, canonical: nil, display: visible.isEmpty ? (aliases.first ?? "") : visible, mapID: nil, queries: ActorNameNormalizer.orderedUnique(supplied))
         }
-        return ExternalActorIdentity(sourceName: visible, canonical: record.canonical, display: record.display, mapID: record.id, queries: record.aliases)
+        let known = Set(record.aliases.map(ActorNameNormalizer.key))
+        let priority = ([record.canonical] + supplied).filter { known.contains(ActorNameNormalizer.key($0)) }
+        return ExternalActorIdentity(sourceName: visible, canonical: record.canonical, display: record.display, mapID: record.id, queries: ActorNameNormalizer.orderedUnique(priority + record.aliases))
     }
 }

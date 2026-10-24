@@ -46,8 +46,12 @@ import Foundation
     }
     static func resolve(name: String, aliases: [String] = [], catalog: ActorAliasCatalog = .bundled(), search: Search) async throws -> Actor? {
         let identity = identity(name: name, aliases: aliases, catalog: catalog)
-        guard identity.queries.count <= 4 else { throw JavVerseFailure.message("演员别名查询超过4项；未自动匹配") }
-        return try await ExternalActorResolver.resolve(identity: identity, search: search, queryLimit: 4)?.actor
+        switch try await ExternalActorResolver.inspect(identity: identity, search: search, queryLimit: 12) {
+        case .matched(let match): return match.actor
+        case .notFound: return nil
+        case .ambiguous(let candidates): throw ExternalActorResolver.Failure.ambiguous(candidates)
+        case .incomplete(let candidates, _): throw ExternalActorResolver.Failure.incomplete(candidates)
+        }
     }
 }
 

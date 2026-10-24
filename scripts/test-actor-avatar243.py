@@ -66,6 +66,15 @@ struct Actor: Decodable {
     }
 }
 enum ActorNameNormalizer {
+    static func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.compactMap { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = key(trimmed)
+            guard !normalized.isEmpty, seen.insert(normalized).inserted else { return nil }
+            return trimmed
+        }
+    }
     static func key(_ value: String) -> String {
         value.precomposedStringWithCompatibilityMapping.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }

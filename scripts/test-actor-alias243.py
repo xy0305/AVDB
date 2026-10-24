@@ -40,7 +40,7 @@ class Alias243(unittest.TestCase):
         self.assertIn("conflicts[$0] == nil", policy)
         self.assertIn("ids.count == 1", policy)
         self.assertIn("AVDB IDs are never invented", resolver)
-        self.assertIn("matches.count <= 1", resolver)
+        self.assertIn("if candidates.count > 1 { return .ambiguous(candidates) }", resolver)
 
     def test_external_boards_call_shared_resolver(self):
         verse = (R / "AVDB/Services/JavVerseSource.swift").read_text()
@@ -81,9 +81,9 @@ class Alias243(unittest.TestCase):
     def test_version_registration_and_preserved_releases(self):
         info = plistlib.loads((R / "AVDB/Resources/Info.plist").read_bytes())
         self.assertEqual(info["CFBundleShortVersionString"], "1.0.2")
-        self.assertEqual(info["CFBundleVersion"], "247")
+        self.assertEqual(info["CFBundleVersion"], "248")
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
-        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 247;"), 2)
+        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 248;"), 2)
         self.assertIn("IPHONEOS_DEPLOYMENT_TARGET = 17.0;", project)
         for name in ("ActorAliasCatalog.swift", "ExternalActorResolver.swift", "ActorAliasIndex.json"):
             self.assertIn(name, project)

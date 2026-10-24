@@ -78,6 +78,11 @@ jobs:
           python3 scripts/test-tmdb-avatar244.py
           python3 scripts/test-javverse244.py
 
+      - name: Integrated production actor regression (195 assertions)
+        env:
+          ACTOR_REGRESSION: '1'
+        run: python3 scripts/actor-live248.py
+
       - name: Test scrub preview policy and real AVFoundation frames
         run: python3 scripts/test-seek-preview.py
 

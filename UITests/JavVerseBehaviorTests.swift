@@ -250,9 +250,12 @@ extension JavVerseBehaviorTests {
         let unique = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact] }
         XCTAssertEqual(unique?.id, "neutral-a", "Explicit alias evidence must retain the unique real SDK identity")
         let other = try actor("neutral-b", "中性名前", "中性別名")
-        let ambiguous = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact, other] }
-        // The shared resolver fails closed with nil. Nil is NOT an accepted ID.
-        XCTAssertNil(ambiguous, "Same-name IDs must never yield a navigable identity")
+        do {
+            _ = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact, other] }
+            XCTFail("Same-name IDs must never yield a navigable identity")
+        } catch ExternalActorResolver.Failure.ambiguous(let candidates) {
+            XCTAssertEqual(Set(candidates.map(\.id)), ["neutral-a", "neutral-b"])
+        } catch { XCTFail("Ambiguity must remain distinct from request failure: \(type(of: error))") }
     }
     @MainActor func testAutomaticSecondPageAndRetryStates() async {
         let mapper = JavVerseMapper(search: { code, _ in
