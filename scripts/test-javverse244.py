@@ -58,6 +58,8 @@ class JavVerseTimestamp244(unittest.TestCase):
         self.assertEqual(project.count("MARKETING_VERSION = 1.0.2;"), 2)
         replay = (R / "scripts/test-actor-avatar243.py").read_text()
         self.assertIn('source.split("struct TMDBAvatarTokenStore", 1)[0]', replay)
+        self.assertIn('main = "import Foundation\\n"', replay)
+        self.assertNotIn("import Foundation\nlet names", replay)
 
 if __name__ == "__main__":
     unittest.main()
