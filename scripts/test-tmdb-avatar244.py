@@ -28,7 +28,7 @@ class TMDBAvatar244(unittest.TestCase):
         verse = (R / "AVDB/Services/JavVerseSource.swift").read_text()
         view = (R / "AVDB/Views/JavVerseView.swift").read_text()
         miss = (R / "AVDB/Services/MissAVMetadata.swift").read_text()
-        self.assertIn('lookup.status == .missingKey { self.avatarStatus[entry.id] = "未设置" }', verse)
+        self.assertIn('lookup.status == .missingKey { avatarStatus[entry.id] = "未设置" }', verse)
         self.assertIn('Text("未设置")', view)
         self.assertIn('avatar.status == .missingKey ? "未设置"', miss)
         self.assertIn("Existing AVDB artwork always wins", (R / "AVDB/Services/ExternalActorResolver.swift").read_text())
