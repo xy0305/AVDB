@@ -221,10 +221,40 @@ enum ActorPortraitBytes {
 
 /// Deliberately narrow public agency-portrait source. Only one whitelisted agency
 /// collection, exact alias filenames from its real index, never guessed actor URLs.
+/// Delegate receives bounded chunks off the UI actor. AsyncBytes per-byte iteration
+/// for a multi-megabyte public index is intentionally avoided.
+private final class AgencyPortraitDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    let url: URL
+    let image: Bool
+    let limit: Int
+    var continuation: CheckedContinuation<Data, Error>?
+    private var data = Data()
+    private var accepted = false
+    private(set) var response: HTTPURLResponse?
+    init(url: URL, image: Bool) { self.url = url; self.image = image; self.limit = image ? 2 * 1024 * 1024 : 8 * 1024 * 1024 }
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        let http = response as? HTTPURLResponse; self.response = http
+        accepted = http?.statusCode == 200 && http?.url == url && (image ? ["image/jpeg","image/png"] : ["application/json","text/plain"]).contains(http?.mimeType?.lowercased() ?? "") && response.expectedContentLength <= Int64(limit)
+        completionHandler(accepted ? .allow : .cancel)
+    }
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive chunk: Data) {
+        guard accepted, chunk.count <= limit - data.count else { accepted = false; dataTask.cancel(); return }
+        data.append(chunk)
+    }
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let completion = continuation; continuation = nil
+        if let error { completion?.resume(throwing:error) }
+        else if !accepted { completion?.resume(throwing:URLError(.badServerResponse)) }
+        else { completion?.resume(returning:data) }
+    }
+}
+
 @MainActor enum GfriendsPortraits {
     struct Result { let url: String; let data: Data }
-    static let root = "https://raw.githubusercontent.com/gfriends/gfriends/master/"
-    static let group = "6-Tpowers"
+    nonisolated static let root = "https://raw.githubusercontent.com/gfriends/gfriends/master/"
+    nonisolated static let group = "6-Tpowers"
+    private(set) static var diagnostics: [String:String] = [:]
     private static var index: [String:String]?
     private static var expiry = Date.distantPast
     private static var busy = false
@@ -265,20 +295,27 @@ enum ActorPortraitBytes {
         guard allowed(url) else { return nil }
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil; config.httpShouldSetCookies = false; config.urlCredentialStorage = nil; config.urlCache = nil
-        config.timeoutIntervalForRequest = 10; config.timeoutIntervalForResource = 18
-        // Redirect policy permits only strict JavBus paths, so ALL Gfriends redirects are rejected.
-        let session = URLSession(configuration: config, delegate: JavBusActorRedirects(), delegateQueue: nil)
+        config.timeoutIntervalForRequest = 12; config.timeoutIntervalForResource = 30
+        let delegate = AgencyPortraitDownload(url:url,image:image)
+        let session = URLSession(configuration:config,delegate:delegate,delegateQueue:nil)
         defer { session.invalidateAndCancel() }
-        var req = URLRequest(url: url); req.httpShouldHandleCookies = false
-        let (bytes,response) = try await session.bytes(for: req)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200, http.url == url,
-              (image ? ["image/jpeg","image/png"] : ["application/json","text/plain"]).contains(http.mimeType?.lowercased() ?? "") else { return nil }
-        var data = Data(); let limit = image ? 2 * 1024 * 1024 : 8 * 1024 * 1024
-        for try await byte in bytes {
-            if data.count % 4096 == 0 { try Task.checkCancellation() }
-            guard data.count < limit else { return nil }; data.append(byte)
+        let kind = image ? "image" : "index"
+        do {
+            try Task.checkCancellation()
+            let data: Data = try await withTaskCancellationHandler(operation: {
+                try await withCheckedThrowingContinuation { continuation in
+                    delegate.continuation = continuation
+                    var request = URLRequest(url:url); request.httpShouldHandleCookies = false
+                    session.dataTask(with:request).resume()
+                }
+            }, onCancel: { session.invalidateAndCancel() })
+            try Task.checkCancellation()
+            diagnostics[kind] = "HTTP \(delegate.response?.statusCode ?? 0) \(delegate.response?.mimeType ?? "") bytes=\(data.count)"
+            return !image || ActorPortraitBytes.valid(data) ? data : nil
+        } catch {
+            diagnostics[kind] = "HTTP \(delegate.response?.statusCode ?? 0) \(delegate.response?.mimeType ?? "") error=\(error.localizedDescription)"
+            throw error
         }
-        return !image || ActorPortraitBytes.valid(data) ? data : nil
     }
     static func lookup(names: [String]) async throws -> Result? {
         let starting = epoch, scope = JavBusActorService.currentScope
@@ -295,6 +332,7 @@ enum ActorPortraitBytes {
             } else { rows = [:] }
             try Task.checkCancellation()
             guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
+            diagnostics["indexedRows"] = String(rows.count)
             index = rows
             expiry = Date().addingTimeInterval(rows.isEmpty ? 600 : 86400)
         }

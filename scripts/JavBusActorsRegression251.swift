@@ -137,6 +137,7 @@ import ImageIO
                     try hit.data.write(to:URL(fileURLWithPath:"native-portrait252.jpg"))
                 }
             } catch { object["error"] = error.localizedDescription }
+            object["gfriendsDiagnostics"] = GfriendsPortraits.diagnostics
             let data=try JSONSerialization.data(withJSONObject:object,options:[.prettyPrinted,.sortedKeys]);try data.write(to:URL(fileURLWithPath:"javbus-native252.json"));print(String(decoding:data,as:UTF8.self))
         }
     }

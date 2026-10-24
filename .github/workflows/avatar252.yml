@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Production API identity and no-cookie redirect diagnostics
         run: |
           set -euo pipefail
