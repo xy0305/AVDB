@@ -47,8 +47,8 @@ precondition(missingKey.status == .missingKey)
 print("PASS actor avatar boundaries")
 '''
 source = (root / "AVDB/Services/ExternalActorResolver.swift").read_text()
-marker = "struct TMDBAvatarTokenStore"
-main = "import SwiftUI\n" + source.replace(marker, "import SwiftUI\n" + marker, 1) + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
+source = source.split("struct TMDBAvatarTokenStore", 1)[0]
+main = source + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     (path / "main.swift").write_text(main)
