@@ -56,6 +56,7 @@ struct Actor: Decodable {
     let avatarURL: String?
     let coverURL: String?
     let nameZht: String?
+    let videosCount: Int?
     var displayName: String { name ?? id }
     enum CodingKeys: String, CodingKey {
         case id, name, keyword
@@ -63,6 +64,7 @@ struct Actor: Decodable {
         case avatarURL = "avatar_url"
         case coverURL = "cover_url"
         case nameZht = "name_zht"
+        case videosCount = "videos_count"
     }
 }
 enum ActorNameNormalizer {

@@ -265,6 +265,7 @@ enum JavVerseIdentity {
     @Published private(set) var avatarStatus: [String: String] = [:]
     @Published private(set) var messages: [String: String] = [:]
     @Published private(set) var candidates: [String: [Actor]] = [:]
+    @Published private(set) var videoCounts: [String: Int] = [:]
     @Published private(set) var busy = false
     @Published private(set) var completed = 0
     @Published private(set) var total = 0
