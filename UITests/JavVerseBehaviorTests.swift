@@ -237,18 +237,22 @@ extension JavVerseBehaviorTests {
         await board.resolve(source)?.value
         XCTAssertEqual(calls, 2)
     }
-    @MainActor func testActorParentheticalAliasEvidenceAndAmbiguousIDs() async throws {
+    @MainActor func testUnifiedExplicitAliasEvidenceAndAmbiguousIDs() async throws {
         func actor(_ id: String, _ name: String, _ alias: String) throws -> Actor {
             try JSONDecoder().decode(Actor.self, from: JSONSerialization.data(withJSONObject: ["id": id, "name": name, "other_name": alias]))
         }
         let exact = try actor("neutral-a", "中性名前", "中性別名")
-        XCTAssertTrue(JavVerseActorResolver.matches("中性名前（中性別名）", actor: exact))
+        // 243 uses explicit aliases/catalog identities, never guesses parenthetical tokens.
+        XCTAssertTrue(JavVerseActorResolver.matches("中性名前", actor: exact))
+        XCTAssertTrue(JavVerseActorResolver.matches("中性別名", actor: exact))
         XCTAssertFalse(JavVerseActorResolver.matches("中性名前（別人）", actor: exact))
+        XCTAssertFalse(JavVerseActorResolver.matches("中性名前（中性別名）", actor: exact))
+        let unique = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact] }
+        XCTAssertEqual(unique?.id, "neutral-a", "Explicit alias evidence must retain the unique real SDK identity")
         let other = try actor("neutral-b", "中性名前", "中性別名")
-        do {
-            _ = try await JavVerseActorResolver.resolve(name: "中性名前（中性別名）") { _, _ in [exact, other] }
-            XCTFail("Same-name IDs accepted")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("多个")) }
+        let ambiguous = try await JavVerseActorResolver.resolve(name: "中性名前", aliases: ["中性別名"]) { _, _ in [exact, other] }
+        // The shared resolver fails closed with nil. Nil is NOT an accepted ID.
+        XCTAssertNil(ambiguous, "Same-name IDs must never yield a navigable identity")
     }
     @MainActor func testAutomaticSecondPageAndRetryStates() async {
         let mapper = JavVerseMapper(search: { code, _ in
