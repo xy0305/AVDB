@@ -767,10 +767,6 @@ private struct RankingActorMatchLink: View {
                     try await JavDBSDK.shared.searchActors(keyword: name, page: page, limit: 20)
                 }
                 actor = match?.actor
-                if let actor, ActorAvatarFallback.existing(actor) == nil {
-                    let lookup = await ActorAvatarFallback.resolveMissing(actor: actor, names: identity.queries)
-                    avatarURL = lookup.status == .matched ? lookup.url : nil
-                }
                 message = match == nil ? "未唯一匹配；来源名次与人物页保留" : "已核验唯一 AVDB 演员"
             } catch is CancellationError {
                 return

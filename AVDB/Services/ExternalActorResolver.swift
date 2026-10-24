@@ -106,7 +106,7 @@ struct ActorAvatarLookup: Sendable {
         return lookup
     }
 
-    static func officialURL(profilePath: String) -> String? {
+    nonisolated static func officialURL(profilePath: String) -> String? {
         guard profilePath.hasPrefix("/"), !profilePath.contains(".."),
               profilePath.range(of: #"^/[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil else { return nil }
         return imageBase + profilePath

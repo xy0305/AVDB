@@ -174,6 +174,7 @@ enum JavVerseIdentity {
 @MainActor final class JavVerseMapper: ObservableObject {
     @Published private(set) var movies: [String: Movie] = [:]
     @Published private(set) var actors: [String: Actor] = [:]
+    @Published private(set) var avatars: [String: String] = [:]
     @Published private(set) var messages: [String: String] = [:]
     @Published private(set) var busy = false
     @Published private(set) var completed = 0
