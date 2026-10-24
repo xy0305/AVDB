@@ -74,7 +74,9 @@ final class AppState: ObservableObject {
         self.readToken = readToken
         self.fetchProfile = fetchProfile
         self.pause = pause
+        #if targetEnvironment(simulator)
         guard !JavVerseReleaseProbe.enabled else { return }
+        #endif
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") { return }
         #endif
@@ -125,7 +127,9 @@ final class AppState: ObservableObject {
     }
 
     func restoreLogin() {
+        #if targetEnvironment(simulator)
         guard !JavVerseReleaseProbe.enabled else { return }
+        #endif
         let token = readToken().flatMap { $0.isEmpty ? nil : $0 }
         if token != activeToken {
             restoreTask?.cancel(); restoreTask = nil; epoch = UUID()
