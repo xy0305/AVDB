@@ -1,0 +1,19 @@
+name: ActorProbe249
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: macos-26
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only text metadata for screenshot identities
+        run: python3 scripts/actor-probe249.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actor-probe249
+          path: actor-probe249.json
+          retention-days: 14
