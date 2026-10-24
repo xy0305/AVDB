@@ -75,7 +75,7 @@ import Foundation
         var mitaniCalls = [String]()
         let mitaniResult = try await ExternalActorResolver.inspect(identity: mitani, search: { query, _ in
             mitaniCalls.append(query)
-            return query == "美谷朱里" ? [akane, secondary] : [akari]
+            return query == "美谷朱里" ? [akane, secondary] : []
         })
         if case .ambiguous(let choices) = mitaniResult {
             precondition(Set(choices.map(\.id)) == ["PQJKe", "gyRE"], "same canonical name stays ambiguous ids=\(choices.map(\.id)) calls=\(mitaniCalls)")
