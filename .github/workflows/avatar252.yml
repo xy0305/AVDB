@@ -15,6 +15,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/avatar-identity252.py 2>&1 | tee avatar-identity252.log
+          JAVBUS_LIVE_PROBE=1 python3 scripts/test-javbus-actors251.py 2>&1 | tee avatar-regression252.log
+          ACTOR_REGRESSION=1 python3 scripts/actor-live248.py 2>&1 | tee actor-regression252.log
+          python3 scripts/test-actor-avatar243.py
+          python3 scripts/test-javverse247.py
           swiftc -parse-as-library scripts/LocationProbe252.swift -o /tmp/location252
           /tmp/location252 2>&1 | tee location252.log
       - uses: actions/upload-artifact@v4
@@ -25,4 +29,8 @@ jobs:
             avatar-identity252.json
             avatar-identity252.log
             location252.log
+            avatar-regression252.log
+            actor-regression252.log
+            javbus-native252.json
+            native-portrait252.jpg
           retention-days: 14

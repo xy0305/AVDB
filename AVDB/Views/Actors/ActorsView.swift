@@ -504,7 +504,7 @@ struct ActorDetailView: View {
 
     private func actorHeader(_ actor: Actor) -> some View {
         HStack(alignment: .top, spacing: 16) {
-            ActorAvatarArtwork(actor: actor, numbers: Array(vm.movies.compactMap(\.number).prefix(2)))
+            ActorAvatarArtwork(actor: actor, numbers: Array(vm.movies.compactMap(\.number).prefix(JavBusActorService.maxWorks)))
                 .frame(width: 88, height: 88)
                 .liquidCover(cornerRadius: 12)
             VStack(alignment: .leading, spacing: 6) {

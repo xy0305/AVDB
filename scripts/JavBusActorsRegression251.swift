@@ -1,4 +1,6 @@
 import Foundation
+import CryptoKit
+import ImageIO
 
 @main struct JavBusActorsRegression251 {
     @MainActor static func main() async throws {
@@ -66,9 +68,9 @@ import Foundation
         expect(calls == 2, "account-isolated cache")
         JavBusActorService.reset(); calls = 0
         _ = try await JavBusActorService.lookup(actor: a, numbers: ["DSOD-071", "DSOD-072", "DSOD-073"], fetch: { _ in calls += 1; return .init(entries: [], status: 200) })
-        expect(calls == 2, "at most two known works")
+        expect(calls == 3, "bounded known works")
         JavBusActorService.remember(actorID: "A", numbers: ["DSOD-070", "DSOD-071", "DSOD-072"])
-        expect(JavBusActorService.knownNumbers(actorID: "A") == ["DSOD-070", "DSOD-071"], "bounded already-fetched work registry")
+        expect(JavBusActorService.knownNumbers(actorID: "A") == ["DSOD-070", "DSOD-071", "DSOD-072"], "bounded already-fetched work registry")
         JavBusActorService.reset(); calls = 0
         let cancelledTask = Task { @MainActor in
             try await JavBusActorService.lookup(actor: a, numbers: ["DSOD-070"], fetch: { _ in
@@ -88,20 +90,54 @@ import Foundation
         async let two = JavBusActorService.lookup(actor: b, numbers: ["DSOD-070"], fetch: slow)
         let shared = try await (one, two)
         expect(shared.0 != nil && shared.1 != nil && calls == 1, "concurrent shared page coalesced")
-        print("PASS JavBus actors251: \(checks) neutral production Swift assertions")
+        JavBusActorService.reset(); calls = 0
+        let invalidExisting = try await JavBusActorService.lookup(actor: existing, numbers: ["DSOD-070"], existingFailed: true, fetch: fetch)
+        expect(invalidExisting != nil && calls == 1, "failed AVDB image permits lookup; valid existing default preserved")
+        JavBusActorService.reset(); calls = 0
+        _ = try await JavBusActorService.lookup(actor: a, numbers: ["DSOD-071","DSOD-072","DSOD-073","DSOD-074","DSOD-075","DSOD-076","DSOD-077"], fetch: { _ in calls += 1; return .init(entries: [],status:200) })
+        expect(calls == 6, "six is hard maximum, no full filmography")
+        JavBusActorService.reset(); calls = 0
+        _ = try await JavBusActorService.lookup(actor: a, numbers: ["DSOD-071","DSOD-072"], fetch: { _ in calls += 1; if calls == 1 { throw URLError(.timedOut) }; return .init(entries:entries,status:200) })
+        expect(calls == 2, "transport error on first candidate does not discard later candidate")
+        JavBusActorService.reset(); calls = 0
+        _ = try await JavBusActorService.lookup(actor: a, numbers: ["DSOD-071","DSOD-072"], fetch: { _ in calls += 1; return .init(entries:[],status:302) })
+        expect(calls == 1, "challenge stops work sweep")
+        expect(ActorAvatarRedirectPolicy.permits(from:page,to:page,hops:0), "safe exact-resource HTTPS redirect")
+        expect(!ActorAvatarRedirectPolicy.permits(from:page,to:page,hops:3), "three-hop bound")
+        for unsafe in ["http://www.javbus.com/DSOD-070","https://127.0.0.1/DSOD-070","https://www.javbus.com.evil/DSOD-070","https://www.javbus.com/doc/driver-verify","https://www.javbus.com/DSOD-070?token=x","https://u:p@www.javbus.com/DSOD-070","https://www.javbus.com/DSOD-071","https://www.javbus.com:443/DSOD-070","https://www.javbus.com/%44SOD-070"] {
+            expect(!ActorAvatarRedirectPolicy.permits(from:page,to:URL(string:unsafe)!,hops:0),"unsafe redirect rejected")
+        }
+        expect(!ActorPortraitBytes.valid(Data("<html>challenge</html>".utf8)), "HTML not image")
+        expect(ActorPortraitBytes.valid(Data([255,216,255,0])), "JPEG signature")
+        let rows = ["中性演員甲.jpg":"neutral.jpg?t=123"]
+        expect(GfriendsPortraits.select(rows,names:["中性演員甲"])?.path.hasSuffix("/neutral.jpg") == true,"exact indexed portrait")
+        expect(GfriendsPortraits.select(rows,names:["中性演員"]) == nil,"portrait substring rejected")
+        expect(GfriendsPortraits.select(["中性演員甲.jpg":"../evil.jpg?t=123"],names:["中性演員甲"]) == nil,"index path traversal rejected")
+        expect(GfriendsPortraits.select(rows.merging(["別名.jpg":"other.jpg?t=123"]) { a,_ in a },names:["中性演員甲","別名"]) == nil,"two different alias images ambiguous")
+        let chinese = try actor("alias-test", "池田萬裡奈")
+        expect(JavBusActorService.names(chinese).contains("池田マリナ"), "real bundled verified Chinese/Japanese alias")
+        JavBusActorService.reset()
+        JavBusActorService.remember(actorID:"A",numbers:["DSOD-071"])
+        JavBusActorService.remember(actorID:"A",numbers:["DSOD-071","DSOD-070"])
+        expect(JavBusActorService.knownNumbers(actorID:"A").count == 2,"already loaded work update changes revision inputs")
+        print("PASS JavBus actors252: \(checks) neutral production Swift assertions")
         if CommandLine.arguments.contains("--live") {
+            var object:[String:Any] = ["transport":"production native URLSession no cookies", "onlineSuccess":false]
             do {
                 let live = try await JavBusActorService.request("DSOD-070")
-                let object: [String: Any] = ["number":"DSOD-070", "transport":"native URLSession (no cookies)", "status":live.status,
-                    "entries":live.entries.map { ["name":$0.name,"actorURL":$0.actorURL,"imageURL":$0.imageURL] }]
-                let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys,.prettyPrinted])
-                try data.write(to: URL(fileURLWithPath: "javbus-native251.json"))
-                print(String(decoding: data, as: UTF8.self))
-            } catch {
-                let data = try JSONSerialization.data(withJSONObject: ["number":"DSOD-070","transport":"native URLSession (no cookies)","error":String(describing:error),"success":false],options:[.sortedKeys,.prettyPrinted])
-                try data.write(to: URL(fileURLWithPath: "javbus-native251.json"))
-                print("Native JavBus HTTP failed; diagnostic saved (not a successful lookup)")
-            }
+                object["javbusStatus"] = live.status
+                object["javbusEntries"] = live.entries.map { ["name":$0.name,"actorURL":$0.actorURL,"imageURL":$0.imageURL] }
+                let identity = try JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:"avatar-identity252.json"))) as! [[String:Any]]
+                guard let row = identity.first, let id = row["id"] as? String, let name = row["name"] as? String, let numbers = row["numbers"] as? [String] else { throw URLError(.cannotParseResponse) }
+                let real = try actor(id,name)
+                object["actorID"] = id; object["name"] = name; object["names"] = JavBusActorService.names(real); object["numbers"] = numbers
+                object["javbusLookup"] = try await JavBusActorService.lookup(actor:real,numbers:numbers) ?? ""
+                if let hit = try await GfriendsPortraits.lookup(names:JavBusActorService.names(real)), let src = CGImageSourceCreateWithData(hit.data as CFData,nil), let image = CGImageSourceCreateImageAtIndex(src,0,nil) {
+                    object["onlineSuccess"] = true;object["source"] = "Gfriends public 6-Tpowers agency portrait index";object["imageURL"] = hit.url; object["imageBytes"] = hit.data.count;object["imageSHA256"] = SHA256.hash(data:hit.data).map { String(format:"%02x",$0) }.joined();object["width"] = image.width;object["height"] = image.height
+                    try hit.data.write(to:URL(fileURLWithPath:"native-portrait252.jpg"))
+                }
+            } catch { object["error"] = error.localizedDescription }
+            let data=try JSONSerialization.data(withJSONObject:object,options:[.prettyPrinted,.sortedKeys]);try data.write(to:URL(fileURLWithPath:"javbus-native252.json"));print(String(decoding:data,as:UTF8.self))
         }
     }
 }

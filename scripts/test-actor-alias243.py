@@ -65,7 +65,7 @@ class Alias243(unittest.TestCase):
         verse = (R / "AVDB/Services/JavVerseSource.swift").read_text()
         self.assertIn("Existing AVDB artwork always wins", resolver)
         self.assertIn("actor.avatarURL ?? actor.coverURL ?? result.avatarURL", (R / "AVDB/Views/MissAVRankingView.swift").read_text())
-        self.assertIn("if existing(actor) != nil", resolver)
+        self.assertIn("if !existingFailed, existing(actor) != nil", resolver)
         self.assertIn("First result is never chosen", resolver)
         self.assertIn("hits.count == 1", resolver)
         self.assertIn(".missingKey", resolver)
@@ -81,9 +81,9 @@ class Alias243(unittest.TestCase):
     def test_version_registration_and_preserved_releases(self):
         info = plistlib.loads((R / "AVDB/Resources/Info.plist").read_bytes())
         self.assertEqual(info["CFBundleShortVersionString"], "1.0.2")
-        self.assertEqual(info["CFBundleVersion"], "251")
+        self.assertEqual(info["CFBundleVersion"], "252")
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
-        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 251;"), 2)
+        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 252;"), 2)
         self.assertIn("IPHONEOS_DEPLOYMENT_TARGET = 17.0;", project)
         for name in ("ActorAliasCatalog.swift", "ExternalActorResolver.swift", "ActorAliasIndex.json"):
             self.assertIn(name, project)

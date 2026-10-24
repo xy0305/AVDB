@@ -52,9 +52,22 @@ enum JavBusActorParser {
     }
 }
 
-private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+enum ActorAvatarRedirectPolicy {
+    static func permits(from: URL, to: URL, hops: Int) -> Bool {
+        guard hops < 3, JavBusPoster.clean(from), JavBusPoster.clean(to), from.path == to.path else { return false }
+        return JavBusActorParser.allowedImage(to) || JavBusPoster.number(String(to.path.dropFirst())).map { JavBusPoster.allowedPage(to, number: $0) } == true
+    }
+}
+private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private var hops = 0
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        guard let from = response.url, let to = request.url, ActorAvatarRedirectPolicy.permits(from: from, to: to, hops: hops) else { completionHandler(nil); return }
+        hops += 1
+        var clean = URLRequest(url: to); clean.httpShouldHandleCookies = false
+        clean.setValue(request.value(forHTTPHeaderField: "Accept"), forHTTPHeaderField: "Accept")
+        completionHandler(clean)
+    }
 }
 
 /// Shared, bounded, cancellable page cache. No account token/cookie is sent to JavBus.
@@ -73,11 +86,15 @@ private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @un
     static func synchronize() {
         if scope != currentScope { reset(); scope = currentScope }
     }
+    static let maxWorks = 6
     static func remember(actorID: String, numbers: [String]) {
         synchronize()
         let values = ActorNameNormalizer.orderedUnique(numbers.compactMap(JavBusPoster.number))
-        if !values.isEmpty { works[actorID] = Array(values.prefix(2)) }
-        if works.count > 240 { works.removeAll(); works[actorID] = Array(values.prefix(2)) }
+        if !values.isEmpty, works[actorID] != Array(values.prefix(maxWorks)) {
+            works[actorID] = Array(values.prefix(maxWorks))
+            NotificationCenter.default.post(name: Notification.Name("avdb.actor.worksChanged"), object: actorID)
+        }
+        if works.count > 240 { works.removeAll(); works[actorID] = Array(values.prefix(maxWorks)) }
     }
     static func knownNumbers(actorID: String) -> [String] { synchronize(); return works[actorID] ?? [] }
     static func names(_ actor: Actor) -> [String] {
@@ -88,11 +105,13 @@ private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @un
         let aliases = (mapped.map { [$0.canonical] + $0.aliases } ?? []).filter { !catalog.isConflict($0) }
         return ActorNameNormalizer.orderedUnique(source + aliases)
     }
-    static func lookup(actor: Actor, numbers: [String], fetch: Fetch? = nil) async throws -> String? {
-        guard ActorAvatarFallback.existing(actor) == nil else { return nil }
+    static func lookup(actor: Actor, numbers: [String], existingFailed: Bool = false, fetch: Fetch? = nil) async throws -> String? {
+        guard existingFailed || ActorAvatarFallback.existing(actor) == nil else { return nil }
         synchronize(); let generation = epoch, startingScope = currentScope
-        let candidates = Array(ActorNameNormalizer.orderedUnique(numbers.compactMap(JavBusPoster.number)).prefix(2))
+        let candidates = Array(ActorNameNormalizer.orderedUnique(numbers.compactMap(JavBusPoster.number)).prefix(maxWorks))
+        let deadline = Date().addingTimeInterval(25)
         for number in candidates {
+            guard Date() < deadline else { break }
             try Task.checkCancellation()
             let key = scope + "|" + number
             // Awaiting callers share the completed page, not uncancellable detached tasks.
@@ -113,13 +132,14 @@ private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @un
                 catch {
                     try Task.checkCancellation()
                     if generation == epoch, startingScope == currentScope { cache[key] = Cached(page: Page(entries: [], status: 0), expiry: Date().addingTimeInterval(600)) }
-                    throw error
+                    continue
                 }
                 try Task.checkCancellation()
                 guard generation == epoch, startingScope == currentScope else { throw CancellationError() }
                 if cache.count >= 120 { cache.removeAll() }
                 cache[key] = Cached(page: page, expiry: Date().addingTimeInterval(page.status == 200 && !page.entries.isEmpty ? 86400 : 600))
             }
+            if [302, 401, 403, 429].contains(page.status) { return nil }
             guard page.status == 200 else { continue } // Includes 403: never a successful match.
             if let result = JavBusActorParser.select(page.entries, names: names(actor)) { return result }
         }
@@ -138,20 +158,20 @@ private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @un
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil; config.httpShouldSetCookies = false; config.urlCredentialStorage = nil; config.urlCache = nil
         config.timeoutIntervalForRequest = 8; config.timeoutIntervalForResource = 10
-        let session = URLSession(configuration: config, delegate: JavBusActorNoRedirect(), delegateQueue: nil)
+        let session = URLSession(configuration: config, delegate: JavBusActorRedirects(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         var request = URLRequest(url: url); request.httpShouldHandleCookies = false
         let (bytes, response) = try await session.bytes(for: request)
         var result: Data?
-        if let http = response as? HTTPURLResponse, http.statusCode == 200, http.url == url,
-           http.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true {
+        if let http = response as? HTTPURLResponse, http.statusCode == 200, let finalURL = http.url, JavBusActorParser.allowedImage(finalURL), finalURL.path == url.path,
+           ["image/jpeg", "image/png"].contains(http.mimeType?.lowercased() ?? "") {
             var data = Data()
             for try await byte in bytes {
                 if data.count % 4096 == 0 { try Task.checkCancellation() }
                 guard data.count < 2 * 1024 * 1024 else { return nil }
                 data.append(byte)
             }
-            result = data
+            if ActorPortraitBytes.valid(data) { result = data }
         }
         try Task.checkCancellation()
         guard generation == epoch, startingScope == currentScope else { throw CancellationError() }
@@ -165,7 +185,7 @@ private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @un
         config.httpCookieStorage = nil; config.httpShouldSetCookies = false
         config.urlCredentialStorage = nil; config.urlCache = nil
         config.timeoutIntervalForRequest = 8; config.timeoutIntervalForResource = 10
-        let session = URLSession(configuration: config, delegate: JavBusActorNoRedirect(), delegateQueue: nil)
+        let session = URLSession(configuration: config, delegate: JavBusActorRedirects(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         var request = URLRequest(url: url); request.httpShouldHandleCookies = false
         request.setValue("text/html", forHTTPHeaderField: "Accept")
@@ -185,11 +205,108 @@ private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @un
         // Parsing never runs on the UI actor. Cancellation is explicitly forwarded;
         // this short-lived CPU task cannot become detached background network work.
         let parser = Task.detached(priority: .utility) {
-            try JavBusActorParser.entries(html: html, number: number, finalURL: url)
+            try JavBusActorParser.entries(html: html, number: number, finalURL: finalURL)
         }
         let entries = try await withTaskCancellationHandler(operation: { try await parser.value }, onCancel: { parser.cancel() })
         try Task.checkCancellation()
         return Page(entries: entries, status: 200)
+    }
+}
+
+enum ActorPortraitBytes {
+    static func valid(_ data: Data) -> Bool {
+        data.starts(with: [0xff, 0xd8, 0xff]) || data.starts(with: [137,80,78,71,13,10,26,10])
+    }
+}
+
+/// Deliberately narrow public agency-portrait source. Only one whitelisted agency
+/// collection, exact alias filenames from its real index, never guessed actor URLs.
+@MainActor enum GfriendsPortraits {
+    struct Result { let url: String; let data: Data }
+    static let root = "https://raw.githubusercontent.com/gfriends/gfriends/master/"
+    static let group = "6-Tpowers"
+    private static var index: [String:String]?
+    private static var expiry = Date.distantPast
+    private static var busy = false
+    private static var epoch = 0
+    private static var cache: [String:(Result?,Date)] = [:]
+    static func reset() { epoch += 1; index = nil; expiry = .distantPast; cache.removeAll() }
+    static func allowed(_ url: URL) -> Bool {
+        guard url.scheme == "https", url.host == "raw.githubusercontent.com", url.port == nil,
+              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else { return false }
+        let path = url.path
+        if path == "/gfriends/gfriends/master/Filetree.json" { return true }
+        let prefix = "/gfriends/gfriends/master/Content/" + group + "/"
+        guard path.hasPrefix(prefix) else { return false }
+        let file = String(path.dropFirst(prefix.count))
+        return file.count < 180 && !file.contains("/") && !file.contains("\\") && !file.contains("..") && !file.contains("%") && !file.contains("?") && !file.contains("#") && !file.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) && file.lowercased().hasSuffix(".jpg")
+    }
+    nonisolated static func parse(_ data: Data) throws -> [String:String] {
+        try Task.checkCancellation()
+        guard data.count <= 8 * 1024 * 1024,
+              let object = try JSONSerialization.jsonObject(with: data) as? [String:Any],
+              let content = object["Content"] as? [String:Any], let rows = content[group] as? [String:String], rows.count <= 5000 else { return [:] }
+        return rows
+    }
+    static func select(_ rows: [String:String], names: [String]) -> URL? {
+        let wanted = Set(names.map(ActorNameNormalizer.key).filter { !$0.isEmpty })
+        var hits = Set<URL>()
+        for (name,value) in rows {
+            guard name.lowercased().hasSuffix(".jpg"), wanted.contains(ActorNameNormalizer.key(String(name.dropLast(4)))) else { continue }
+            let pieces = value.components(separatedBy: "?t=")
+            guard pieces.count == 2, !pieces[1].isEmpty, pieces[1].allSatisfy(\.isNumber) else { continue }
+            let file = pieces[0]
+            let url = URL(string: root)!.appendingPathComponent("Content").appendingPathComponent(group).appendingPathComponent(file)
+            if allowed(url) { hits.insert(url) }
+        }
+        return hits.count == 1 ? hits.first : nil
+    }
+    private static func download(_ url: URL, image: Bool) async throws -> Data? {
+        guard allowed(url) else { return nil }
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil; config.httpShouldSetCookies = false; config.urlCredentialStorage = nil; config.urlCache = nil
+        config.timeoutIntervalForRequest = 10; config.timeoutIntervalForResource = 18
+        // Redirect policy permits only strict JavBus paths, so ALL Gfriends redirects are rejected.
+        let session = URLSession(configuration: config, delegate: JavBusActorRedirects(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        var req = URLRequest(url: url); req.httpShouldHandleCookies = false
+        let (bytes,response) = try await session.bytes(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200, http.url == url,
+              (image ? ["image/jpeg","image/png"] : ["application/json","text/plain"]).contains(http.mimeType?.lowercased() ?? "") else { return nil }
+        var data = Data(); let limit = image ? 2 * 1024 * 1024 : 8 * 1024 * 1024
+        for try await byte in bytes {
+            if data.count % 4096 == 0 { try Task.checkCancellation() }
+            guard data.count < limit else { return nil }; data.append(byte)
+        }
+        return !image || ActorPortraitBytes.valid(data) ? data : nil
+    }
+    static func lookup(names: [String]) async throws -> Result? {
+        let starting = epoch, scope = JavBusActorService.currentScope
+        while busy { try await Task.sleep(nanoseconds:50_000_000); try Task.checkCancellation() }
+        guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
+        busy = true; defer { busy = false }
+        let key = names.map(ActorNameNormalizer.key).sorted().joined(separator:"|")
+        if let hit = cache[key], hit.1 > Date() { return hit.0 }
+        if expiry < Date() {
+            let rows: [String:String]
+            if let data = try? await download(URL(string:root+"Filetree.json")!,image:false) {
+                let parser = Task.detached(priority: .utility) { try parse(data) }
+                rows = try await withTaskCancellationHandler(operation: { try await parser.value }, onCancel: { parser.cancel() })
+            } else { rows = [:] }
+            try Task.checkCancellation()
+            guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
+            index = rows
+            expiry = Date().addingTimeInterval(rows.isEmpty ? 600 : 86400)
+        }
+        try Task.checkCancellation()
+        guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
+        var result:Result?
+        if let index, let url = select(index,names:names), let data = try? await download(url,image:true) { result = Result(url:url.absoluteString,data:data) }
+        try Task.checkCancellation()
+        guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
+        if cache.count >= 60 { cache.removeAll() }
+        cache[key] = (result,Date().addingTimeInterval(result == nil ? 600 : 86400))
+        return result
     }
 }
 
@@ -202,35 +319,48 @@ import SwiftUI
     var numbers: [String] = []
     var contentMode: ContentMode = .fill
     @State private var fallback: String?
-    @State private var javbusImage: UIImage?
+    @State private var portrait: UIImage?
     @State private var revision = 0
     private var identity: String {
-        actor.id + "|" + (ActorAvatarFallback.existing(actor) ?? "") + "|" + numbers.joined(separator: ",") + "|" + String(revision)
+        actor.id + "|" + ([actor.avatarURL, actor.coverURL].compactMap { $0 }.joined(separator: ",")) + "|" + JavBusActorService.names(actor).joined(separator: ",") + "|" + numbers.joined(separator: ",") + "|" + String(revision)
     }
     var body: some View {
         Group {
-            if ActorAvatarFallback.existing(actor) == nil, let javbusImage {
-                Image(uiImage: javbusImage).resizable().aspectRatio(contentMode: contentMode)
-            } else { JavDBImage(url: ActorAvatarFallback.existing(actor) ?? fallback, contentMode: contentMode) }
+            if let portrait { Image(uiImage: portrait).resizable().aspectRatio(contentMode: contentMode) }
+            else { JavDBImage(url: fallback, contentMode: contentMode) }
         }
-            .task(id: identity) {
-                fallback = nil; javbusImage = nil
-                guard ActorAvatarFallback.existing(actor) == nil else { return }
-                let account = JavBusActorService.currentScope
-                let known = numbers.isEmpty ? JavBusActorService.knownNumbers(actorID: actor.id) : numbers
-                let hit = try? await JavBusActorService.lookup(actor: actor, numbers: known)
+        .task(id: identity) {
+            fallback = nil; portrait = nil
+            let account = JavBusActorService.currentScope
+            // A non-empty URL is not proof of a decoded image. Preserve valid AVDB artwork;
+            // only a completed failed load enables public fallbacks (not cancellation).
+            for source in ActorNameNormalizer.orderedUnique([actor.avatarURL, actor.coverURL].compactMap { $0 }) {
+                let image = await ImageLoader.shared.load(source, maxPixelSize: 512)
                 guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
-                if let hit, let url = URL(string: hit), let data = try? await JavBusActorService.imageData(url), let image = UIImage(data: data) {
-                    guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
-                    javbusImage = image; return
-                }
-                guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
-                let tmdb = await ActorAvatarFallback.resolveMissing(actor: actor, names: JavBusActorService.names(actor))
-                guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
-                fallback = tmdb.url
+                if let image { portrait = image; return }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("avdb.catalog.accountChanged"))) { _ in
-                JavBusActorService.reset(); ActorAvatarFallback.resetCache(); fallback = nil; javbusImage = nil; revision += 1
+            let known = numbers.isEmpty ? JavBusActorService.knownNumbers(actorID: actor.id) : numbers
+            let hit = try? await JavBusActorService.lookup(actor: actor, numbers: known, existingFailed: true)
+            guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
+            if let hit, let url = URL(string: hit), let data = try? await JavBusActorService.imageData(url), let image = UIImage(data: data) {
+                guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
+                portrait = image; return
             }
+            // Public agency portrait index; no JavBus verification/challenge is followed.
+            if let result = try? await GfriendsPortraits.lookup(names: JavBusActorService.names(actor)), let image = UIImage(data: result.data) {
+                guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
+                portrait = image; return
+            }
+            guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
+            let tmdb = await ActorAvatarFallback.resolveMissing(actor: actor, names: JavBusActorService.names(actor), existingFailed: true)
+            guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
+            fallback = tmdb.url
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("avdb.actor.worksChanged"))) { note in
+            if note.object as? String == actor.id { revision += 1 }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("avdb.catalog.accountChanged"))) { _ in
+            JavBusActorService.reset(); GfriendsPortraits.reset(); ActorAvatarFallback.resetCache(); fallback = nil; portrait = nil; revision += 1
+        }
     }
 }

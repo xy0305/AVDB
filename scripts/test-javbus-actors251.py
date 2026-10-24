@@ -12,7 +12,10 @@ for p in ['AVDB/Views/Rankings/RankingsView.swift','AVDB/Views/Search/SearchView
  assert 'ActorAvatarArtwork(actor: actor' in read(p),p
 service=read('AVDB/Services/JavBusActorAvatar.swift').split('// MARK: - Native shared presentation')[0]
 assert 'actorMovies(' not in service
-for safety in ['active >= 2','cache.count >= 120','600','86400','session.bytes(for:', 'http.statusCode == 200','httpShouldSetCookies = false','urlCredentialStorage = nil','768 * 1024','2 * 1024 * 1024','completionHandler(nil)','Task.checkCancellation()']:
+ui=read('AVDB/Services/JavBusActorAvatar.swift').split('// MARK: - Native shared presentation')[1]
+for refresh in ['numbers.joined', 'worksChanged', 'revision += 1', 'ImageLoader.shared.load', 'existingFailed: true']:
+ assert refresh in ui,refresh
+for safety in ['active >= 2','cache.count >= 120','600','86400','session.bytes(for:', 'http.statusCode == 200','httpShouldSetCookies = false','urlCredentialStorage = nil','768 * 1024','2 * 1024 * 1024','completionHandler(nil)', 'ActorAvatarRedirectPolicy', 'existingFailed', 'GfriendsPortraits', 'maxWorks = 6','Task.checkCancellation()']:
  assert safety in service,safety
 if not shutil.which('swiftc'):
  print('PASS Swift source wiring/security checks; Swift runtime NOT RUN locally (requires macOS CI)');raise SystemExit(0)
@@ -28,6 +31,7 @@ parts=['import Foundation',read('AVDB/Models/JSONFlex.swift'),decl(read('AVDB/Mo
 with tempfile.TemporaryDirectory() as t:
  p=pathlib.Path(t)/'JavBusActors251.swift';p.write_text('\n'.join(parts));binary=p.with_suffix('')
  subprocess.run(['swiftc','-parse-as-library',str(p),'-o',str(binary)],check=True)
+ shutil.copy(R/'AVDB/Resources/ActorAliasIndex.json', pathlib.Path(t)/'ActorAliasIndex.json')
  subprocess.run([str(binary)],check=True)
  if os.environ.get('JAVBUS_LIVE_PROBE')=='1':
   subprocess.run([str(binary),'--live'],check=True)

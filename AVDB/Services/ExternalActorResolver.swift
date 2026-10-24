@@ -162,15 +162,15 @@ struct ActorAvatarLookup: Sendable {
         [actor.avatarURL, actor.coverURL].compactMap { $0 }.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
-    static func resolveMissing(actor: Actor, names: [String]) async -> ActorAvatarLookup {
-        await resolve(actor: actor, names: names) { names in
+    static func resolveMissing(actor: Actor, names: [String], existingFailed: Bool = false) async -> ActorAvatarLookup {
+        await resolve(actor: actor, names: names, existingFailed: existingFailed) { names in
             // Read at request time. A blank field never reaches the network.
             try await TMDBPersonClient.search(names: names, apiKey: TMDBAvatarSettings.shared.currentKey())
         }
     }
 
-    static func resolve(actor: Actor, names: [String], search: Search) async -> ActorAvatarLookup {
-        if existing(actor) != nil { return ActorAvatarLookup(status: .existing, url: nil, personID: nil) }
+    static func resolve(actor: Actor, names: [String], existingFailed: Bool = false, search: Search) async -> ActorAvatarLookup {
+        if !existingFailed, existing(actor) != nil { return ActorAvatarLookup(status: .existing, url: nil, personID: nil) }
         let keys = Array(Set(names.map(ActorNameNormalizer.key).filter { !$0.isEmpty })).sorted()
         guard !keys.isEmpty else { return ActorAvatarLookup(status: .notFound, url: nil, personID: nil) }
         let key = keys.joined(separator: "\u{1f}")
