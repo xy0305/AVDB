@@ -230,6 +230,18 @@ struct UserView: View {
                     }
                     .accessibilityIdentifier("tpdb-settings-entry")
                     NavigationLink {
+                        TMDBAvatarSettingsView()
+                    } label: {
+                        HStack {
+                            Label("TMDB 头像", systemImage: "person.crop.square")
+                            Spacer()
+                            Text(TMDBAvatarSettings.shared.configured ? "已设置" : "未设置")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("tmdb-avatar-settings-entry")
+                    NavigationLink {
                         ExternalLibrarySettingsView()
                     } label: {
                         Label("外部数据库", systemImage: "externaldrive.badge.person.crop")

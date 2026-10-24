@@ -175,6 +175,7 @@ enum JavVerseIdentity {
     @Published private(set) var movies: [String: Movie] = [:]
     @Published private(set) var actors: [String: Actor] = [:]
     @Published private(set) var avatars: [String: String] = [:]
+    @Published private(set) var avatarStatus: [String: String] = [:]
     @Published private(set) var messages: [String: String] = [:]
     @Published private(set) var busy = false
     @Published private(set) var completed = 0
@@ -293,6 +294,7 @@ enum JavVerseIdentity {
                             if let found = actor {
                                 let lookup = await ActorAvatarFallback.resolveMissing(actor: found, names: JavVerseActorResolver.identity(name: entry.label, aliases: entry.aliases).queries)
                                 if lookup.status == .matched { self.avatars[entry.id] = lookup.url }
+                                else if lookup.status == .missingKey { self.avatarStatus[entry.id] = "未设置" }
                             }
                         }
                     }

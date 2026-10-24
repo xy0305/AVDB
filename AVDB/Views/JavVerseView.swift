@@ -27,6 +27,8 @@ import SwiftUI
                 JavDBImage(url: source, contentMode: .fit)
             } else if let source = mapper.avatars[entry.id] {
                 JavDBImage(url: source, contentMode: .fit)
+            } else if mapper.avatarStatus[entry.id] == "未设置" {
+                Text("未设置").font(.caption2).accessibilityIdentifier("tmdb-avatar-missing")
             } else { Text("已匹配 · AVDB未提供头像").font(.caption2) }
         } else if mapper.messages[entry.id] == "请求中…" || mapper.messages[entry.id] == "排队中" {
             ProgressView()

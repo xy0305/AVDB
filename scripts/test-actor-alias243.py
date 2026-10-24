@@ -71,15 +71,19 @@ class Alias243(unittest.TestCase):
         self.assertIn(".missingKey", resolver)
         self.assertIn("Cancellation is intentionally not cached", resolver)
         self.assertIn("https://image.tmdb.org/t/p/w185", resolver)
+        self.assertIn("TMDBAvatarSettings.shared.currentKey()", resolver)
+        self.assertNotIn("TMDB_API_KEY", resolver)
+        self.assertIn("tmdb-avatar-settings-entry", (R / "AVDB/Views/User/UserView.swift").read_text())
+        self.assertIn('Text("未设置")', (R / "AVDB/Views/JavVerseView.swift").read_text())
         self.assertNotIn("for actor in ActorAliasCatalog", verse)
         self.assertIn("prefix(20)", verse)
 
     def test_version_registration_and_preserved_releases(self):
         info = plistlib.loads((R / "AVDB/Resources/Info.plist").read_bytes())
         self.assertEqual(info["CFBundleShortVersionString"], "1.0.2")
-        self.assertEqual(info["CFBundleVersion"], "243")
+        self.assertEqual(info["CFBundleVersion"], "244")
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
-        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 243;"), 2)
+        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 244;"), 2)
         self.assertIn("IPHONEOS_DEPLOYMENT_TARGET = 17.0;", project)
         for name in ("ActorAliasCatalog.swift", "ExternalActorResolver.swift", "ActorAliasIndex.json"):
             self.assertIn(name, project)

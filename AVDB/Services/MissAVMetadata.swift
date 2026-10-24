@@ -152,7 +152,8 @@ import Combine
         }
         if exact.count == 1 && complete, let actor = exact.values.first {
             let avatar = await ActorAvatarFallback.resolveMissing(actor: actor, names: identity.queries)
-            return Result(actor: actor, avatarURL: avatar.status == .matched ? avatar.url : nil, message: avatar.status == .matched ? "AVDB 演员资料 · 公开头像已唯一匹配" : "AVDB 演员资料 · \(sourceName) 顺序", loading: false)
+            let note = avatar.status == .missingKey ? "未设置" : (avatar.status == .matched ? "公开头像已唯一匹配" : "\(sourceName) 顺序")
+            return Result(actor: actor, avatarURL: avatar.status == .matched ? avatar.url : nil, message: "AVDB 演员资料 · \(note)", loading: false)
         }
         let choices = (exact.isEmpty ? suggestions : exact).values.sorted { $0.id < $1.id }
         return Result(candidates: choices, message: exact.count > 1 ? "多个精确姓名候选，待手动确认" : (complete ? "未匹配唯一精确别名，待手动核对" : "搜索达到分页上限，待手动核对"), loading: false)

@@ -74,7 +74,8 @@ struct ActorAvatarLookup: Sendable {
 
     static func resolveMissing(actor: Actor, names: [String]) async -> ActorAvatarLookup {
         await resolve(actor: actor, names: names) { names in
-            try await TMDBPersonClient.search(names: names, apiKey: ProcessInfo.processInfo.environment["TMDB_API_KEY"])
+            // Read at request time. A blank field never reaches the network.
+            try await TMDBPersonClient.search(names: names, apiKey: TMDBAvatarSettings.shared.currentKey())
         }
     }
 
@@ -164,5 +165,104 @@ enum TMDBPersonSelector {
         struct Payload: Decodable { let results: [TMDBPerson] }
         let payload = try JSONDecoder().decode(Payload.self, from: data)
         return TMDBPersonSelector.select(payload.results, names: names)
+    }
+}
+
+/// Device-only Read Access Token. Never logged, bundled, or echoed back into the field.
+struct TMDBAvatarTokenStore: ExternalTokenStore {
+    private var query: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: "app.avdb.tmdb-avatar",
+         kSecAttrAccount as String: "read-access-token",
+         kSecAttrSynchronizable as String: false]
+    }
+    func read() throws -> String? {
+        var q = query
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(q as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = item as? Data, let token = String(data: data, encoding: .utf8) else {
+            throw ExternalLibraryError.keychain(status)
+        }
+        return token
+    }
+    func write(_ token: String) throws {
+        let attributes: [String: Any] = [kSecValueData as String: Data(token.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly]
+        var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(query.merging(attributes) { _, new in new } as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { throw ExternalLibraryError.keychain(status) }
+    }
+    func clear() throws {
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw ExternalLibraryError.keychain(status) }
+    }
+}
+
+@MainActor final class TMDBAvatarSettings: ObservableObject {
+    static let shared = TMDBAvatarSettings()
+    private let store: ExternalTokenStore
+    @Published private(set) var configured = false
+    init(store: ExternalTokenStore = TMDBAvatarTokenStore()) {
+        self.store = store
+        configured = ((try? store.read()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+    func currentKey() -> String? {
+        let value = ((try? store.read()) ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? nil : value
+    }
+    /// Empty replacement keeps the stored key. Only the clear action deletes it.
+    func save(replacement: String) throws {
+        let trimmed = replacement.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count <= 4096, trimmed.utf8.allSatisfy({ (33...126).contains($0) }) else { throw ExternalLibraryError.invalidToken }
+        if !trimmed.isEmpty { try store.write(trimmed) }
+        configured = currentKey() != nil
+    }
+    func clear() throws {
+        try store.clear()
+        configured = false
+    }
+}
+
+struct TMDBAvatarSettingsView: View {
+    @ObservedObject private var settings = TMDBAvatarSettings.shared
+    @State private var token = ""
+    @State private var status = ""
+    var body: some View {
+        Form {
+            Section("TMDB 头像") {
+                SecureField("TMDB 头像（不回显）", text: $token)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("tmdb-avatar-token")
+                Text(settings.configured ? "已设置（不显示内容）" : "未设置")
+                    .accessibilityIdentifier("tmdb-avatar-configuration")
+                Button("保存") {
+                    do {
+                        try settings.save(replacement: token)
+                        token = ""
+                        status = settings.configured ? "已保存到本机钥匙串" : "未填写，已保留原设置"
+                    } catch {
+                        token = ""
+                        status = "保存失败，请检查密钥格式或解锁设备后重试"
+                    }
+                }.accessibilityIdentifier("tmdb-avatar-save")
+                Button("清除", role: .destructive) {
+                    do { try settings.clear(); token = ""; status = "已清除本机密钥" }
+                    catch { token = ""; status = "清除失败，请解锁设备后重试" }
+                }.accessibilityIdentifier("tmdb-avatar-clear")
+                if !status.isEmpty { Text(status).accessibilityIdentifier("tmdb-avatar-status") }
+            }
+            Section("范围") {
+                Text("仅在已有 AVDB 头像缺失、且姓名唯一匹配时使用。已有 AVDB 头像始终优先，不会被替换。")
+                Text("密钥仅存本机钥匙串，仅发送到 https://api.themoviedb.org。不写入日志，不进入 IPA。留空保存不会清除；未设置时界面显示“未设置”且不发请求。")
+            }
+        }
+        .navigationTitle("TMDB 头像")
+        .onDisappear { token = "" }
     }
 }
