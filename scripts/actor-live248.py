@@ -19,4 +19,4 @@ parts.append(decl(read('AVDB/Services/JavVersePolicy.swift'),'@MainActor enum Ja
 parts.append(read('scripts/ActorResolverRegression248.swift' if regression else 'scripts/ActorLive248.swift'))
 p=pathlib.Path(os.environ.get('RUNNER_TEMP','/tmp'))/('ActorRegression248.swift' if regression else 'ActorLive248.swift');p.write_text('\n'.join(parts));binary=p.with_suffix('')
 subprocess.run(['swiftc','-parse-as-library',str(p),'-o',str(binary)],check=True)
-subprocess.run([str(binary),str(R/'AVDB/Resources/ActorAliasIndex.json'),str(R/'scripts/actor-live248-replay.json'),str(R/'AVDB/Resources/JavVerseSnapshot.json')],check=True)
+subprocess.run([str(binary),str(R/'AVDB/Resources/ActorAliasIndex.json'),str(R/'scripts/actor-live248-replay.json'),str(R/'AVDB/Resources/JavVerseSnapshot.json'),str(R/'AVDB/Views/JavVerseView.swift'),str(R/'AVDB/Services/JavVerseSource.swift')],check=True)

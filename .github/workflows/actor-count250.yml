@@ -10,6 +10,7 @@ on:
       - scripts/ActorCountProbe250.swift
       - scripts/actor-count-probe250.py
       - scripts/actor-live248.py
+      - scripts/test-playback-history.py
       - .github/workflows/actor-count250.yml
 permissions:
   contents: read

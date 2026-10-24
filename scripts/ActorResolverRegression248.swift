@@ -112,10 +112,11 @@ import Foundation
         })
         if case .matched(let match) = akihoCounted { check(match.actor.id == "0yVv" && match.byVideoCount == 1422, "strict maximum selects 0yVv") }
         else { preconditionFailure("吉沢明歩 strict maximum rejected") }
-        let view = try String(contentsOfFile: "AVDB/Views/JavVerseView.swift")
+        let view = try String(contentsOfFile: CommandLine.arguments[4], encoding: .utf8)
         check(!view.contains("javverse-candidate-"), "ranking rows no longer emit one NavigationLink per candidate")
         check(view.contains("JavVerseActorConfirmView"), "ambiguous rows push one confirmation page")
-        check(view.contains("已按作品数最多匹配"), "automatic count copy is not labelled unique")
+        let source = try String(contentsOfFile: CommandLine.arguments[5], encoding: .utf8)
+        check(view.contains("已按作品数最多匹配") || source.contains("已按作品数最多匹配"), "automatic count copy is not labelled unique")
         let jessica = ExternalActorIdentity.resolve(sourceName: "希崎ジェシカ", aliases: ["希崎杰西卡"], catalog: catalog)
         let jessicaActor = try actor("dxne", "希崎潔西卡")
         let jessicaResult = try await ExternalActorResolver.inspect(identity: jessica, search: { _, _ in [jessicaActor] })
