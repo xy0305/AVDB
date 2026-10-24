@@ -182,7 +182,14 @@ private final class JavBusActorNoRedirect: NSObject, URLSessionTaskDelegate, @un
             data.append(byte)
         }
         guard let html = String(data: data, encoding: .utf8) else { return Page(entries: [], status: 0) }
-        return Page(entries: try JavBusActorParser.entries(html: html, number: number, finalURL: url), status: 200)
+        // Parsing never runs on the UI actor. Cancellation is explicitly forwarded;
+        // this short-lived CPU task cannot become detached background network work.
+        let parser = Task.detached(priority: .utility) {
+            try JavBusActorParser.entries(html: html, number: number, finalURL: url)
+        }
+        let entries = try await withTaskCancellationHandler(operation: { try await parser.value }, onCancel: { parser.cancel() })
+        try Task.checkCancellation()
+        return Page(entries: entries, status: 200)
     }
 }
 
