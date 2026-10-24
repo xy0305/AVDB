@@ -63,3 +63,5 @@ class JavVerseTimestamp244(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+# replay stubs stay local to the standalone avatar test

@@ -47,7 +47,45 @@ print("PASS actor avatar boundaries")
 '''
 source = (root / "AVDB/Services/ExternalActorResolver.swift").read_text()
 source = source.split("struct TMDBAvatarTokenStore", 1)[0]
-main = "import Foundation\n" + source + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
+stubs = r'''
+struct Actor: Decodable {
+    let id: String
+    let name: String?
+    let otherName: String?
+    let keyword: String?
+    let avatarURL: String?
+    let coverURL: String?
+    let nameZht: String?
+    var displayName: String { name ?? id }
+    enum CodingKeys: String, CodingKey {
+        case id, name, keyword
+        case otherName = "other_name"
+        case avatarURL = "avatar_url"
+        case coverURL = "cover_url"
+        case nameZht = "name_zht"
+    }
+}
+enum ActorNameNormalizer {
+    static func key(_ value: String) -> String {
+        value.precomposedStringWithCompatibilityMapping.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+}
+struct ExternalActorIdentity: Hashable {
+    let sourceName: String
+    let canonical: String?
+    let display: String
+    let mapID: String?
+    let queries: [String]
+    var unified: Bool { mapID != nil }
+}
+protocol ExternalTokenStore {
+    func read() throws -> String?
+    func write(_ token: String) throws
+    func clear() throws
+}
+enum ExternalLibraryError: Error { case invalidToken, keychain(Int32) }
+'''
+main = "import Foundation\n" + stubs + source + "\n@main struct Runner {\n static func main() async {\n" + fixture + "\n }\n}\n"
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     (path / "main.swift").write_text(main)
