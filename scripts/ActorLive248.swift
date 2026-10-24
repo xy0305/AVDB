@@ -19,10 +19,25 @@ struct RawActors: Decodable { let actors: [RawActor]? }
     @MainActor static func main() async throws {
         let index = try JSONDecoder().decode(ActorAliasIndex.self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))
         let catalog = ActorAliasCatalog(index: index)
+        let snapshot = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[3]))) as! [String: Any]
+        let people = (snapshot["grok"] as! [String: Any])["people"] as! [[String: Any]]
         var reports: [[String: Any]] = []
         for source in ["波多野结衣", "JULIA", "麻美由真", "桥本有菜"] {
-            let identity = ExternalActorIdentity.resolve(sourceName: source, aliases: [], catalog: catalog)
-            var report: [String: Any] = ["source": source, "canonical": identity.canonical ?? "", "queries": identity.queries, "policy247_rejects_before_network": identity.queries.count > 4]
+            let person = people.first { ($0["nameZh"] as? String) == source }!
+            let sourceName = person["nameJa"] as! String
+            let sourceAliases = sourceName == source ? [] : [source]
+            let identity = ExternalActorIdentity.resolve(sourceName: sourceName, aliases: sourceAliases, catalog: catalog)
+            var report: [String: Any] = ["source": source, "actualSourceName": sourceName, "actualSourceAliases": sourceAliases, "canonical": identity.canonical ?? "", "queries": identity.queries, "policy247_rejects_before_network": identity.queries.count > 4]
+            var policyRequests: [[String: Any]] = []
+            do {
+                let actor = try await JavVerseActorResolver.resolve(name: sourceName, aliases: sourceAliases, catalog: catalog) { q, page in
+                    let rows = try await JavDBSDK.shared.searchActors(keyword: q, page: page)
+                    policyRequests.append(["query": q, "page": page, "ids": rows.map(\.id), "count": rows.count]); return rows
+                }
+                report["actualPolicyMatch"] = actor?.id ?? "nil"
+            } catch let error as JavVerseFailure { report["actualPolicyError"] = error.localizedDescription }
+            catch { report["actualPolicyErrorType"] = String(describing: type(of: error)) }
+            report["actualPolicyRequests"] = policyRequests
             var requests: [[String: Any]] = []
             do {
                 let match = try await ExternalActorResolver.resolve(identity: identity, search: { q, page in

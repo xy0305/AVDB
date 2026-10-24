@@ -15,8 +15,12 @@ import Foundation
         check(ActorNameNormalizer.key("波多野結衣") != ActorNameNormalizer.key("波多結衣"), "never delete 野")
         for alias in index.conflicts { check(catalog.lookup([alias.alias]) == nil, "conflict remains unassigned: " + alias.alias) }
         let real = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[2]))) as! [[String: Any]]
+        let snapshot = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[3]))) as! [String: Any]
+        let people = (snapshot["grok"] as! [String: Any])["people"] as! [[String: Any]]
         for report in real {
             let source = report["source"] as! String
+            let sourceName = people.first { ($0["nameZh"] as? String) == source }!["nameJa"] as! String
+            let sourceAliases = sourceName == source ? [] : [source]
             let probes = report["probes"] as! [[String: Any]]
             var calls = [(String, Int)]()
             let search: ExternalActorResolver.Search = { q, page in
@@ -24,7 +28,7 @@ import Foundation
                 guard let found = probes.first(where: { ($0["query"] as? String) == q && ($0["page"] as? Int) == page }) else { throw NSError(domain: "missing recorded request", code: 1) }
                 return try JSONDecoder().decode([Actor].self, from: JSONSerialization.data(withJSONObject: found["actors"]!))
             }
-            let identity = ExternalActorIdentity.resolve(sourceName: source, aliases: [], catalog: catalog)
+            let identity = ExternalActorIdentity.resolve(sourceName: sourceName, aliases: sourceAliases, catalog: catalog)
             let outcome = try await ExternalActorResolver.inspect(identity: identity, search: search)
             if source == "波多野结衣" || source == "JULIA" {
                 if case .ambiguous(let candidates) = outcome { check(candidates.count == 2, source + " replay retains two real IDs") }
@@ -32,7 +36,7 @@ import Foundation
             } else {
                 if case .matched(let match) = outcome { check(match.actor.id == (source == "桥本有菜" ? "RJM8" : "ex3z"), source + " replay exact real ID") }
                 else { preconditionFailure("unique mapped actor rejected") }
-                let policy = try await JavVerseActorResolver.resolve(name: source, catalog: catalog, search: search)
+                let policy = try await JavVerseActorResolver.resolve(name: sourceName, aliases: sourceAliases, catalog: catalog, search: search)
                 check(policy != nil, source + " policy does not reject alias count")
             }
             check(calls.first?.0 == identity.canonical, source + " canonical first actual call")
