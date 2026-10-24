@@ -24,7 +24,7 @@ stubs='''
 }
 '''
 core=read('AVDB/Services/JavRankingCore.swift')
-parts=['import Foundation',read('AVDB/Models/JSONFlex.swift'),decl(read('AVDB/Models/Movie.swift'),'public struct Actor:'),read('AVDB/Services/ActorAliasCatalog.swift'),decl(core,'enum JRError:'),decl(core,'final class JRNode'),decl(core,'enum JRHTML'),read('AVDB/Services/JavBusPoster.swift'),stubs,service,read('scripts/JavBusActorsRegression251.swift')]
+parts=['import Foundation',read('AVDB/Models/JSONFlex.swift'),decl(read('AVDB/Models/Movie.swift'),'public struct Actor:'),read('AVDB/Services/ActorAliasCatalog.swift'),core.split('// MARK: - Controlled cache API')[0],read('AVDB/Services/JavBusPoster.swift'),stubs,service,read('scripts/JavBusActorsRegression251.swift')]
 with tempfile.TemporaryDirectory() as t:
  p=pathlib.Path(t)/'JavBusActors251.swift';p.write_text('\n'.join(parts));binary=p.with_suffix('')
  subprocess.run(['swiftc','-parse-as-library',str(p),'-o',str(binary)],check=True)

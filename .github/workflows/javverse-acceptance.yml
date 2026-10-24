@@ -23,6 +23,7 @@ jobs:
       - name: Prepare hosted tests and pinned MediaPipe
         run: |
           gem install cocoapods -v 1.16.2 --no-document
+          python3 scripts/test-javbus-actors251.py
           python3 scripts/test-javverse.py
           python3 scripts/test-javverse241.py
           python3 scripts/test-javverse242.py
