@@ -78,7 +78,8 @@ import Foundation
             return query == "美谷朱里" ? [akane, secondary] : [akari]
         })
         if case .ambiguous(let choices) = mitaniResult {
-            check(Set(choices.map(\.id)) == ["PQJKe", "gyRE"] && mitaniCalls == ["美谷朱里"] && mitani.queries.count > 1, "same canonical name stays ambiguous; later aliases not queried")
+            check(Set(choices.map(\.id)) == ["PQJKe", "gyRE"], "same canonical name stays ambiguous")
+            check(mitaniCalls == mitani.queries, "unprioritized source name cannot skip mapped aliases")
             check(ExternalActorResolver.Failure.ambiguous(choices).localizedDescription.contains("美谷朱里 [PQJKe]") && ExternalActorResolver.Failure.ambiguous(choices).localizedDescription.contains("美谷朱里 [gyRE]"), "candidate copy uses each ID name")
         } else { preconditionFailure("美谷朱里 must not merge") }
         let akiho = ExternalActorIdentity.resolve(sourceName: "吉沢明歩", aliases: ["吉泽明步"], catalog: catalog)
