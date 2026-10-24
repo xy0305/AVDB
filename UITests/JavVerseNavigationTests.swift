@@ -21,6 +21,8 @@ final class JavVerseNavigationTests: XCTestCase {
         }
         app.buttons["javverse-period-menu"].tap()
         app.buttons["javverse-period-2026-10-21"].tap()
+        let historicalRow = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "SONE-269"), object: first)
+        XCTAssertEqual(XCTWaiter.wait(for: [historicalRow], timeout: 10), .completed, "Wait for the real historical row after the period menu transition")
         XCTAssertEqual(first.label, "SONE-269", "Actual historical period must remain selectable")
         app.buttons["Grok Top250"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["javverse-grok-yui-hatano"].waitForExistence(timeout: 5))
