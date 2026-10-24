@@ -306,6 +306,7 @@ extension JavVerseBehaviorTests {
                 }
             }
         }
+        XCTAssertEqual(grok.people.filter { $0.status == "已故" }.count, 2, "Original deceased status must not be relabelled as retired or reject the complete list")
         XCTAssertEqual(grok.rows(metric: .total, status: .all).first?.person.scoreText["total"], "8.84")
         for status in [JavVerseGrokStatus.active, .retired] {
             let rows = grok.rows(metric: .total, status: status)
@@ -329,9 +330,11 @@ extension JavVerseBehaviorTests {
         XCTAssertEqual(latest.movie(for: oldRows[0])?.id, "new-period")
     }
     @MainActor func test241MetadataImmediatelyAvailableBeforeImageRequestsComplete() async throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "JavVerseSnapshot", withExtension: "json"))
         let start = ProcessInfo.processInfo.systemUptime
-        let snapshot = try JavVerseSnapshot.bundled()
+        let snapshot = try JavVerseSnapshot.decode(Data(contentsOf: url))
         let cold = (ProcessInfo.processInfo.systemUptime-start)*1000
+        _ = try JavVerseSnapshot.bundled() // Prime the separate bounded metadata cache explicitly.
         let warmStart = ProcessInfo.processInfo.systemUptime
         _ = try JavVerseSnapshot.bundled()
         let warm = (ProcessInfo.processInfo.systemUptime-warmStart)*1000
@@ -342,7 +345,7 @@ extension JavVerseBehaviorTests {
         XCTAssertEqual(daily.entries.count, 100)
         XCTAssertEqual(daily.entries.first?.code, "SONE-371")
         XCTAssertTrue(mapper.movies.isEmpty)
-        print("JAVVERSE241 metadataCacheProbeMs first=\(cold) warm=\(warm) rows=\(daily.entries.count) imagesAwaited=false")
+        print("JAVVERSE241 metadataCacheProbeMs coldReadDecode=\(cold) warm=\(warm) rows=\(daily.entries.count) imagesAwaited=false")
         for _ in 0..<100 where gate.continuation == nil { await Task.yield() }
         mapper.cancel(); gate.continuation?.resume(returning: []); gate.continuation = nil
         await task?.value

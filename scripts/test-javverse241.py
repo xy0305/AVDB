@@ -27,6 +27,9 @@ class HistoryGrok241(unittest.TestCase):
    self.assertIn(b['periodKey'],b['sourceURL'])
  def test_grok_same_original_score_values_and_no_portraits(self):
   self.assertEqual(len(self.people),250);self.assertEqual(len(set(p['id'] for p in self.people)),250)
+  self.assertEqual(sum(p['status']=='已故' for p in self.people),2)
+  source=(R/'AVDB/Services/JavVerseSource.swift').read_text()
+  self.assertIn('["现役", "引退", "已故"].contains($0.status)',source)
   for p in self.people:
    self.assertNotIn('imageUrl',p);self.assertNotIn('works',p)
    self.assertEqual(set(p['scores']),{'total','works','pop','face','body','award','years'})

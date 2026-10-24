@@ -33,7 +33,7 @@ struct JavVerseSnapshot: Decodable {
         if let grok {
             guard Self.timestamp(grok.capturedAt), Self.sourceURL(grok.sourceURL),
                   grok.people.count == 250, Set(grok.people.map(\.id)).count == 250,
-                  grok.people.allSatisfy({ !$0.nameJa.isEmpty && !$0.nameZh.isEmpty && ["现役", "引退"].contains($0.status) && $0.scores.count == 7 && $0.scores.values.allSatisfy({ (0...10000).contains($0) }) }) else {
+                  grok.people.allSatisfy({ !$0.nameJa.isEmpty && !$0.nameZh.isEmpty && ["现役", "引退", "已故"].contains($0.status) && $0.actressId > 0 && Set($0.scores.keys) == Set(["total", "works", "pop", "face", "body", "award", "years"]) && $0.scores.values.allSatisfy({ (0...10000).contains($0) }) }) else {
                 throw JavVerseFailure.message("Grok公开快照不完整；拒绝推测名次")
             }
         }
