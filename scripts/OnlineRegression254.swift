@@ -92,6 +92,7 @@ actor OnlineLog254 {
         try await Task.sleep(nanoseconds:300_000_000);check(slow.states[.av123] == .idle && slow.plan==nil,"cancel prevents late result")
         slow.query(.av123,number:"DEMO-123",versions:false);slow.reset();try await Task.sleep(nanoseconds:300_000_000);check(slow.states.isEmpty,"reset prevents late account result")
         print("PASS \(count) production four-adapter assertions; neutral HTML/HLS only; no adult media or first-frame claim")
+        try await OnlineSafetyRegression255.run()
         if ProcessInfo.processInfo.environment["ONLINE254_LIVE"]=="1" {
             for s in OnlineSource.allCases {
                 let code=s == .memojav ? "START-642" : "FNS-249";let real=OnlineProvider();var stage="exact-search"
