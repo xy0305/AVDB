@@ -1,0 +1,39 @@
+name: JavBus Independent Native Headers
+on:
+  push:
+    branches: ['diagnostics/javbus-native-headers-20261025']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record toolchain
+        run: |
+          mkdir -p evidence
+          sw_vers > evidence/toolchain.txt
+          xcodebuild -version >> evidence/toolchain.txt
+          swiftc --version >> evidence/toolchain.txt
+          xcrun simctl list runtimes >> evidence/toolchain.txt
+      - name: Compile and execute macOS native probe once
+        run: |
+          swiftc -swift-version 5 -D NATIVE_CLI -parse-as-library diagnostics/javbus-native-headers/NativeProbe.swift -o NativeProbe 2> evidence/macos-compile.log
+          ./NativeProbe evidence/macos.json > evidence/macos-stdout.json
+      - name: Build and execute independent iOS Simulator host once
+        run: python3 diagnostics/javbus-native-headers/run_simulator.py
+      - name: Evidence hashes
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import pathlib,hashlib,json
+          p=pathlib.Path('evidence')
+          (p/'sha256.json').write_text(json.dumps({x.name:hashlib.sha256(x.read_bytes()).hexdigest() for x in p.iterdir() if x.is_file()},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: javbus-independent-native-evidence
+          path: evidence/
+          retention-days: 14
