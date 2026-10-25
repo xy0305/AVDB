@@ -109,7 +109,8 @@ private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unc
     }
 }
 
-/// Shared, bounded, cancellable page cache. No account token/cookie is sent to JavBus.
+/// Shared, bounded, cancellable page cache. Policy-versioned scope isolates old failures.
+/// No account token/cookie is sent to JavBus.
 @MainActor enum JavBusActorService {
     struct Page: Sendable {
         let entries: [JavBusActorParser.Entry]; let status: Int

@@ -8,7 +8,7 @@ import CryptoKit
         let actor = try JSONDecoder().decode(Actor.self, from: Data(#"{"id":"neutral-live253","name":"池田マリナ"}"#.utf8))
         let page = try await JavBusActorService.request("DSOD-070")
         precondition(page.status == 200, "production JavBus page must be 200")
-        precondition(page.entries.contains { ActorNameNormalizer.key($0.name) == ActorNameNormalizer.key(actor.name) }, "exact actor node")
+        precondition(page.entries.contains { ActorNameNormalizer.key($0.name) == ActorNameNormalizer.key(actor.name ?? "") }, "exact actor node")
         guard let hit = try await JavBusActorService.lookupArtwork(actor: actor, numbers: ["DSOD-070"]),
               let data = try await JavBusActorService.imageData(hit.imageURL, sourceURL: hit.sourceURL),
               let src = CGImageSourceCreateWithData(data as CFData, nil), let image = CGImageSourceCreateImageAtIndex(src, 0, nil) else { throw URLError(.cannotDecodeContentData) }
@@ -16,7 +16,7 @@ import CryptoKit
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try data.write(to: dir.appendingPathComponent("portrait253.jpg"))
         return ["onlineJavBusSuccess": true, "source": "modified production JavBusActorService", "gfriendsCounted": false,
-                "pageStatus": page.status, "entries": page.entries.count, "actor": actor.name, "imageURL": hit.imageURL.absoluteString,
+                "pageStatus": page.status, "entries": page.entries.count, "actor": actor.name ?? "", "imageURL": hit.imageURL.absoluteString,
                 "sourceURL": hit.sourceURL.absoluteString, "referer": JavBusActorRequests.request(hit.imageURL, sourceURL: hit.sourceURL)!.value(forHTTPHeaderField: "Referer")!,
                 "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format:"%02x",$0) }.joined(),
                 "width": image.width, "height": image.height, "os": ProcessInfo.processInfo.operatingSystemVersionString]
