@@ -49,6 +49,9 @@ jobs:
           ONLINE254_LIVE: '1'
         run: python3 scripts/test-online254.py
 
+      - name: iOS production Fake-IP compatibility and mode lifecycle regressions
+        run: python3 scripts/test-online256.py
+
       - name: Check poster identity, latency and shared regressions
         run: |
           set -euo pipefail

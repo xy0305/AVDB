@@ -153,6 +153,10 @@ enum OnlinePolicy {
 // public HTTPS origin explicitly issued by an identity-validated Jable detail page.
 // No suffix/domain wildcard; requests never follow redirects. DNS preflight is not
 // DNS pinning and cannot guarantee the native player's later redirect/DNS behavior.
+// Immutable per-transport policy. Only the on-device preference opts in; never
+// changes system DNS/proxy settings, hostname, TLS evaluation or redirect policy.
+enum OnlineDNSMode: String, Sendable { case strict, systemProxy }
+
 struct OnlineMediaScope: Sendable {
     let root: URL
     func contains(_ url: URL) -> Bool { OnlinePolicy.bound(url, to: root) }
@@ -210,22 +214,53 @@ struct OnlineMediaScope: Sendable {
         if publicAddress(address) { return nil }
         let a = address.lowercased()
         if a.hasPrefix("198.18.") || a.hasPrefix("198.19.") || a.hasPrefix("fd27:") || a.hasPrefix("::ffff:198.18.") || a.hasPrefix("::ffff:198.19.") {
-            return "DNS 返回代理/基准测试保留地址（可能由 VPN 合成）；当前路由不支持安全预检，已在请求前停止。请在可返回公共地址的正常路由重试；应用未更改网络设置"
+            return "DNS 返回代理/基准测试保留地址（可能由 VPN 合成）；严格模式已在请求前停止。如信任当前系统代理，可在本面板开启“系统代理/Fake-IP兼容”（仅支持 198.18.0.0/15）；应用未更改网络设置"
         }
         return "DNS 返回非公网、私网或保留地址；已在请求前停止"
     }
-    static func validateAddresses(_ addresses: [String], root: URL) throws {
+    // Only RFC 2544's exact /15 is recognized. No fd27/ULA exception.
+    // Decode mapped and well-known NAT64 wrappers before classifying the IPv4.
+    static func syntheticAddress(_ address: String) -> Bool {
+        if address.contains(":") {
+            #if canImport(Darwin)
+            var value = in6_addr()
+            guard inet_pton(AF_INET6, address, &value) == 1 else { return false }
+            return withUnsafeBytes(of: &value) { bytes in
+                let a = Array(bytes)
+                let mapped = a.prefix(10).allSatisfy { $0 == 0 } && a[10] == 255 && a[11] == 255
+                let nat64 = Array(a.prefix(12)) == [0,100,255,155,0,0,0,0,0,0,0,0]
+                return (mapped || nat64) && syntheticAddress(a.suffix(4).map(String.init).joined(separator: "."))
+            }
+            #else
+            return false
+            #endif
+        }
+        let parts = address.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4, parts.allSatisfy({ !$0.isEmpty && $0.utf8.allSatisfy { (48...57).contains($0) } }),
+              let a = Int(parts[0]), let b = Int(parts[1]), let c = Int(parts[2]), let d = Int(parts[3]),
+              [a,b,c,d].allSatisfy({ (0...255).contains($0) }) else { return false }
+        return a == 198 && (b == 18 || b == 19)
+    }
+    static func validateAddresses(_ addresses: [String], root: URL, mode: OnlineDNSMode = .strict, approvedOrigin: Bool = false) throws {
+        guard OnlinePolicy.secure(root) else { throw diagnostic(root, stage: "DNS", reason: "域名格式不被允许") }
         guard !addresses.isEmpty else { throw diagnostic(root, stage: "DNS", reason: "解析无结果（空地址集）") }
         guard addresses.count <= 32 else { throw diagnostic(root, stage: "DNS", reason: "解析地址数量超限") }
         for address in addresses {
+            if mode == .systemProxy && approvedOrigin && syntheticAddress(address) { continue }
             if let reason = dnsRejection(address) { throw diagnostic(root, stage: "DNS", reason: reason) }
         }
     }
     static func diagnostic(_ url: URL, stage: String, reason: String) -> OnlineFailure {
         .diagnostic(stage: stage, host: url.host.flatMap { publicHost($0) ? $0 : nil } ?? "无效域名", reason: reason)
     }
-    func validateDNS() async throws {
+    func validateDNS(mode: OnlineDNSMode = .strict, approvedOrigin: Bool = false, resolver: (@Sendable (String) async throws -> [String])? = nil) async throws {
         guard let host = root.host, Self.publicHost(host) else { throw Self.diagnostic(root, stage: "DNS", reason: "域名格式不被允许") }
+        if let resolver {
+            let addresses = try await resolver(host)
+            try Task.checkCancellation()
+            try Self.validateAddresses(addresses, root: root, mode: mode, approvedOrigin: approvedOrigin)
+            return
+        }
         try await Task.detached(priority: .utility) { [root] in
             #if canImport(Darwin)
             var result: UnsafeMutablePointer<addrinfo>?
@@ -248,7 +283,7 @@ struct OnlineMediaScope: Sendable {
                 addresses.append(String(cString: buffer))
                 count += 1; cursor = value.ai_next
             }
-            try Self.validateAddresses(addresses, root: root)
+            try Self.validateAddresses(addresses, root: root, mode: mode, approvedOrigin: approvedOrigin)
             #else
             throw OnlineFailure.unsafe
             #endif
@@ -351,8 +386,15 @@ struct OnlineManifest {
     }
 }
 final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    let dnsMode: OnlineDNSMode
     private let loader: (@Sendable (URLRequest) async throws -> Data)?
-    init(loader: (@Sendable (URLRequest) async throws -> Data)? = nil) { self.loader = loader; super.init() }
+    private let resolver: (@Sendable (String) async throws -> [String])?
+    init(dnsMode: OnlineDNSMode = .strict, resolver: (@Sendable (String) async throws -> [String])? = nil, loader: (@Sendable (URLRequest) async throws -> Data)? = nil) {
+        self.dnsMode = dnsMode; self.resolver = resolver; self.loader = loader; super.init()
+    }
+    func withDNSMode(_ mode: OnlineDNSMode) -> OnlineTransport {
+        OnlineTransport(dnsMode: mode, resolver: resolver, loader: loader)
+    }
     private func makeSession() -> URLSession {
         let c = URLSessionConfiguration.ephemeral
         c.httpCookieStorage = nil; c.httpShouldSetCookies = false; c.urlCredentialStorage = nil
@@ -380,14 +422,14 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         try Task.checkCancellation()
         if let scope {
             guard scope.contains(url) else { throw OnlineFailure.unsafe }
-            if loader == nil { try await scope.validateDNS() }
+            if loader == nil || resolver != nil { try await scope.validateDNS(mode: dnsMode, approvedOrigin: true, resolver: resolver) }
         } else {
             guard OnlineSource.allCases.contains(where: { OnlinePolicy.metadata(url, source: $0) }) || OnlinePolicy.embed(url) || OnlinePolicy.media(url) else {
                 if loader != nil { throw OnlineFailure.unsafe }
                 throw OnlineMediaScope.diagnostic(url, stage: "URL", reason: OnlinePolicy.addressRejection(url))
             }
         }
-        if loader == nil && scope == nil { try await OnlineMediaScope(root:url).validateDNS() }
+        if (loader == nil || resolver != nil) && scope == nil { try await OnlineMediaScope(root:url).validateDNS(mode: dnsMode, approvedOrigin: true, resolver: resolver) }
         var request = URLRequest(url: url); request.timeoutInterval = 12
         guard body == nil else { throw OnlineFailure.unsafe }
         request.setValue(OnlinePolicy.ua, forHTTPHeaderField: "User-Agent")
