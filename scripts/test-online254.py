@@ -10,7 +10,7 @@ assert 'c.httpShouldSetCookies = false' in core and 'completionHandler(nil)' in 
 assert 'validateDNS(mode:' in core and 'data.count < cap' in core and 'session.bytes(for: request)' in core
 assert 'evaluateJavaScript' not in core+adapters+panel
 assert 'APIClient.shared.token' not in core+adapters+panel
-assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='258'
+assert plistlib.loads((R/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']=='259'
 print('PASS four-source detail/native-header/cancellation/privacy static guards')
 if platform.system()!='Darwin':
  print('SKIP native Swift on Linux; mandatory macOS IPA CI executes actual production sources')
