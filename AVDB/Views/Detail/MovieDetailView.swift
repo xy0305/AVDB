@@ -300,6 +300,9 @@ struct MovieDetailView: View {
             }
 
             VStack(alignment: .leading, spacing: 20) {
+                if movie.type != "2", OnlineIdentity.key(movie.displayNumber) != nil {
+                    OnlinePlaybackPanel(number: movie.displayNumber).id(movie.id + ":" + movie.displayNumber)
+                }
                 if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
                 if let actors = movie.actors, !actors.isEmpty { actorsSection(actors) }
                 if let summary = movie.summary, !summary.isEmpty { summarySection(summary) }

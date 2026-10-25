@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B25400000000000000000004 /* OnlinePlaybackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000004 /* OnlinePlaybackPanel.swift */; };
+		B25400000000000000000003 /* DetailOnlineAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000003 /* DetailOnlineAdapters.swift */; };
+		B25400000000000000000002 /* OnlineAdditionalProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000002 /* OnlineAdditionalProviders.swift */; };
+		B25400000000000000000001 /* OnlinePlaybackCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000001 /* OnlinePlaybackCore.swift */; };
 		B25100000000000000000001 /* JavBusActorAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25100000000000000000002 /* JavBusActorAvatar.swift */; };
 		0B917EE3D4B4BFD8A9400C51 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F0F2E9AE15B3379F4B9DD5 /* APIClient.swift */; };
 		1FCC523DAF4878448C890BF3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB59A308766B79E1C4EB955B /* HomeView.swift */; };
@@ -85,6 +89,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C25400000000000000000004 /* OnlinePlaybackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlinePlaybackPanel.swift; sourceTree = "<group>"; };
+		C25400000000000000000003 /* DetailOnlineAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailOnlineAdapters.swift; sourceTree = "<group>"; };
+		C25400000000000000000002 /* OnlineAdditionalProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineAdditionalProviders.swift; sourceTree = "<group>"; };
+		C25400000000000000000001 /* OnlinePlaybackCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlinePlaybackCore.swift; sourceTree = "<group>"; };
 		B25100000000000000000002 /* JavBusActorAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavBusActorAvatar.swift; sourceTree = "<group>"; };
 		0E30F604E876D29C296F9649 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
 		14321A82C49C1554A3104999 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
@@ -276,6 +284,9 @@
 			children = (
 				A16700000000000000000002 /* JavRankingCore.swift */,
 				B17400000000000000000000 /* MissAVCore.swift */,
+				C25400000000000000000003 /* DetailOnlineAdapters.swift */,
+				C25400000000000000000002 /* OnlineAdditionalProviders.swift */,
+				C25400000000000000000001 /* OnlinePlaybackCore.swift */,
 				A16700000000000000000004 /* JavRankingSource.swift */,
 				B17400000000000000000001 /* MissAVSource.swift */,
 				B17600000000000000000001 /* MissAVMetadata.swift */,
@@ -342,6 +353,7 @@
 				D21600000000000000000001 /* SubtitleCatProvider.swift */,
 				D21600000000000000000002 /* OnlineSubtitleModel.swift */,
 				B08C58091094C960D502C7F8 /* PlayerView.swift */,
+				C25400000000000000000004 /* OnlinePlaybackPanel.swift */,
 				D21500000000000000000001 /* PlaybackVideoMetrics.swift */,
 				A16600000000000000000002 /* SeekPreview.swift */,
 				AB1620000000000000000002 /* PlaybackAudioSession.swift */,
@@ -481,6 +493,10 @@
 			files = (
 				A16700000000000000000001 /* JavRankingCore.swift in Sources */,
 				A17400000000000000000000 /* MissAVCore.swift in Sources */,
+				B25400000000000000000004 /* OnlinePlaybackPanel.swift in Sources */,
+				B25400000000000000000003 /* DetailOnlineAdapters.swift in Sources */,
+				B25400000000000000000002 /* OnlineAdditionalProviders.swift in Sources */,
+				B25400000000000000000001 /* OnlinePlaybackCore.swift in Sources */,
 				A16700000000000000000003 /* JavRankingSource.swift in Sources */,
 				A17400000000000000000001 /* MissAVSource.swift in Sources */,
 				A17600000000000000000001 /* MissAVMetadata.swift in Sources */,
@@ -559,7 +575,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 253;
+				CURRENT_PROJECT_VERSION = 254;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -582,7 +598,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 253;
+				CURRENT_PROJECT_VERSION = 254;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
