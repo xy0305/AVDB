@@ -8,7 +8,10 @@ import CryptoKit
         let actor = try JSONDecoder().decode(Actor.self, from: Data(#"{"id":"neutral-live253","name":"池田マリナ"}"#.utf8))
         let page = try await JavBusActorService.request("DSOD-070")
         precondition(page.status == 200, "production JavBus page must be 200")
-        precondition(page.entries.contains { ActorNameNormalizer.key($0.name) == ActorNameNormalizer.key(actor.name ?? "") }, "exact actor node")
+        guard page.entries.contains(where: { ActorNameNormalizer.key($0.name) == ActorNameNormalizer.key(actor.name ?? "") }) else {
+            try await structureDiagnostic()
+            throw URLError(.cannotParseResponse)
+        }
         guard let hit = try await JavBusActorService.lookupArtwork(actor: actor, numbers: ["DSOD-070"]),
               let data = try await JavBusActorService.imageData(hit.imageURL, sourceURL: hit.sourceURL),
               let src = CGImageSourceCreateWithData(data as CFData, nil), let image = CGImageSourceCreateImageAtIndex(src, 0, nil) else { throw URLError(.cannotDecodeContentData) }
@@ -20,6 +23,23 @@ import CryptoKit
                 "sourceURL": hit.sourceURL.absoluteString, "referer": JavBusActorRequests.request(hit.imageURL, sourceURL: hit.sourceURL)!.value(forHTTPHeaderField: "Referer")!,
                 "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format:"%02x",$0) }.joined(),
                 "width": image.width, "height": image.height, "os": ProcessInfo.processInfo.operatingSystemVersionString]
+    }
+    static func structureDiagnostic() async throws {
+        let url = JavBusPoster.page(number:"DSOD-070")!
+        let session = URLSession(configuration:JavBusActorRequests.configuration(),delegate:JavBusActorRedirects(),delegateQueue:nil)
+        defer { session.invalidateAndCancel() }
+        let (bytes,response) = try await session.bytes(for:JavBusActorRequests.request(url)!)
+        var data = Data()
+        for try await b in bytes { guard data.count < 768*1024 else { break }; data.append(b) }
+        let html = String(decoding:data,as:UTF8.self), tree = try JRHTML.tree(html)
+        let movies = tree.all { $0.tag == "div" && $0.cls("movie") }
+        let infos = movies.flatMap { $0.all { $0.tag == "div" && $0.cls("info") } }
+        let result:[String:Any] = ["status":(response as? HTTPURLResponse)?.statusCode ?? 0,"movies":movies.count,"infos":infos.count,
+            "headers":infos.flatMap { $0.all { $0.tag == "span" && $0.cls("header") }.map(\.text) },
+            "numberSpans":infos.flatMap { $0.all { $0.tag == "p" }.prefix(2).map { $0.children.filter { $0.tag == "span" }.map(\.text) } },
+            "markers":["cf-chl-","challenge-platform","captcha","just a moment","age verification","driver-verify"].filter { html.lowercased().contains($0) },
+            "avatars":tree.all { $0.tag == "a" && $0.cls("avatar-box") }.map { node in ["href":node.attrs["href"] ?? "", "labels":node.all { $0.tag == "span" }.map(\.text).joined(separator:"|"), "images":node.all { $0.tag == "img" }.map { ($0.attrs["src"] ?? "") + " title=" + ($0.attrs["title"] ?? "") }.joined(separator:"|")] }]
+        try JSONSerialization.data(withJSONObject:result,options:[.prettyPrinted,.sortedKeys]).write(to:URL(fileURLWithPath:"evidence253/structure253.json"))
     }
     static func checks() async throws {
         let page = JavBusPoster.page(number: "DSOD-070")!, image = URL(string:"https://www.javbus.com/pics/actress/neutral_a.jpg")!
