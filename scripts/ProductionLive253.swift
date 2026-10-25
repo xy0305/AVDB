@@ -35,7 +35,7 @@ import CryptoKit
         let movies = tree.all { $0.tag == "div" && $0.cls("movie") }
         let infos = movies.flatMap { $0.all { $0.tag == "div" && $0.cls("info") } }
         let result:[String:Any] = ["status":(response as? HTTPURLResponse)?.statusCode ?? 0,"movies":movies.count,"infos":infos.count,
-            "headers":infos.flatMap { $0.all { $0.tag == "span" && $0.cls("header") }.map(\.text) },
+            "movieNodes":movies.map { node in ["attrs":node.attrs.description,"children":node.children.filter { $0.tag != "text" }.map { $0.tag + $0.attrs.description }.joined(separator:"|"),"infos":String(node.all { $0.tag == "div" && $0.cls("info") }.count)] }, "headers":infos.flatMap { $0.all { $0.tag == "span" && $0.cls("header") }.map(\.text) },
             "numberSpans":infos.flatMap { $0.all { $0.tag == "p" }.prefix(2).map { $0.children.filter { $0.tag == "span" }.map(\.text) } },
             "markers":["cf-chl-","challenge-platform","captcha","just a moment","age verification","driver-verify"].filter { html.lowercased().contains($0) },
             "avatars":tree.all { $0.tag == "a" && $0.cls("avatar-box") }.map { node in ["href":node.attrs["href"] ?? "", "labels":node.all { $0.tag == "span" }.map(\.text).joined(separator:"|"), "images":node.all { $0.tag == "img" }.map { ($0.attrs["src"] ?? "") + " title=" + ($0.attrs["title"] ?? "") }.joined(separator:"|")] }]
