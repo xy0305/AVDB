@@ -299,6 +299,12 @@ struct OnlineMediaScope: Sendable {
 struct OnlineManifest {
     let variants: [URL]
     let keys: [URL]
+    var ladder: [HLSVariant] = []
+    init(variants: [URL], keys: [URL], ladder: [HLSVariant] = []) {
+        self.variants = variants
+        self.keys = keys
+        self.ladder = ladder
+    }
     // RFC 8216 attribute lists: quoted commas are not delimiters; duplicate names
     // and unbalanced quotes are rejected rather than guessing a decryption method.
     static func attributes(_ value: String) throws -> [String:String] {
