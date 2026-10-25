@@ -12,8 +12,10 @@ enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
 }
 enum OnlineFailure: Error, LocalizedError, Equatable {
     case noMatch, blocked, tls, parse, timeout, unsafe, resolver, tooLarge, cancelled, unsupported, incomplete, drm, keyUnavailable, http(Int)
+    case diagnostic(stage: String, host: String, reason: String)
     var errorDescription: String? {
         switch self {
+        case .diagnostic(let stage, let host, let reason): return "\(host) · \(stage)：\(reason)"
         case .noMatch: return "未匹配"
         case .blocked: return "来源拒绝访问或要求验证（未绕过限制）"
         case .drm: return "不支持 DRM / SAMPLE-AES 或专有密钥格式"
@@ -87,6 +89,11 @@ enum OnlinePolicy {
         guard url.scheme == "https", url.user == nil, url.password == nil, url.fragment == nil,
               url.port == nil || url.port == 443, let h = url.host?.lowercased(), OnlineMediaScope.publicHost(h) else { return false }
         return !url.absoluteString.contains(where: { $0.asciiValue.map { $0 < 32 || $0 == 127 } == true })
+    }
+    static func addressRejection(_ url: URL) -> String {
+        if url.scheme != "https" || url.user != nil || url.password != nil || url.fragment != nil || !(url.port == nil || url.port == 443) { return "地址格式：仅允许无凭据、无片段的 HTTPS/443" }
+        guard let host = url.host, OnlineMediaScope.publicHost(host) else { return "host：域名格式或范围不允许" }
+        return "path/query：不符合此来源的精确公开路由或参数规则"
     }
     static func metadata(_ url: URL, source: OnlineSource) -> Bool {
         guard secure(url), !url.path.contains(".."), !url.absoluteString.lowercased().contains("%2e") else { return false }
@@ -166,7 +173,17 @@ struct OnlineMediaScope: Sendable {
             guard inet_pton(AF_INET6, address, &value) == 1 else { return false }
             return withUnsafeBytes(of: &value) { bytes in
                 let a = Array(bytes)
-                guard a.count == 16, a[0] & 0xe0 == 0x20 else { return false } // global unicast only
+                guard a.count == 16 else { return false }
+                // Apple may return IPv4-mapped IPv6. Classify the embedded IPv4,
+                // never accept mapped private/reserved addresses as public IPv6.
+                if a.prefix(10).allSatisfy({ $0 == 0 }) && a[10] == 255 && a[11] == 255 {
+                    return publicAddress(a.suffix(4).map(String.init).joined(separator: "."))
+                }
+                // Well-known NAT64 prefix on IPv6-only Apple networks (RFC 6052).
+                if Array(a.prefix(12)) == [0,100,255,155,0,0,0,0,0,0,0,0] {
+                    return publicAddress(a.suffix(4).map(String.init).joined(separator: "."))
+                }
+                guard a[0] & 0xe0 == 0x20 else { return false } // global unicast only
                 if a[0] == 0x20 && a[1] == 0x02 { return false } // 6to4 may embed private IPv4
                 if a[0] == 0x20 && a[1] == 0x01 {
                     if a[2] == 0x0d && a[3] == 0xb8 { return false } // documentation
@@ -189,25 +206,49 @@ struct OnlineMediaScope: Sendable {
         if a == 203 && b == 0 && c == 113 { return false }
         return true
     }
+    static func dnsRejection(_ address: String) -> String? {
+        if publicAddress(address) { return nil }
+        let a = address.lowercased()
+        if a.hasPrefix("198.18.") || a.hasPrefix("198.19.") || a.hasPrefix("fd27:") || a.hasPrefix("::ffff:198.18.") || a.hasPrefix("::ffff:198.19.") {
+            return "DNS 返回代理/基准测试保留地址（可能由 VPN 合成）；当前路由不支持安全预检，已在请求前停止。请在可返回公共地址的正常路由重试；应用未更改网络设置"
+        }
+        return "DNS 返回非公网、私网或保留地址；已在请求前停止"
+    }
+    static func validateAddresses(_ addresses: [String], root: URL) throws {
+        guard !addresses.isEmpty else { throw diagnostic(root, stage: "DNS", reason: "解析无结果（空地址集）") }
+        guard addresses.count <= 32 else { throw diagnostic(root, stage: "DNS", reason: "解析地址数量超限") }
+        for address in addresses {
+            if let reason = dnsRejection(address) { throw diagnostic(root, stage: "DNS", reason: reason) }
+        }
+    }
+    static func diagnostic(_ url: URL, stage: String, reason: String) -> OnlineFailure {
+        .diagnostic(stage: stage, host: url.host.flatMap { publicHost($0) ? $0 : nil } ?? "无效域名", reason: reason)
+    }
     func validateDNS() async throws {
-        guard let host = root.host, Self.publicHost(host) else { throw OnlineFailure.unsafe }
-        try await Task.detached(priority: .utility) {
+        guard let host = root.host, Self.publicHost(host) else { throw Self.diagnostic(root, stage: "DNS", reason: "域名格式不被允许") }
+        try await Task.detached(priority: .utility) { [root] in
             #if canImport(Darwin)
             var result: UnsafeMutablePointer<addrinfo>?
-            guard getaddrinfo(host, nil, nil, &result) == 0, let first = result else { throw OnlineFailure.resolver }
+            var hints = addrinfo(); hints.ai_family = AF_UNSPEC
+            hints.ai_socktype = SOCK_STREAM; hints.ai_protocol = IPPROTO_TCP
+            let status = getaddrinfo(host, nil, &hints, &result)
+            guard status == 0, let first = result else {
+                throw Self.diagnostic(root, stage: "DNS", reason: "解析无结果（getaddrinfo=\(status)）")
+            }
             defer { freeaddrinfo(first) }
-            var cursor: UnsafeMutablePointer<addrinfo>? = first; var count = 0
+            var cursor: UnsafeMutablePointer<addrinfo>? = first; var count = 0; var addresses: [String] = []
             while let item = cursor {
                 guard count < 32 else { throw OnlineFailure.tooLarge }
                 var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
                 let value = item.pointee
                 guard value.ai_family == AF_INET || value.ai_family == AF_INET6,
-                      let address = value.ai_addr,
-                      getnameinfo(address, value.ai_addrlen, &buffer, socklen_t(NI_MAXHOST), nil, 0, NI_NUMERICHOST) == 0,
-                      Self.publicAddress(String(cString: buffer)) else { throw OnlineFailure.unsafe }
+                      let address = value.ai_addr else { throw Self.diagnostic(root, stage: "DNS", reason: "解析返回未知地址族") }
+                let numericStatus = getnameinfo(address, value.ai_addrlen, &buffer, socklen_t(NI_MAXHOST), nil, 0, NI_NUMERICHOST)
+                guard numericStatus == 0 else { throw Self.diagnostic(root, stage: "DNS", reason: "数值地址转换失败（getnameinfo=\(numericStatus)）") }
+                addresses.append(String(cString: buffer))
                 count += 1; cursor = value.ai_next
             }
-            guard count > 0 else { throw OnlineFailure.unsafe }
+            try Self.validateAddresses(addresses, root: root)
             #else
             throw OnlineFailure.unsafe
             #endif
@@ -322,12 +363,29 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
     func fetch(_ url: URL, cap: Int, headers: [String:String] = [:], body: Data? = nil, scope: OnlineMediaScope? = nil) async throws -> Data {
+        let stage = scope != nil ? (url.path.hasSuffix(".m3u8") ? "清单" : "密钥") : (url.path.contains("/search/") || url.path == "/en/search" || url.path.hasPrefix("/video/") ? "查询" : "详情/嵌入/API")
+        do { return try await fetchChecked(url, cap:cap, headers:headers, body:body, scope:scope) }
+        catch {
+            // Neutral loader retains historical error contracts; real requests gain
+            // only bounded stage/host/reason, never URL path, query or credentials.
+            if loader != nil { throw error }
+            let failure = OnlineFailure.classify(error)
+            if case .diagnostic(let substage, _, let reason) = failure {
+                throw OnlineMediaScope.diagnostic(url, stage: stage + "/" + substage, reason: reason)
+            }
+            throw OnlineMediaScope.diagnostic(url, stage: stage, reason: failure.localizedDescription)
+        }
+    }
+    private func fetchChecked(_ url: URL, cap: Int, headers: [String:String], body: Data?, scope: OnlineMediaScope?) async throws -> Data {
         try Task.checkCancellation()
         if let scope {
             guard scope.contains(url) else { throw OnlineFailure.unsafe }
             if loader == nil { try await scope.validateDNS() }
         } else {
-            guard OnlineSource.allCases.contains(where: { OnlinePolicy.metadata(url, source: $0) }) || OnlinePolicy.embed(url) || OnlinePolicy.media(url) else { throw OnlineFailure.unsafe }
+            guard OnlineSource.allCases.contains(where: { OnlinePolicy.metadata(url, source: $0) }) || OnlinePolicy.embed(url) || OnlinePolicy.media(url) else {
+                if loader != nil { throw OnlineFailure.unsafe }
+                throw OnlineMediaScope.diagnostic(url, stage: "URL", reason: OnlinePolicy.addressRejection(url))
+            }
         }
         if loader == nil && scope == nil { try await OnlineMediaScope(root:url).validateDNS() }
         var request = URLRequest(url: url); request.timeoutInterval = 12
@@ -345,7 +403,9 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         defer { session.invalidateAndCancel() }
         let (bytes, response) = try await session.bytes(for: request)
         guard let r = response as? HTTPURLResponse, r.url == url else { throw OnlineFailure.unsafe }
-        if [401,403,429,451].contains(r.statusCode) || (300..<400).contains(r.statusCode) { throw OnlineFailure.blocked }
+        if [401,403,429,451].contains(r.statusCode) || (300..<400).contains(r.statusCode) {
+            throw OnlineMediaScope.diagnostic(url, stage: "HTTP", reason: "上游 HTTP \(r.statusCode)，拒绝访问、重定向或要求验证（未绕过）")
+        }
         if r.statusCode == 404 { throw OnlineFailure.noMatch }
         guard r.statusCode == 200 else { throw OnlineFailure.http(r.statusCode) }
         guard r.expectedContentLength <= Int64(cap) else { throw OnlineFailure.tooLarge }
@@ -380,7 +440,10 @@ struct OnlineProvider: Sendable {
             guard !seen.contains(url) else { continue }
             guard seen.count < 12, depth <= 3 else { throw OnlineFailure.tooLarge }
             seen.insert(url)
-            let manifest = try OnlineManifest.parse(try await transport.fetch(url, cap: 512*1024, headers: headers, scope: scope), at: url, root: media)
+            let bytes = try await transport.fetch(url, cap: 512*1024, headers: headers, scope: scope)
+            let manifest: OnlineManifest
+            do { manifest = try OnlineManifest.parse(bytes, at: url, root: media) }
+            catch { throw OnlineMediaScope.diagnostic(url, stage: "清单解析", reason: OnlineFailure.classify(error).localizedDescription) }
             for key in manifest.keys { keys.insert(key) }
             guard keys.count <= 16 else { throw OnlineFailure.tooLarge }
             if manifest.variants.isEmpty { hasLeaf = true }

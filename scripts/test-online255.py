@@ -10,8 +10,8 @@ if d['state']!='Booted':run(['xcrun','simctl','boot',d['udid']])
 run(['xcrun','simctl','bootstatus',d['udid'],'-b'])
 with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp);identity=p/'Identity.swift';s=(R/'AVDB/Services/CatalogueMetadata.swift').read_text();identity.write_text('import Foundation\nenum CatalogueIdentity {'+s.split('enum CatalogueIdentity {',1)[1].split('\nstruct ScrapedMetadata:',1)[0])
- files=['AVDB/Services/JavRankingCore.swift','AVDB/Services/MissAVCore.swift','AVDB/Services/OnlinePlaybackCore.swift','AVDB/Services/OnlineAdditionalProviders.swift','AVDB/Services/DetailOnlineAdapters.swift','scripts/OnlineProbe255.swift']
+ files=['AVDB/Services/JavRankingCore.swift','AVDB/Services/MissAVCore.swift','AVDB/Services/OnlinePlaybackCore.swift','AVDB/Services/OnlineAdditionalProviders.swift','AVDB/Services/DetailOnlineAdapters.swift','AVDB/Views/Player/OnlinePlaybackPanel.swift','scripts/OnlineSafetyRegression255.swift','scripts/OnlineProbe255.swift']
  sdk=subprocess.check_output(['xcrun','--sdk','iphonesimulator','--show-sdk-path'],text=True).strip()
  binary=p/'probe255'
- run(['xcrun','--sdk','iphonesimulator','swiftc','-parse-as-library','-target',platform.machine()+'-apple-ios17.0-simulator','-sdk',sdk,'-swift-version','5',str(identity),*[str(R/f) for f in files],'-o',str(binary)])
+ run(['xcrun','--sdk','iphonesimulator','swiftc','-parse-as-library','-target',platform.machine()+'-apple-ios17.0-simulator','-sdk',sdk,'-swift-version','5','-D','ONLINE_CORE_TEST',str(identity),*[str(R/f) for f in files],'-o',str(binary)])
  run(['xcrun','simctl','spawn',d['udid'],str(binary)],timeout=300)
