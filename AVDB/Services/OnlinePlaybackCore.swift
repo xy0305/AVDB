@@ -63,6 +63,16 @@ struct OnlinePlaybackPlan: Identifiable, Sendable {
     let source: OnlineSource
     let number: String
     let headers: [String:String]
+    var ladder: [HLSVariant] = []
+    var preference: OnlineQualityPreference = OnlineQualityPreference()
+    init(url: URL, source: OnlineSource, number: String, headers: [String:String], ladder: [HLSVariant] = [], preference: OnlineQualityPreference = OnlineQualityPreference()) {
+        self.url = url
+        self.source = source
+        self.number = number
+        self.headers = headers
+        self.ladder = ladder
+        self.preference = preference
+    }
 }
 enum OnlineIdentity {
     static func key(_ raw: String) -> String? {
