@@ -46,8 +46,13 @@ import Foundation
         check(resolution.label.contains("详情") && resolution.label.contains("暂不支持"), "production resolution label")
         // Real production parser, synthetic bytes only; no Python parser replacement.
         let manifest = Data("#EXTM3U\n#EXTINF:4,\nneutral.ts\n#EXT-X-ENDLIST\n".utf8)
-        _ = try OnlineManifest.parse(manifest, at: signed, root: signed)
-        check(true, "production HLS parser with example.test synthetic bytes")
+        do {
+            _ = try OnlineManifest.parse(manifest, at: signed, root: signed)
+            preconditionFailure("reserved test TLD escaped existing production policy")
+        } catch { check(OnlineFailure.classify(error) == .unsafe, "existing reserved-domain restriction preserved") }
+        let memoryOnly = URL(string: "https://cdn.example.net/neutral/index.m3u8")!
+        _ = try OnlineManifest.parse(manifest, at: memoryOnly, root: memoryOnly)
+        check(true, "production HLS parser with synthetic in-memory bytes; no fetch")
         // Child ignores task cancellation while waiting for a genuine async callback.
         // Old structured task group waited 300ms before delivering its 20ms timeout.
         let start = DispatchTime.now().uptimeNanoseconds

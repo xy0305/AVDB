@@ -2,7 +2,7 @@ name: Neutral playback diagnostics
 on:
   push:
     branches: [fix/subtitle-position-201]
-    paths: ['AVDB/Services/OnlinePlaybackCore.swift', 'AVDB/Services/DetailOnlineAdapters.swift', 'scripts/*255*', '.github/workflows/online255.yml']
+    paths: ['AVDB/Services/OnlinePlaybackCore.swift', 'AVDB/Services/DetailOnlineAdapters.swift', 'scripts/*255*', 'scripts/*257*', 'AVDB/Services/PlaybackDiagnostic.swift', 'AVDB/Views/Player/OnlinePlaybackPanel.swift', '.github/workflows/online255.yml']
 permissions:
   contents: read
 jobs:
