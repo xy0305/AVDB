@@ -1,0 +1,20 @@
+name: Online iOS production diagnostic 255
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Services/OnlinePlaybackCore.swift', 'AVDB/Services/DetailOnlineAdapters.swift', 'scripts/*255*', '.github/workflows/online255.yml']
+permissions:
+  contents: read
+jobs:
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real iOS production discover and native DNS
+        run: python3 scripts/test-online255.py | tee online255-ios.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: online255-ios
+          path: online255-ios.txt
