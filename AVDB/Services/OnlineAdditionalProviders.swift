@@ -87,7 +87,9 @@ enum OnlineAdditional {
     // of three known URL assignments; executable statements cannot be returned.
     static func missavPackedSource(_ script: String) throws -> String? {
         let pattern = #"return\s+p\}\('((?:\\.|[^'\\])*)',(\d+),(\d+),'([^'\\]*)'\.split\('\|'\),0,\{\}\)\)"#
-        let blocks = JRHTML.matches(pattern, script)
+        // Ignore unrelated advertisement/library containers without a source field.
+        // This is literal word-table inspection, not evaluation or a decoder fallback.
+        let blocks = JRHTML.matches(pattern, script).filter { $0[4].components(separatedBy: "|").contains("source") }
         guard !blocks.isEmpty else { return nil }
         guard blocks.count == 1 else { throw OnlineFailure.unsupported }
         let m = blocks[0]

@@ -63,6 +63,8 @@ actor OnlineLog254 {
         fails(.incomplete) { _=try OneTwoThreeAVAdapter.embeds(playerHTML(host:"unknown.site"),page:URL(string:"https://123av.com/en/v/demo-123")!,number:"DEMO-123") }
         fails(.noMatch) { _=try OneTwoThreeAVAdapter.embeds(playerHTML("DEMO-1230"),page:URL(string:"https://123av.com/en/v/demo-123")!,number:"DEMO-123") }
         fails(.blocked) { try OnlineAdapters.rejectChallenge("<title>Just a moment...</title><div id='challenge-form'></div>") }
+        let unrelated = #"eval(function(p,a,c,k,e,d){return p}('ad',62,9999,'advert|library'.split('|'),0,{}))"#
+        check(try OnlineAdditional.missavMedia("<script>"+unrelated+"</script><script>"+packed+"</script>").host == "surrit.neutral.media","unrelated packer not a source container")
         let decoded=try OnlineAdditional.missavMedia("<script>"+packed+"</script>")
         check(decoded.host=="surrit.neutral.media","word table decoded without executing")
         fails(.unsupported) { _=try OnlineAdditional.missavMedia("<script>"+packed+packed+"</script>") }
@@ -103,7 +105,20 @@ actor OnlineLog254 {
                     stage="all-manifests-and-public-DNS"
                     let plan=try await OnlinePlaybackModel.bounded { try await real.validatedPlan(media:parsed.media,referrer:parsed.referrer,line:line,number:code,pageIssued:true) }
                     print("LIVE254 source=\(s.rawValue) manifest-validation=PASS host=\(plan.url.host ?? "") FIRST-FRAME=UNVERIFIED")
-                } catch { print("LIVE254 source=\(s.rawValue) stage=\(stage) result=\(OnlineFailure.classify(error)) FIRST-FRAME=UNVERIFIED") }
+                } catch {
+                    print("LIVE254 source=\(s.rawValue) stage=\(stage) result=\(OnlineFailure.classify(error)) FIRST-FRAME=UNVERIFIED")
+                    if s == .missav && OnlineFailure.classify(error) == .tooLarge {
+                        do {
+                            let page=URL(string:"https://missav.ws/en/fns-249")!
+                            let data=try await real.transport.fetch(page,cap:2*1024*1024)
+                            let text=try OnlineAdditional.html(data)
+                            print("DIAG254 missav public-detail-bytes=\(data.count)")
+                            for m in JRHTML.matches(#"return\s+p\}\('((?:\\.|[^'\\])*)',(\d+),(\d+),'([^'\\]*)'\.split\('\|'\),0,\{\}\)\)"#,text) {
+                                print("DIAG254 missav radix=\(m[2]) count=\(m[3]) payload-length=\(m[1].count) table-length=\(m[4].count) has-source=\(m[4].components(separatedBy:"|").contains("source"))")
+                            }
+                        } catch { print("DIAG254 missav bounded-detail=\(OnlineFailure.classify(error))") }
+                    }
+                }
             }
         }
     }

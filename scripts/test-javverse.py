@@ -93,5 +93,5 @@ class JavVerseTests(unittest.TestCase):
   self.assertNotIn('Image(',label)
   self.assertNotIn('Label(',label)
   self.assertNotIn('chevron',label)
-  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 253;'),2)
+  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 254;'),2)
 if __name__=='__main__':unittest.main()
