@@ -83,7 +83,7 @@ class Alias243(unittest.TestCase):
         self.assertEqual(info["CFBundleShortVersionString"], "1.0.2")
         self.assertEqual(info["CFBundleVersion"], "258")
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
-        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 259;"), 2)
+        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 260;"), 2)
         self.assertIn("IPHONEOS_DEPLOYMENT_TARGET = 17.0;", project)
         for name in ("ActorAliasCatalog.swift", "ExternalActorResolver.swift", "ActorAliasIndex.json"):
             self.assertIn(name, project)

@@ -307,10 +307,6 @@ struct MovieDetailView: View {
                 heroHeader(movie)
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("legacy-landscape-header")
-                if movie.type != "2", OnlineIdentity.key(movie.displayNumber) != nil {
-                    PlaybackResourceActions(onlineAvailable: true, play115: { play115 = true }, openOnline: { showOnlinePlayback = true })
-                        .padding(.horizontal, 20).padding(.top, 12)
-                }
             } else {
                 // Resolving has exactly the portrait viewport and real metadata /
                 // actions, but no speculative cover (especially no wide fallback).
@@ -405,36 +401,12 @@ struct MovieDetailView: View {
                     Text("「\(movie.displayNumber)」").font(.system(size: 13))
                         .frame(maxWidth: .infinity).padding(.top, 22)
                 }
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("播放资源").font(.system(size: 17, weight: .bold))
-                    PlaybackResourceActions(onlineAvailable: movie.type != "2" && OnlineIdentity.key(movie.displayNumber) != nil,
-                                            play115: { play115 = true }, openOnline: { showOnlinePlayback = true })
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            Button { play115 = true } label: {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("115 原画").font(.title3.bold())
-                                    Text(Pan115Settings.shared.isConfigured ? "打开 115 匹配资源" : "需先在「我的」配置 115")
-                                        .font(.caption)
-                                    Label("选择播放文件", systemImage: "play.circle")
-                                        .font(.subheadline)
-                                }
-                                .padding(16).frame(minWidth: 220, alignment: .leading)
-                                .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.45)))
-                            }
-                            if (movie.magnetsCount ?? 0) > 0 || externalSettings.enabled {
-                                Button { showPosterResources = true } label: {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        Text("磁力与外部资源").font(.title3.bold())
-                                        Text("查看可用链接后选择推送").font(.caption)
-                                        Label("查看资源", systemImage: "link").font(.subheadline)
-                                    }.padding(16).frame(minWidth: 220, alignment: .leading)
-                                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.22)))
-                                }
-                            }
-                        }.padding(.horizontal, 18)
-                    }.padding(.horizontal, -18)
-                }
+                PlaybackResourceCards(configured115: Pan115Settings.shared.isConfigured,
+                                       onlineAvailable: movie.type != "2" && OnlineIdentity.key(movie.displayNumber) != nil,
+                                       externalAvailable: (movie.magnetsCount ?? 0) > 0 || externalSettings.enabled,
+                                       play115: { play115 = true },
+                                       openOnline: { showOnlinePlayback = true },
+                                       openExternal: { showPosterResources = true })
                 .padding(.horizontal, 18).padding(.top, 30)
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .contain)
@@ -447,6 +419,8 @@ struct MovieDetailView: View {
         .frame(width: width)
 
     }
+
+
 
     // Text wraps at narrow widths / accessibility sizes instead of forcing the
     // metadata or controls outside the available detail width.

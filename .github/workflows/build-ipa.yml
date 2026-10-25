@@ -19,6 +19,7 @@ on:
       - "scripts/*257*"
       - "scripts/*258*"
       - "scripts/*259*"
+      - "scripts/*260*"
       - "scripts/GestureRegression.swift"
       - "scripts/SeekPreviewRegression.swift"
       - "scripts/ExternalLibraryRegression.swift"

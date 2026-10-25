@@ -54,7 +54,7 @@ class JavVerseTimestamp244(unittest.TestCase):
         info = plistlib.loads((R / "AVDB/Resources/Info.plist").read_bytes())
         self.assertEqual((info["CFBundleShortVersionString"], info["CFBundleVersion"]), ("1.0.2", "258"))
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
-        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 259;"), 2)
+        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 260;"), 2)
         self.assertEqual(project.count("MARKETING_VERSION = 1.0.2;"), 2)
         replay = (R / "scripts/test-actor-avatar243.py").read_text()
         self.assertIn('source.split("struct TMDBAvatarTokenStore", 1)[0]', replay)

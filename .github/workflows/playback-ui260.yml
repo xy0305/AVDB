@@ -1,0 +1,28 @@
+name: Build260 neutral resource cards
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Views/Detail/MovieDetailView.swift', 'AVDB/Views/Detail/PlaybackResourceCards.swift', 'scripts/*260*', '.github/workflows/playback-ui260.yml']
+permissions:
+  contents: read
+jobs:
+  neutral-ui:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated native UI test project generator
+        run: gem install xcodeproj --no-document
+      - name: Production SwiftUI resource cards on iPhone and iPad
+        run: |
+          set -euo pipefail
+          python3 scripts/test-playback-ui260.py 2>&1 | tee ui260.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playback-ui260-neutral
+          path: |
+            evidence260/ui260-status.json
+            evidence260/*-screenshots/
+            ui260.log
+          if-no-files-found: error
