@@ -58,21 +58,70 @@ enum ActorAvatarRedirectPolicy {
         return JavBusActorParser.allowedImage(to) || JavBusPoster.number(String(to.path.dropFirst())).map { JavBusPoster.allowedPage(to, number: $0) } == true
     }
 }
+/// One public, credential-free header policy for both stages and redirect reconstruction.
+enum JavBusActorRequests {
+    static let version = "public-headers253"
+    static let userAgent = "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    static let language = "zh-CN,zh;q=0.9,en;q=0.7"
+    static let pageAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    static let imageAccept = "image/avif,image/webp,image/*,*/*;q=0.8"
+    static func validSource(_ url: URL) -> Bool {
+        guard let n = JavBusPoster.number(String(url.path.dropFirst())) else { return false }
+        return JavBusPoster.allowedPage(url, number: n)
+    }
+    static func request(_ url: URL, sourceURL: URL? = nil) -> URLRequest? {
+        let image = JavBusActorParser.allowedImage(url)
+        guard image ? sourceURL.map(validSource) == true : validSource(url) && sourceURL == nil else { return nil }
+        var result = URLRequest(url: url)
+        result.httpShouldHandleCookies = false
+        result.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        result.setValue(language, forHTTPHeaderField: "Accept-Language")
+        result.setValue(image ? imageAccept : pageAccept, forHTTPHeaderField: "Accept")
+        if image { result.setValue(sourceURL!.absoluteString, forHTTPHeaderField: "Referer") }
+        return result
+    }
+    static func configuration() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil; config.httpShouldSetCookies = false
+        config.urlCredentialStorage = nil; config.urlCache = nil
+        config.timeoutIntervalForRequest = 8; config.timeoutIntervalForResource = 10
+        return config
+    }
+    static func redirected(from: URL, to: URL, hops: Int, sourceURL: URL?) -> URLRequest? {
+        guard from.host?.lowercased() == to.host?.lowercased(), ActorAvatarRedirectPolicy.permits(from: from, to: to, hops: hops) else { return nil }
+        return request(to, sourceURL: sourceURL)
+    }
+}
 private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     private var hops = 0
+    private let sourceURL: URL?
+    init(sourceURL: URL? = nil) { self.sourceURL = sourceURL }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        guard let from = response.url, let to = request.url, ActorAvatarRedirectPolicy.permits(from: from, to: to, hops: hops) else { completionHandler(nil); return }
+        guard let from = response.url, let to = request.url,
+              let clean = JavBusActorRequests.redirected(from: from, to: to, hops: hops, sourceURL: sourceURL) else { completionHandler(nil); return }
         hops += 1
-        var clean = URLRequest(url: to); clean.httpShouldHandleCookies = false
-        clean.setValue(request.value(forHTTPHeaderField: "Accept"), forHTTPHeaderField: "Accept")
         completionHandler(clean)
+    }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        completionHandler(challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust ? .performDefaultHandling : .cancelAuthenticationChallenge, nil)
     }
 }
 
 /// Shared, bounded, cancellable page cache. No account token/cookie is sent to JavBus.
 @MainActor enum JavBusActorService {
-    struct Page: Sendable { let entries: [JavBusActorParser.Entry]; let status: Int }
+    struct Page: Sendable {
+        let entries: [JavBusActorParser.Entry]; let status: Int
+        var sourceURL: URL? = nil
+    }
+    struct Artwork: Sendable { let imageURL: URL; let sourceURL: URL }
+    private static var sources: [String: URL] = [:]
+    static func lookupArtwork(actor: Actor, numbers: [String], existingFailed: Bool = false) async throws -> Artwork? {
+        guard let hit = try await lookup(actor: actor, numbers: numbers, existingFailed: existingFailed),
+              let image = URL(string: hit), let source = sources[hit] else { return nil }
+        return Artwork(imageURL: image, sourceURL: source)
+    }
     typealias Fetch = @MainActor (String) async throws -> Page
     private struct Cached { let page: Page; let expiry: Date }
     private static var cache: [String: Cached] = [:]
@@ -81,8 +130,8 @@ private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unc
     private static var epoch = 0
     private static var scope = ""
     private static var works: [String: [String]] = [:]
-    static var currentScope: String { JavDBConstants.baseURL + "|" + (APIClient.shared.token ?? "anonymous") }
-    static func reset() { epoch += 1; cache.removeAll(); works.removeAll(); imageCache.removeAll() }
+    static var currentScope: String { JavBusActorRequests.version + "|" + JavDBConstants.baseURL + "|" + (APIClient.shared.token ?? "anonymous") }
+    static func reset() { epoch += 1; cache.removeAll(); works.removeAll(); imageCache.removeAll(); sources.removeAll() }
     static func synchronize() {
         if scope != currentScope { reset(); scope = currentScope }
     }
@@ -143,26 +192,29 @@ private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unc
             }
             if [302, 401, 403, 429].contains(page.status) { return nil }
             guard page.status == 200 else { continue } // Includes 403: never a successful match.
-            if let result = JavBusActorParser.select(page.entries, names: names(actor)) { return result }
+            if let result = JavBusActorParser.select(page.entries, names: names(actor)) {
+                if let source = page.sourceURL, JavBusPoster.allowedPage(source, number: number) {
+                    if sources.count >= 720 { sources.removeAll() }
+                    sources[result] = source
+                }
+                return result
+            }
         }
         return nil
     }
     private static var imageCache: [String: (Data?, Date)] = [:]
-    static func imageData(_ url: URL) async throws -> Data? {
-        guard JavBusActorParser.allowedImage(url) else { return nil }
+    static func imageData(_ url: URL, sourceURL: URL) async throws -> Data? {
+        guard JavBusActorParser.allowedImage(url), sources[url.absoluteString] == sourceURL,
+              let request = JavBusActorRequests.request(url, sourceURL: sourceURL) else { return nil }
         synchronize(); let startingScope = currentScope, generation = epoch
-        let key = scope + "|image|" + url.absoluteString
+        let key = scope + "|image|" + sourceURL.absoluteString + "|" + url.absoluteString
         while busy.contains(key) || active >= 2 { try await Task.sleep(nanoseconds: 50_000_000); try Task.checkCancellation() }
         guard generation == epoch, startingScope == currentScope else { throw CancellationError() }
         if let hit = imageCache[key], hit.1 > Date() { return hit.0 }
         active += 1; busy.insert(key)
         defer { active -= 1; busy.remove(key) }
-        let config = URLSessionConfiguration.ephemeral
-        config.httpCookieStorage = nil; config.httpShouldSetCookies = false; config.urlCredentialStorage = nil; config.urlCache = nil
-        config.timeoutIntervalForRequest = 8; config.timeoutIntervalForResource = 10
-        let session = URLSession(configuration: config, delegate: JavBusActorRedirects(), delegateQueue: nil)
+        let session = URLSession(configuration: JavBusActorRequests.configuration(), delegate: JavBusActorRedirects(sourceURL: sourceURL), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
-        var request = URLRequest(url: url); request.httpShouldHandleCookies = false
         let (bytes, response) = try await session.bytes(for: request)
         var result: Data?
         if let http = response as? HTTPURLResponse, http.statusCode == 200, let finalURL = http.url, JavBusActorParser.allowedImage(finalURL), finalURL.path == url.path,
@@ -183,14 +235,9 @@ private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unc
     }
     static func request(_ number: String) async throws -> Page {
         guard let url = JavBusPoster.page(number: number) else { return Page(entries: [], status: 0) }
-        let config = URLSessionConfiguration.ephemeral
-        config.httpCookieStorage = nil; config.httpShouldSetCookies = false
-        config.urlCredentialStorage = nil; config.urlCache = nil
-        config.timeoutIntervalForRequest = 8; config.timeoutIntervalForResource = 10
-        let session = URLSession(configuration: config, delegate: JavBusActorRedirects(), delegateQueue: nil)
+        let session = URLSession(configuration: JavBusActorRequests.configuration(), delegate: JavBusActorRedirects(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
-        var request = URLRequest(url: url); request.httpShouldHandleCookies = false
-        request.setValue("text/html", forHTTPHeaderField: "Accept")
+        guard let request = JavBusActorRequests.request(url) else { return Page(entries: [], status: 0) }
         let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200,
               let finalURL = http.url, JavBusPoster.allowedPage(finalURL, number: number),
@@ -211,7 +258,7 @@ private final class JavBusActorRedirects: NSObject, URLSessionTaskDelegate, @unc
         }
         let entries = try await withTaskCancellationHandler(operation: { try await parser.value }, onCancel: { parser.cancel() })
         try Task.checkCancellation()
-        return Page(entries: entries, status: 200)
+        return Page(entries: entries, status: 200, sourceURL: finalURL)
     }
 }
 
@@ -380,9 +427,9 @@ import SwiftUI
                 if let image { portrait = image; return }
             }
             let known = numbers.isEmpty ? JavBusActorService.knownNumbers(actorID: actor.id) : numbers
-            let hit = try? await JavBusActorService.lookup(actor: actor, numbers: known, existingFailed: true)
+            let hit = try? await JavBusActorService.lookupArtwork(actor: actor, numbers: known, existingFailed: true)
             guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
-            if let hit, let url = URL(string: hit), let data = try? await JavBusActorService.imageData(url), let image = UIImage(data: data) {
+            if let hit, let data = try? await JavBusActorService.imageData(hit.imageURL, sourceURL: hit.sourceURL), let image = UIImage(data: data) {
                 guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
                 portrait = image; return
             }

@@ -1,0 +1,38 @@
+name: ProductionAvatar253
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Services/JavBusActorAvatar.swift', 'scripts/*253*', '.github/workflows/avatar253.yml']
+permissions:
+  contents: read
+jobs:
+  production:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve original production regressions
+        run: |
+          set -euo pipefail
+          python3 scripts/test-javbus-actors251.py | tee avatar57.log
+          ACTOR_REGRESSION=1 python3 scripts/actor-live248.py | tee actor207.log
+          python3 scripts/test-actor-avatar243.py
+          python3 scripts/test-javverse247.py
+      - name: Modified production URLSession and actual avatar View on iOS Simulator
+        run: |
+          python3 -m venv /tmp/avatar253-venv
+          /tmp/avatar253-venv/bin/pip install Pillow
+          /tmp/avatar253-venv/bin/python scripts/production-avatar253.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-avatar253
+          path: |
+            evidence253/*.json
+            evidence253/*.log
+            evidence253/*.png
+            evidence253/*.jpg
+            avatar57.log
+            actor207.log
+          if-no-files-found: error
+          retention-days: 14
