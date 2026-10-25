@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feat/tangxin-from258
       - fix/subtitle-position-201
     paths:
       - "AVDB/**"
@@ -111,6 +112,9 @@ jobs:
           python3 scripts/test-native-lut.py
           python3 scripts/test-mediapipe-parity.py
 
+      - name: Tangxin production parser and transport neutral tests
+        run: python3 scripts/test-tangxin261.py
+
       - name: Install pinned native MediaPipe SDK
         run: |
           gem install cocoapods -v 1.16.2 --no-document
@@ -209,3 +213,25 @@ jobs:
           path: ${{ runner.temp }}/xcodebuild.log
           if-no-files-found: ignore
           retention-days: 7
+
+  tangxin-native-ui:
+    if: github.ref == 'refs/heads/feat/tangxin-from258'
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated test project generator
+        run: gem install xcodeproj --no-document
+      - name: Production native iPhone and iPad navigation with synthetic data
+        run: |
+          set -euo pipefail
+          python3 scripts/test-tangxin-ui261.py 2>&1 | tee tangxin-ui261.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tangxin-native-ui261-synthetic
+          path: |
+            evidence261/status.json
+            evidence261/*-screenshots/
+            tangxin-ui261.log
+          if-no-files-found: error

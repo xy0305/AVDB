@@ -1,0 +1,38 @@
+import XCTest
+
+final class TangxinUITests261: XCTestCase {
+    func shot(_ name:String) {
+        let a = XCTAttachment(screenshot:XCUIApplication().screenshot()); a.name = "SYNTHETIC-261-"+name; a.lifetime = .keepAlways; add(a)
+    }
+    func testNativeTabAuthorWorksAndBack() {
+        let app = XCUIApplication(); app.launch()
+        let tab = app.buttons["app.tab.4"]
+        XCTAssertTrue(tab.waitForExistence(timeout:10)); XCTAssertTrue(tab.isHittable)
+        for n in 0...5 {
+            let button = app.buttons["app.tab.\(n)"]
+            XCTAssertTrue(button.isHittable,"All six tabs, no More: \(n)")
+            XCTAssertGreaterThanOrEqual(button.frame.height,44)
+        }
+        tab.tap()
+        let author = app.buttons["tangxin.author.neutral1"]
+        XCTAssertTrue(author.waitForExistence(timeout:8)); shot("native-list")
+        let more = app.buttons["tangxin.more"]
+        if !more.isHittable { app.swipeUp() }
+        XCTAssertTrue(more.isHittable); more.tap()
+        let second = app.buttons["tangxin.video.neutral2"]
+        XCTAssertTrue(second.waitForExistence(timeout:5)); shot("pagination-dedup")
+        if !author.isHittable { app.swipeDown() }
+        author.tap()
+        XCTAssertTrue(app.staticTexts["tangxin.author.heading"].waitForExistence(timeout:5)); shot("native-author")
+        let work = app.buttons["tangxin.video.neutral1"]
+        XCTAssertTrue(work.waitForExistence(timeout:5)); work.tap()
+        XCTAssertTrue(app.buttons["tangxin.play"].waitForExistence(timeout:5)); shot("native-detail-NO-playback")
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(app.staticTexts["tangxin.author.heading"].waitForExistence(timeout:5))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(second.waitForExistence(timeout:5)); shot("returned-list-kept-pagination")
+        app.buttons["app.tab.5"].tap()
+        XCTAssertTrue(app.staticTexts["合成用户替身"].waitForExistence(timeout:5))
+        tab.tap(); XCTAssertTrue(second.waitForExistence(timeout:5))
+    }
+}

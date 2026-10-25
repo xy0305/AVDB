@@ -9,7 +9,7 @@
 import SwiftUI
 
 enum AppTab: Int, CaseIterable, Identifiable {
-    case home, rankings, categories, actors, me
+    case home, rankings, categories, actors, tangxin, me
     var id: Int { rawValue }
 
     var title: String {
@@ -18,6 +18,7 @@ enum AppTab: Int, CaseIterable, Identifiable {
         case .rankings: return "排行"
         case .categories: return "類別"
         case .actors: return "演員"
+        case .tangxin: return "糖心"
         case .me: return "我的"
         }
     }
@@ -28,12 +29,14 @@ enum AppTab: Int, CaseIterable, Identifiable {
         case .rankings: return "trophy"
         case .categories: return "square.grid.2x2"
         case .actors: return "person.2"
+        case .tangxin: return "play.rectangle"
         case .me: return "person.crop.circle"
         }
     }
 }
 
 struct ContentView: View {
+    var tangxinClient: TangxinClient = TangxinClient()
     @State private var selectedTab: AppTab = .home
 
     var body: some View {
@@ -109,6 +112,10 @@ struct ContentView: View {
                 }
                 .tag(AppTab.actors)
 
+            TangxinRootView(client: tangxinClient)
+                .tabItem { Label(AppTab.tangxin.title, systemImage: AppTab.tangxin.icon) }
+                .tag(AppTab.tangxin)
+
             UserView()
                 .tabItem {
                     Label(
@@ -117,6 +124,10 @@ struct ContentView: View {
                     )
                 }
                 .tag(AppTab.me)
+        }
+        .toolbar(.hidden, for: .tabBar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            AVDBNativeTabBar(selection: $selectedTab)
         }
         .modifier(SceneLayoutReader())
         .tint(JAVDBPalette.accent)

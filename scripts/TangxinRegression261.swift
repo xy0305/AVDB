@@ -1,0 +1,44 @@
+import Foundation
+
+@main struct TangxinRegression261 {
+    static func reject(_ body: () throws -> Void) { do { try body(); fatalError("Expected rejection") } catch {} }
+    static func main() async throws {
+        let root = TangxinPolicy.featured
+        let first = try TangxinParser.list(TangxinFixtures261.first,at:root)
+        precondition(first.videos.count == 1 && first.next?.path == "/featured/2")
+        precondition(first.videos[0].author?.name == "黑料昵称")
+        precondition(first.videos[0].url.host == root.host)
+        let detail = try TangxinParser.detail(TangxinFixtures261.detail,at:first.videos[0].url)
+        precondition(detail.video.author?.name == "黑料昵称")
+        precondition(detail.tags == ["原创"] && detail.summary.contains("合成"))
+        precondition(detail.stream.host == TangxinPolicy.cdn)
+        let author = try TangxinParser.list(TangxinFixtures261.authorPage,at:first.videos[0].author!.url)
+        precondition(author.videos.count == 1 && author.next == nil)
+        for word in ["未成年","偷拍","私密流出","迷奸","泄露"] {
+            let page = try TangxinParser.list("<div class=\"grid\">"+TangxinFixtures261.card("bad",title:word)+"</div>",at:root)
+            precondition(page.videos.isEmpty)
+            reject { _ = try TangxinParser.detail(TangxinFixtures261.detail.replacingOccurrences(of:"成人自愿演示作品",with:word),at:first.videos[0].url) }
+        }
+        precondition(TangxinPolicy.permitted("普通黑料昵称 成人自愿原创"))
+        for raw in ["http://tangxinvlog.app/featured/","https://127.0.0.1/featured/","https://tangxinvlog.app.evil.org/featured/","https://user:pass@tangxinvlog.app/featured/","https://tangxinvlog.app:8443/featured/","https://tangxinvlog.app/featured/?url=foo"] { precondition(!TangxinPolicy.page(URL(string:raw)!)) }
+        for raw in ["https://t.5gcdn.xyz.evil.org/videos/n/index.m3u8","https://10.0.0.1/videos/n/index.m3u8","http://t.5gcdn.xyz/videos/n/index.m3u8"] { precondition(!TangxinPolicy.stream(URL(string:raw)!)) }
+        precondition(!TangxinPolicy.next(URL(string:"https://tangxinvlog.app/a/Other/2")!,from:first.videos[0].author!.url))
+        precondition(!TangxinPolicy.next(root,from:root))
+        precondition(!TangxinPolicy.next(URL(string:"https://tangxinvlog.app/featured/3")!,from:root))
+        let evilNext = TangxinFixtures261.first.replacingOccurrences(of:"/featured/2",with:"https://elsewhere.org/featured/2")
+        let safeNext = try TangxinParser.list(evilNext,at:root)
+        precondition(safeNext.next == nil)
+        reject { _ = try TangxinParser.detail(TangxinFixtures261.detail.replacingOccurrences(of:"https://t.5gcdn.xyz/videos/neutral1/index.m3u8",with:""),at:first.videos[0].url) }
+        reject { _ = try TangxinParser.list("<html>Challenge required</html>",at:root) }
+        let client = TangxinFixtures261.client()
+        let liveDetail = try await client.detail(first.videos[0].url)
+        let plan = try await client.playback(liveDetail)
+        precondition(plan.headers["Referer"] == "https://tangxinvlog.app/" && plan.headers["Cookie"] == nil)
+        precondition(plan.headers.count == 2)
+        let escaped = TangxinFixtures261.playlist.replacingOccurrences(of:"segment.ts",with:"https://127.0.0.1/a.ts")
+        reject { _ = try OnlineManifest.parse(Data(escaped.utf8),at:plan.url,root:plan.url) }
+        let privateDNS = TangxinClient(transport:OnlineTransport(resolver:{ _ in ["127.0.0.1"] },loader:{ _ in fatalError("Private DNS must fail before loader") }))
+        do { _ = try await privateDNS.list(root); fatalError("DNS rejection required") } catch {}
+        print("PASS261 production Swift parser/detail/author/pagination/filter/URL/Referer/AES/private-DNS; synthetic, zero network")
+    }
+}
