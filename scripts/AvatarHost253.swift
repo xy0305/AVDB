@@ -12,7 +12,7 @@ struct AvatarHostView253: View {
             Text("AVDB production avatar 253").font(.headline)
             if let actor {
                 ActorAvatarArtwork(actor: actor, numbers: ["DSOD-070"], contentMode: .fit)
-                    .frame(width:125,height:125).background(Color.magenta)
+                    .frame(width:125,height:125).background(Color(red:1,green:0,blue:1))
             }
             Text(status).font(.caption)
         }.frame(maxWidth:.infinity,maxHeight:.infinity).background(Color.white)
