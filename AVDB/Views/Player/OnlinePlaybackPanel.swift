@@ -46,12 +46,14 @@ final class OnlinePlaybackModel: ObservableObject {
     private var namespace = UUID()
     static let proxyPreferenceKey = "online.systemProxyFakeIP.v1"
     @Published private(set) var systemProxyCompatibility: Bool
+    @Published private(set) var preferHighestQuality: Bool
     private let preferences: UserDefaults
     private var provider: OnlineProvider
     init(provider: OnlineProvider = OnlineProvider(), preferences: UserDefaults = .standard) {
         self.preferences = preferences
         let enabled = preferences.bool(forKey: Self.proxyPreferenceKey)
         self.systemProxyCompatibility = enabled
+        self.preferHighestQuality = OnlineQualityPreference(preferences: preferences).preferHighest
         self.provider = OnlineProvider(transport: provider.transport.withDNSMode(enabled ? .systemProxy : .strict))
     }
     func setSystemProxyCompatibility(_ enabled: Bool) {
@@ -63,6 +65,13 @@ final class OnlinePlaybackModel: ObservableObject {
         systemProxyCompatibility = enabled
         preferences.set(enabled, forKey: Self.proxyPreferenceKey)
     }
+    func setPreferHighestQuality(_ enabled: Bool) {
+        guard enabled != preferHighestQuality else { return }
+        // Local preference only. Do not cancel, query, or touch any source.
+        preferHighestQuality = enabled
+        preferences.set(enabled, forKey: OnlineQualityPreference.storageKey)
+    }
+    var qualityStatus: String { OnlineQualityPreference(preferHighest: preferHighestQuality).status }
     var state: (OnlineSource) -> State { { self.states[$0] ?? .idle } }
     // The panel is inert on creation. Only explicit per-source buttons call query.
     func query(_ source: OnlineSource, number: String, versions: Bool) {
@@ -104,8 +113,9 @@ final class OnlinePlaybackModel: ObservableObject {
         selection = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await Self.bounded { try await provider.resolve(line, number: number, versions: versions) }
+                var result = try await Self.bounded { try await provider.resolve(line, number: number, versions: versions) }
                 guard !Task.isCancelled, self.selectionEpoch == epoch else { return }
+                result.preference = OnlineQualityPreference(preferHighest: self.preferHighestQuality)
                 self.resolutions[line.source] = Resolution(line: line, status: .validated)
                 self.plan = result; self.resolving = nil; self.selectedLine = nil
             } catch {
@@ -213,6 +223,13 @@ struct OnlinePlaybackPanel: View {
                 .accessibilityIdentifier("online.proxy-status")
             DisclosureGroup("高级设置", isExpanded: $advancedExpanded) {
                 VStack(alignment: .leading, spacing: 12) {
+                    Text(model.qualityStatus)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("online.quality-status")
+                    Toggle("优先最高画质", isOn: Binding(get: { model.preferHighestQuality }, set: { model.setPreferHighestQuality($0) }))
+                        .accessibilityIdentifier("online.prefer-highest-quality")
+                    Text("仅作用于随后开始的在线播放会话：在当前线路已验证的标准 HLS master 中选设备可播的最高分辨率，同分辨率再比 BANDWIDTH。不跨站换源，不改 115 或普通播放，也不保证网络差时永不降档。切换只保存本机偏好，不发送查询。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Toggle("系统代理/Fake-IP兼容", isOn: Binding(get: { model.systemProxyCompatibility }, set: { model.setSystemProxyCompatibility($0) }))
                         .accessibilityIdentifier("online.system-proxy-compatibility")
                     Text("仅信任系统代理时开启；会降低连接地址预检保证，无法验证代理最终目的地。仅允许已批准域名的 198.18.0.0/15 合成 DNS（含 mapped IPv6 / 标准 NAT64），仍保留 HTTPS/TLS 校验；不支持 fd27 或其他私网。这不是 DNS pinning 或播放器全生命周期沙箱。切换会取消请求并清空候选，需重新主动查询。")
@@ -233,9 +250,7 @@ struct OnlinePlaybackPanel: View {
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in model.reset() }
         .onDisappear { model.cancelPending() }
         .fullScreenCover(item: $model.plan, onDismiss: { model.cancelPending() }) { plan in
-            KSChromePlayer(url: plan.url, title: plan.number, subtitle: plan.source.label,
-                           headers: plan.headers, progressID: "online:" + plan.id.uuidString,
-                           supportsFramePreview: false, publicSubtitleQuery: plan.number)
+            OnlineQualityPlayer(plan: plan)
                 .id(plan.id)
         }
     }
@@ -277,6 +292,38 @@ struct OnlinePlaybackPanel: View {
                         }
                     }.padding(.top, 8)
                 }.font(.subheadline)
+            }
+        }
+    }
+}
+
+
+struct OnlineQualityPlayer: View {
+    let plan: OnlinePlaybackPlan
+    @State private var manual: HLSVariant?
+    private var choice: OnlineQualityChoice {
+        OnlineQualitySelector.select(plan.ladder, preferHighest: plan.preference.preferHighest, manual: manual)
+    }
+    var body: some View {
+        KSChromePlayer(url: plan.url, title: plan.number, subtitle: plan.source.label,
+                       headers: plan.headers, onlineQuality: choice,
+                       progressID: "online:" + plan.id.uuidString,
+                       supportsFramePreview: false, publicSubtitleQuery: plan.number)
+        .overlay(alignment: .topTrailing) {
+            if plan.ladder.count > 1 {
+                Menu {
+                    Button("自动") { manual = nil }
+                    ForEach(Array(plan.ladder.enumerated()), id: \.offset) { _, variant in
+                        Button(OnlineQualitySelector.label(.specific, variant)) { manual = variant }
+                    }
+                } label: {
+                    Text(choice.mode == .specific ? "手动" : (plan.preference.preferHighest ? "最高" : "自动"))
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(.black.opacity(0.55), in: Capsule())
+                }
+                .padding(.top, 54).padding(.trailing, 12)
+                .accessibilityIdentifier("online.quality-menu")
             }
         }
     }

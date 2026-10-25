@@ -141,6 +141,8 @@ struct KSChromePlayer: View {
     var title: String = ""
     var subtitle: String = ""
     var headers: [String: String] = [:]
+    /// Online-session opt-in only. Nil leaves AVPlayerItem unconstrained, including 115 and catalog playback.
+    var onlineQuality: OnlineQualityChoice? = nil
     var progressID: String? = nil
     var supportsFramePreview: Bool = true
     var onPlaybackFailure: (() -> Void)? = nil
@@ -165,6 +167,9 @@ struct KSChromePlayer: View {
     @State private var historyToken = APIClient.shared.token
     @State private var lastVideoMetrics: PlaybackVideoMetrics?
     @State private var metricsSettled = false
+    @State private var qualityGeneration = 0
+    @State private var appliedQuality: OnlineQualityChoice?
+    @State private var observedResolution: CGSize = .zero
     @StateObject private var onlineSubtitles = OnlineSubtitleModel()
     @State private var showOnlineSubtitles = false
     @State private var editingSubtitlePosition = false
@@ -286,6 +291,9 @@ struct KSChromePlayer: View {
         .onChange(of: progressID) { _, _ in onlineSubtitles.clear() }
         .onChange(of: publicSubtitleQuery) { _, _ in onlineSubtitles.clear() }
         .onChange(of: url) { _, _ in
+            qualityGeneration += 1
+            appliedQuality = nil
+            observedResolution = .zero
             playbackDiagnostic = nil
             failureReported = false
             editingSubtitlePosition = false
@@ -693,6 +701,11 @@ struct KSChromePlayer: View {
                 } else if !subtitle.isEmpty {
                     Text(subtitle).font(.caption).foregroundStyle(.white.opacity(0.8))
                 }
+                if onlineQuality != nil {
+                    Text(onlineQualityStatus)
+                        .font(.caption2).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
+                        .accessibilityIdentifier("player.online-quality-status")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
@@ -870,6 +883,7 @@ struct KSChromePlayer: View {
                     }
                     audio.begin()
                     coordinator.playerLayer?.play()
+                    applyOnlineQuality()
                     applyFillMode()
                     syncTime()
                 }
@@ -890,6 +904,7 @@ struct KSChromePlayer: View {
                                       seeking: isSeeking || seekPending, failed: failureReported) {
                     PlaybackHistoryStore.shared.record(movie, artwork: historyArtwork, scope: historyScope)
                 }
+                applyOnlineQuality()
                 publishVideoMetrics(timedOut: Date().timeIntervalSince(start) > 30)
                 if !hasStarted, !failureReported, Date().timeIntervalSince(start) > 30, onPlaybackFailure != nil {
                     failureReported = true
@@ -898,6 +913,23 @@ struct KSChromePlayer: View {
                 lut.tick(coordinator.playerLayer?.player as? KSAVPlayer)
             }
         }
+    }
+
+    @MainActor
+    private func applyOnlineQuality() {
+        guard let choice = onlineQuality, let av = coordinator.playerLayer?.player as? KSAVPlayer,
+              let item = av.player.currentItem else { return }
+        let generation = qualityGeneration
+        let applied = OnlineQualitySession.apply(choice, generation: generation, to: item)
+        guard generation == qualityGeneration else { return }
+        appliedQuality = choice
+        _ = applied
+        let presented = item.presentationSize
+        if presented.width > 1, presented.height > 1 { observedResolution = presented }
+    }
+
+    var onlineQualityStatus: String {
+        OnlinePlaybackQualityStatus.display(choice: appliedQuality ?? onlineQuality, observed: observedResolution)
     }
 
     @MainActor

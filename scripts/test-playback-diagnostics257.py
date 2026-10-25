@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp);identity=p/'Identity.swift';s=(R/'AVDB/Services/CatalogueMetadata.swift').read_text()
  identity.write_text('import Foundation\nenum CatalogueIdentity {'+s.split('enum CatalogueIdentity {',1)[1].split('\nstruct ScrapedMetadata:',1)[0])
  fixture=p/'Fixture254.swift';fixture.write_text((R/'scripts/OnlineRegression254.swift').read_text().replace('@main struct OnlineRegression254','struct OnlineRegression254'))
- files=['AVDB/Services/PlaybackDiagnostic.swift','AVDB/Services/JavRankingCore.swift','AVDB/Services/MissAVCore.swift','AVDB/Services/OnlinePlaybackCore.swift','AVDB/Services/OnlineAdditionalProviders.swift','AVDB/Services/DetailOnlineAdapters.swift','AVDB/Views/Player/OnlinePlaybackPanel.swift','scripts/OnlineSafetyRegression255.swift','scripts/OnlineCompatibilityRegression256.swift','scripts/PlaybackDiagnosticRegression257.swift']
+ files=['AVDB/Services/PlaybackDiagnostic.swift','AVDB/Services/JavRankingCore.swift','AVDB/Services/MissAVCore.swift','AVDB/Services/OnlinePlaybackCore.swift','AVDB/Services/OnlineAdditionalProviders.swift','AVDB/Services/DetailOnlineAdapters.swift','AVDB/Views/Player/OnlinePlaybackPanel.swift','scripts/OnlineSafetyRegression255.swift','scripts/OnlineCompatibilityRegression256.swift','scripts/PlaybackDiagnosticRegression257.swift','scripts/OnlineQualityRegression259.swift','AVDB/Views/Player/PlaybackVideoMetrics.swift']
  common=['-parse-as-library','-swift-version','5','-D','ONLINE_CORE_TEST',str(identity),str(fixture),*[str(R/f) for f in files]]
  if '--simulator-only' not in sys.argv:
   binary=p/'neutral257-macos'

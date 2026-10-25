@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /// Engine-reported video dimensions, never a viewport or a filename-derived guess.
@@ -58,5 +59,54 @@ struct PlaybackMetricsState {
     }
     static func isCurrent(name: String, original: Bool, activeName: String?, activeOriginal: Bool?) -> Bool {
         name == activeName && original == activeOriginal
+    }
+}
+
+
+/// Displayed selection is the session hint, not a promise that adaptation never drops.
+/// Observed presentation size is shown separately and may be lower on a constrained network.
+enum OnlinePlaybackQualityStatus {
+    static func display(choice: OnlineQualityChoice?, observed: CGSize) -> String {
+        let selected: String
+        if let choice {
+            switch choice.mode {
+            case .automatic: selected = "自动"
+            case .unavailable: selected = choice.label
+            case .highest: selected = choice.label
+            case .specific: selected = "手动·" + choice.label
+            }
+        } else { selected = "自动" }
+        var text = "画质 " + selected
+        if observed.width > 1, observed.height > 1 {
+            let grade = PlaybackVideoMetrics(width: observed.width, height: observed.height, evidence: .presentation)?.grade ?? "\(Int(min(observed.width, observed.height)))p"
+            text += " · 当前 " + grade
+            if let choice, choice.mode == .highest || choice.mode == .specific,
+               let cap = choice.maximumResolution, cap.height > 1,
+               min(observed.width, observed.height) + 8 < min(cap.width, cap.height) {
+                text += "（网络降档）"
+            }
+        }
+        return text
+    }
+}
+
+
+/// Applies a finite session hint to one AVPlayerItem. Zero peak/size clears the hint
+/// (Apple's automatic path). Never writes Double.greatestFiniteMagnitude.
+enum OnlineQualitySession {
+    struct Applied: Equatable {
+        var generation: Int
+        var peakBitRate: Double
+        var maximumResolution: CGSize
+        var label: String
+    }
+    static func apply(_ choice: OnlineQualityChoice, generation: Int, to item: AVPlayerItem) -> Applied {
+        let peak = choice.peakBitRate ?? 0
+        let size = choice.maximumResolution ?? .zero
+        precondition(peak.isFinite && peak >= 0 && peak < 1_000_000_000)
+        precondition(size.width.isFinite && size.height.isFinite && size.width >= 0 && size.height >= 0)
+        if item.preferredPeakBitRate != peak { item.preferredPeakBitRate = peak }
+        if item.preferredMaximumResolution != size { item.preferredMaximumResolution = size }
+        return Applied(generation: generation, peakBitRate: item.preferredPeakBitRate, maximumResolution: item.preferredMaximumResolution, label: choice.label)
     }
 }

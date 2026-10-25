@@ -331,7 +331,8 @@ struct OnlineManifest {
         guard t.hasPrefix("#EXTM3U"), !t.lowercased().contains("<html"), !t.lowercased().contains("<!doctype") else { throw OnlineFailure.parse }
         let lines = t.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard lines.first == "#EXTM3U" else { throw OnlineFailure.parse }
-        var variants: [URL] = []; var keys: [URL] = []; var expectsVariant = false; var segments = 0
+        var variants: [URL] = []; var ladder: [HLSVariant] = []; var keys: [URL] = []; var expectsVariant = false
+        var pendingVariant: HLSVariant?; var segments = 0; var streamOrder = 0
         func scoped(_ raw: String) throws -> URL {
             if raw.lowercased().hasPrefix("skd:") { throw OnlineFailure.drm }
             guard !raw.contains("{$"), !raw.contains("\\"), !raw.contains(where: { $0.isWhitespace }),
@@ -339,9 +340,14 @@ struct OnlineManifest {
                   OnlinePolicy.bound(child, to: root) else { throw OnlineFailure.unsafe }
             return child
         }
-        func appendVariant(_ child: URL) throws {
-            guard !variants.contains(child) else { return }
-            guard variants.count < 6 else { throw OnlineFailure.tooLarge }; variants.append(child)
+        func appendVariant(_ child: URL, capture: Bool = false) throws {
+            guard !variants.contains(child) else { if capture { pendingVariant = nil }; return }
+            guard variants.count < 6 else { throw OnlineFailure.tooLarge }
+            variants.append(child)
+            if capture, var meta = pendingVariant {
+                meta.url = child; meta.order = streamOrder; streamOrder += 1; ladder.append(meta)
+            }
+            if capture { pendingVariant = nil }
         }
         for line in lines.dropFirst() where !line.isEmpty {
             if line.hasPrefix("#EXT-X-KEY:") || line.hasPrefix("#EXT-X-SESSION-KEY:") {
@@ -366,7 +372,10 @@ struct OnlineManifest {
             }
             if line.hasPrefix("#EXT-X-DEFINE:") || line.hasPrefix("#EXT-X-CONTENT-STEERING:") { throw OnlineFailure.unsupported }
             if line.hasPrefix("#EXT-X-STREAM-INF:") {
-                guard !expectsVariant else { throw OnlineFailure.parse }; expectsVariant = true; continue
+                guard !expectsVariant else { throw OnlineFailure.parse }
+                let a = try attributes(String(line.split(separator: ":", maxSplits: 1)[1]))
+                pendingVariant = try HLSVariant(attributes: a, order: streamOrder)
+                expectsVariant = true; continue
             }
             if line.hasPrefix("#") {
                 let uriTags = ["#EXT-X-MEDIA:", "#EXT-X-I-FRAME-STREAM-INF:", "#EXT-X-MAP:", "#EXT-X-PART:", "#EXT-X-PRELOAD-HINT:", "#EXT-X-SESSION-DATA:", "#EXT-X-RENDITION-REPORT:"]
@@ -382,12 +391,157 @@ struct OnlineManifest {
                 continue
             }
             let child = try scoped(line)
-            if expectsVariant { try appendVariant(child); expectsVariant = false } else { segments += 1 }
+            if expectsVariant { try appendVariant(child, capture: true); expectsVariant = false } else { segments += 1 }
         }
-        guard !expectsVariant, !variants.isEmpty || (segments > 0 && t.contains("#EXTINF:")),
+        guard !expectsVariant, pendingVariant == nil, !variants.isEmpty || (segments > 0 && t.contains("#EXTINF:")),
               !(segments > 0 && lines.contains(where: { $0.hasPrefix("#EXT-X-STREAM-INF:") })) else { throw OnlineFailure.parse }
-        return OnlineManifest(variants: variants, keys: keys)
+        return OnlineManifest(variants: variants, keys: keys, ladder: ladder)
     }
+}
+
+/// Neutral HLS variant metadata. Selection never fetches another origin and never
+/// treats an unbounded peak bitrate as “highest quality”.
+struct HLSVariant: Equatable, Sendable {
+    var url: URL?
+    var width: Int?
+    var height: Int?
+    var bandwidth: Int?
+    var averageBandwidth: Int?
+    var codecs: String?
+    var order: Int
+    init(attributes: [String:String], order: Int = 0) throws {
+        if let raw = attributes["RESOLUTION"] {
+            let parts = raw.split(separator: "x", omittingEmptySubsequences: false)
+            guard parts.count == 2, let w = Int(parts[0]), let h = Int(parts[1]), w > 0, h > 0, w < 100_000, h < 100_000 else { throw OnlineFailure.parse }
+            width = w; height = h
+        }
+        func integer(_ name: String) throws -> Int? {
+            guard let raw = attributes[name] else { return nil }
+            guard let value = Int(raw), value >= 0, value < 1_000_000_000 else { throw OnlineFailure.parse }
+            return value
+        }
+        bandwidth = try integer("BANDWIDTH")
+        averageBandwidth = try integer("AVERAGE-BANDWIDTH")
+        if let codecs = attributes["CODECS"] {
+            guard !codecs.isEmpty, codecs.count <= 256, !codecs.contains(where: \.isNewline) else { throw OnlineFailure.parse }
+            self.codecs = codecs
+        }
+        self.order = order
+    }
+    var pixels: Int? { guard let width, let height else { return nil }; return width * height }
+    /// Device-decodable check for codecs named in the already-parsed master.
+    /// Unknown/absent codecs are not rejected; only a known-unsupported video codec is skipped.
+    static func videoCodecSupported(_ codecs: String?) -> Bool {
+        guard let codecs, !codecs.isEmpty else { return true }
+        let parts = codecs.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        let video = parts.filter { $0.hasPrefix("avc1") || $0.hasPrefix("hvc1") || $0.hasPrefix("hev1") || $0.hasPrefix("dvh1") || $0.hasPrefix("dvhe") || $0.hasPrefix("av01") || $0.hasPrefix("vp09") || $0.hasPrefix("vp9") || $0.hasPrefix("mp4v") }
+        guard !video.isEmpty else { return true }
+        return video.contains { codec in
+            let type: String
+            if codec.hasPrefix("avc1") || codec.hasPrefix("mp4v") { type = "avc1" }
+            else if codec.hasPrefix("hvc1") || codec.hasPrefix("hev1") { type = "hvc1" }
+            else if codec.hasPrefix("dvh1") || codec.hasPrefix("dvhe") { type = "dvh1" }
+            else { type = String(codec.prefix(4)) }
+            return Self.platformSupports(type)
+        }
+    }
+    private static func platformSupports(_ type: String) -> Bool {
+        switch type {
+        case "avc1", "mp4v": return true
+        case "hvc1", "dvh1":
+            #if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
+            return true
+            #elseif os(macOS)
+            return true
+            #else
+            return false
+            #endif
+        case "av01":
+            if #available(iOS 17, macOS 14, tvOS 17, *) { return false } // Do not assume AV1 hardware.
+            return false
+        default: return false // vp09 and other named video codecs are not native AVPlayer codecs here.
+        }
+    }
+    var supported: Bool { Self.videoCodecSupported(codecs) }
+}
+
+struct OnlineQualityChoice: Equatable, Sendable {
+    enum Mode: String, Equatable, Sendable { case automatic, highest, specific, unavailable }
+    var mode: Mode
+    var variant: HLSVariant?
+    /// Session hint only. Nil means do not constrain the player (existing automatic path).
+    var peakBitRate: Double?
+    var maximumResolution: CGSize?
+    var label: String
+    static let automatic = OnlineQualityChoice(mode: .automatic, variant: nil, peakBitRate: nil, maximumResolution: nil, label: "自动")
+}
+
+enum OnlineQualitySelector {
+    /// Deterministic: largest legal resolution, then BANDWIDTH, then stable order.
+    /// Variants without resolution compete by bandwidth only against each other.
+    /// Unsupported codecs are skipped. Empty/all-unsupported falls back to automatic.
+    static func select(_ ladder: [HLSVariant], preferHighest: Bool, manual: HLSVariant? = nil) -> OnlineQualityChoice {
+        let indexed = ladder
+        if let manual {
+            guard manual.supported else { return .automatic }
+            return choice(.specific, manual)
+        }
+        guard preferHighest else { return .automatic }
+        guard !indexed.isEmpty else { return .automatic }
+        let playable = indexed.filter(\.supported)
+        guard !playable.isEmpty else {
+            return OnlineQualityChoice(mode: .unavailable, variant: nil, peakBitRate: nil, maximumResolution: nil, label: "自动·无可用最高档")
+        }
+        let ranked = playable.sorted { a, b in
+            switch (a.pixels, b.pixels) {
+            case let (ap?, bp?) where ap != bp: return ap > bp
+            case (.some, .none): return true
+            case (.none, .some): return false
+            default:
+                let ab = a.bandwidth ?? -1, bb = b.bandwidth ?? -1
+                if ab != bb { return ab > bb }
+                return a.order < b.order
+            }
+        }
+        guard let best = ranked.first else { return .automatic }
+        if best.pixels == nil && best.bandwidth == nil { return .automatic }
+        return choice(.highest, best)
+    }
+    private static func choice(_ mode: OnlineQualityChoice.Mode, _ variant: HLSVariant) -> OnlineQualityChoice {
+        let peak: Double? = variant.bandwidth.map { Double($0) }
+        let size: CGSize? = {
+            guard let w = variant.width, let h = variant.height else { return nil }
+            return CGSize(width: w, height: h)
+        }()
+        return OnlineQualityChoice(mode: mode, variant: variant, peakBitRate: peak, maximumResolution: size, label: label(mode, variant))
+    }
+    static func label(_ mode: OnlineQualityChoice.Mode, _ variant: HLSVariant) -> String {
+        let grade: String
+        if let h = variant.height, let w = variant.width {
+            grade = PlaybackVideoMetrics(width: Double(w), height: Double(h), evidence: .track)?.grade ?? "\(min(w,h))p"
+        } else if let bandwidth = variant.bandwidth {
+            grade = "带宽 \(bandwidth)"
+        } else { grade = "原清单" }
+        switch mode {
+        case .highest: return "最高·" + grade
+        case .specific: return grade
+        case .automatic: return "自动"
+        case .unavailable: return "自动·无可用最高档"
+        }
+    }
+}
+
+/// On-device, non-sensitive preference. Default is highest for online playback only.
+struct OnlineQualityPreference: Equatable, Sendable {
+    static let storageKey = "online.preferHighestQuality.v1"
+    var preferHighest: Bool
+    init(preferHighest: Bool = true) { self.preferHighest = preferHighest }
+    init(preferences: UserDefaults) {
+        if preferences.object(forKey: Self.storageKey) == nil { preferHighest = true }
+        else { preferHighest = preferences.bool(forKey: Self.storageKey) }
+    }
+    func save(_ preferences: UserDefaults) { preferences.set(preferHighest, forKey: Self.storageKey) }
+    var status: String { preferHighest ? "优先最高画质：已开启" : "优先最高画质：关闭 · 自动" }
 }
 final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     let dnsMode: OnlineDNSMode
@@ -486,6 +640,7 @@ struct OnlineProvider: Sendable {
         let headers = OnlinePolicy.headers(referrer: referrer)
         let scope = OnlineMediaScope(root: media)
         var pending: [(URL,Int)] = [(media,0)]; var seen = Set<URL>(); var keys = Set<URL>(); var hasLeaf = false
+        var rootLadder: [HLSVariant] = []
         // Validate every adaptive/rendition playlist, bounded across the whole graph.
         while !pending.isEmpty {
             let (url,depth) = pending.removeFirst()
@@ -499,6 +654,7 @@ struct OnlineProvider: Sendable {
             for key in manifest.keys { keys.insert(key) }
             guard keys.count <= 16 else { throw OnlineFailure.tooLarge }
             if manifest.variants.isEmpty { hasLeaf = true }
+            if depth == 0, !manifest.ladder.isEmpty { rootLadder = manifest.ladder }
             pending += manifest.variants.map { ($0,depth+1) }
         }
         guard hasLeaf else { throw OnlineFailure.parse }
@@ -515,6 +671,6 @@ struct OnlineProvider: Sendable {
             }
         }
         try Task.checkCancellation()
-        return OnlinePlaybackPlan(url: media, source: line.source, number: number, headers: headers)
+        return OnlinePlaybackPlan(url: media, source: line.source, number: number, headers: headers, ladder: rootLadder)
     }
 }

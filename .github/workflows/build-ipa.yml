@@ -18,6 +18,7 @@ on:
       - "scripts/*253*"
       - "scripts/*257*"
       - "scripts/*258*"
+      - "scripts/*259*"
       - "scripts/GestureRegression.swift"
       - "scripts/SeekPreviewRegression.swift"
       - "scripts/ExternalLibraryRegression.swift"
@@ -53,6 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/test-playback-diagnostics257.py | tee diagnostics257.txt
+          python3 scripts/test-online-quality259.py | tee quality259.txt
 
       - name: Check poster identity, latency and shared regressions
         run: |

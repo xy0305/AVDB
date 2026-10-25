@@ -121,6 +121,7 @@ import Foundation
         try await OnlineRegression254.main()
         try await OnlineCompatibilityRegression256.run()
         try await PlaybackDiagnosticRegression257.run()
+        try await OnlineQualityRegression259.run()
         print("NEUTRAL257 COMPLETE; no real-source requests; real playback not verified")
     }
 }

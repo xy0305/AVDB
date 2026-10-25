@@ -7,6 +7,7 @@ struct KSChromePlayer: View {
     let title: String
     let subtitle: String
     let headers: [String: String]
+    var onlineQuality: OnlineQualityChoice? = nil
     let progressID: String
     let supportsFramePreview: Bool
     let publicSubtitleQuery: String
