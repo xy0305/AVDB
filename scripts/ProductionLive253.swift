@@ -66,6 +66,21 @@ import CryptoKit
                 precondition(JavBusActorRequests.redirected(from:from,to:URL(string:unsafe)!,hops:0,sourceURL:source) == nil)
             }
         }
+        let neutral = """
+        <div class="row movie"><div class="info"><p><span class="header">識別碼:</span><span>DSOD-070</span></p></div></div>
+        <a class="avatar-box" href="/star/neutralA"><img src="/pics/actress/neutralA_a.jpg" title="中性演員甲"><span>中性演員甲</span></a>
+        <a class="avatar-box" href="/star/neutralB"><img src="/pics/actress/neutralB_a.jpg" title="中性演員乙"><span>中性演員乙</span></a>
+        """
+        let auxiliary = "<div class='movie' id='mag-submit'><button>Neutral auxiliary</button></div><div class='movie'><table id='magnet-table'></table><div id='movie-loading'></div></div>"
+        let parsed = try JavBusActorParser.entries(html:neutral+auxiliary,number:"DSOD-070",finalURL:page)
+        precondition(parsed.count == 2)
+        precondition(JavBusActorParser.select(parsed,names:["中性演員乙"])?.contains("neutralB_a.jpg") == true)
+        for extra in ["<div class='movie'></div>","<div class='movie' id='mag-submit'><div class='info'></div></div>","<div class='movie'><table id='magnet-table'></table><span class='header'>識別碼:</span></div>",neutral] {
+            let rejected = try JavBusActorParser.entries(html:neutral+auxiliary+extra,number:"DSOD-070",finalURL:page)
+            precondition(rejected.isEmpty,"unknown or identity-bearing extra movie remains ambiguous")
+        }
+        let mismatch = try JavBusActorParser.entries(html:(neutral+auxiliary).replacingOccurrences(of:"DSOD-070",with:"DSOD-071"),number:"DSOD-070",finalURL:page)
+        precondition(mismatch.isEmpty)
         precondition(JavBusActorService.currentScope.contains("public-headers253"))
         let rejected = try await JavBusActorService.imageData(image, sourceURL:page)
         precondition(rejected == nil, "unproven source cannot download")

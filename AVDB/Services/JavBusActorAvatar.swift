@@ -13,7 +13,14 @@ enum JavBusActorParser {
         let lower = html.lowercased()
         guard !["cf-chl-", "challenge-platform", "captcha", "just a moment", "age verification", "driver-verify"].contains(where: lower.contains) else { return [] }
         let tree = try JRHTML.tree(html)
-        let movies = tree.all { $0.tag == "div" && $0.cls("movie") }
+        // Real pages also label the magnet-submit form and magnet table as `movie`.
+        // Ignore only these evidenced, identity-free auxiliary containers; an unknown
+        // extra movie or any auxiliary carrying info/actor identity remains ambiguous.
+        let movies = tree.all { $0.tag == "div" && $0.cls("movie") }.filter { node in
+            let auxiliary = node.attrs["id"] == "mag-submit" || node.children.contains { $0.tag == "table" && $0.attrs["id"] == "magnet-table" }
+            let identity = node.all { ($0.tag == "div" && $0.cls("info")) || ($0.tag == "a" && $0.cls("avatar-box")) || ($0.tag == "span" && $0.cls("header")) }
+            return !auxiliary || !identity.isEmpty
+        }
         guard movies.count == 1 else { return [] }
         let infos = movies[0].all { $0.tag == "div" && $0.cls("info") }
         guard infos.count == 1 else { return [] }
