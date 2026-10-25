@@ -34,7 +34,11 @@ final class PlaybackResourceUITests258: XCTestCase {
         expectation(for: predicate, evaluatedWith: error)
         waitForExpectations(timeout: 8)
         XCTAssertTrue(error.label.contains("TLS")); XCTAssertTrue(error.label.contains("查询"))
-        XCTAssertGreaterThan(error.frame.height, 20)
+        // iPad may render the complete diagnostic on one natural-height line.
+        // Verify readable intrinsic height, not a phone-only wrapping assumption.
+        XCTAssertGreaterThanOrEqual(error.frame.height, 12)
+        XCTAssertGreaterThan(error.frame.width, 100)
+        XCTAssertLessThanOrEqual(error.frame.maxX, app.frame.maxX)
         screenshot("258-readable-typed-error")
         app.buttons["online.close"].tap(); XCTAssertTrue(online.waitForExistence(timeout: 5))
         open(app)
