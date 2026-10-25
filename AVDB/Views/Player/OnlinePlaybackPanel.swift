@@ -152,7 +152,8 @@ struct PlaybackResourceActions: View {
                 resourceButton("在线播放", icon: "play.rectangle", id: "detail.resource.online", action: openOnline)
             }
         }
-        .accessibilityIdentifier("detail.resource.actions")
+        // Do not put an AX identifier on this transparent HStack: SwiftUI
+        // forwards it to both buttons and masks their independent identities.
     }
     private func resourceButton(_ title: String, icon: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -185,7 +186,6 @@ struct OnlinePlaybackSheet: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) {
                 Button("关闭") { dismiss() }.accessibilityIdentifier("online.close")
             } }
-            .accessibilityIdentifier("online.sheet")
         }
         .onDisappear { model.cancelPending() }
     }
@@ -208,7 +208,10 @@ struct OnlinePlaybackPanel: View {
                     if source != OnlineSource.allCases.last { Divider().padding(.vertical, 10) }
                 }
             }.padding(14).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            DisclosureGroup(isExpanded: $advancedExpanded) {
+            Text(model.systemProxyCompatibility ? "系统代理兼容：已开启（已保存）" : "系统代理兼容：关闭 · 严格预检")
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("online.proxy-status")
+            DisclosureGroup("高级设置", isExpanded: $advancedExpanded) {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("系统代理/Fake-IP兼容", isOn: Binding(get: { model.systemProxyCompatibility }, set: { model.setSystemProxyCompatibility($0) }))
                         .accessibilityIdentifier("online.system-proxy-compatibility")
@@ -220,14 +223,7 @@ struct OnlinePlaybackPanel: View {
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("online.diagnostic-help")
                 }.padding(.top, 12)
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("高级设置").font(.subheadline.weight(.semibold))
-                    Text(model.systemProxyCompatibility ? "系统代理兼容：已开启（已保存）" : "系统代理兼容：关闭 · 严格预检")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .accessibilityIdentifier("online.proxy-status")
-                }
-            }.accessibilityIdentifier("online.advanced")
+            }.font(.subheadline)
             if model.resolving != nil {
                 Button("取消解析") { model.cancelSelection() }.buttonStyle(.bordered)
             }

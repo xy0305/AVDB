@@ -49,8 +49,8 @@ final class PlaybackResourceUITests258: XCTestCase {
     func testAdvancedDefaultsPersistenceAndReturn() {
         let app = XCUIApplication(); app.launch(); open(app)
         XCTAssertTrue(app.staticTexts["online.proxy-status"].label.contains("关闭"))
-        let advanced = app.buttons["online.advanced"]
-        // Disclosure label is one native button with stable identifier.
+        let advanced = app.buttons["高级设置"]
+        // Use the native disclosure label, never mask identifiers on child controls.
         advanced.tap()
         let toggle = app.switches["online.system-proxy-compatibility"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5)); XCTAssertEqual(toggle.value as? String, "0")

@@ -437,6 +437,7 @@ struct MovieDetailView: View {
                 }
                 .padding(.horizontal, 18).padding(.top, 30)
                 .buttonStyle(.plain)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("portrait-hero-resources")
             }
             .padding(.top, titleTop)
