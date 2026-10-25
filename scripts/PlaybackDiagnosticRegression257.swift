@@ -28,6 +28,11 @@ import Foundation
         }
         let http = OnlineFailure.http(403).presentation(at: .manifest)
         check(http.httpCode == 403 && http.category == .http && http.display.contains("403"), "typed HTTP code")
+        for status in [301, 401, 403, 429, 451, 500, 503] {
+            let response = OnlineFailure.httpResponse(status, at: signed).presentation(at: .manifest)
+            check(response.category == .http && response.httpCode == status && response.stage == .manifest, "production HTTP response bridge")
+            check(response.host == "cdn.example.test" && !response.display.contains("SECRET"), "production HTTP bridge signed URL redaction")
+        }
         check(D(stage: .manifest, category: .http, httpCode: 999).httpCode == nil, "invalid HTTP status hidden")
         let hostile = OnlineFailure.diagnostic(stage: signed.absoluteString, host: signed.absoluteString, reason: signed.absoluteString).presentation(at: .document)
         check(hostile.stage == .document && hostile.host == nil && !hostile.display.contains("SECRET"), "untrusted legacy free text removed")

@@ -104,6 +104,10 @@ extension OnlineFailure {
         }
         return D(stage: context, category: category)
     }
+    static func httpResponse(_ code: Int, at url: URL) -> OnlineFailure {
+        .safe(PlaybackDiagnostic(stage: .unknown, category: .http, httpCode: code,
+                                 host: PlaybackDiagnostic.resourceHost(url)))
+    }
     static func captured(_ error: Error, at stage: PlaybackDiagnostic.Stage) -> OnlineFailure {
         if let legacy = error as? OnlineFailure { return legacy }
         return .safe(PlaybackDiagnostic.system(error, stage: stage))

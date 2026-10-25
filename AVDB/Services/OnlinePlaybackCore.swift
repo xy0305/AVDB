@@ -456,10 +456,10 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         let (bytes, response) = try await session.bytes(for: request)
         guard let r = response as? HTTPURLResponse, r.url == url else { throw OnlineFailure.unsafe }
         if [401,403,429,451].contains(r.statusCode) || (300..<400).contains(r.statusCode) {
-            throw OnlineMediaScope.diagnostic(url, stage: "HTTP", reason: "上游 HTTP \(r.statusCode)，拒绝访问、重定向或要求验证（未绕过）")
+            throw OnlineFailure.httpResponse(r.statusCode, at: url)
         }
         if r.statusCode == 404 { throw OnlineFailure.noMatch }
-        guard r.statusCode == 200 else { throw OnlineFailure.http(r.statusCode) }
+        guard r.statusCode == 200 else { throw OnlineFailure.httpResponse(r.statusCode, at: url) }
         guard r.expectedContentLength <= Int64(cap) else { throw OnlineFailure.tooLarge }
         var data = Data(); data.reserveCapacity(min(cap, 65536))
         for try await byte in bytes {
