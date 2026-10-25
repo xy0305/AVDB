@@ -54,7 +54,7 @@ jobs:
       - name: Hosted identity and behavior XCTest
         run: |
           set -o pipefail
-          xcodebuild test -workspace AVDB.xcworkspace -scheme JavVerseAcceptance -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/JavVerseDerived" -resultBundlePath "$RUNNER_TEMP/Unit.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:JavVerseUnitTests 2>&1 | tee "$RUNNER_TEMP/unit.log"
+          xcodebuild test -workspace AVDB.xcworkspace -scheme JavVerseAcceptance -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/JavVerseDerived" -resultBundlePath "$RUNNER_TEMP/Unit.xcresult" CODE_SIGNING_ALLOWED=NO -parallel-testing-enabled NO -only-testing:JavVerseUnitTests -skip-testing:JavVerseUnitTests/JavVerseLive240Tests 2>&1 | tee "$RUNNER_TEMP/unit.log"
       - name: Neutral menu pagination static label and back UI
         run: |
           set -o pipefail

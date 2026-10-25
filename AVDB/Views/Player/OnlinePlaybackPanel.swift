@@ -9,7 +9,7 @@ final class OnlinePlaybackModel: ObservableObject {
             case .idle: return "未查询"
             case .querying: return "查询中"
             case .found(let rows): return "找到候选，待解析 · \(Set(rows.map(\.recordID)).count) 版本 / \(rows.count) 线路"
-            case .failed(let error): return error.localizedDescription
+            case .failed(let error): return error.presentation(at: .discovery).display
             }
         }
     }
@@ -24,7 +24,7 @@ final class OnlinePlaybackModel: ObservableObject {
             switch status {
             case .resolving: return prefix + "正在重新解析并验证 HLS 清单…"
             case .validated: return prefix + "清单已验证，尚未确认首帧（若播放失败请重新查询，不自动换源）"
-            case .failed(let error): return prefix + error.localizedDescription
+            case .failed(let error): return prefix + error.presentation(at: .document).display
             }
         }
     }
@@ -66,8 +66,8 @@ final class OnlinePlaybackModel: ObservableObject {
     var state: (OnlineSource) -> State { { self.states[$0] ?? .idle } }
     // The panel is inert on creation. Only explicit per-source buttons call query.
     func query(_ source: OnlineSource, number: String, versions: Bool) {
-        guard states[source] != .querying else { return }
         bind(number: number, versions: versions)
+        guard states[source] != .querying else { return }
         queryMessages[source] = nil
         if states[source] != .querying && states.values.filter({ $0 == .querying }).count >= 2 {
             queryMessages[source] = source.label + "：最多同时查询两个来源；请等待或取消一个查询。"; return
@@ -89,13 +89,13 @@ final class OnlinePlaybackModel: ObservableObject {
                 else { self.states[source] = .found(rows); self.cache[key] = (Date(),rows) }
             } catch {
                 guard !Task.isCancelled, self.epochs[source] == epoch else { return }
-                self.states[source] = .failed(OnlineFailure.classify(error))
+                self.states[source] = .failed(OnlineFailure.captured(error, at: .discovery))
             }
         }
     }
     func choose(_ line: OnlineLine, number: String, versions: Bool) {
-        guard resolving == nil else { return }
         bind(number: number, versions: versions)
+        guard resolving == nil else { return }
         cancelSelection(); plan = nil
         selectionEpoch = UUID(); let epoch = selectionEpoch
         selectedLine = line; resolving = line.id
@@ -111,17 +111,12 @@ final class OnlinePlaybackModel: ObservableObject {
             } catch {
                 guard !Task.isCancelled, self.selectionEpoch == epoch else { return }
                 self.resolving = nil; self.selectedLine = nil
-                self.resolutions[line.source] = Resolution(line: line, status: .failed(OnlineFailure.classify(error)))
+                self.resolutions[line.source] = Resolution(line: line, status: .failed(OnlineFailure.captured(error, at: .document)))
             }
         }
     }
-    static func bounded<T: Sendable>(_ work: @escaping @Sendable () async throws -> T) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await work() }
-            group.addTask { try await Task.sleep(nanoseconds: 25_000_000_000); throw OnlineFailure.timeout }
-            defer { group.cancelAll() }
-            guard let result = try await group.next() else { throw OnlineFailure.cancelled }; return result
-        }
+    static func bounded<T: Sendable>(nanoseconds: UInt64 = 25_000_000_000, _ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await PlaybackDeadline<T>.run(nanoseconds: nanoseconds, work: work)
     }
     func cancel(_ source: OnlineSource) {
         tasks[source]?.cancel(); tasks[source] = nil; epochs[source] = nil
@@ -211,3 +206,4 @@ struct OnlinePlaybackPanel: View {
 }
 
 #endif
+

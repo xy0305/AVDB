@@ -149,6 +149,7 @@ struct KSChromePlayer: View {
     var onSelectSource: (() -> Void)? = nil
     var onSelectEpisode: (() -> Void)? = nil
     @State private var failureReported = false
+    @State private var playbackDiagnostic: PlaybackDiagnostic?
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var coordinator = KSVideoPlayer.Coordinator()
@@ -204,6 +205,7 @@ struct KSChromePlayer: View {
     }
 
     private var playerOptions: KSOptions {
+        KSOptions.logger = PlaybackPrivateLogger()
         let o = KSOptions()
         if !headers.isEmpty { o.appendHeader(headers) }
         if let ua = headers["User-Agent"] { o.userAgent = ua }
@@ -218,6 +220,16 @@ struct KSChromePlayer: View {
         GeometryReader { geo in
             videoArea(height: geo.size.height, width: geo.size.width, safeArea: geo.safeAreaInsets)
                 .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .overlay(alignment: .top) {
+            if let playbackDiagnostic {
+                Text(playbackDiagnostic.display)
+                    .font(.caption).foregroundStyle(.white)
+                    .padding(10).background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.top, 54).padding(.horizontal)
+                    .accessibilityIdentifier("player.safe-diagnostic")
+                    .allowsHitTesting(false)
+            }
         }
         .background(Color.black)
         .ignoresSafeArea()
@@ -274,6 +286,8 @@ struct KSChromePlayer: View {
         .onChange(of: progressID) { _, _ in onlineSubtitles.clear() }
         .onChange(of: publicSubtitleQuery) { _, _ in onlineSubtitles.clear() }
         .onChange(of: url) { _, _ in
+            playbackDiagnostic = nil
+            failureReported = false
             editingSubtitlePosition = false
             onlineSubtitles.clear()
             seekGeneration += 1
@@ -808,6 +822,15 @@ struct KSChromePlayer: View {
 
     private func wireCoordinator() {
         coordinator.isMaskShow = false
+        coordinator.onFinish = { layer, error in
+            guard let error else { return }
+            // Reduce synchronously; never move NSError/userInfo into UI state or logs.
+            let safe = PlaybackDiagnostic.system(error, stage: .decode, url: url)
+            Task { @MainActor in
+                guard playbackActive, coordinator.playerLayer === layer else { return }
+                playbackDiagnostic = safe
+            }
+        }
         coordinator.onStateChanged = { layer, state in
             Task { @MainActor in
                 // Ignore stale completion from a source that has already been replaced.
@@ -821,6 +844,10 @@ struct KSChromePlayer: View {
                     audio.end()
                 }
                 if state == .error, !failureReported {
+                    if playbackDiagnostic == nil {
+                        playbackDiagnostic = PlaybackDiagnostic(stage: .decode, category: .unknown,
+                            host: PlaybackDiagnostic.resourceHost(url))
+                    }
                     failureReported = true
                     onPlaybackFailure?()
                 }
@@ -1175,4 +1202,10 @@ struct PlayerGestureLayer: UIViewRepresentable {
         }
         @objc func singleTap(_ gesture: UITapGestureRecognizer) { parent.onSingleTap() }
     }
+}
+
+// KSPlayer emits full request/errors to its logger. App diagnostics are typed;
+// third-party free-text messages must not become our diagnostic log stream.
+private struct PlaybackPrivateLogger: LogHandler {
+    func log(level: LogLevel, message: CustomStringConvertible, file: String, function: String, line: UInt) {}
 }

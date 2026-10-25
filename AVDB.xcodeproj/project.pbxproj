@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B25700000000000000000001 /* PlaybackDiagnostic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25700000000000000000001 /* PlaybackDiagnostic.swift */; };
 		B25400000000000000000004 /* OnlinePlaybackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000004 /* OnlinePlaybackPanel.swift */; };
 		B25400000000000000000003 /* DetailOnlineAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000003 /* DetailOnlineAdapters.swift */; };
 		B25400000000000000000002 /* OnlineAdditionalProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000002 /* OnlineAdditionalProviders.swift */; };
@@ -89,6 +90,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C25700000000000000000001 /* PlaybackDiagnostic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackDiagnostic.swift; sourceTree = "<group>"; };
 		C25400000000000000000004 /* OnlinePlaybackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlinePlaybackPanel.swift; sourceTree = "<group>"; };
 		C25400000000000000000003 /* DetailOnlineAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailOnlineAdapters.swift; sourceTree = "<group>"; };
 		C25400000000000000000002 /* OnlineAdditionalProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineAdditionalProviders.swift; sourceTree = "<group>"; };
@@ -286,6 +288,7 @@
 				B17400000000000000000000 /* MissAVCore.swift */,
 				C25400000000000000000003 /* DetailOnlineAdapters.swift */,
 				C25400000000000000000002 /* OnlineAdditionalProviders.swift */,
+				C25700000000000000000001 /* PlaybackDiagnostic.swift */,
 				C25400000000000000000001 /* OnlinePlaybackCore.swift */,
 				A16700000000000000000004 /* JavRankingSource.swift */,
 				B17400000000000000000001 /* MissAVSource.swift */,
@@ -496,6 +499,7 @@
 				B25400000000000000000004 /* OnlinePlaybackPanel.swift in Sources */,
 				B25400000000000000000003 /* DetailOnlineAdapters.swift in Sources */,
 				B25400000000000000000002 /* OnlineAdditionalProviders.swift in Sources */,
+				B25700000000000000000001 /* PlaybackDiagnostic.swift in Sources */,
 				B25400000000000000000001 /* OnlinePlaybackCore.swift in Sources */,
 				A16700000000000000000003 /* JavRankingSource.swift in Sources */,
 				A17400000000000000000001 /* MissAVSource.swift in Sources */,
@@ -575,7 +579,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 256;
+				CURRENT_PROJECT_VERSION = 257;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -598,7 +602,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 256;
+				CURRENT_PROJECT_VERSION = 257;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

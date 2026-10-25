@@ -12,10 +12,12 @@ enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
 }
 enum OnlineFailure: Error, LocalizedError, Equatable {
     case noMatch, blocked, tls, parse, timeout, unsafe, resolver, tooLarge, cancelled, unsupported, incomplete, drm, keyUnavailable, http(Int)
+    case safe(PlaybackDiagnostic)
     case diagnostic(stage: String, host: String, reason: String)
     var errorDescription: String? {
         switch self {
-        case .diagnostic(let stage, let host, let reason): return "\(host) · \(stage)：\(reason)"
+        case .safe(let value): return value.display
+        case .diagnostic: return presentation(at: .unknown).display
         case .noMatch: return "未匹配"
         case .blocked: return "来源拒绝访问或要求验证（未绕过限制）"
         case .drm: return "不支持 DRM / SAMPLE-AES 或专有密钥格式"
@@ -35,12 +37,14 @@ enum OnlineFailure: Error, LocalizedError, Equatable {
     static func classify(_ error: Error) -> OnlineFailure {
         if let e = error as? OnlineFailure { return e }
         if error is CancellationError { return .cancelled }
-        let code = (error as NSError).code
+        let system = error as NSError
+        guard system.domain == NSURLErrorDomain else { return .safe(.system(error, stage: .unknown)) }
+        let code = system.code
         if code == NSURLErrorCancelled { return .cancelled }
         if code == NSURLErrorTimedOut { return .timeout }
         if [-1200,-1201,-1202,-1203,-1204,-1205,-1206].contains(code) { return .tls }
-        if [NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed, NSURLErrorCannotConnectToHost].contains(code) { return .resolver }
-        return .parse
+        if [NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed].contains(code) { return .resolver }
+        return .safe(.system(error, stage: .unknown))
     }
 }
 struct OnlineLine: Identifiable, Equatable, Sendable {
@@ -412,6 +416,12 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
             // only bounded stage/host/reason, never URL path, query or credentials.
             if loader != nil { throw error }
             let failure = OnlineFailure.classify(error)
+            if case .safe(let value) = failure {
+                let context: PlaybackDiagnostic.Stage = scope != nil ? .manifest : (stage == "查询" ? .discovery : .document)
+                throw OnlineFailure.safe(PlaybackDiagnostic(stage: context, category: value.category,
+                    httpCode: value.httpCode, systemCode: value.systemCode,
+                    host: PlaybackDiagnostic.resourceHost(url), dnsContext: value.dnsContext))
+            }
             if case .diagnostic(let substage, _, let reason) = failure {
                 throw OnlineMediaScope.diagnostic(url, stage: stage + "/" + substage, reason: reason)
             }

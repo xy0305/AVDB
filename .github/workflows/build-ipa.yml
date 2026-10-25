@@ -44,13 +44,13 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
-      - name: Four public detail sources production Swift regression and bounded live metadata
-        env:
-          ONLINE254_LIVE: '1'
+      - name: Offline production contracts and synthetic Swift regression (no source probes)
         run: python3 scripts/test-online254.py
 
-      - name: iOS production Fake-IP compatibility and mode lifecycle regressions
-        run: python3 scripts/test-online256.py
+      - name: Generic diagnostics and preserved 254-256 neutral guards on macOS and iOS
+        run: |
+          set -euo pipefail
+          python3 scripts/test-playback-diagnostics257.py | tee diagnostics257.txt
 
       - name: Check poster identity, latency and shared regressions
         run: |
@@ -137,9 +137,8 @@ jobs:
       - name: Real Release Bundle schema (not fixture)
         run: python3 scripts/test-javverse247.py "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/AVDB.app/JavVerseSnapshot.json"
 
-      - name: Probe optional third-party with system URLSession TLS
-        continue-on-error: true
-        run: SUBTITLE_LIVE_PROBE=1 python3 scripts/test-online-subtitles.py
+      # Live probes are deliberately not part of this engineering build gate.
+      # The mandatory offline subtitle, transport, parser and lifecycle regressions remain.
 
       - name: Package IPA
         run: |
@@ -194,6 +193,7 @@ jobs:
           path: |
             javranking-performance.txt
             detail-delivery-performance.txt
+            diagnostics257.txt
           if-no-files-found: ignore
 
       - name: Upload build log on failure

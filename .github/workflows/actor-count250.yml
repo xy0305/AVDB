@@ -31,6 +31,8 @@ jobs:
           path: actor-regression248.json
           retention-days: 14
   readonly-search:
+    # Generic engineering builds must never run real-source online probes.
+    if: ${{ false }}
     runs-on: macos-26
     timeout-minutes: 12
     steps:
