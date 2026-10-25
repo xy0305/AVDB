@@ -14,6 +14,9 @@ struct MovieDetailView: View {
     @AppStorage("detail.showCoverTitle") private var showCoverTitle = true
     @ScaledMetric(relativeTo: .largeTitle) private var portraitTitleSize: CGFloat = 34
     @State private var play115 = false
+    @State private var showOnlinePlayback = false
+    @State private var onlineVersions = false
+    @StateObject private var onlinePlaybackModel = OnlinePlaybackModel()
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
     private let posterSeed: Movie?
@@ -115,6 +118,17 @@ struct MovieDetailView: View {
         .overlay(alignment: .top) {
             if !usesLandscapeLayout { detailChrome }
         }
+        .sheet(isPresented: $showOnlinePlayback, onDismiss: { onlinePlaybackModel.cancelPending() }) {
+            if let movie = vm.movie {
+                OnlinePlaybackSheet(number: movie.displayNumber, model: onlinePlaybackModel, versions: $onlineVersions)
+            }
+        }
+        .onChange(of: movieID) { _, _ in
+            showOnlinePlayback = false; onlinePlaybackModel.reset(); onlineVersions = false
+        }
+        .onChange(of: vm.movie?.displayNumber) { _, _ in
+            onlinePlaybackModel.reset(); onlineVersions = false
+        }
         .sheet(isPresented: $showPosterResources) {
             if let movie = vm.movie {
                 NavigationStack {
@@ -134,6 +148,7 @@ struct MovieDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
             var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
             withTransaction(transaction) { posterAccountEpoch = UUID(); posterPresentation = nil }
+            showOnlinePlayback = false; onlinePlaybackModel.reset()
             Task { await vm.reloadReviewForAccount() }
         }
         .alert("操作未完成", isPresented: Binding(
@@ -292,6 +307,10 @@ struct MovieDetailView: View {
                 heroHeader(movie)
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("legacy-landscape-header")
+                if movie.type != "2", OnlineIdentity.key(movie.displayNumber) != nil {
+                    PlaybackResourceActions(onlineAvailable: true, play115: { play115 = true }, openOnline: { showOnlinePlayback = true })
+                        .padding(.horizontal, 20).padding(.top, 12)
+                }
             } else {
                 // Resolving has exactly the portrait viewport and real metadata /
                 // actions, but no speculative cover (especially no wide fallback).
@@ -300,9 +319,6 @@ struct MovieDetailView: View {
             }
 
             VStack(alignment: .leading, spacing: 20) {
-                if movie.type != "2", OnlineIdentity.key(movie.displayNumber) != nil {
-                    OnlinePlaybackPanel(number: movie.displayNumber).id(movie.id + ":" + movie.displayNumber)
-                }
                 if let tags = movie.tags, !tags.isEmpty { tagsSection(tags) }
                 if let actors = movie.actors, !actors.isEmpty { actorsSection(actors) }
                 if let summary = movie.summary, !summary.isEmpty { summarySection(summary) }
@@ -390,13 +406,9 @@ struct MovieDetailView: View {
                         .frame(maxWidth: .infinity).padding(.top, 22)
                 }
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 12) {
-                        Text("播放资源:").font(.system(size: 17, weight: .bold))
-                        Button("115 原画") { play115 = true }
-                            .font(.system(size: 15, weight: .semibold))
-                            .padding(.horizontal, 14).padding(.vertical, 6)
-                            .overlay(Capsule().stroke(.white.opacity(0.22)))
-                    }
+                    Text("播放资源").font(.system(size: 17, weight: .bold))
+                    PlaybackResourceActions(onlineAvailable: movie.type != "2" && OnlineIdentity.key(movie.displayNumber) != nil,
+                                            play115: { play115 = true }, openOnline: { showOnlinePlayback = true })
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             Button { play115 = true } label: {

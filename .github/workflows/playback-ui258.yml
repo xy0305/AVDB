@@ -1,0 +1,28 @@
+name: Build258 neutral playback UI
+on:
+  push:
+    branches: [fix/subtitle-position-201]
+    paths: ['AVDB/Views/Detail/MovieDetailView.swift', 'AVDB/Views/Player/OnlinePlaybackPanel.swift', 'scripts/*258*', '.github/workflows/playback-ui258.yml']
+permissions:
+  contents: read
+jobs:
+  neutral-ui:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated native UI test project generator
+        run: gem install xcodeproj --no-document
+      - name: Real production SwiftUI iPhone and iPad XCTest (injected loader, no source probes)
+        run: |
+          set -euo pipefail
+          python3 scripts/test-playback-ui258.py 2>&1 | tee ui258.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playback-ui258-neutral
+          path: |
+            evidence258/ui258-status.json
+            evidence258/*-screenshots/
+            ui258.log
+          if-no-files-found: error
