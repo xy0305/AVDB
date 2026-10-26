@@ -67,6 +67,7 @@ import UniformTypeIdentifiers
         List(rows) { row in
             VStack(alignment: .leading, spacing: 6) {
                 Text("#\(row.rank) · DMM · \(row.cid)").font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("dmm-rank-\(row.rank)")
                 if let item = entry(row) {
                     Text(item.label).font(.headline)
                     if let movie = mapper.movie(for: item) {
@@ -90,7 +91,7 @@ import UniformTypeIdentifiers
                     Button("获取 / 重试详情") { store.request(row) }
                 }
                 NavigationLink("手动搜索核对（不自动认领）") { SearchView() }.font(.caption)
-            }.padding(.vertical, 4).accessibilityIdentifier("dmm-rank-\(row.rank)")
+            }.padding(.vertical, 4)
         }.listStyle(.plain)
         .buttonStyle(.borderless)
         .onDisappear { mapper.cancel() }
