@@ -5,7 +5,7 @@ final class TangxinUITests261: XCTestCase {
         let a = XCTAttachment(screenshot:XCUIApplication().screenshot()); a.name = "SYNTHETIC-261-"+name; a.lifetime = .keepAlways; add(a)
     }
     func testNetworkDiagnostics263() {
-        let app = XCUIApplication(); app.launchArguments = ["--network263"]; app.launch()
+        let app = XCUIApplication(); app.launchArguments = ["--network263", "--reset-network263"]; app.launch()
         app.buttons["app.tab.4"].tap()
         XCTAssertTrue(app.buttons["tangxin.network.open"].waitForExistence(timeout:8))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "严格模式拒绝合成")).firstMatch.waitForExistence(timeout:8))
@@ -28,12 +28,24 @@ final class TangxinUITests261: XCTestCase {
         shot("263-explicit-compatible-diagnostic")
         app.buttons["完成"].tap()
         XCTAssertTrue(app.buttons["tangxin.video.neutral1"].waitForExistence(timeout:8))
+        // Relaunch without resetting UserDefaults: persisted mode must reach the
+        // real production client before the first list request.
+        app.terminate(); app.launchArguments = ["--network263"]; app.launch()
+        app.buttons["app.tab.4"].tap()
+        XCTAssertTrue(app.buttons["tangxin.video.neutral1"].waitForExistence(timeout:8))
         app.buttons["tangxin.network.open"].tap()
         let off = app.switches["tangxin.network.compatibility"]
-        XCTAssertTrue(off.waitForExistence(timeout:5)); off.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
+        XCTAssertTrue(off.waitForExistence(timeout:5)); XCTAssertEqual(off.value as? String,"1")
+        off.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
         XCTAssertEqual(off.value as? String,"0"); app.buttons["完成"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "严格模式拒绝合成")).firstMatch.waitForExistence(timeout:8))
         shot("263-strict-restored-no-blank-state")
+        app.terminate(); app.launch()
+        app.buttons["app.tab.4"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "严格模式拒绝合成")).firstMatch.waitForExistence(timeout:8))
+        app.buttons["tangxin.network.open"].tap()
+        XCTAssertEqual(app.switches["tangxin.network.compatibility"].value as? String,"0")
+        shot("263-persisted-strict-after-relaunch")
     }
     func testEmptyStatesAndManualAdvance262() {
         let app = XCUIApplication(); app.launchArguments = ["--empty-states262"]; app.launch()
