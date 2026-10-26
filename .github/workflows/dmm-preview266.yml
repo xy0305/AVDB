@@ -16,6 +16,8 @@ jobs:
           set -euo pipefail
           swiftc AVDB/Services/DMMRankingCore.swift scripts/DMMRankingRegression.swift -o /tmp/dmm-regression
           /tmp/dmm-regression scripts/dmm-ranking-fixtures
+          swiftc AVDB/Services/DMMRankingCore.swift AVDB/Services/DMMTransport.swift AVDB/Services/DMMRankingStore.swift scripts/DMMStoreRegression.swift -o /tmp/dmm-store-regression
+          /tmp/dmm-store-regression scripts/dmm-ranking-fixtures
       - name: Build native simulator
         run: |
           set -euo pipefail

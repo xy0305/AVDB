@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+ D66000000000000000000001 /* DMMTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D66000000000000000000002; };
 		7EEA0D8E71C4E74DA6994F0E /* DMMRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4031D23F39AF24C4C02AD8D /* DMMRankingView.swift */; };
 		A3EC3F1685CEB8B8FF962DBD /* DMMRankingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */; };
 		69597798619FBE0B45B47025 /* DMMRankingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 204221DE191DC1FDA176767F /* DMMRankingCore.swift */; };
@@ -97,6 +98,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+ D66000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMTransport.swift; sourceTree = "<group>"; };
 		F4031D23F39AF24C4C02AD8D /* DMMRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingView.swift; sourceTree = "<group>"; };
 		08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingStore.swift; sourceTree = "<group>"; };
 		204221DE191DC1FDA176767F /* DMMRankingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingCore.swift; sourceTree = "<group>"; };
@@ -301,6 +303,7 @@
 			isa = PBXGroup;
 			children = (
 				08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */,
+ D66000000000000000000002,
 				204221DE191DC1FDA176767F /* DMMRankingCore.swift */,
 				A16700000000000000000002 /* JavRankingCore.swift */,
 				B17400000000000000000000 /* MissAVCore.swift */,
@@ -515,6 +518,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+ D66000000000000000000001,
 				7EEA0D8E71C4E74DA6994F0E /* DMMRankingView.swift in Sources */,
 				A3EC3F1685CEB8B8FF962DBD /* DMMRankingStore.swift in Sources */,
 				69597798619FBE0B45B47025 /* DMMRankingCore.swift in Sources */,

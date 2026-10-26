@@ -13,28 +13,19 @@ import Combine
     private var queue: [DMMRankingRow] = []
     private var tasks: [String: Task<Void, Never>] = [:]
     private var cache: [String: (DMMManufacturerEvidence, Date)] = [:]
-    private let session: URLSession
-    init(session suppliedSession: URLSession? = nil) {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.timeoutIntervalForRequest = 20
-        session = suppliedSession ?? URLSession(configuration: configuration)
+    private let transport: DMMTransport
+    var authorizeAdultDeclaration: Bool {
+        get { UserDefaults.standard.bool(forKey: "dmm.authorizedAdultDeclaration") }
+        set { UserDefaults.standard.set(newValue, forKey: "dmm.authorizedAdultDeclaration") }
     }
+    func forgetSession() async { cancel(); await transport.clear() }
+    init(transport: DMMTransport = DMMTransport()) { self.transport = transport }
     func cancel() {
         generation = UUID(); queue.removeAll()
         tasks.values.forEach { $0.cancel() }; tasks.removeAll()
     }
     private func document(_ url: URL) async throws -> (String, URL) {
-        let (data, response) = try await session.data(from: url)
-        try Task.checkCancellation()
-        guard let http = response as? HTTPURLResponse, let final = http.url else { throw DMMRankingError.malformed }
-        guard final.host == "video.dmm.co.jp", !final.path.contains("age_check"), http.statusCode != 403,
-              http.statusCode != 429 else { throw DMMRankingError.accessGate }
-        guard http.statusCode == 200, data.count <= 8_000_000,
-              let html = String(data: data, encoding: .utf8) else { throw DMMRankingError.malformed }
-        return (html, final)
+        try await transport.document(url, authorizeAdultDeclaration: authorizeAdultDeclaration)
     }
     func refresh() async {
         cancel(); let epoch = generation

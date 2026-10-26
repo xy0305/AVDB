@@ -5,12 +5,17 @@ import UniformTypeIdentifiers
     @StateObject private var store = DMMRankingStore()
     @State private var importing = false
     @State private var importError: String?
+    @AppStorage("dmm.authorizedAdultDeclaration") private var adultAuthorization = false
     @State private var page = 0
     var body: some View {
         VStack(spacing: 8) {
             Text("周榜 · 100榜位 · 统计起止未知").font(.headline)
             Text(store.status).font(.footnote).foregroundStyle(.secondary)
                 .accessibilityIdentifier("dmm-source-status")
+            Toggle("我已满18岁，授权按官方自声明并记住选择", isOn: Binding(get: { adultAuthorization }, set: { value in
+                adultAuthorization = value; store.authorizeAdultDeclaration = value
+                if !value { Task { await store.forgetSession() } }
+            })).font(.caption).accessibilityIdentifier("dmm-adult-authorization")
             HStack {
                 Button("尝试直连") { Task { await store.refresh() } }
                 Button("导入HTML") { importing = true }.accessibilityIdentifier("dmm-import")
