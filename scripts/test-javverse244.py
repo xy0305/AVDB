@@ -52,7 +52,7 @@ class JavVerseTimestamp244(unittest.TestCase):
         gate = parser.split("guard clock.hasSuffix", 1)[0]
         self.assertNotIn("return true", gate)
         info = plistlib.loads((R / "AVDB/Resources/Info.plist").read_bytes())
-        self.assertEqual((info["CFBundleShortVersionString"], info["CFBundleVersion"]), ("1.0.2", "258"))
+        self.assertEqual((info["CFBundleShortVersionString"], info["CFBundleVersion"]), ("1.0.2", "261"))
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
         self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 261;"), 2)
         self.assertEqual(project.count("MARKETING_VERSION = 1.0.2;"), 2)

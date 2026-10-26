@@ -81,7 +81,7 @@ class Alias243(unittest.TestCase):
     def test_version_registration_and_preserved_releases(self):
         info = plistlib.loads((R / "AVDB/Resources/Info.plist").read_bytes())
         self.assertEqual(info["CFBundleShortVersionString"], "1.0.2")
-        self.assertEqual(info["CFBundleVersion"], "258")
+        self.assertEqual(info["CFBundleVersion"], "261")
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
         self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 261;"), 2)
         self.assertIn("IPHONEOS_DEPLOYMENT_TARGET = 17.0;", project)
