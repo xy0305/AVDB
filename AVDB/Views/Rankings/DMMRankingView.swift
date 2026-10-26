@@ -92,6 +92,7 @@ import UniformTypeIdentifiers
                 NavigationLink("手动搜索核对（不自动认领）") { SearchView() }.font(.caption)
             }.padding(.vertical, 4).accessibilityIdentifier("dmm-rank-\(row.rank)")
         }.listStyle(.plain)
+        .buttonStyle(.borderless)
         .onDisappear { mapper.cancel() }
     }
 }

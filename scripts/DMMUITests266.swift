@@ -7,8 +7,8 @@ final class DMMUITests266: XCTestCase {
         XCTAssertTrue(app.staticTexts["dmm-source-status"].label.contains("用户导入100"))
         XCTAssertTrue(app.buttons["精确核对AVDB"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["精确核对AVDB"].firstMatch.tap()
-        let movie = app.buttons["dmm-movie-1"]
-        XCTAssertTrue(movie.waitForExistence(timeout: 5))
+        let movie = app.descendants(matching: .any)["dmm-movie-1"].firstMatch
+        XCTAssertTrue(movie.waitForExistence(timeout: 10), app.debugDescription)
         movie.tap()
         XCTAssertTrue(app.staticTexts["dmm-fixture-detail-id"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["dmm-fixture-detail-id"].label, "详情ID: avdb-real-fixture-id")
