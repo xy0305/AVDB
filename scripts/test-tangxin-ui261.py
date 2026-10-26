@@ -33,6 +33,9 @@ p.save;s=Xcodeproj::XCScheme.new;s.add_build_target(a);s.add_build_target(t);s.a
 (O/'setup.rb').write_text(ruby)
 subprocess.run(['ruby',str(O/'setup.rb')],check=True,cwd=R)
 devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices'];status={}
+# Both device families are mandatory: the production scroll-content clearance must
+# be verified by the full playback-button rect versus the measured native tab bar,
+# followed by an actual tap into the inert player (never real-playback evidence).
 for kind in ['iPhone','iPad']:
  choices=[d for rt,ds in devices.items() if 'iOS' in rt for d in ds if kind in d['name']];assert choices
  d=choices[0]
