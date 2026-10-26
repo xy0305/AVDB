@@ -4,7 +4,7 @@ import Foundation
 struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
     enum Stage: String, Sendable {
         case discovery = "查询", document = "详情", embed = "嵌入", manifest = "清单"
-        case segment = "分片", decode = "播放", dns = "DNS", unknown = "未知阶段"
+        case image = "图片", key = "密钥", segment = "分片", decode = "播放", dns = "DNS", unknown = "未知阶段"
     }
     enum Category: String, Sendable {
         case http = "HTTP", tls = "TLS 错误（未降低证书验证）", timeout = "请求超时"
@@ -13,6 +13,17 @@ struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
         case unsafe = "安全策略拒绝", noMatch = "未匹配", tooLarge = "响应超出大小限制"
         case blocked = "来源拒绝访问或要求验证（未绕过限制）", unknown = "失败（原因未确定）"
     }
+    enum Detail: String, Sendable {
+        case dnsEmpty = "解析无结果（空地址集）"
+        case dnsSynthetic = "严格模式拒绝合成/基准测试地址；仅信任当前系统代理时可手动启用兼容"
+        case dnsPrivate = "DNS 返回非公网、私网或保留地址；请求已停止"
+        case dnsLookup = "系统域名解析失败"
+        case dnsInvalid = "域名或解析结果格式不允许"
+        case dnsLimit = "解析地址数量超限"
+    }
+    let detail: Detail?
+    let errorDomain: String?
+    let addressSummary: String?
     let stage: Stage
     let category: Category
     let httpCode: Int?
@@ -20,11 +31,14 @@ struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
     let host: String?
     let dnsContext: Bool
     init(stage: Stage, category: Category, httpCode: Int? = nil, systemCode: Int? = nil,
-         host: String? = nil, dnsContext: Bool = false) {
+         host: String? = nil, dnsContext: Bool = false, detail: Detail? = nil,
+         errorDomain: String? = nil, addressSummary: String? = nil) {
         self.stage = stage; self.category = category
         self.httpCode = httpCode.flatMap { (100...599).contains($0) ? $0 : nil }
         self.systemCode = systemCode; self.host = host.flatMap(Self.safeHost)
-        self.dnsContext = dnsContext
+        self.dnsContext = dnsContext; self.detail = detail
+        self.errorDomain = errorDomain.flatMap { $0.range(of: #"^[A-Za-z][A-Za-z0-9_.-]{0,79}$"#, options: .regularExpression) != nil ? $0 : nil }
+        self.addressSummary = addressSummary.flatMap { $0.range(of: #"^public=\d+ synthetic=\d+ private=\d+ empty=[01]$"#, options: .regularExpression) != nil ? $0 : nil }
     }
     static func safeHost(_ value: String) -> String? {
         guard value.utf8.count <= 253, value.range(of: #"^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"#, options: .regularExpression) != nil,
@@ -41,14 +55,18 @@ struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
         let place = stage.rawValue + (dnsContext && stage != .dns ? "/DNS" : "")
         let status = httpCode.map { " \($0)" } ?? ""
         let code = systemCode.map { "（系统码 \($0)）" } ?? ""
-        return (host.map { $0 + " · " } ?? "") + place + "：" + category.rawValue + status + code
+        return (host.map { $0 + " · " } ?? "") + place + "：" + category.rawValue + status + code + (errorDomain.map { " [" + $0 + "]" } ?? "") + (detail.map { " · " + $0.rawValue } ?? "") + (addressSummary.map { " · " + $0 } ?? "")
     }
     static func system(_ error: Error, stage: Stage, url: URL? = nil) -> Self {
         if let typed = error as? Self { return typed }
         if error is CancellationError { return .init(stage: stage, category: .cancelled) }
         let e = error as NSError
+        if let value = OnlineFailure.bridgedDiagnostic(e) { return value }
         // The same integer in another domain does not mean a URL-loading error.
-        guard e.domain == NSURLErrorDomain else { return .init(stage: stage, category: .unknown, host: resourceHost(url)) }
+        guard e.domain == NSURLErrorDomain else {
+            return .init(stage: stage, category: e.domain == "getaddrinfo" || e.domain == "getnameinfo" ? .dns : .unknown,
+                         systemCode: e.code, host: resourceHost(url), errorDomain: e.domain)
+        }
         let category: Category
         switch e.code {
         case NSURLErrorCancelled: category = .cancelled
@@ -59,7 +77,7 @@ struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
         case NSURLErrorUnsupportedURL: category = .unsupported
         default: category = .unknown
         }
-        return .init(stage: stage, category: category, systemCode: e.code, host: resourceHost(url))
+        return .init(stage: stage, category: category, systemCode: e.code, host: resourceHost(url), errorDomain: e.domain)
     }
 }
 
@@ -72,7 +90,7 @@ extension OnlineFailure {
         case .safe(let value):
             guard value.stage == .unknown else { return value }
             return D(stage: context, category: value.category, httpCode: value.httpCode,
-                     systemCode: value.systemCode, host: value.host, dnsContext: value.dnsContext)
+                     systemCode: value.systemCode, host: value.host, dnsContext: value.dnsContext, detail: value.detail, errorDomain: value.errorDomain, addressSummary: value.addressSummary)
         case .diagnostic(let stage, let host, let reason):
             let known: [String:D.Stage] = ["查询":.discovery, "详情":.document, "清单":.manifest,
                 "清单解析":.manifest, "分片":.segment, "DNS":.dns]
@@ -82,6 +100,16 @@ extension OnlineFailure {
             // only explicit known wording, never print or retain that free text.
             if reason.contains("HTTP "), let code = reason.split(separator: " ").compactMap({ Int($0.trimmingCharacters(in: .punctuationCharacters)) }).first(where: { (100...599).contains($0) }) {
                 return D(stage: actual, category: .http, httpCode: code, host: host, dnsContext: parts.contains("DNS"))
+            }
+            // Compatibility for old bounded producers: never display arbitrary reason text.
+            if reason.hasPrefix("解析无结果") {
+                let code = reason.range(of: #"getaddrinfo=(-?\d+)"#, options: .regularExpression).flatMap { Int(reason[$0].split(separator: "=").last ?? "") }
+                return D(stage: actual, category: .dns, systemCode: code, host: host, dnsContext: true,
+                         detail: code == nil ? .dnsEmpty : .dnsLookup, errorDomain: code == nil ? nil : "getaddrinfo")
+            }
+            if reason.hasPrefix("DNS 返回") || reason == "域名格式不被允许" || reason == "解析地址数量超限" {
+                let detail: D.Detail = reason.hasPrefix("DNS 返回代理/") ? .dnsSynthetic : (reason.hasPrefix("DNS 返回非公网") ? .dnsPrivate : .dnsInvalid)
+                return D(stage: actual, category: .unsafe, host: host, dnsContext: true, detail: detail)
             }
             if reason == OnlineFailure.incomplete.localizedDescription || reason == OnlineFailure.unsupported.localizedDescription { category = .unsupported }
             else if reason == OnlineFailure.timeout.localizedDescription { category = .timeout }

@@ -3,6 +3,7 @@ import SwiftUI
 // This host uses production ContentView, native tab bar and Tangxin views.
 // Other catalog tabs and the player are inert substitutes. NO playback proof.
 @main struct TangxinUIHost261: App {
+    init() { UserDefaults.standard.removeObject(forKey:"tangxin.systemProxyCompatibility") }
     var body: some Scene { WindowGroup { ContentView(tangxinClient:TangxinFixtures261.client()).environmentObject(AppState()) } }
 }
 final class AppState: ObservableObject {}

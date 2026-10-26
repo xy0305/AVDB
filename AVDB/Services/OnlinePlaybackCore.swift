@@ -10,7 +10,17 @@ enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var label: String { switch self { case .jable: return "Jable"; case .missav: return "MissAV"; case .av123: return "123AV"; case .memojav: return "MemoJav" } }
 }
-enum OnlineFailure: Error, LocalizedError, Equatable {
+enum OnlineFailure: Error, LocalizedError, CustomNSError, Equatable {
+    static var errorDomain: String { "AVDB.OnlineFailure" }
+    var errorCode: Int { 1 }
+    var errorUserInfo: [String:Any] {
+        [NSLocalizedDescriptionKey: errorDescription ?? "请求失败",
+         "AVDB.SafeDiagnostic": presentation(at: .unknown)]
+    }
+    static func bridgedDiagnostic(_ error: NSError) -> PlaybackDiagnostic? {
+        guard error.domain == errorDomain, error.code == 1 else { return nil }
+        return error.userInfo["AVDB.SafeDiagnostic"] as? PlaybackDiagnostic
+    }
     case noMatch, blocked, tls, parse, timeout, unsafe, resolver, tooLarge, cancelled, unsupported, incomplete, drm, keyUnavailable, http(Int)
     case safe(PlaybackDiagnostic)
     case diagnostic(stage: String, host: String, reason: String)
@@ -38,12 +48,10 @@ enum OnlineFailure: Error, LocalizedError, Equatable {
         if let e = error as? OnlineFailure { return e }
         if error is CancellationError { return .cancelled }
         let system = error as NSError
-        guard system.domain == NSURLErrorDomain else { return .safe(.system(error, stage: .unknown)) }
-        let code = system.code
-        if code == NSURLErrorCancelled { return .cancelled }
-        if code == NSURLErrorTimedOut { return .timeout }
-        if [-1200,-1201,-1202,-1203,-1204,-1205,-1206].contains(code) { return .tls }
-        if [NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed].contains(code) { return .resolver }
+        if let value = bridgedDiagnostic(system) { return .safe(value) }
+        // Keep domain and code; category conversion is typed, never localized free text.
+        if system.domain == NSURLErrorDomain && system.code == NSURLErrorCancelled { return .cancelled }
+        if system.domain == NSURLErrorDomain && system.code == NSURLErrorTimedOut { return .timeout }
         return .safe(.system(error, stage: .unknown))
     }
 }
@@ -256,12 +264,16 @@ struct OnlineMediaScope: Sendable {
         return a == 198 && (b == 18 || b == 19)
     }
     static func validateAddresses(_ addresses: [String], root: URL, mode: OnlineDNSMode = .strict, approvedOrigin: Bool = false) throws {
-        guard OnlinePolicy.secure(root) else { throw diagnostic(root, stage: "DNS", reason: "域名格式不被允许") }
-        guard !addresses.isEmpty else { throw diagnostic(root, stage: "DNS", reason: "解析无结果（空地址集）") }
-        guard addresses.count <= 32 else { throw diagnostic(root, stage: "DNS", reason: "解析地址数量超限") }
+        let summary = "public=\(addresses.filter { publicAddress($0) }.count) synthetic=\(addresses.filter { syntheticAddress($0) }.count) private=\(addresses.filter { !publicAddress($0) && !syntheticAddress($0) }.count) empty=\(addresses.isEmpty ? 1 : 0)"
+        func reject(_ detail: PlaybackDiagnostic.Detail, _ category: PlaybackDiagnostic.Category = .unsafe) -> OnlineFailure {
+            .safe(PlaybackDiagnostic(stage: .dns, category: category, host: root.host, dnsContext: true, detail: detail, addressSummary: summary))
+        }
+        guard OnlinePolicy.secure(root) else { throw reject(.dnsInvalid) }
+        guard !addresses.isEmpty else { throw reject(.dnsEmpty, .dns) }
+        guard addresses.count <= 32 else { throw reject(.dnsLimit) }
         for address in addresses {
             if mode == .systemProxy && approvedOrigin && syntheticAddress(address) { continue }
-            if let reason = dnsRejection(address) { throw diagnostic(root, stage: "DNS", reason: reason) }
+            if !publicAddress(address) { throw reject(syntheticAddress(address) ? .dnsSynthetic : .dnsPrivate) }
         }
     }
     static func diagnostic(_ url: URL, stage: String, reason: String) -> OnlineFailure {
@@ -282,7 +294,7 @@ struct OnlineMediaScope: Sendable {
             hints.ai_socktype = SOCK_STREAM; hints.ai_protocol = IPPROTO_TCP
             let status = getaddrinfo(host, nil, &hints, &result)
             guard status == 0, let first = result else {
-                throw Self.diagnostic(root, stage: "DNS", reason: "解析无结果（getaddrinfo=\(status)）")
+                throw OnlineFailure.safe(PlaybackDiagnostic(stage: .dns, category: .dns, systemCode: Int(status), host: host, dnsContext: true, detail: .dnsLookup, errorDomain: "getaddrinfo"))
             }
             defer { freeaddrinfo(first) }
             var cursor: UnsafeMutablePointer<addrinfo>? = first; var count = 0; var addresses: [String] = []
@@ -293,7 +305,7 @@ struct OnlineMediaScope: Sendable {
                 guard value.ai_family == AF_INET || value.ai_family == AF_INET6,
                       let address = value.ai_addr else { throw Self.diagnostic(root, stage: "DNS", reason: "解析返回未知地址族") }
                 let numericStatus = getnameinfo(address, value.ai_addrlen, &buffer, socklen_t(NI_MAXHOST), nil, 0, NI_NUMERICHOST)
-                guard numericStatus == 0 else { throw Self.diagnostic(root, stage: "DNS", reason: "数值地址转换失败（getnameinfo=\(numericStatus)）") }
+                guard numericStatus == 0 else { throw OnlineFailure.safe(PlaybackDiagnostic(stage: .dns, category: .dns, systemCode: Int(numericStatus), host: host, dnsContext: true, detail: .dnsInvalid, errorDomain: "getnameinfo")) }
                 addresses.append(String(cString: buffer))
                 count += 1; cursor = value.ai_next
             }
@@ -578,24 +590,19 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         return URLSession(configuration: c, delegate: self, delegateQueue: nil)
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
-    func fetch(_ url: URL, cap: Int, headers: [String:String] = [:], body: Data? = nil, scope: OnlineMediaScope? = nil) async throws -> Data {
+    func fetch(_ url: URL, cap: Int, headers: [String:String] = [:], body: Data? = nil, scope: OnlineMediaScope? = nil, context: PlaybackDiagnostic.Stage? = nil) async throws -> Data {
         let stage = scope != nil ? (url.path.hasSuffix(".m3u8") ? "清单" : "密钥") : (url.path.contains("/search/") || url.path == "/en/search" || url.path.hasPrefix("/video/") ? "查询" : "详情/嵌入/API")
         do { return try await fetchChecked(url, cap:cap, headers:headers, body:body, scope:scope) }
         catch {
             // Neutral loader retains historical error contracts; real requests gain
             // only bounded stage/host/reason, never URL path, query or credentials.
-            if loader != nil { throw error }
-            let failure = OnlineFailure.classify(error)
-            if case .safe(let value) = failure {
-                let context: PlaybackDiagnostic.Stage = scope != nil ? .manifest : (stage == "查询" ? .discovery : .document)
-                throw OnlineFailure.safe(PlaybackDiagnostic(stage: context, category: value.category,
-                    httpCode: value.httpCode, systemCode: value.systemCode,
-                    host: PlaybackDiagnostic.resourceHost(url), dnsContext: value.dnsContext))
-            }
-            if case .diagnostic(let substage, _, let reason) = failure {
-                throw OnlineMediaScope.diagnostic(url, stage: stage + "/" + substage, reason: reason)
-            }
-            throw OnlineMediaScope.diagnostic(url, stage: stage, reason: failure.localizedDescription)
+            if loader != nil && context == nil { throw error }
+            let inferred: PlaybackDiagnostic.Stage = scope != nil ? .manifest : (stage == "查询" ? .discovery : .document)
+            let value = OnlineFailure.captured(error, at: context ?? inferred).presentation(at: context ?? inferred)
+            throw OnlineFailure.safe(PlaybackDiagnostic(stage: context ?? (value.stage == .dns ? inferred : value.stage), category: value.category,
+                httpCode: value.httpCode, systemCode: value.systemCode,
+                host: PlaybackDiagnostic.resourceHost(url), dnsContext: value.dnsContext || value.stage == .dns,
+                detail: value.detail, errorDomain: value.errorDomain, addressSummary: value.addressSummary))
         }
     }
     private func fetchChecked(_ url: URL, cap: Int, headers: [String:String], body: Data?, scope: OnlineMediaScope?) async throws -> Data {

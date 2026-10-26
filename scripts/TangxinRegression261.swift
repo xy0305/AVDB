@@ -3,6 +3,7 @@ import Foundation
 @main struct TangxinRegression261 {
     static func reject(_ body: () throws -> Void) { do { try body(); fatalError("Expected rejection") } catch {} }
     static func main() async throws {
+        try await TangxinNetworkRegression263.run()
         let root = TangxinPolicy.featured
         let first = try TangxinParser.list(TangxinFixtures261.first,at:root)
         precondition(first.videos.count == 1 && first.next?.path == "/featured/2")

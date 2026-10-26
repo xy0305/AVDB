@@ -189,9 +189,10 @@ struct TangxinClient: Sendable {
     // Own transport: ephemeral, no cookies/cache/credentials, no redirects or TLS exceptions.
     let transport: OnlineTransport
     init(transport: OnlineTransport = OnlineTransport()) { self.transport = transport }
+    func withDNSMode(_ mode: OnlineDNSMode) -> TangxinClient { TangxinClient(transport: transport.withDNSMode(mode)) }
     func document(_ url: URL) async throws -> String {
         guard TangxinPolicy.page(url) || TangxinPolicy.video(url) else { throw TangxinError.unsafe }
-        let bytes = try await transport.fetch(url,cap:2*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:TangxinPolicy.origin))
+        let bytes = try await transport.fetch(url,cap:2*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:TangxinPolicy.origin),context:TangxinPolicy.video(url) ? .document : .discovery)
         guard let html = String(data:bytes,encoding:.utf8) else { throw TangxinError.structure }
         return html
     }
@@ -199,7 +200,7 @@ struct TangxinClient: Sendable {
     func detail(_ url: URL) async throws -> TangxinDetail { try TangxinParser.detail(await document(url),at:url) }
     func image(_ url: URL) async throws -> Data {
         guard TangxinPolicy.image(url) else { throw TangxinError.unsafe }
-        return try await transport.fetch(url,cap:8*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:url))
+        return try await transport.fetch(url,cap:8*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:url),context:.image)
     }
     func playback(_ detail: TangxinDetail) async throws -> TangxinPlayback {
         guard TangxinPolicy.stream(detail.stream), TangxinPolicy.permitted(([detail.video.title,detail.summary]+detail.tags).joined(separator:" ")) else { throw TangxinError.unsafe }
@@ -211,7 +212,7 @@ struct TangxinClient: Sendable {
             if seen.contains(url) { continue }
             guard seen.count < 12, depth <= 3 else { throw TangxinError.unsafe }
             seen.insert(url)
-            let data = try await transport.fetch(url,cap:512*1024,headers:TangxinPolicy.headers,scope:scope)
+            let data = try await transport.fetch(url,cap:512*1024,headers:TangxinPolicy.headers,scope:scope,context:.manifest)
             let manifest = try OnlineManifest.parse(data,at:url,root:detail.stream)
             for key in manifest.keys { keys.insert(key) }
             if manifest.variants.isEmpty { leaf = true }
@@ -219,7 +220,7 @@ struct TangxinClient: Sendable {
         }
         guard leaf, keys.count <= 12 else { throw TangxinError.unsafe }
         for key in keys {
-            let bytes = try await transport.fetch(key,cap:32,headers:TangxinPolicy.headers,scope:scope)
+            let bytes = try await transport.fetch(key,cap:32,headers:TangxinPolicy.headers,scope:scope,context:.key)
             guard bytes.count == 16 else { throw TangxinError.unsafe }
         }
         return TangxinPlayback(url:detail.stream,headers:TangxinPolicy.headers)

@@ -19,7 +19,9 @@ import UIKit
     deinit { task?.cancel() }
     func start() async { if !loaded { await refresh() } }
     func cancel() {
+        let interrupted = loading
         task?.cancel(); task = nil; generation = UUID(); loading = false
+        if interrupted { error = "加载已取消；返回本页会重新加载，也可点重试。" }
         // Successful pages survive navigation; incomplete requests can be re-entered.
         loaded = !visited.isEmpty
     }
@@ -48,7 +50,7 @@ import UIKit
             } catch {
                 guard let self, token == self.generation else { return }
                 self.loading = false
-                if !Task.isCancelled { self.error = error.localizedDescription }
+                self.error = Task.isCancelled ? "加载已取消，请重试" : error.localizedDescription
             }
         }
         let current = task
@@ -57,16 +59,72 @@ import UIKit
 }
 
 struct TangxinRootView: View {
+    @AppStorage("tangxin.systemProxyCompatibility") private var compatibility = false
+    @State private var networkSettings = false
     let client: TangxinClient
     init(client: TangxinClient = TangxinClient()) { self.client = client }
     var body: some View {
+        let selected = client.withDNSMode(compatibility ? .systemProxy : .strict)
         NavigationStack {
-            TangxinListView(root:TangxinPolicy.featured,title:"糖心",client:client)
-                .navigationDestination(for:TangxinVideo.self) { TangxinDetailView(video:$0,client:client) }
-                .navigationDestination(for:TangxinAuthor.self) { author in
-                    TangxinListView(root:author.url,title:author.name,client:client,isAuthor:true)
+            TangxinListView(root:TangxinPolicy.featured,title:"糖心",client:selected)
+                .toolbar {
+                    ToolbarItem(placement:.topBarTrailing) {
+                        Button { networkSettings = true } label: { Label("网络设置/诊断",systemImage:"network") }
+                            .accessibilityIdentifier("tangxin.network.open")
+                    }
                 }
+                .navigationDestination(for:TangxinVideo.self) { TangxinDetailView(video:$0,client:selected) }
+                .navigationDestination(for:TangxinAuthor.self) { author in
+                    TangxinListView(root:author.url,title:author.name,client:selected,isAuthor:true)
+                }
+        }.id(compatibility)
+        .sheet(isPresented:$networkSettings) { TangxinNetworkSettings(client:client,compatibility:$compatibility) }
+    }
+}
+
+/// Local to Tangxin. No system settings, fixed IPs, TLS or private-network exceptions.
+struct TangxinNetworkSettings: View {
+    let client: TangxinClient
+    @Binding var compatibility: Bool
+    @Environment(\.dismiss) private var dismiss
+    @State private var status = "尚未运行诊断；请在出错的同一网络下运行。"
+    @State private var running = false
+    @State private var request = UUID()
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("糖心网络策略") {
+                    Toggle("系统代理/Fake-IP兼容",isOn:$compatibility)
+                        .accessibilityIdentifier("tangxin.network.compatibility")
+                    Text(compatibility ? "当前：系统代理兼容（用户选择）" : "当前：严格模式（默认）")
+                    Text("仅在信任当前 VPN/系统代理时开启。只允许已核准来源的 198.18.0.0/15 合成地址；私网、ULA、fd27 等仍拒绝。不代表已确认当前网络使用 Fake-IP，也不保证能修复。仅影响糖心；不会修改系统 DNS、代理、TLS 或其他栏目。切换后重建糖心页面与请求。")
+                        .font(.footnote)
+                }
+                Section("只读诊断") {
+                    Text(status).font(.footnote).textSelection(.enabled)
+                        .accessibilityIdentifier("tangxin.network.status")
+                    if running { ProgressView("检查来源连接") }
+                    Button("运行诊断/重试") { request = UUID() }
+                        .disabled(running).accessibilityIdentifier("tangxin.network.run")
+                    Link("在 Safari 核对来源",destination:TangxinPolicy.featured)
+                        .accessibilityIdentifier("tangxin.network.source")
+                    Text("仅请求公开列表，不渲染网页、不绕验证。诊断不显示完整 URL、查询、Cookie、密钥或地址。原生播放器会自行解析/连接分片，应用的预检不是 DNS 固定，不能承诺播放期每次解析与重定向均被拦截。")
+                        .font(.footnote)
+                }
+            }.navigationTitle("网络设置/诊断")
+                .toolbar { ToolbarItem(placement:.confirmationAction) { Button("完成") { dismiss() } } }
         }
+        .task(id:request) {
+            running = true
+            status = "正在检查 tangxinvlog.app · 查询 · " + (compatibility ? "系统代理兼容" : "严格模式")
+            do {
+                let page = try await client.withDNSMode(compatibility ? .systemProxy : .strict).list(TangxinPolicy.featured)
+                try Task.checkCancellation()
+                status = "tangxinvlog.app · 查询：HTTP 200 · 状态 " + page.state.rawValue + " · 可显示 \(page.videos.count) 项（不等于播放验收）"
+            } catch { status = Task.isCancelled ? "诊断已取消，请重试" : error.localizedDescription }
+            running = false
+        }
+        .onChange(of:compatibility) { _, _ in request = UUID() }
     }
 }
 struct TangxinListView: View {
@@ -87,6 +145,8 @@ struct TangxinListView: View {
                     Text("作者作品 · 仅显示当前已加载且通过内容筛查的视频")
                         .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                 }
+                Link("在 Safari 核对来源",destination:model.root)
+                    .font(.caption).padding(.horizontal).accessibilityIdentifier("tangxin.source")
                 Text("来源：糖心Vlog · 限合法、自愿成人内容")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                 LazyVGrid(columns:[GridItem(.adaptive(minimum:160),spacing:14)],spacing:18) {
@@ -107,7 +167,12 @@ struct TangxinListView: View {
                         }
                     }
                 }.padding(.horizontal)
-                if model.loading { ProgressView().frame(maxWidth:.infinity,minHeight:44) }
+                if model.loading { ProgressView("正在加载来源").frame(maxWidth:.infinity,minHeight:44) }
+                if !model.loading, model.error == nil, model.pageState == nil {
+                    Text("尚未加载完成，请重试。")
+                    Button("重试加载") { Task { await model.refresh() } }.frame(minHeight:44)
+                        .accessibilityIdentifier("tangxin.idle.retry")
+                }
                 if !model.loading, model.error == nil, let state = model.pageState, state != .content {
                     VStack(alignment:.leading,spacing:8) {
                         switch state {
