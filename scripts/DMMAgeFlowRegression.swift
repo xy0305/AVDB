@@ -9,7 +9,8 @@ final class DMMAgeMock: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
     override func startLoading() {
         let url = request.url!
-        Self.paths.append(url.path)
+        let path = URLComponents(url: url, resolvingAgainstBaseURL: false)!.path
+        Self.paths.append(path)
         precondition(request.value(forHTTPHeaderField: "Authorization") == nil)
         precondition(request.value(forHTTPHeaderField: "X-115-Token") == nil)
         let returnURL = "https%3A%2F%2Fvideo.dmm.co.jp%2Fav%2Franking%2F%3Fterm%3Dweekly"
@@ -18,7 +19,7 @@ final class DMMAgeMock: URLProtocol, @unchecked Sendable {
         var status = 200, headers: [String: String] = [:], body = ""
         if Self.mode == "cross" { status = 302; headers["Location"] = "https://accounts.dmm.co.jp/login/" }
         else if Self.mode == "loop" { status = 302; headers["Location"] = url.absoluteString }
-        else if url.path == "/age_check/=/declared=yes/" {
+        else if path == "/age_check/=/declared=yes/" {
             status = 302; headers = ["Location": "https://video.dmm.co.jp/av/ranking/?term=weekly", "Set-Cookie": "age_checked=yes; Domain=.dmm.co.jp; Path=/; Secure; HttpOnly; Max-Age=60"]
         } else if url.host == "www.dmm.co.jp" {
             body = "18歳以上<script id=\"__NEXT_DATA__\" type=\"application/json\">{\"props\":{\"pageProps\":{\"yesButtonLink\":\"\(yes)\"}}}</script>"

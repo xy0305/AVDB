@@ -52,6 +52,10 @@ actor DMMTransport {
         for _ in 0..<8 {
             try Task.checkCancellation()
             guard Self.allowed(url) else { throw DMMRankingError.accessGate }
+            // Only a parsed official age page may authorize this state transition.
+            if URLComponents(url: url, resolvingAgainstBaseURL: false)?.path == "/age_check/=/declared=yes/" {
+                guard authorizeAdultDeclaration, declared else { throw DMMRankingError.accessGate }
+            }
             var request = URLRequest(url: url)
             let now = Date()
             cookies.removeAll { ($0.expiresDate ?? .distantFuture) < now }
