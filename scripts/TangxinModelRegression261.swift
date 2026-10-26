@@ -6,7 +6,7 @@ actor TangxinModelFixture261 {
     var secondCount = 0
     var waiting = false
     func fetch(_ url:URL) async throws -> Data {
-        if url.path == "/featured/" {
+        if url.path == "/featured" || url.path == "/featured/" {
             firstCount += 1
             if waiting { try await Task.sleep(nanoseconds:2_000_000_000) }
             return Data(TangxinFixtures261.first.utf8)

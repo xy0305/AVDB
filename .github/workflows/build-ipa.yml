@@ -47,6 +47,9 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
+      - name: Tangxin production parser and transport neutral tests
+        run: python3 scripts/test-tangxin261.py
+
       - name: Offline production contracts and synthetic Swift regression (no source probes)
         run: python3 scripts/test-online254.py
 
@@ -108,9 +111,6 @@ jobs:
         run: |
           python3 scripts/test-native-lut.py
           python3 scripts/test-mediapipe-parity.py
-
-      - name: Tangxin production parser and transport neutral tests
-        run: python3 scripts/test-tangxin261.py
 
       - name: Install pinned native MediaPipe SDK
         run: |
