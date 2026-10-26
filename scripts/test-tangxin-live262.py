@@ -13,6 +13,8 @@ with tempfile.TemporaryDirectory() as d:
  identity=p/'Identity.swift'; identity.write_text('import Foundation\nenum CatalogueIdentity {'+s.split('enum CatalogueIdentity {',1)[1].split('\nstruct ScrapedMetadata:',1)[0])
  files=['PlaybackDiagnostic','JavRankingCore','MissAVCore','OnlinePlaybackCore','OnlineAdditionalProviders','DetailOnlineAdapters']
  base=[str(R/('AVDB/Services/'+f+'.swift')) for f in files]
+ # Match the 261 production quality dependency closure (AVFoundation/CoreGraphics).
+ base.append(str(R/'AVDB/Views/Player/PlaybackVideoMetrics.swift'))
  main=p/'Probe.swift';main.write_text('''import Foundation
 @main struct Probe {
  static func main() throws {
