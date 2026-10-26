@@ -34,7 +34,10 @@ devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','a
 for kind in ['iPhone','iPad']:
  choices=[d for rt,ds in devices.items() if 'iOS' in rt for d in ds if kind in d['name']];assert choices
  d=choices[0]
- if d['state']!='Booted':subprocess.run(['xcrun','simctl','boot',d['udid']],check=True)
+ # Keep only one device booted: concurrent iPhone/iPad SpringBoards can exhaust
+ # the hosted runner and make DVT lose all concrete simulator destinations.
+ subprocess.run(['xcrun','simctl','shutdown','all'],check=True)
+ subprocess.run(['xcrun','simctl','boot',d['udid']],check=True)
  subprocess.run(['xcrun','simctl','bootstatus',d['udid'],'-b'],check=True)
  if kind == 'iPhone':
   sdk=subprocess.check_output(['xcrun','--sdk','iphonesimulator','--show-sdk-path'],text=True).strip()
@@ -43,7 +46,7 @@ for kind in ['iPhone','iPad']:
   subprocess.run(['xcrun','--sdk','iphonesimulator','swiftc','-parse-as-library','-swift-version','5','-target',platform.machine()+'-apple-ios17.0-simulator','-sdk',sdk,*[str(R/f) for f in model_files],'-o',str(binary)],check=True)
   subprocess.run(['xcrun','simctl','spawn',d['udid'],str(binary)],check=True,timeout=60)
  xc=O/(kind+'.xcresult');shots=O/(kind+'-screenshots');shots.mkdir(exist_ok=True)
- code=subprocess.call(['xcodebuild','test','-project',str(O/'Tangxin261.xcodeproj'),'-scheme','Tangxin261','-configuration','Release','-destination','platform=iOS Simulator,id='+d['udid'],'-derivedDataPath',str(O/'Derived'),'-resultBundlePath',str(xc),'-parallel-testing-enabled','NO','CODE_SIGNING_ALLOWED=NO'],cwd=R)
+ code=subprocess.call(['xcodebuild','test','-project',str(O/'Tangxin261.xcodeproj'),'-scheme','Tangxin261','-configuration','Release','-destination','platform=iOS Simulator,id='+d['udid'],'-destination-timeout','180','-derivedDataPath',str(O/'Derived'),'-resultBundlePath',str(xc),'-parallel-testing-enabled','NO','CODE_SIGNING_ALLOWED=NO'],cwd=R)
  if xc.exists():subprocess.run(['xcrun','xcresulttool','export','attachments','--path',str(xc),'--output-path',str(shots)],check=True)
  status[kind]={'name':d['name'],'exit':code,'synthetic':True,'realPlaybackVerified':False}
  (O/'status.json').write_text(json.dumps(status,indent=2))
