@@ -57,6 +57,7 @@ import UniformTypeIdentifiers
 
 @MainActor private struct DMMRankingPage: View {
     @ObservedObject var store: DMMRankingStore
+    @State private var manualSearch = false
     let rows: [DMMRankingRow]
     @StateObject private var mapper = JavVerseMapper(scope: "dmm|weekly|manufacturer-verified")
     private func entry(_ row: DMMRankingRow) -> JavVerseEntry? {
@@ -90,10 +91,11 @@ import UniformTypeIdentifiers
                     Text(store.messages[row.cid] ?? "按需核对，不从CID推号").font(.caption)
                     Button("获取 / 重试详情") { store.request(row) }
                 }
-                NavigationLink("手动搜索核对（不自动认领）") { SearchView() }.font(.caption)
+                Button("手动搜索核对（不自动认领）") { manualSearch = true }.font(.caption)
             }.padding(.vertical, 4)
         }.listStyle(.plain)
         .buttonStyle(.borderless)
+        .navigationDestination(isPresented: $manualSearch) { SearchView() }
         .onDisappear { mapper.cancel() }
     }
 }
