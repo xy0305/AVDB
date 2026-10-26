@@ -1,0 +1,42 @@
+name: DMM native preview 266
+on:
+  push:
+    branches: [feat/dmm-ranking-from261]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dmm:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Production parser regression
+        run: |
+          set -euo pipefail
+          swiftc AVDB/Services/DMMRankingCore.swift scripts/DMMRankingRegression.swift -o /tmp/dmm-regression
+          /tmp/dmm-regression scripts/dmm-ranking-fixtures
+      - name: Build native simulator
+        run: |
+          set -euo pipefail
+          xcodebuild -project AVDB.xcodeproj -scheme AVDB -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/dmm-sim CODE_SIGNING_ALLOWED=NO build > /tmp/dmm-sim.log 2>&1 || { tail -100 /tmp/dmm-sim.log; exit 1; }
+      - name: Build unsigned arm64 release
+        run: |
+          set -euo pipefail
+          xcodebuild -project AVDB.xcodeproj -scheme AVDB -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/dmm-release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' CODE_SIGN_ENTITLEMENTS='' build > /tmp/dmm-release.log 2>&1 || { tail -100 /tmp/dmm-release.log; exit 1; }
+          mkdir -p /tmp/dmm-package/Payload
+          ditto /tmp/dmm-release/Build/Products/Release-iphoneos/AVDB.app /tmp/dmm-package/Payload/AVDB.app
+          cd /tmp/dmm-package
+          zip -qry "$GITHUB_WORKSPACE/AVDB-unsigned-1.0.2-266-dmm-preview.ipa" Payload
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Payload/AVDB.app/Info.plist
+          lipo -info Payload/AVDB.app/AVDB
+          if codesign -dv Payload/AVDB.app 2>/dev/null; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AVDB-unsigned-1.0.2-266-dmm-preview
+          path: '*.ipa'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dmm-build-logs
+          path: /tmp/dmm-*.log

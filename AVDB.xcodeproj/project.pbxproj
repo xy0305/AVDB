@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7EEA0D8E71C4E74DA6994F0E /* DMMRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4031D23F39AF24C4C02AD8D /* DMMRankingView.swift */; };
+		A3EC3F1685CEB8B8FF962DBD /* DMMRankingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */; };
+		69597798619FBE0B45B47025 /* DMMRankingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 204221DE191DC1FDA176767F /* DMMRankingCore.swift */; };
 		B26100000000000000000003 /* AVDBNativeTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000003 /* AVDBNativeTabBar.swift */; };
 		B26100000000000000000002 /* TangxinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000002 /* TangxinView.swift */; };
 		B26100000000000000000001 /* TangxinCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000001 /* TangxinCore.swift */; };
@@ -94,6 +97,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F4031D23F39AF24C4C02AD8D /* DMMRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingView.swift; sourceTree = "<group>"; };
+		08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingStore.swift; sourceTree = "<group>"; };
+		204221DE191DC1FDA176767F /* DMMRankingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingCore.swift; sourceTree = "<group>"; };
 		C26100000000000000000003 /* AVDBNativeTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVDBNativeTabBar.swift; sourceTree = "<group>"; };
 		C26100000000000000000002 /* TangxinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TangxinView.swift; sourceTree = "<group>"; };
 		C26100000000000000000001 /* TangxinCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TangxinCore.swift; sourceTree = "<group>"; };
@@ -275,6 +281,7 @@
 		A115C11E7A7B115C11E7A201 /* Rankings */ = {
 			isa = PBXGroup;
 			children = (
+				F4031D23F39AF24C4C02AD8D /* DMMRankingView.swift */,
 				A115C11E7A7B115C11E7A105 /* RankingsView.swift */,
 			);
 			name = Rankings;
@@ -293,6 +300,8 @@
 		A1B9B43015237F5437EE30F3 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */,
+				204221DE191DC1FDA176767F /* DMMRankingCore.swift */,
 				A16700000000000000000002 /* JavRankingCore.swift */,
 				B17400000000000000000000 /* MissAVCore.swift */,
 				C25400000000000000000003 /* DetailOnlineAdapters.swift */,
@@ -506,6 +515,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7EEA0D8E71C4E74DA6994F0E /* DMMRankingView.swift in Sources */,
+				A3EC3F1685CEB8B8FF962DBD /* DMMRankingStore.swift in Sources */,
+				69597798619FBE0B45B47025 /* DMMRankingCore.swift in Sources */,
 				B26100000000000000000003 /* AVDBNativeTabBar.swift in Sources */,
 				B26100000000000000000002 /* TangxinView.swift in Sources */,
 				B26100000000000000000001 /* TangxinCore.swift in Sources */,
@@ -595,7 +607,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 264;
+				CURRENT_PROJECT_VERSION = 266;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -618,7 +630,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 264;
+				CURRENT_PROJECT_VERSION = 266;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

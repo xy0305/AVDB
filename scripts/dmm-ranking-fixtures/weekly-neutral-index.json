@@ -1,0 +1,548 @@
+{
+  "period": {
+    "start": null,
+    "end": null,
+    "kind": "weekly",
+    "label": "週間"
+  },
+  "entries": [
+    {
+      "rank": 1,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mfyd00204",
+      "cid": "mfyd00204"
+    },
+    {
+      "cid": "sone00269",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00269",
+      "rank": 2
+    },
+    {
+      "rank": 3,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=skhb00009",
+      "cid": "skhb00009"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=eyan00227",
+      "cid": "eyan00227",
+      "rank": 4
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=npjb00102",
+      "cid": "npjb00102",
+      "rank": 5
+    },
+    {
+      "cid": "sivr00525",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sivr00525",
+      "rank": 6
+    },
+    {
+      "rank": 7,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=spone00001",
+      "cid": "spone00001"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00425",
+      "rank": 8,
+      "cid": "sone00425"
+    },
+    {
+      "rank": 9,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mida00823",
+      "cid": "mida00823"
+    },
+    {
+      "cid": "hsoda00004",
+      "rank": 10,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=hsoda00004"
+    },
+    {
+      "cid": "sone00912",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00912",
+      "rank": 11
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1sdnm00554",
+      "rank": 12,
+      "cid": "1sdnm00554"
+    },
+    {
+      "cid": "sone00400",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00400",
+      "rank": 13
+    },
+    {
+      "rank": 14,
+      "cid": "1favr00010",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1favr00010"
+    },
+    {
+      "rank": 15,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00198",
+      "cid": "sone00198"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=dass00431",
+      "cid": "dass00431",
+      "rank": 16
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00312",
+      "rank": 17,
+      "cid": "sone00312"
+    },
+    {
+      "rank": 18,
+      "cid": "h_1721fkaw00004",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=h_1721fkaw00004"
+    },
+    {
+      "cid": "sone00371",
+      "rank": 19,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00371"
+    },
+    {
+      "rank": 20,
+      "cid": "mida00791",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mida00791"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mida00821",
+      "cid": "mida00821",
+      "rank": 21
+    },
+    {
+      "rank": 22,
+      "cid": "ofje00426",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ofje00426"
+    },
+    {
+      "rank": 23,
+      "cid": "sivr00492",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sivr00492"
+    },
+    {
+      "rank": 24,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=idbd00894",
+      "cid": "idbd00894"
+    },
+    {
+      "cid": "sone00991",
+      "rank": 25,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00991"
+    },
+    {
+      "rank": 26,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ktkf01005",
+      "cid": "ktkf01005"
+    },
+    {
+      "cid": "kwbd00376",
+      "rank": 27,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=kwbd00376"
+    },
+    {
+      "cid": "ssis00760",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ssis00760",
+      "rank": 28
+    },
+    {
+      "cid": "sone00324",
+      "rank": 29,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00324"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00152",
+      "cid": "snos00152",
+      "rank": 30
+    },
+    {
+      "cid": "ipzz00734",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ipzz00734",
+      "rank": 31
+    },
+    {
+      "rank": 32,
+      "cid": "ssis00308",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ssis00308"
+    },
+    {
+      "rank": 33,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ofje00545",
+      "cid": "ofje00545"
+    },
+    {
+      "rank": 34,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=prpm00001",
+      "cid": "prpm00001"
+    },
+    {
+      "cid": "sone00925",
+      "rank": 35,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00925"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00489",
+      "cid": "snos00489",
+      "rank": 36
+    },
+    {
+      "cid": "sone00316",
+      "rank": 37,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00316"
+    },
+    {
+      "rank": 38,
+      "cid": "13dsvr02035",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=13dsvr02035"
+    },
+    {
+      "cid": "sivr00514",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sivr00514",
+      "rank": 39
+    },
+    {
+      "cid": "jums00038",
+      "rank": 40,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=jums00038"
+    },
+    {
+      "cid": "ipvr00389",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ipvr00389",
+      "rank": 41
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ofje00547",
+      "rank": 42,
+      "cid": "ofje00547"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1namh00052",
+      "rank": 43,
+      "cid": "1namh00052"
+    },
+    {
+      "rank": 44,
+      "cid": "1namh00051",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1namh00051"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00093",
+      "cid": "snos00093",
+      "rank": 45
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ebwh00372",
+      "cid": "ebwh00372",
+      "rank": 46
+    },
+    {
+      "rank": 47,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=vrkm01658",
+      "cid": "vrkm01658"
+    },
+    {
+      "cid": "bmw00294",
+      "rank": 48,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=bmw00294"
+    },
+    {
+      "rank": 49,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=hhf00033",
+      "cid": "hhf00033"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00811",
+      "cid": "sone00811",
+      "rank": 50
+    },
+    {
+      "cid": "snos00384",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00384",
+      "rank": 51
+    },
+    {
+      "rank": 52,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mdvr00394",
+      "cid": "mdvr00394"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=urvrsp00620",
+      "rank": 53,
+      "cid": "urvrsp00620"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00209",
+      "rank": 54,
+      "cid": "snos00209"
+    },
+    {
+      "cid": "sone00299",
+      "rank": 55,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00299"
+    },
+    {
+      "rank": 56,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00334",
+      "cid": "snos00334"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mida00826",
+      "cid": "mida00826",
+      "rank": 57
+    },
+    {
+      "rank": 58,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1namh00079",
+      "cid": "1namh00079"
+    },
+    {
+      "rank": 59,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mida00808",
+      "cid": "mida00808"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00003",
+      "cid": "snos00003",
+      "rank": 60
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=hndb00250",
+      "cid": "hndb00250",
+      "rank": 61
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=urvrsp00603",
+      "cid": "urvrsp00603",
+      "rank": 62
+    },
+    {
+      "rank": 63,
+      "cid": "dvmm00453",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=dvmm00453"
+    },
+    {
+      "rank": 64,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=pppe00449",
+      "cid": "pppe00449"
+    },
+    {
+      "rank": 65,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=atkd00354",
+      "cid": "atkd00354"
+    },
+    {
+      "rank": 66,
+      "cid": "sivr00479",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sivr00479"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mida00368",
+      "rank": 67,
+      "cid": "mida00368"
+    },
+    {
+      "cid": "ebwh00382",
+      "rank": 68,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ebwh00382"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1murikuri00015",
+      "cid": "1murikuri00015",
+      "rank": 69
+    },
+    {
+      "cid": "1namh00053",
+      "rank": 70,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1namh00053"
+    },
+    {
+      "rank": 71,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ebwh00385",
+      "cid": "ebwh00385"
+    },
+    {
+      "cid": "roe00244",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=roe00244",
+      "rank": 72
+    },
+    {
+      "cid": "mida00812",
+      "rank": 73,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mida00812"
+    },
+    {
+      "cid": "snos00157",
+      "rank": 74,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00157"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=hmn00917",
+      "rank": 75,
+      "cid": "hmn00917"
+    },
+    {
+      "rank": 76,
+      "cid": "ebwh00301",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ebwh00301"
+    },
+    {
+      "rank": 77,
+      "cid": "urvrsp00613",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=urvrsp00613"
+    },
+    {
+      "rank": 78,
+      "cid": "mikr00129",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mikr00129"
+    },
+    {
+      "cid": "juvr00281",
+      "rank": 79,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=juvr00281"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=kwbd00355",
+      "cid": "kwbd00355",
+      "rank": 80
+    },
+    {
+      "cid": "1jera00049",
+      "rank": 81,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1jera00049"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1namh00055",
+      "cid": "1namh00055",
+      "rank": 82
+    },
+    {
+      "rank": 83,
+      "cid": "jfb00337",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=jfb00337"
+    },
+    {
+      "cid": "1namh00040",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1namh00040",
+      "rank": 84
+    },
+    {
+      "rank": 85,
+      "cid": "ofje00410",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ofje00410"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=atvr00075",
+      "cid": "atvr00075",
+      "rank": 86
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00377",
+      "rank": 87,
+      "cid": "snos00377"
+    },
+    {
+      "rank": 88,
+      "cid": "mdvr00443",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mdvr00443"
+    },
+    {
+      "rank": 89,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=mfyd00196",
+      "cid": "mfyd00196"
+    },
+    {
+      "cid": "huntc00137",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=huntc00137",
+      "rank": 90
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=sone00969",
+      "cid": "sone00969",
+      "rank": 91
+    },
+    {
+      "cid": "h_1758jjgg00009",
+      "rank": 92,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=h_1758jjgg00009"
+    },
+    {
+      "rank": 93,
+      "cid": "snos00022",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=snos00022"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ipzz00677",
+      "cid": "ipzz00677",
+      "rank": 94
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=1dandya00023",
+      "cid": "1dandya00023",
+      "rank": 95
+    },
+    {
+      "cid": "jums00010",
+      "rank": 96,
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=jums00010"
+    },
+    {
+      "rank": 97,
+      "cid": "ipzz00713",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ipzz00713"
+    },
+    {
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=cemd00751",
+      "rank": 98,
+      "cid": "cemd00751"
+    },
+    {
+      "rank": 99,
+      "cid": "atad00160",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=atad00160"
+    },
+    {
+      "cid": "ebvr00115",
+      "sourceURL": "https://video.dmm.co.jp/av/content/?id=ebvr00115",
+      "rank": 100
+    }
+  ],
+  "title": "【100位まで】週間作品ランキング｜エロ動画・アダルトビデオ｜FANZA動画",
+  "pagination": [],
+  "observedAt": "2026-10-26T07:41:57.628Z",
+  "sourceURL": "https://video.dmm.co.jp/av/ranking/?term=weekly",
+  "navigation": [
+    {
+      "url": "https://video.dmm.co.jp/av/ranking/?release=latest",
+      "label": "新作ランキング"
+    },
+    {
+      "url": "https://video.dmm.co.jp/av/ranking/?term=monthly&type=actress",
+      "label": "月間AV女優"
+    },
+    {
+      "url": "https://video.dmm.co.jp/av/ranking/?term=monthly&type=series",
+      "label": "月間シリーズ"
+    },
+    {
+      "label": "10分(2D)",
+      "url": "https://video.dmm.co.jp/av/ranking/?term=realtime"
+    },
+    {
+      "url": "https://video.dmm.co.jp/av/ranking/?term=realtime&only=vr",
+      "label": "10分(VR)"
+    },
+    {
+      "label": "日間",
+      "url": "https://video.dmm.co.jp/av/ranking/?term=daily"
+    },
+    {
+      "url": "https://video.dmm.co.jp/av/ranking/?term=monthly",
+      "label": "月間"
+    },
+    {
+      "url": "https://video.dmm.co.jp/av/ranking/?release=latest",
+      "label": "新作"
+    }
+  ]
+}
