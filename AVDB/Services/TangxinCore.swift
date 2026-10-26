@@ -13,10 +13,23 @@ struct TangxinVideo: Identifiable, Hashable, Sendable {
     let author: TangxinAuthor?
     var id: URL { url } // Not a JavDB/Movie identifier.
 }
+enum TangxinPageState: String, Sendable {
+    case content, sourceEmpty, filtered, structureChanged
+}
+// Counts only: never persist titles, accounts, URLs or blocked metadata in diagnostics.
+struct TangxinPageReport: Sendable {
+    let cards: Int
+    let extracted: Int
+    let blocked: Int
+    let malformed: Int
+    let duplicates: Int
+}
 struct TangxinPage: Sendable {
     let videos: [TangxinVideo]
     let next: URL?
     let heading: String?
+    let state: TangxinPageState
+    let report: TangxinPageReport
 }
 struct TangxinDetail: Sendable {
     let video: TangxinVideo
@@ -117,26 +130,44 @@ enum TangxinParser {
     static func list(_ html: String, at page: URL) throws -> TangxinPage {
         guard TangxinPolicy.page(page) else { throw TangxinError.unsafe }
         var videos: [TangxinVideo] = []; var seen = Set<URL>()
+        var extracted = 0, blocked = 0, malformed = 0, duplicates = 0
         let cards = matches("<article\\b([^>]*)>(.*?)</article\\s*>",html).filter { (attrs($0[1])["class"] ?? "").split(separator:" ").contains("card") }
         for card in cards {
-            for (a,body) in links(card[2]) where (a["class"] ?? "").split(separator:" ").contains("cover-link") {
-                guard let raw = a["href"], let u = TangxinPolicy.resolve(raw,at:page), TangxinPolicy.video(u), seen.insert(u).inserted else { continue }
-                let imageTag = matches("<img\\b([^>]*)>",body).first.map { attrs($0[1]) } ?? [:]
-                let title = clean(a["aria-label"] ?? imageTag["alt"] ?? "")
-                let tags = links(card[2]).filter { ($0.0["href"] ?? "").hasPrefix("/tag/") }.map { clean($0.1) }
-                guard !title.isEmpty, TangxinPolicy.permitted(([title] + tags).joined(separator:" ")) else { continue }
-                let poster = imageTag["src"].flatMap { TangxinPolicy.resolve($0,at:page) }.flatMap { TangxinPolicy.image($0) ? $0 : nil }
-                videos.append(TangxinVideo(url:u,title:title,poster:poster,author:author(card[2],at:page)))
-            }
+            // Scope title/tags to this card; never inspect global tag navigation or nicknames.
+            let covers = links(card[2]).filter { ($0.0["class"] ?? "").split(separator:" ").contains("cover-link") }
+            guard covers.count == 1, let (a,body) = covers.first,
+                  let raw = a["href"], let u = TangxinPolicy.resolve(raw,at:page), TangxinPolicy.video(u) else { malformed += 1; continue }
+            let imageTag = matches("<img\\b([^>]*)>",body).first.map { attrs($0[1]) } ?? [:]
+            let candidates = [a["aria-label"], imageTag["alt"]].compactMap { $0 }.map(clean).filter { !$0.isEmpty }
+            let headings = matches("<h3\\b([^>]*)>(.*?)</h3\\s*>",card[2]).filter { (attrs($0[1])["class"] ?? "").split(separator:" ").contains("title") }
+            // Real source uses a separate h3.title link as well as the image alt.
+            let titles = headings.flatMap { links($0[2]) }.filter { link in
+                link.0["href"].flatMap { TangxinPolicy.resolve($0,at:page) } == u
+            }.map { clean($0.1) }.filter { !$0.isEmpty }
+            guard let title = (candidates + titles).first else { malformed += 1; continue }
+            extracted += 1
+            let tags = links(card[2]).filter { ($0.0["href"] ?? "").hasPrefix("/tag/") }.map { clean($0.1) }
+            // Check every available video title; a benign alt cannot mask a risky heading.
+            guard TangxinPolicy.permitted((candidates + titles + tags).joined(separator:" ")) else { blocked += 1; continue }
+            guard seen.insert(u).inserted else { duplicates += 1; continue }
+            let poster = imageTag["src"].flatMap { TangxinPolicy.resolve($0,at:page) }.flatMap { TangxinPolicy.image($0) ? $0 : nil }
+            videos.append(TangxinVideo(url:u,title:title,poster:poster,author:author(card[2],at:page)))
         }
         let next = links(html).compactMap { a,body -> URL? in
             guard a["rel"] == "next" || clean(body).contains("下一页") else { return nil }
             guard let href = a["href"], let url = TangxinPolicy.resolve(href,at:page), TangxinPolicy.next(url,from:page) else { return nil }
             return url
         }.first
-        // Empty known grids are legitimate; challenge/changed markup is not a silent end.
-        guard !cards.isEmpty || html.contains("class=\"grid\"") else { throw TangxinError.structure }
-        return TangxinPage(videos:videos,next:next,heading:matches("<h1\\b[^>]*>(.*?)</h1>",html).first.map { clean($0[1]) })
+        // A recognized empty grid is not proof that the policy blocked anything.
+        // Unknown/partial markup keeps an independently validated next link for manual advance.
+        let emptyGrid = matches("<div\\b([^>]*)>\\s*</div\\s*>",html).contains { (attrs($0[1])["class"] ?? "").split(separator:" ").contains("grid") }
+        let state: TangxinPageState
+        if !videos.isEmpty { state = .content }
+        else if malformed > 0 || (cards.isEmpty && !emptyGrid) { state = .structureChanged }
+        else if blocked > 0 { state = .filtered }
+        else { state = .sourceEmpty }
+        return TangxinPage(videos:videos,next:next,heading:matches("<h1\\b[^>]*>(.*?)</h1>",html).first.map { clean($0[1]) },state:state,
+                           report:TangxinPageReport(cards:cards.count,extracted:extracted,blocked:blocked,malformed:malformed,duplicates:duplicates))
     }
     static func detail(_ html: String, at page: URL) throws -> TangxinDetail {
         guard TangxinPolicy.video(page), let info = matches("<article\\b([^>]*)>(.*?)</article\\s*>",html).first(where: { (attrs($0[1])["class"] ?? "").split(separator:" ").contains("info") }) else { throw TangxinError.structure }

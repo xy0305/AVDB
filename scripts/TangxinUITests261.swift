@@ -4,6 +4,23 @@ final class TangxinUITests261: XCTestCase {
     func shot(_ name:String) {
         let a = XCTAttachment(screenshot:XCUIApplication().screenshot()); a.name = "SYNTHETIC-261-"+name; a.lifetime = .keepAlways; add(a)
     }
+    func testEmptyStatesAndManualAdvance262() {
+        let app = XCUIApplication(); app.launchArguments = ["--empty-states262"]; app.launch()
+        app.buttons["app.tab.4"].tap()
+        for state in ["filtered", "sourceEmpty", "structureChanged"] {
+            let view = app.otherElements["tangxin.state.\(state)"]
+            XCTAssertTrue(view.waitForExistence(timeout:8),state)
+            XCTAssertFalse(app.buttons["tangxin.video.neutral1"].exists)
+            shot("262-state-"+state)
+            let more = app.buttons["tangxin.more"]
+            if !more.isHittable { app.swipeUp() }
+            XCTAssertTrue(more.isHittable); more.tap()
+        }
+        XCTAssertTrue(app.buttons["tangxin.video.neutral1"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.buttons["tangxin.video.blocked"].exists)
+        XCTAssertFalse(app.buttons["tangxin.more"].exists)
+        shot("262-mixed-safe-content")
+    }
     func testNativeTabAuthorWorksAndBack() {
         let app = XCUIApplication(); app.launch()
         let tab = app.buttons["app.tab.4"]

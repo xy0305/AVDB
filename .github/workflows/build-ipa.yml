@@ -49,6 +49,9 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
+      - name: Read-only live production Swift counts (no titles or HTML retained)
+        run: python3 scripts/test-tangxin-live262.py
+
       - name: Tangxin production parser and transport neutral tests
         run: python3 scripts/test-tangxin261.py
 

@@ -29,7 +29,30 @@ import Foundation
         let safeNext = try TangxinParser.list(evilNext,at:root)
         precondition(safeNext.next == nil)
         reject { _ = try TangxinParser.detail(TangxinFixtures261.detail.replacingOccurrences(of:"https://t.5gcdn.xyz/videos/neutral1/index.m3u8",with:""),at:first.videos[0].url) }
-        reject { _ = try TangxinParser.list("<html>Challenge required</html>",at:root) }
+        let changed = try TangxinParser.list("<html>Challenge required</html>",at:root)
+        precondition(changed.state == .structureChanged && changed.report.cards == 0)
+        let safe = TangxinFixtures261.card("safe")
+        let unsafe = TangxinFixtures261.card("blocked",title:"未成年")
+        let nextLink = "<a rel='next' href='/featured/2'>Next</a>"
+        let allBlocked = try TangxinParser.list("<div class='grid'>" + unsafe + "</div>" + nextLink,at:root)
+        precondition(allBlocked.state == .filtered && allBlocked.next != nil && allBlocked.report.blocked == 1)
+        let empty = try TangxinParser.list("<div class='grid additional'></div>" + nextLink,at:root)
+        precondition(empty.state == .sourceEmpty && empty.report.blocked == 0 && empty.next != nil)
+        let malformed = try TangxinParser.list("<div class='grid'><article class='card'><a class='cover-link' href='/v/missing/'></a></article></div>" + nextLink,at:root)
+        precondition(malformed.state == .structureChanged && malformed.report.malformed == 1 && malformed.next != nil)
+        let mixed = try TangxinParser.list("<nav><a href='/tag/risk/'>偷拍</a></nav><div class='grid'>" + safe + unsafe + "</div>" + nextLink,at:root)
+        precondition(mixed.videos.count == 1 && mixed.report.blocked == 1 && mixed.state == .content && mixed.next != nil)
+        let headingCard = "<article class='card'><a class='cover-link' href='/v/heading/'><img alt=''></a><h3 class='title'><a href='/v/heading/'>成人自愿合成标题</a></h3><a class='nickname' href='/a/test/'>黑料昵称</a></article>"
+        let headingPage = try TangxinParser.list(headingCard,at:root)
+        precondition(headingPage.videos.count == 1)
+        let conflicting = headingCard.replacingOccurrences(of:"alt=''",with:"alt='成人自愿合成标题'").replacingOccurrences(of:">成人自愿合成标题<",with:">偷拍<")
+        let conflictingPage = try TangxinParser.list(conflicting,at:root)
+        precondition(conflictingPage.state == .filtered)
+        // Optional live HTML captured with a read-only production-header request. Counts only.
+        if let path = ProcessInfo.processInfo.environment["TANGXIN_LIVE_HTML"] {
+            let live = try TangxinParser.list(String(contentsOfFile:path,encoding:.utf8),at:root)
+            print("LIVE262 state=\(live.state.rawValue) cards=\(live.report.cards) extracted=\(live.report.extracted) blocked=\(live.report.blocked) malformed=\(live.report.malformed) duplicates=\(live.report.duplicates) displayed=\(live.videos.count) next=\(live.next != nil)")
+        }
         let client = TangxinFixtures261.client()
         let liveDetail = try await client.detail(first.videos[0].url)
         let plan = try await client.playback(liveDetail)
