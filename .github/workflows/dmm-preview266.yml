@@ -1,7 +1,7 @@
 name: DMM native preview 266
 on:
   push:
-    branches: [feat/dmm-ranking-from261]
+    branches: [feat/dmm-ranking-from261, fix/dmm-preview266-bundle-version]
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Preview source version synchronization
+        run: python3 scripts/check-dmm-preview-version.py
       - name: Production parser regression
         run: |
           set -euo pipefail
@@ -41,6 +43,7 @@ jobs:
           set -euo pipefail
           xcodebuild -workspace AVDB.xcworkspace -scheme AVDB -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/dmm-release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' CODE_SIGN_ENTITLEMENTS='' build > /tmp/dmm-release.log 2>&1 || { tail -100 /tmp/dmm-release.log; exit 1; }
           /usr/libexec/PlistBuddy -c "Add :AVDBSourceCommit string $GITHUB_SHA" /tmp/dmm-release/Build/Products/Release-iphoneos/AVDB.app/Info.plist
+          python3 scripts/check-dmm-preview-version.py /tmp/dmm-release/Build/Products/Release-iphoneos/AVDB.app/Info.plist "$GITHUB_SHA"
           mkdir -p /tmp/dmm-package/Payload
           ditto /tmp/dmm-release/Build/Products/Release-iphoneos/AVDB.app /tmp/dmm-package/Payload/AVDB.app
           cd /tmp/dmm-package
