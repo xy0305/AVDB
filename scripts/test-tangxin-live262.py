@@ -29,3 +29,11 @@ with tempfile.TemporaryDirectory() as d:
  subprocess.run([str(binary),str(html)],check=True)
  env=dict(os.environ,TANGXIN_LIVE_HTML=str(html))
  subprocess.run(['python3','scripts/test-tangxin261.py'],cwd=R,env=env,check=True)
+
+ # Compare curl's HTTP result with actual production Darwin DNS / URLSession.
+ # Only diagnostics and counts; no HTML/title/media/query data in output/artifacts.
+ network=p/'Network263.swift'
+ network.write_text('import Foundation\n@main struct Network263 {\n static func main() async {\n  let root = TangxinPolicy.featured\n  do {\n   try await OnlineMediaScope(root:root).validateDNS(mode:.strict,approvedOrigin:true)\n   print("PRODUCTION263 host=tangxinvlog.app stage=DNS strict=accepted (runner only)")\n   let page = try await TangxinClient().list(root)\n   print("PRODUCTION263 host=tangxinvlog.app stage=query HTTP=200 state=\\(page.state.rawValue) displayed=\\(page.videos.count) runnerOnly=true")\n  } catch {\n   print("PRODUCTION263 runnerOnly=true " + OnlineFailure.captured(error,at:.discovery).presentation(at:.discovery).display)\n  }\n }\n}\n')
+ netbin=p/'network263'
+ subprocess.run(['swiftc','-parse-as-library','-swift-version','5',str(identity),*base,str(R/'AVDB/Services/TangxinCore.swift'),str(network),'-o',str(netbin)],check=True)
+ subprocess.run([str(netbin)],check=True,timeout=90)

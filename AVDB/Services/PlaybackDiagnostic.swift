@@ -42,7 +42,7 @@ struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
     }
     static func safeHost(_ value: String) -> String? {
         guard value.utf8.count <= 253, value.range(of: #"^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"#, options: .regularExpression) != nil,
-              !value.contains("..") else { return nil }
+              !value.contains(".."), !value.allSatisfy({ $0.isNumber || $0 == "." }) else { return nil }
         return value.lowercased()
     }
     static func resourceHost(_ url: URL?) -> String? {
@@ -93,7 +93,7 @@ extension OnlineFailure {
                      systemCode: value.systemCode, host: value.host, dnsContext: value.dnsContext, detail: value.detail, errorDomain: value.errorDomain, addressSummary: value.addressSummary)
         case .diagnostic(let stage, let host, let reason):
             let known: [String:D.Stage] = ["查询":.discovery, "详情":.document, "清单":.manifest,
-                "清单解析":.manifest, "分片":.segment, "DNS":.dns]
+                "清单解析":.manifest, "分片":.segment, "密钥":.key, "图片":.image, "DNS":.dns]
             let parts = stage.split(separator: "/").map(String.init)
             let actual = parts.first.flatMap { known[$0] } ?? context
             // Existing diagnostic producers provide bounded fixed reasons. Classify
