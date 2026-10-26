@@ -2,13 +2,13 @@
 //  ContentView.swift
 //  AVDB
 //
-//  系统 TabView：iOS 26 自动使用 Liquid Glass Tab Bar，
-//  不再手绘悬浮条。
+//  原生六栏容器：iOS 26 Liquid Glass、iOS 17 material 回退。
+//  不使用系统五项溢出 More，避免新增栏目产生双重导航。
 //
 
 import SwiftUI
 
-enum AppTab: Int, CaseIterable, Identifiable {
+enum AppTab: Int, CaseIterable, Identifiable, Hashable {
     case home, rankings, categories, actors, tangxin, me
     var id: Int { rawValue }
 
@@ -38,6 +38,7 @@ enum AppTab: Int, CaseIterable, Identifiable {
 struct ContentView: View {
     var tangxinClient: TangxinClient = TangxinClient()
     @State private var selectedTab: AppTab = .home
+    @State private var visitedTabs: Set<AppTab> = [.home]
 
     var body: some View {
         #if DEBUG
@@ -75,75 +76,36 @@ struct ContentView: View {
     }
 
     private var mainTabs: some View {
-        TabView(selection: $selectedTab) {
-            HomeView()
-                .tabItem {
-                    Label(
-                        AppTab.home.title,
-                        systemImage: selectedTab == .home ? "house.fill" : AppTab.home.icon
-                    )
+        ZStack {
+            ForEach(AppTab.allCases) { tab in
+                if visitedTabs.contains(tab) {
+                    tabContent(tab)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .opacity(selectedTab == tab ? 1 : 0)
+                        .allowsHitTesting(selectedTab == tab)
+                        .accessibilityHidden(selectedTab != tab)
+                        .zIndex(selectedTab == tab ? 1 : 0)
                 }
-                .tag(AppTab.home)
-
-            RankingsView()
-                .tabItem {
-                    Label(
-                        AppTab.rankings.title,
-                        systemImage: selectedTab == .rankings ? "trophy.fill" : AppTab.rankings.icon
-                    )
-                }
-                .tag(AppTab.rankings)
-
-            CategoriesView()
-                .tabItem {
-                    Label(
-                        AppTab.categories.title,
-                        systemImage: selectedTab == .categories ? "square.grid.2x2.fill" : AppTab.categories.icon
-                    )
-                }
-                .tag(AppTab.categories)
-
-            ActorsView()
-                .tabItem {
-                    Label(
-                        AppTab.actors.title,
-                        systemImage: selectedTab == .actors ? "person.2.fill" : AppTab.actors.icon
-                    )
-                }
-                .tag(AppTab.actors)
-
-            TangxinRootView(client: tangxinClient)
-                .tabItem { Label(AppTab.tangxin.title, systemImage: AppTab.tangxin.icon) }
-                .tag(AppTab.tangxin)
-
-            UserView()
-                .tabItem {
-                    Label(
-                        AppTab.me.title,
-                        systemImage: selectedTab == .me ? "person.crop.circle.fill" : AppTab.me.icon
-                    )
-                }
-                .tag(AppTab.me)
+            }
         }
-        .toolbar(.hidden, for: .tabBar)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             AVDBNativeTabBar(selection: $selectedTab)
         }
+        .onChange(of: selectedTab) { _, tab in visitedTabs.insert(tab) }
         .modifier(SceneLayoutReader())
         .tint(JAVDBPalette.accent)
         .sensoryFeedback(.selection, trigger: selectedTab)
-        .modifier(LiquidGlassTabBarModifier())
     }
-}
 
-/// iOS 26：滚动时系统液态玻璃 Tab Bar 自动收起。
-private struct LiquidGlassTabBarModifier: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), !AdaptiveLayout.isPad {
-            content.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            content
+    @ViewBuilder private func tabContent(_ tab: AppTab) -> some View {
+        switch tab {
+        case .home: HomeView()
+        case .rankings: RankingsView()
+        case .categories: CategoriesView()
+        case .actors: ActorsView()
+        case .tangxin: TangxinRootView(client: tangxinClient)
+        case .me: UserView()
         }
     }
 }

@@ -14,7 +14,7 @@
 - 详情使用生产Swift parser；只取`article.info`中的作者链接，不把相关推荐作者当本片作者。作者页按同源`/a/<name>/`链接原生展示作品；本站采样未下发头像，不编造头像/总作品数。
 - 复用既有`KSChromePlayer`，每次实例局部传入站点Referer和UA，不改播放器代码、不修改全局headers、不查JavDB，不生成Movie ID、不将HLS传给115。
 - 点击播放前复用公共`OnlineTransport`/`OnlineMediaScope`/`OnlineManifest`，严格公网DNS、HTTPS、同源HLS子清单/密钥/分片路径检查，限制清单图深度/数量；标准AES-128由现成HLS播放器处理，不自写解密或中转。
-- 六个原生底栏按钮均可见（含iPad）；隐藏系统五项More溢出栏，保留TabView内容与导航状态。iOS26使用真正`glassEffect(.regular)`，17–25使用系统material回退。按钮高度52pt，作者和播放控件至少44pt，图片装饰不抢触控。
+- 六个原生底栏按钮均可见（含iPad）；真实iPhone XCTest发现六项TabView即使隐藏系统栏仍会生成More外壳、双层返回及双栏，因此改用延迟挂载、稳定身份的原生SwiftUI六栏容器；未访问栏目不自动挂载，已访问栏目与导航状态保留，不创建系统More。iOS26使用真正`glassEffect(.regular)`，17–25使用系统material回退。按钮高度52pt，作者和播放控件至少44pt，图片装饰不抢触控。
 
 ## 脚本移植边界
 
