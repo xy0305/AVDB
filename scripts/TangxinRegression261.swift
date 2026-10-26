@@ -12,6 +12,16 @@ import Foundation
         let detail = try TangxinParser.detail(TangxinFixtures261.detail,at:first.videos[0].url)
         precondition(detail.video.author?.name == "黑料昵称")
         precondition(detail.tags == ["原创"] && detail.summary.contains("合成"))
+        precondition(detail.tagLinks.first?.url.path == "/tag/original/")
+        let encodedTag = "/tag/%E5%8E%9F%E5%88%9B/"
+        let parsedTags = TangxinParser.detailTags("<a href='\(encodedTag)'>原创</a><a href='\(encodedTag)'>原创</a><a href='https://evil.org/tag/x/'>外部</a><a class='tag'>只有文字</a><a href='/tag/hidden-camera/'>偷拍</a><a href='/tag/%E6%9C%AA%E6%88%90%E5%B9%B4/'>测试</a><a href='/tag/black/'>黑料</a>",at:first.videos[0].url)
+        precondition(parsedTags.links.count == 2 && parsedTags.links[0].name == "原创")
+        precondition(parsedTags.links[0].url.absoluteString.contains("%E5%8E%9F"))
+        precondition(parsedTags.names.contains("只有文字") && !parsedTags.links.contains { $0.name == "只有文字" })
+        let tagRoot = parsedTags.links[0].url
+        precondition(TangxinPolicy.next(tagRoot.appendingPathComponent("2"),from:tagRoot))
+        precondition(!TangxinPolicy.next(URL(string:"https://tangxinvlog.app/tag/other/2")!,from:tagRoot))
+        for raw in ["http://tangxinvlog.app/tag/a/", "https://127.0.0.1/tag/a/", "https://tangxinvlog.app/tag/a/?q=x", "https://tangxinvlog.app/tag/a/b/", "https://tangxinvlog.app/tag/%2F/"] { precondition(!TangxinPolicy.page(URL(string:raw)!)) }
         precondition(detail.stream.host == TangxinPolicy.cdn)
         let author = try TangxinParser.list(TangxinFixtures261.authorPage,at:first.videos[0].author!.url)
         precondition(author.videos.count == 1 && author.next == nil)

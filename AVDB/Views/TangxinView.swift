@@ -13,6 +13,14 @@ import UIKit
     private var generation = UUID()
     private var task: Task<Void,Never>?
     private var visited = Set<URL>()
+    private var automaticTail: URL?
+    @Published private(set) var canAutomaticallyAdvance = false
+    func nearBottom(tail: URL) async {
+        guard canAutomaticallyAdvance, !loading, error == nil,
+              videos.last?.id == tail, automaticTail != tail else { return }
+        automaticTail = tail // Consume before suspension: repeated appearances cannot retry.
+        await more()
+    }
     let root: URL
     let client: TangxinClient
     init(root: URL, client: TangxinClient) { self.root = root; self.client = client }
@@ -28,6 +36,7 @@ import UIKit
     func refresh() async {
         task?.cancel(); generation = UUID(); loading = false
         visited = []; next = nil; loaded = false; pageState = nil; report = nil
+        automaticTail = nil; canAutomaticallyAdvance = false
         await load(root, replacing:true)
     }
     func more() async { if let next { await load(next,replacing:false) } }
@@ -46,6 +55,8 @@ import UIKit
                 self.visited.insert(url)
                 self.next = page.next.flatMap { self.visited.contains($0) ? nil : $0 }
                 self.heading = page.heading; self.pageState = page.state; self.report = page.report
+                // Empty, filtered, malformed or duplicate-only pages require a deliberate one-page advance.
+                self.canAutomaticallyAdvance = page.state == .content && !fresh.isEmpty
                 self.loaded = true; self.loading = false
             } catch {
                 guard let self, token == self.generation else { return }
@@ -76,6 +87,9 @@ struct TangxinRootView: View {
                 .navigationDestination(for:TangxinVideo.self) { TangxinDetailView(video:$0,client:selected) }
                 .navigationDestination(for:TangxinAuthor.self) { author in
                     TangxinListView(root:author.url,title:author.name,client:selected,isAuthor:true)
+                }
+                .navigationDestination(for:TangxinTag.self) { tag in
+                    TangxinListView(root:tag.url,title:tag.name,client:selected)
                 }
         }.id(compatibility)
         .sheet(isPresented:$networkSettings) { TangxinNetworkSettings(client:client,compatibility:$compatibility) }
@@ -197,9 +211,21 @@ struct TangxinListView: View {
                     VStack { Text(error).font(.footnote); Button("重试") { Task { await model.retry() } }.frame(minWidth:44,minHeight:44) }
                         .frame(maxWidth:.infinity).padding().accessibilityIdentifier("tangxin.retry")
                 } else if model.next != nil {
-                    Button("加载更多") { Task { await model.more() } }
-                        .frame(maxWidth:.infinity,minHeight:44).disabled(model.loading)
-                        .accessibilityIdentifier("tangxin.more")
+                    if model.canAutomaticallyAdvance, let tail = model.videos.last?.id {
+                        Text("下滑自动加载更多").font(.footnote).foregroundStyle(.secondary)
+                            .frame(maxWidth:.infinity,minHeight:44)
+                            .id(tail)
+                            .task { await model.nearBottom(tail:tail) }
+                            .accessibilityIdentifier("tangxin.auto.more")
+                    } else {
+                        Button("加载更多") { Task { await model.more() } }
+                            .frame(maxWidth:.infinity,minHeight:44).disabled(model.loading)
+                            .accessibilityIdentifier("tangxin.more")
+                    }
+                } else if !model.loading, model.pageState != nil {
+                    Text("已到最后一页").font(.footnote).foregroundStyle(.secondary)
+                        .frame(maxWidth:.infinity,minHeight:44)
+                        .accessibilityIdentifier("tangxin.end")
                 }
             }.padding(.vertical)
         }
@@ -248,7 +274,15 @@ struct TangxinDetailView: View {
                             .accessibilityIdentifier("tangxin.detail.author")
                     }
                     if !detail.summary.isEmpty { Text(detail.summary).font(.body) }
-                    Text(detail.tags.joined(separator:" · ")).font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment:.leading,spacing:8) {
+                        ForEach(detail.tagLinks) { tag in
+                            NavigationLink(value:tag) { Text(tag.name).font(.caption).frame(minHeight:44) }
+                                .accessibilityIdentifier("tangxin.tag.\(tag.url.lastPathComponent)")
+                        }
+                        ForEach(detail.tags.filter { name in !detail.tagLinks.contains { $0.name == name } },id:\.self) { name in
+                            Text(name).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                     Button {
                         guard !loading else { return }; loading = true; error = nil
                         playTask = Task {

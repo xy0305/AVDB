@@ -4,6 +4,58 @@ final class TangxinUITests261: XCTestCase {
     func shot(_ name:String) {
         let a = XCTAttachment(screenshot:XCUIApplication().screenshot()); a.name = "SYNTHETIC-261-"+name; a.lifetime = .keepAlways; add(a)
     }
+    func testAutomaticFailureRequiresManualRetry264() {
+        let app = XCUIApplication(); app.launchArguments = ["--failure264", "--reset-network263"]; app.launch()
+        app.buttons["app.tab.4"].tap(); app.swipeUp()
+        let retry = app.buttons["重试"]
+        XCTAssertTrue(retry.waitForExistence(timeout:8))
+        for _ in 0..<3 { app.swipeDown(); app.swipeUp() }
+        XCTAssertTrue(retry.exists)
+        XCTAssertFalse(app.buttons["tangxin.video.neutral2"].exists)
+        shot("264-failed-auto-no-loop")
+        retry.tap()
+        XCTAssertTrue(app.buttons["tangxin.video.neutral2"].waitForExistence(timeout:8))
+        shot("264-manual-retry-success")
+    }
+    func testAutomaticScrollHomeAndAuthor264() {
+        let app = XCUIApplication(); app.launchArguments = ["--auto264", "--reset-network263"]; app.launch()
+        app.buttons["app.tab.4"].tap()
+        XCTAssertTrue(app.buttons["tangxin.video.scroll1"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.buttons["tangxin.video.tail264"].exists, "Must not fetch next at the top")
+        for _ in 0..<16 {
+            if app.buttons["tangxin.video.tail264"].exists { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["tangxin.video.tail264"].waitForExistence(timeout:8))
+        shot("264-home-automatic-tail")
+        let author = app.buttons["tangxin.author.tail264"]
+        if !author.isHittable { app.swipeUp() }; author.tap()
+        XCTAssertTrue(app.staticTexts["tangxin.author.heading"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.buttons["tangxin.video.tail264"].exists)
+        for _ in 0..<16 {
+            if app.buttons["tangxin.video.tail264"].exists { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["tangxin.video.tail264"].waitForExistence(timeout:8))
+        shot("264-author-automatic-tail")
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(app.buttons["tangxin.video.tail264"].waitForExistence(timeout:5))
+        shot("264-back-retains-tail-position")
+        let detailCard = app.buttons["tangxin.video.neutral1"]
+        if !detailCard.isHittable { app.swipeDown() }; detailCard.tap()
+        let tag = app.buttons["tangxin.tag.original"]
+        XCTAssertTrue(tag.waitForExistence(timeout:8)); tag.tap()
+        XCTAssertTrue(app.buttons["tangxin.video.scroll1"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.buttons["tangxin.video.tail264"].exists)
+        for _ in 0..<16 {
+            if app.buttons["tangxin.video.tail264"].exists { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["tangxin.video.tail264"].waitForExistence(timeout:8))
+        shot("264-tag-native-list-auto-pagination")
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(tag.waitForExistence(timeout:5))
+    }
     func testNetworkDiagnostics263() {
         let app = XCUIApplication(); app.launchArguments = ["--network263", "--reset-network263"]; app.launch()
         app.buttons["app.tab.4"].tap()
@@ -77,11 +129,9 @@ final class TangxinUITests261: XCTestCase {
         tab.tap()
         let author = app.buttons["tangxin.author.neutral1"]
         XCTAssertTrue(author.waitForExistence(timeout:8)); shot("native-list")
-        let more = app.buttons["tangxin.more"]
-        if !more.isHittable { app.swipeUp() }
-        XCTAssertTrue(more.isHittable); more.tap()
         let second = app.buttons["tangxin.video.neutral2"]
-        XCTAssertTrue(second.waitForExistence(timeout:5)); shot("pagination-dedup")
+        app.swipeUp()
+        XCTAssertTrue(second.waitForExistence(timeout:5)); shot("automatic-pagination-dedup")
         if !author.isHittable { app.swipeDown() }
         author.tap()
         XCTAssertTrue(app.staticTexts["tangxin.author.heading"].waitForExistence(timeout:5)); shot("native-author")

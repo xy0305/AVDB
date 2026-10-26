@@ -31,10 +31,16 @@ struct TangxinPage: Sendable {
     let state: TangxinPageState
     let report: TangxinPageReport
 }
+struct TangxinTag: Identifiable, Hashable, Sendable {
+    let url: URL
+    let name: String
+    var id: URL { url }
+}
 struct TangxinDetail: Sendable {
     let video: TangxinVideo
     let summary: String
     let tags: [String]
+    var tagLinks: [TangxinTag] = []
     let stream: URL
 }
 struct TangxinPlayback: Identifiable, Sendable {
@@ -65,9 +71,11 @@ enum TangxinPolicy {
     }
     static func page(_ url: URL) -> Bool {
         guard OnlinePolicy.secure(url), url.host == origin.host, url.query == nil, url.fragment == nil else { return false }
+        let encoded = URLComponents(url:url,resolvingAgainstBaseURL:false)?.percentEncodedPath.lowercased() ?? ""
+        guard !encoded.contains("%2f"), !encoded.contains("%5c"), !encoded.contains("%25") else { return false }
         let p = url.path.split(separator: "/").map(String.init)
         if p.first == "featured" { return p.count == 1 || (p.count == 2 && Int(p[1]).map { $0 > 1 } == true) }
-        return p.first == "a" && (p.count == 2 || (p.count == 3 && Int(p[2]).map { $0 > 1 } == true)) && slug(p[1])
+        return ["a", "tag"].contains(p.first ?? "") && (p.count == 2 || (p.count == 3 && Int(p[2]).map { $0 > 1 } == true)) && slug(p[1]) && (p.first != "tag" || permitted(p[1]))
     }
     static func slug(_ s: String) -> Bool {
         !s.isEmpty && s.count <= 150 && s != "." && s != ".." && !s.contains(where: { $0 == "/" || $0 == "\\" || $0.isNewline || $0.asciiValue.map { $0 < 32 } == true })
@@ -86,7 +94,7 @@ enum TangxinPolicy {
         guard page(current), page(candidate) else { return false }
         func parts(_ u: URL) -> ([String], Int) {
             var p = u.path.split(separator: "/").map(String.init)
-            if let n = p.last.flatMap(Int.init), p.count > (p.first == "a" ? 2 : 1) { p.removeLast(); return (p,n) }
+            if let n = p.last.flatMap(Int.init), p.count > (["a", "tag"].contains(p.first ?? "") ? 2 : 1) { p.removeLast(); return (p,n) }
             return (p,1)
         }
         let a = parts(current), b = parts(candidate)
@@ -118,6 +126,24 @@ enum TangxinParser {
     }
     static func links(_ html: String) -> [([String:String],String)] {
         matches("<a\\b([^>]*)>(.*?)</a\\s*>",html).map { (attrs($0[1]), $0[2]) }
+    }
+    static func detailTags(_ html: String, at page: URL) -> (names:[String], links:[TangxinTag]) {
+        var names: [String] = [], result: [TangxinTag] = []
+        var seenNames = Set<String>(), seenURLs = Set<URL>()
+        for (attributes, body) in links(html) {
+            let raw = attributes["href"] ?? ""
+            let url = TangxinPolicy.resolve(raw,at:page)
+            guard raw.hasPrefix("/tag/") || url?.path.hasPrefix("/tag/") == true ||
+                    (attributes["class"] ?? "").split(separator:" ").contains("tag") else { continue }
+            let name = clean(body)
+            guard !name.isEmpty else { continue }
+            if seenNames.insert(name).inserted { names.append(name) }
+            guard !raw.isEmpty, let url, url.path.hasPrefix("/tag/"),
+                  TangxinPolicy.page(url), TangxinPolicy.permitted(name),
+                  seenURLs.insert(url).inserted else { continue }
+            result.append(TangxinTag(url:url,name:name))
+        }
+        return (names,result)
     }
     static func author(_ html: String, at page: URL) -> TangxinAuthor? {
         for (a,body) in links(html) where (a["class"] ?? "").split(separator:" ").contains("nickname") {
@@ -173,7 +199,8 @@ enum TangxinParser {
         guard TangxinPolicy.video(page), let info = matches("<article\\b([^>]*)>(.*?)</article\\s*>",html).first(where: { (attrs($0[1])["class"] ?? "").split(separator:" ").contains("info") }) else { throw TangxinError.structure }
         let primary = info[2]
         guard let title = matches("<h1\\b[^>]*>(.*?)</h1>",primary).first.map({ clean($0[1]) }), !title.isEmpty else { throw TangxinError.structure }
-        let tags = links(primary).filter { ($0.0["href"] ?? "").hasPrefix("/tag/") }.map { clean($0.1) }
+        let parsedTags = detailTags(primary,at:page)
+        let tags = parsedTags.names
         // Do not scan unrelated recommendations or the author's nickname as video metadata.
         let summary = matches("<p\\b([^>]*)>(.*?)</p>",primary).filter { (attrs($0[1])["class"] ?? "").contains("desc") }.map { clean($0[2]) }.joined(separator:"\n")
         guard TangxinPolicy.permitted(([title,summary]+tags).joined(separator:" ")) else { throw TangxinError.blocked }
@@ -181,7 +208,7 @@ enum TangxinParser {
         let candidates = matches("https://[^\\s\"'<>]+\\.m3u8[^\\s\"'<>]*",html).compactMap { TangxinPolicy.resolve(clean($0[0]),at:page) }.filter(TangxinPolicy.stream)
         guard let stream = candidates.first, Set(candidates).count == 1 else { throw TangxinError.structure }
         let poster = matches("<video\\b([^>]*)>",html).first.flatMap { attrs($0[1])["poster"] }.flatMap { TangxinPolicy.resolve($0,at:page) }.flatMap { TangxinPolicy.image($0) ? $0 : nil }
-        return TangxinDetail(video:TangxinVideo(url:page,title:title,poster:poster,author:author(primary,at:page)),summary:summary,tags:tags,stream:stream)
+        return TangxinDetail(video:TangxinVideo(url:page,title:title,poster:poster,author:author(primary,at:page)),summary:summary,tags:tags,tagLinks:parsedTags.links,stream:stream)
     }
 }
 

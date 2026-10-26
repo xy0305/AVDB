@@ -14,6 +14,6 @@ assert '打开 115 匹配资源' in cards and '需先在「我的」配置 115' 
 assert '在线播放' in cards and 'detail.card.online' in cards and 'detail.card.115' in cards
 assert 'query(' not in cards
 assert 'struct PlaybackResourceActions' in panel and 'struct OnlinePlaybackSheet' in panel
-assert 'CURRENT_PROJECT_VERSION = 263;' in (root / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert '<string>263</string>' in (root / 'AVDB/Resources/Info.plist').read_text()
+assert 'CURRENT_PROJECT_VERSION = 264;' in (root / 'AVDB.xcodeproj/project.pbxproj').read_text()
+assert '<string>264</string>' in (root / 'AVDB/Resources/Info.plist').read_text()
 print('PASS260 layout source: restored resource row, peer online card, no auto query, 115 callback retained')

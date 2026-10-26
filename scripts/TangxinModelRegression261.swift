@@ -23,7 +23,13 @@ actor TangxinModelFixture261 {
         let client = TangxinClient(transport:OnlineTransport(loader:{ request in try await state.fetch(request.url!) }))
         let m = TangxinListModel(root:TangxinPolicy.featured,client:client)
         await m.start(); precondition(m.videos.count == 1 && m.next != nil && !m.loading)
-        await m.more(); precondition(m.error != nil && m.next != nil && m.videos.count == 1)
+        async let firstAuto: Void = m.nearBottom(tail:m.videos.last!.id)
+        async let concurrentAuto: Void = m.nearBottom(tail:m.videos.last!.id)
+        _ = await (firstAuto, concurrentAuto)
+        precondition(m.error != nil && m.next != nil && m.videos.count == 1)
+        for _ in 0..<20 { await m.nearBottom(tail:m.videos.last!.id) }
+        let attempts = await state.secondCount
+        precondition(attempts == 1, "Failed sentinel must not retry")
         await m.retry(); precondition(m.error == nil && m.videos.count == 2 && m.next == nil)
         await m.refresh(); precondition(m.videos.count == 1 && m.next != nil)
         await state.setWaiting(true)
@@ -59,13 +65,25 @@ actor TangxinModelFixture261 {
         let pages = TangxinListModel(root:TangxinPolicy.featured,client:sequence)
         await pages.start()
         precondition(pages.videos.isEmpty && pages.pageState == .filtered && pages.next?.path == "/featured/2")
+        for _ in 0..<20 { await pages.nearBottom(tail:TangxinPolicy.featured) }
+        precondition(pages.pageState == .filtered && pages.next?.path == "/featured/2")
         await pages.more()
         precondition(pages.videos.isEmpty && pages.pageState == .sourceEmpty && pages.next?.path == "/featured/3")
         await pages.more()
         precondition(pages.videos.isEmpty && pages.pageState == .structureChanged && pages.next?.path == "/featured/4")
         await pages.more()
         precondition(pages.videos.count == 1 && pages.pageState == .content && pages.next == nil)
-        print("PASS262 production model mixed/filter-empty/source-empty/malformed manual pagination and cancel/reentry; synthetic")
+        let duplicates = TangxinClient(transport:OnlineTransport(loader:{ request in
+            let next = request.url!.path.hasSuffix("2") ? "/featured/3" : "/featured/2"
+            return Data(("<div class='grid'>" + TangxinFixtures261.card("same") + "</div><a rel='next' href='\(next)'>Next</a>").utf8)
+        }))
+        let duplicateModel = TangxinListModel(root:TangxinPolicy.featured,client:duplicates)
+        await duplicateModel.start()
+        await duplicateModel.nearBottom(tail:duplicateModel.videos.last!.id)
+        precondition(duplicateModel.videos.count == 1 && !duplicateModel.canAutomaticallyAdvance)
+        for _ in 0..<20 { await duplicateModel.nearBottom(tail:duplicateModel.videos.last!.id) }
+        precondition(duplicateModel.next?.path == "/featured/3")
+        print("PASS264 production model concurrent automatic pagination, failure latch/manual retry, duplicate-only stop, empty manual advance, cancel/generation/reentry; synthetic")
     }
 }
 // Compile the production view graph for ABI coverage without real media playback.

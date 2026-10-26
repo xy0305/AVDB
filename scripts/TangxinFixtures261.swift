@@ -12,8 +12,16 @@ enum TangxinFixtures261 {
     static let detail = "<video poster='https://t.5gcdn.xyz/videos/neutral1/cover.jpg'></video><article class='info'><h1>成人自愿演示作品</h1><a class='nickname' href='" + author + "'>@黑料昵称</a><p class='desc'>明确合成测试，无真实人物</p><a href='/tag/original/'>原创</a></article><script type='application/json'>{\"src\":\"https://t.5gcdn.xyz/videos/neutral1/index.m3u8\"}</script><section>" + card("unrelated",authorPath:"/a/Other/") + "</section>"
     static let playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:5,\nsegment.ts\n#EXT-X-ENDLIST\n"
     static func client() -> TangxinClient {
+        let attempts = TangxinUIAttempts264()
         let resolver: (@Sendable (String) async throws -> [String])? = ProcessInfo.processInfo.arguments.contains("--network263") ? { _ in ["198.18.0.1"] } : nil
         return TangxinClient(transport:OnlineTransport(resolver:resolver,loader: { request in
+            if ProcessInfo.processInfo.arguments.contains("--auto264"), let url = request.url,
+               url.path.hasPrefix("/featured") || url.path.hasPrefix("/a/") || url.path.hasPrefix("/tag/") {
+                let second = url.path.split(separator:"/").last == "2"
+                let cards = second ? card("neutral1") + card("tail264") : (1...12).map { card("scroll\($0)") }.joined()
+                let next = second ? "" : "<a rel='next' href='\(url.path.hasPrefix("/a/") ? author : (url.path.hasPrefix("/tag/") ? "/tag/original/" : "/featured/"))2'>Next</a>"
+                return Data(("<div class='grid'>" + cards + "</div>" + next).utf8)
+            }
             if ProcessInfo.processInfo.arguments.contains("--empty-states262") {
                 let path = request.url!.path
                 let next: (Int) -> String = { "<a rel='next' href='/featured/\($0)'>Next</a>" }
@@ -31,7 +39,10 @@ enum TangxinFixtures261 {
             }
             guard let url = request.url, request.value(forHTTPHeaderField:"Referer") == TangxinPolicy.origin.absoluteString, request.value(forHTTPHeaderField:"Cookie") == nil else { throw TangxinError.unsafe }
             if url.path == "/featured" || url.path == "/featured/" { return Data(first.utf8) }
-            if url.path == "/featured/2" { return Data(second.utf8) }
+            if url.path == "/featured/2" {
+                if ProcessInfo.processInfo.arguments.contains("--failure264"), await attempts.failFirst() { throw TangxinError.structure }
+                return Data(second.utf8)
+            }
             if url.path.hasPrefix("/a/") { return Data(authorPage.utf8) }
             if url.path == "/v/neutral1" || url.path == "/v/neutral1/" { return Data(detail.utf8) }
             if url.path.hasSuffix(".m3u8") { return Data(playlist.utf8) }
@@ -40,4 +51,9 @@ enum TangxinFixtures261 {
             throw TangxinError.structure
         }))
     }
+}
+
+actor TangxinUIAttempts264 {
+    private var count = 0
+    func failFirst() -> Bool { count += 1; return count == 1 }
 }
