@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - feat/tangxin-from258
+      - feat/tangxin-javverse-from261
       - fix/subtitle-position-201
     paths:
       - "AVDB/**"
@@ -221,7 +221,7 @@ jobs:
           retention-days: 7
 
   tangxin-native-ui:
-    if: github.ref == 'refs/heads/feat/tangxin-from258'
+    if: github.ref == 'refs/heads/feat/tangxin-javverse-from261'
     runs-on: macos-26
     timeout-minutes: 25
     steps:
