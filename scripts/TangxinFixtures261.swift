@@ -13,6 +13,21 @@ enum TangxinFixtures261 {
     static let playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:5,\nsegment.ts\n#EXT-X-ENDLIST\n"
     static func client() -> TangxinClient {
         TangxinClient(transport:OnlineTransport(loader: { request in
+            if ProcessInfo.processInfo.arguments.contains("--empty-states262") {
+                let path = request.url!.path
+                let next: (Int) -> String = { "<a rel='next' href='/featured/\($0)'>Next</a>" }
+                let html: String
+                if path == "/featured" || path == "/featured/" {
+                    html = "<div class='grid'>" + card("blocked",title:"未成年") + "</div>" + next(2)
+                } else if path == "/featured/2" {
+                    html = "<div class='grid'></div>" + next(3)
+                } else if path == "/featured/3" {
+                    html = "<article class='card'></article>" + next(4)
+                } else {
+                    html = "<div class='grid'>" + card("neutral1") + card("blocked",title:"偷拍") + "</div>"
+                }
+                return Data(html.utf8)
+            }
             guard let url = request.url, request.value(forHTTPHeaderField:"Referer") == TangxinPolicy.origin.absoluteString, request.value(forHTTPHeaderField:"Cookie") == nil else { throw TangxinError.unsafe }
             if url.path == "/featured" || url.path == "/featured/" { return Data(first.utf8) }
             if url.path == "/featured/2" { return Data(second.utf8) }

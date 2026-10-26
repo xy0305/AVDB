@@ -7,6 +7,8 @@ import UIKit
     @Published private(set) var heading: String?
     @Published private(set) var loading = false
     @Published private(set) var error: String?
+    @Published private(set) var pageState: TangxinPageState?
+    @Published private(set) var report: TangxinPageReport?
     private var loaded = false
     private var generation = UUID()
     private var task: Task<Void,Never>?
@@ -16,9 +18,14 @@ import UIKit
     init(root: URL, client: TangxinClient) { self.root = root; self.client = client }
     deinit { task?.cancel() }
     func start() async { if !loaded { await refresh() } }
+    func cancel() {
+        task?.cancel(); task = nil; generation = UUID(); loading = false
+        // Successful pages survive navigation; incomplete requests can be re-entered.
+        loaded = !visited.isEmpty
+    }
     func refresh() async {
         task?.cancel(); generation = UUID(); loading = false
-        visited = []; next = nil; loaded = false
+        visited = []; next = nil; loaded = false; pageState = nil; report = nil
         await load(root, replacing:true)
     }
     func more() async { if let next { await load(next,replacing:false) } }
@@ -36,7 +43,8 @@ import UIKit
                 self.videos = replacing ? fresh : self.videos + fresh
                 self.visited.insert(url)
                 self.next = page.next.flatMap { self.visited.contains($0) ? nil : $0 }
-                self.heading = page.heading; self.loaded = true; self.loading = false
+                self.heading = page.heading; self.pageState = page.state; self.report = page.report
+                self.loaded = true; self.loading = false
             } catch {
                 guard let self, token == self.generation else { return }
                 self.loading = false
@@ -100,6 +108,26 @@ struct TangxinListView: View {
                     }
                 }.padding(.horizontal)
                 if model.loading { ProgressView().frame(maxWidth:.infinity,minHeight:44) }
+                if !model.loading, model.error == nil, let state = model.pageState, state != .content {
+                    VStack(alignment:.leading,spacing:8) {
+                        switch state {
+                        case .sourceEmpty:
+                            Label("源暂无数据",systemImage:"tray")
+                            Text("来源返回空列表，未发生内容筛除。")
+                        case .filtered:
+                            Label("当前页无可显示内容",systemImage:"hand.raised")
+                            Text("当前页可解析的视频均未通过年龄或同意风险筛查。")
+                        case .structureChanged:
+                            Label("来源结构变化",systemImage:"exclamationmark.triangle")
+                            Text("未能完整识别视频卡片，不能将其判定为筛查空页。")
+                        case .content: EmptyView()
+                        }
+                        if model.next != nil { Text("可手动加载下一页；每次仅请求一页。") }
+                        Button("重新加载首页") { Task { await model.refresh() } }
+                            .frame(minHeight:44).accessibilityIdentifier("tangxin.empty.refresh")
+                    }.font(.footnote).frame(maxWidth:.infinity,alignment:.leading).padding()
+                        .accessibilityIdentifier("tangxin.state.\(state.rawValue)")
+                }
                 if let error = model.error {
                     VStack { Text(error).font(.footnote); Button("重试") { Task { await model.retry() } }.frame(minWidth:44,minHeight:44) }
                         .frame(maxWidth:.infinity).padding().accessibilityIdentifier("tangxin.retry")
@@ -107,13 +135,12 @@ struct TangxinListView: View {
                     Button("加载更多") { Task { await model.more() } }
                         .frame(maxWidth:.infinity,minHeight:44).disabled(model.loading)
                         .accessibilityIdentifier("tangxin.more")
-                } else if !model.loading && model.videos.isEmpty {
-                    ContentUnavailableView("暂无可显示内容",systemImage:"film",description:Text("当前页面无通过筛查的视频；可下拉刷新。"))
                 }
             }.padding(.vertical)
         }
         .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.refresh() }.task { await model.start() }
+        .onDisappear { model.cancel() }
         .accessibilityIdentifier(isAuthor ? "tangxin.author.page" : "tangxin.list")
     }
 }
