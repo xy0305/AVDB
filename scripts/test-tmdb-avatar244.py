@@ -39,7 +39,7 @@ class TMDBAvatar244(unittest.TestCase):
         project = (R / "AVDB.xcodeproj/project.pbxproj").read_text()
         self.assertEqual(info["CFBundleShortVersionString"], "1.0.2")
         self.assertEqual(info["CFBundleVersion"], "258")
-        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 260;"), 2)
+        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 261;"), 2)
         self.assertEqual(project.count("IPHONEOS_DEPLOYMENT_TARGET = 17.0;"), 4)
         blob = (R / "AVDB/Services/ExternalActorResolver.swift").read_bytes()
         self.assertNotIn(b"eyJ", blob)
