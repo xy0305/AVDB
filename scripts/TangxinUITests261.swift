@@ -19,7 +19,10 @@ final class TangxinUITests261: XCTestCase {
         XCTAssertTrue(app.staticTexts["tangxin.network.status"].waitForExistence(timeout:8))
         XCTAssertTrue(app.staticTexts["tangxin.network.status"].label.contains("严格模式拒绝合成"))
         shot("263-native-network-sheet")
-        toggle.tap()
+        // SwiftUI exposes the whole labelled Form row as Switch; tap the actual
+        // trailing switch, not the row centre (which is only its text label).
+        toggle.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
+        XCTAssertTrue(NSPredicate(format:"value == %@", "1").evaluate(with:toggle))
         let success = app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "HTTP 200")).firstMatch
         XCTAssertTrue(success.waitForExistence(timeout:8))
         shot("263-explicit-compatible-diagnostic")
@@ -27,7 +30,8 @@ final class TangxinUITests261: XCTestCase {
         XCTAssertTrue(app.buttons["tangxin.video.neutral1"].waitForExistence(timeout:8))
         app.buttons["tangxin.network.open"].tap()
         let off = app.switches["tangxin.network.compatibility"]
-        XCTAssertTrue(off.waitForExistence(timeout:5)); off.tap(); app.buttons["完成"].tap()
+        XCTAssertTrue(off.waitForExistence(timeout:5)); off.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
+        XCTAssertEqual(off.value as? String,"0"); app.buttons["完成"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "严格模式拒绝合成")).firstMatch.waitForExistence(timeout:8))
         shot("263-strict-restored-no-blank-state")
     }
