@@ -49,7 +49,7 @@ enum DMMRankingCore {
     }
     static func weekly(html: String, responseURL: URL, observedAt: Date) throws -> DMMWeeklyBoard {
         if responseURL.path.contains("age_check") || responseURL.host == "accounts.dmm.co.jp" { throw DMMRankingError.accessGate }
-        guard validHost(responseURL), responseURL.path == "/av/ranking/",
+        guard validHost(responseURL), URLComponents(url: responseURL, resolvingAgainstBaseURL: false)?.path == "/av/ranking/",
               let parts = URLComponents(url: responseURL, resolvingAgainstBaseURL: false),
               parts.queryItems == [URLQueryItem(name: "term", value: "weekly")] else { throw DMMRankingError.unsupportedURL }
         var rows: [DMMRankingRow] = []
@@ -60,7 +60,7 @@ enum DMMRankingCore {
                   let rank = Int(rankText),
                   let href = matches("\\bhref=[\"']([^\"']+)[\"']", attrs).first?[1],
                   let url = URL(string: text(href), relativeTo: responseURL)?.absoluteURL,
-                  validHost(url), url.path == "/av/content/",
+                  validHost(url), URLComponents(url: url, resolvingAgainstBaseURL: false)?.path == "/av/content/",
                   let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                   let ids = components.queryItems?.filter({ $0.name == "id" }), ids.count == 1,
                   let id = ids[0].value, cid(id),
@@ -78,7 +78,7 @@ enum DMMRankingCore {
     }
     static func manufacturer(html: String, responseURL: URL, expectedCID: String) throws -> DMMManufacturerEvidence {
         if responseURL.path.contains("age_check") || responseURL.host == "accounts.dmm.co.jp" { throw DMMRankingError.accessGate }
-        guard validHost(responseURL), responseURL.path == "/av/content/", cid(expectedCID),
+        guard validHost(responseURL), URLComponents(url: responseURL, resolvingAgainstBaseURL: false)?.path == "/av/content/", cid(expectedCID),
               let parts = URLComponents(url: responseURL, resolvingAgainstBaseURL: false),
               parts.queryItems?.filter({ $0.name == "id" }).map(\.value) == [expectedCID] else { throw DMMRankingError.unsupportedURL }
         var fields: [String: Set<String>] = [:]
