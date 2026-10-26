@@ -318,10 +318,13 @@ struct TangxinDetailView: View {
                 if let error { Text(error).font(.footnote); Button("重试") { request = UUID() }.frame(minWidth:44,minHeight:44) }
             }.padding()
         }
-        // ContentView's measured safeAreaInset owns the custom tab bar height.
-        // Respect that region (no ignoresSafeArea / fixed screen-height spacer),
-        // with a small extra scroll clearance so the final button is fully tappable.
+        // The outer native bar keeps its measured safeAreaInset. Nested navigation
+        // can still leave part of the last target under the floating glass bar:
+        // iPhone CI measured play.maxY=808 versus tab.minY=786 with padding alone.
+        // Add one minimum tap target of scrollable content margin, not screen-height
+        // padding or a hit-testing overlay; the full button must clear the bar in UI.
         .safeAreaPadding(.bottom,16)
+        .contentMargins(.bottom,44,for:.scrollContent)
         .navigationTitle("视频详情").navigationBarTitleDisplayMode(.inline)
         .task(id:request) {
             loading = true; error = nil; detail = nil

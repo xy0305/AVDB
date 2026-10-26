@@ -12,9 +12,9 @@ TangxinPolicy.canonicalPage 先执行现有 HTTPS/精确同源/路径/编码/查
 
 ## 布局事实与推断
 
-生产代码事实：旧详情标签使用自适应网格布局；265改为复用 CategoriesView.swift 中的生产 FlowLayout(spacing:8)，标签按内容宽度排布，最小44pt点击高度；详情 ScrollView 增加16pt底部安全区，继续由 ContentView 的 measured safeAreaInset 决定原生底栏占位，不使用固定屏高/忽略safe area。单独 Swift/模拟器宿主均从原文件抽取相同 FlowLayout 声明编译，不维护测试专用假算法。
+生产代码事实：旧详情标签使用自适应网格布局；265改为复用 CategoriesView.swift 中的生产 FlowLayout(spacing:8)，标签按内容宽度排布，最小44pt点击高度；详情 ScrollView 增加16pt底部安全区和44pt scrollContent底部余量（一个最小点击目标高度），继续由 ContentView 的 measured safeAreaInset 决定原生底栏占位，不使用固定屏高/忽略safe area。单独 Swift/模拟器宿主均从原文件抽取相同 FlowLayout 声明编译，不维护测试专用假算法。
 
-“大间隔竖排来自网格分配宽度”“播放目标被底栏覆盖”是针对反馈和旧代码的合理推断，不冒充旧版真机测量或截图结论。新增 iPhone/iPad Simulator 用12个合成标签及长详情，记录每个chip位置、行数、总高和播放/底栏frame；要求同一行至少两个chip、实际换行、44pt高度、每行8pt间隔以及总高上界。实际滑动后整个播放按钮位于底栏上方且有8pt余量，执行tap并等待全屏惰性 KSChromePlayer 替身标识，不只断言 isHittable。标签与作者入口均执行点击/返回。既有48卡列表自动分页与返回测试不缩减。
+“大间隔竖排来自网格分配宽度”是针对反馈和旧代码的合理推断，不冒充旧版真机测量或截图结论。首轮265 CI（a5a1b26，40292153271）已经测得仅16pt安全区时：iPhone 402×874 viewport，12个chip为3行、总高148pt；播放按钮frame=(16,750,370,58)，底栏按钮从y=786开始，完整播放目标仍重叠22pt。实际tap能进入替身，但完整目标避让断言失败，不能以isHittable或tap成功掩盖这一事实；随后增加44pt可滚动内容余量，保留原断言重跑。新增 iPhone/iPad Simulator 用12个合成标签及长详情，记录每个chip位置、行数、总高和播放/底栏frame；要求同一行至少两个chip、实际换行、44pt高度、每行8pt间隔以及总高上界。实际滑动后整个播放按钮位于底栏上方且有8pt余量，执行tap并等待全屏惰性 KSChromePlayer 替身标识，不只断言 isHittable。标签与作者入口均执行点击/返回。既有48卡列表自动分页与返回测试不缩减。
 
 ## 播放业务预检边界
 
