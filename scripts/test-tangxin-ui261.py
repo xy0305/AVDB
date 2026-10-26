@@ -48,4 +48,4 @@ for kind in ['iPhone','iPad']:
  status[kind]={'name':d['name'],'exit':code,'synthetic':True,'realPlaybackVerified':False}
  (O/'status.json').write_text(json.dumps(status,indent=2))
  if code:raise SystemExit(code)
-print('PASS261 real iPhone + iPad production Tab → author → work → back; synthetic source only, no playback')
+print('PASS262 real iPhone + iPad production navigation and empty-state/manual-next UI; synthetic source only, no playback')
