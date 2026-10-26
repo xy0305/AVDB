@@ -20,6 +20,10 @@ jobs:
           /tmp/dmm-store-regression scripts/dmm-ranking-fixtures
           swiftc AVDB/Services/DMMRankingCore.swift AVDB/Services/DMMTransport.swift scripts/DMMAgeFlowRegression.swift -o /tmp/dmm-age-regression
           /tmp/dmm-age-regression
+      - name: Authorized anonymous production Swift live read-only probe
+        run: |
+          swiftc AVDB/Services/DMMRankingCore.swift AVDB/Services/DMMTransport.swift scripts/DMMLiveProbe266.swift -o /tmp/dmm-live-probe
+          /tmp/dmm-live-probe | tee /tmp/dmm-live.log
       - name: Install pinned existing MediaPipe dependency
         run: |
           gem install cocoapods -v 1.16.2 --no-document
