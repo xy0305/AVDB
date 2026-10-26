@@ -162,6 +162,13 @@ enum OnlinePolicy {
         if let host=referrer.host, ["jable.tv","missav.ws"].contains(host) { h["Origin"]="https://"+host }
         return h
     }
+    /// Query and detail documents need a browser Accept. Media playlists keep the
+    /// existing four-header contract and must not inherit a document Accept.
+    static func documentHeaders(referrer: URL) -> [String:String] {
+        var h = headers(referrer: referrer)
+        h["Accept"] = "text/html,application/xhtml+xml"
+        return h
+    }
 }
 // A media origin is either an existing per-provider allowlist entry, or the exact
 // public HTTPS origin explicitly issued by an identity-validated Jable detail page.
@@ -584,7 +591,7 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         catch {
             // Neutral loader retains historical error contracts; real requests gain
             // only bounded stage/host/reason, never URL path, query or credentials.
-            if loader != nil { throw error }
+            if loader != nil || error is OnlineFailure { throw error }
             let failure = OnlineFailure.classify(error)
             if case .safe(let value) = failure {
                 let context: PlaybackDiagnostic.Stage = scope != nil ? .manifest : (stage == "查询" ? .discovery : .document)

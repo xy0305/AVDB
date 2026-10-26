@@ -56,6 +56,21 @@ jobs:
           set -euo pipefail
           python3 scripts/test-playback-diagnostics257.py | tee diagnostics257.txt
           python3 scripts/test-online-quality259.py | tee quality259.txt
+          python3 scripts/test-missav-scroll262.py | tee missav262.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          s=Path('AVDB/Services/CatalogueMetadata.swift').read_text()
+          Path(os.environ['RUNNER_TEMP'],'identity262.swift').write_text('import Foundation\nenum CatalogueIdentity {'+s.split('enum CatalogueIdentity {',1)[1].split('\nstruct ScrapedMetadata:',1)[0])
+          PY
+          swiftc -parse-as-library -swift-version 5 -D ONLINE_CORE_TEST \
+            -target "$(uname -m)-apple-macosx14.0" \
+            "$RUNNER_TEMP/identity262.swift" \
+            AVDB/Services/PlaybackDiagnostic.swift AVDB/Services/JavRankingCore.swift AVDB/Services/MissAVCore.swift \
+            AVDB/Services/OnlinePlaybackCore.swift AVDB/Services/OnlineAdditionalProviders.swift AVDB/Services/DetailOnlineAdapters.swift \
+            AVDB/Views/Player/OnlinePlaybackPanel.swift scripts/MissAVScrollRegression262.swift \
+            -o "$RUNNER_TEMP/neutral262"
+          sandbox-exec -p '(version 1)(allow default)(deny network*)' "$RUNNER_TEMP/neutral262"
 
       - name: Check poster identity, latency and shared regressions
         run: |

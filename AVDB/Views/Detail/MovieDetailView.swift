@@ -16,7 +16,7 @@ struct MovieDetailView: View {
     @State private var play115 = false
     @State private var showOnlinePlayback = false
     @State private var onlineVersions = false
-    @StateObject private var onlinePlaybackModel = OnlinePlaybackModel()
+    @State private var resourceCards = PlaybackResourceCardState()
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
     private let posterSeed: Movie?
@@ -118,16 +118,16 @@ struct MovieDetailView: View {
         .overlay(alignment: .top) {
             if !usesLandscapeLayout { detailChrome }
         }
-        .sheet(isPresented: $showOnlinePlayback, onDismiss: { onlinePlaybackModel.cancelPending() }) {
-            if let movie = vm.movie {
-                OnlinePlaybackSheet(number: movie.displayNumber, model: onlinePlaybackModel, versions: $onlineVersions)
+        .sheet(isPresented: $showOnlinePlayback, onDismiss: { resourceCards.model?.cancelPending() }) {
+            if let movie = vm.movie, let model = resourceCards.model {
+                OnlinePlaybackSheet(number: movie.displayNumber, model: model, versions: $onlineVersions)
             }
         }
         .onChange(of: movieID) { _, _ in
-            showOnlinePlayback = false; onlinePlaybackModel.reset(); onlineVersions = false
+            showOnlinePlayback = false; resourceCards.model?.reset(); onlineVersions = false
         }
         .onChange(of: vm.movie?.displayNumber) { _, _ in
-            onlinePlaybackModel.reset(); onlineVersions = false
+            resourceCards.model?.reset(); onlineVersions = false
         }
         .sheet(isPresented: $showPosterResources) {
             if let movie = vm.movie {
@@ -148,7 +148,7 @@ struct MovieDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
             var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
             withTransaction(transaction) { posterAccountEpoch = UUID(); posterPresentation = nil }
-            showOnlinePlayback = false; onlinePlaybackModel.reset()
+            showOnlinePlayback = false; resourceCards.model?.reset()
             Task { await vm.reloadReviewForAccount() }
         }
         .alert("操作未完成", isPresented: Binding(
@@ -401,11 +401,15 @@ struct MovieDetailView: View {
                     Text("「\(movie.displayNumber)」").font(.system(size: 13))
                         .frame(maxWidth: .infinity).padding(.top, 22)
                 }
-                PlaybackResourceCards(configured115: Pan115Settings.shared.isConfigured,
+                PlaybackResourceCards(state: resourceCards,
+                                       configured115: Pan115Settings.shared.isConfigured,
                                        onlineAvailable: movie.type != "2" && OnlineIdentity.key(movie.displayNumber) != nil,
                                        externalAvailable: (movie.magnetsCount ?? 0) > 0 || externalSettings.enabled,
                                        play115: { play115 = true },
-                                       openOnline: { showOnlinePlayback = true },
+                                       openOnline: {
+                                           if resourceCards.model == nil { resourceCards.model = OnlinePlaybackModel() }
+                                           showOnlinePlayback = true
+                                       },
                                        openExternal: { showPosterResources = true })
                 .padding(.horizontal, 18).padding(.top, 30)
                 .buttonStyle(.plain)

@@ -895,6 +895,7 @@ struct KSChromePlayer: View {
         tickTask?.cancel()
         tickTask = Task { @MainActor in
             let start = Date()
+            var qualityTick = 0
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled else { return }
@@ -904,7 +905,8 @@ struct KSChromePlayer: View {
                                       seeking: isSeeking || seekPending, failed: failureReported) {
                     PlaybackHistoryStore.shared.record(movie, artwork: historyArtwork, scope: historyScope)
                 }
-                applyOnlineQuality()
+                qualityTick += 1
+                if qualityTick % 4 == 0 { applyOnlineQuality() }
                 publishVideoMetrics(timedOut: Date().timeIntervalSince(start) > 30)
                 if !hasStarted, !failureReported, Date().timeIntervalSince(start) > 30, onPlaybackFailure != nil {
                     failureReported = true
@@ -922,10 +924,10 @@ struct KSChromePlayer: View {
         let generation = qualityGeneration
         let applied = OnlineQualitySession.apply(peakBitRate: choice.peakBitRate, maximumResolution: choice.maximumResolution, label: choice.label, generation: generation, to: item)
         guard generation == qualityGeneration else { return }
-        appliedQuality = choice
+        if appliedQuality != choice { appliedQuality = choice }
         _ = applied
         let presented = item.presentationSize
-        if presented.width > 1, presented.height > 1 { observedResolution = presented }
+        if presented.width > 1, presented.height > 1, observedResolution != presented { observedResolution = presented }
     }
 
     var onlineQualityStatus: String {

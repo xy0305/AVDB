@@ -94,7 +94,7 @@ extension OnlineProvider {
         case .jable:
             let page=JableAdapter.search(code);return try JableAdapter.lines(try await transport.fetch(page,cap:2*1024*1024),page:page,number:code,versions:versions)
         case .missav:
-            let page=MissAVAdapter.search(code);return try MissAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:URL(string:"https://missav.ws/dm339")!)),page:page,number:code,versions:versions)
+            let page=MissAVAdapter.search(code);return try MissAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024,headers:OnlinePolicy.documentHeaders(referrer:URL(string:"https://missav.ws/dm339")!)),page:page,number:code,versions:versions)
         case .av123:
             let page=OneTwoThreeAVAdapter.search(code)
             return try OneTwoThreeAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024),page:page,number:code)
@@ -111,7 +111,7 @@ extension OnlineProvider {
         guard OnlineIdentity.version(line.code,number:number,allowVersions:versions) != nil,
               let detail=line.detailURL,OnlinePolicy.metadata(detail,source:line.source),detail.lastPathComponent == line.recordID,
               detail.lastPathComponent.uppercased() == line.code.uppercased() else { throw OnlineFailure.noMatch }
-        let data=try await transport.fetch(detail,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:detail))
+        let data=try await transport.fetch(detail,cap:2*1024*1024,headers:OnlinePolicy.documentHeaders(referrer:detail))
         try OnlineAdapters.rejectChallenge(OnlineAdditional.html(data))
         let media:URL;let referrer:URL
         switch line.source {
