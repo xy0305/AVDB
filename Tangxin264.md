@@ -2,7 +2,7 @@
 
 基线仍为 d761e795b1111c15c7b91d1ad01368c520e28e0e (1.0.2/261)，仅在 feat/tangxin-javverse-from261 顺增到264；不合并 main/fix。
 
-首页、作者与标签作品列表共用 TangxinListView：用户下滑至 LazyVStack 尾部后按来源真实 next 请求下一页。使用尾部视频 URL 身份，触发前消费令牌；MainActor loading 闸门保证一次仅一请求。URL去重、visited、generation和取消逻辑保留。刷新重置自动令牌；导航返回不清空成功数据或主动重置滚动位置。
+首页、作者与标签作品列表共用 TangxinListView：用户下滑至 LazyVStack 尾部后按来源真实 next 请求下一页。以独立滚动坐标系中尾部位置距真实可视高度100点以内为触发条件，不以预加载 onAppear 判定可见；长列表合成夹具48张确保宽屏也必须滚动。使用尾部视频 URL 身份，触发前消费令牌；MainActor loading 闸门保证一次仅一请求。URL去重、visited、generation和取消逻辑保留。刷新重置自动令牌；导航返回不清空成功数据或主动重置滚动位置。
 
 自动请求失败保留错误和 next，不随尾部重新出现自动重试；必须点击“重试”。当前页 sourceEmpty/filtered/structureChanged 或翻页去重后零新增均停自动扫描，保留“加载更多”手动单页推进；无 next 显示“已到最后一页”。不搜索被屏蔽内容，不编造总数。
 

@@ -143,6 +143,7 @@ struct TangxinNetworkSettings: View {
 }
 struct TangxinListView: View {
     @StateObject private var model: TangxinListModel
+    @State private var viewportHeight: CGFloat = 0
     let title: String
     let isAuthor: Bool
     init(root:URL,title:String,client:TangxinClient,isAuthor:Bool = false) {
@@ -215,7 +216,12 @@ struct TangxinListView: View {
                         Text("下滑自动加载更多").font(.footnote).foregroundStyle(.secondary)
                             .frame(maxWidth:.infinity,minHeight:44)
                             .id(tail)
-                            .task { await model.nearBottom(tail:tail) }
+                            .onGeometryChange(for:Bool.self) { proxy in
+                                let frame = proxy.frame(in:.named("tangxin.scroll"))
+                                return viewportHeight > 0 && frame.minY <= viewportHeight + 100 && frame.maxY >= 0
+                            } action: { visible in
+                                if visible { Task { await model.nearBottom(tail:tail) } }
+                            }
                             .accessibilityIdentifier("tangxin.auto.more")
                     } else {
                         Button("加载更多") { Task { await model.more() } }
@@ -229,6 +235,8 @@ struct TangxinListView: View {
                 }
             }.padding(.vertical)
         }
+        .coordinateSpace(name:"tangxin.scroll")
+        .onGeometryChange(for:CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
         .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.refresh() }.task { await model.start() }
         .onDisappear { model.cancel() }

@@ -18,7 +18,7 @@ enum TangxinFixtures261 {
             if ProcessInfo.processInfo.arguments.contains("--auto264"), let url = request.url,
                url.path.hasPrefix("/featured") || url.path.hasPrefix("/a/") || url.path.hasPrefix("/tag/") {
                 let second = url.path.split(separator:"/").last == "2"
-                let cards = second ? card("neutral1") + card("tail264") : (1...12).map { card("scroll\($0)") }.joined()
+                let cards = second ? card("neutral1") + card("tail264") : (1...48).map { card("scroll\($0)") }.joined()
                 let next = second ? "" : "<a rel='next' href='\(url.path.hasPrefix("/a/") ? author : (url.path.hasPrefix("/tag/") ? "/tag/original/" : "/featured/"))2'>Next</a>"
                 return Data(("<div class='grid'>" + cards + "</div>" + next).utf8)
             }
