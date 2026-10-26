@@ -18,14 +18,23 @@ jobs:
           /tmp/dmm-regression scripts/dmm-ranking-fixtures
           swiftc AVDB/Services/DMMRankingCore.swift AVDB/Services/DMMTransport.swift AVDB/Services/DMMRankingStore.swift scripts/DMMStoreRegression.swift -o /tmp/dmm-store-regression
           /tmp/dmm-store-regression scripts/dmm-ranking-fixtures
+      - name: Install pinned existing MediaPipe dependency
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod install --repo-update
+      - name: Compile existing Core Image Metal kernel
+        run: |
+          xcrun -sdk iphoneos metal -fcikernel -c AVDB/Resources/Enhancement.metal -o /tmp/Enhancement.air
+          xcrun -sdk iphoneos metallib -cikernel /tmp/Enhancement.air -o AVDB/Resources/Enhancement.metallib
       - name: Build native simulator
         run: |
           set -euo pipefail
-          xcodebuild -project AVDB.xcodeproj -scheme AVDB -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/dmm-sim CODE_SIGNING_ALLOWED=NO build > /tmp/dmm-sim.log 2>&1 || { tail -100 /tmp/dmm-sim.log; exit 1; }
+          xcodebuild -workspace AVDB.xcworkspace -scheme AVDB -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/dmm-sim CODE_SIGNING_ALLOWED=NO build > /tmp/dmm-sim.log 2>&1 || { tail -100 /tmp/dmm-sim.log; exit 1; }
       - name: Build unsigned arm64 release
         run: |
           set -euo pipefail
-          xcodebuild -project AVDB.xcodeproj -scheme AVDB -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/dmm-release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' CODE_SIGN_ENTITLEMENTS='' build > /tmp/dmm-release.log 2>&1 || { tail -100 /tmp/dmm-release.log; exit 1; }
+          xcodebuild -workspace AVDB.xcworkspace -scheme AVDB -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/dmm-release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' CODE_SIGN_ENTITLEMENTS='' build > /tmp/dmm-release.log 2>&1 || { tail -100 /tmp/dmm-release.log; exit 1; }
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceCommit string $GITHUB_SHA" /tmp/dmm-release/Build/Products/Release-iphoneos/AVDB.app/Info.plist
           mkdir -p /tmp/dmm-package/Payload
           ditto /tmp/dmm-release/Build/Products/Release-iphoneos/AVDB.app /tmp/dmm-package/Payload/AVDB.app
           cd /tmp/dmm-package
