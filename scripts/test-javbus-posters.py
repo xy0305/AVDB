@@ -47,16 +47,20 @@ source+=r'''
     let amazon=DetailPosterQuality(source:"amazon",width:1050,height:1500,originalPortrait:true)
     assert(DetailPosterQuality.winner([bus,amazon])?.source=="amazon")
     assert(!DetailPosterPolicy.eligible(width:800,height:538))
-    let free:[String]=await DetailPosterSelection.collect(sources:["dmm","javdb"],budget:0.5,supplemental:{ _ in [main] }) { s,_ in
+    // These cases assert selection, not sub-second runner scheduling. Six jobs
+    // need three executor turns; a loaded Simulator host can exhaust 0.5 seconds.
+    // Keep the separate slow-metadata latency assertion below at its real budget.
+    let selectionBudget: TimeInterval = 5
+    let free:[String]=await DetailPosterSelection.collect(sources:["dmm","javdb"],budget:selectionBudget,supplemental:{ _ in [main] }) { s,_ in
         try? await Task.sleep(nanoseconds:20_000_000); return s
     }
     assert(Set(free)==["dmm","javdb",main])
     let all=["dmm1","dmm2","javdb1","javdb2","mgs1","mgs2"]
-    let full:[String]=await DetailPosterSelection.collect(sources:all,budget:0.5,supplemental:{ _ in [main] }) { s,_ in
+    let full:[String]=await DetailPosterSelection.collect(sources:all,budget:selectionBudget,supplemental:{ _ in [main] }) { s,_ in
         try? await Task.sleep(nanoseconds:20_000_000); return s
     }
-    assert(Set(full)==Set(all)) // no provider displaced or seventh attempt.
-    let reserved:[String]=await DetailPosterSelection.collect(sources:["dmm","javdb"],budget:0.5,discover:{ _ in
+    assert(full.count == all.count && Set(full)==Set(all), "six baseline slots: got \(full.count)/\(all.count); no supplemental displacement or seventh result")
+    let reserved:[String]=await DetailPosterSelection.collect(sources:["dmm","javdb"],budget:selectionBudget,discover:{ _ in
         try? await Task.sleep(nanoseconds:30_000_000);return ["tenhow","amazon","exactDMM"]
     },supplemental:{ _ in [main] }) { s,_ in
         try? await Task.sleep(nanoseconds:40_000_000);return s

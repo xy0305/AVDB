@@ -3,8 +3,11 @@ import SwiftUI
 // This host uses production ContentView, native tab bar and Tangxin views.
 // Other catalog tabs and the player are inert substitutes. NO playback proof.
 @main struct TangxinUIHost261: App {
-    private static let resetPreferences: Void = { UserDefaults.standard.removeObject(forKey:"tangxin.systemProxyCompatibility") }()
-    init() { _ = Self.resetPreferences }
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("--reset-network263") {
+            UserDefaults.standard.removeObject(forKey:"tangxin.systemProxyCompatibility")
+        }
+    }
     var body: some Scene { WindowGroup { ContentView(tangxinClient:TangxinFixtures261.client()).environmentObject(AppState()) } }
 }
 final class AppState: ObservableObject {}
