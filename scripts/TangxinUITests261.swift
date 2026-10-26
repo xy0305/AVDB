@@ -26,7 +26,10 @@ final class TangxinUITests261: XCTestCase {
         XCTAssertTrue(app.staticTexts["tangxin.author.heading"].waitForExistence(timeout:5)); shot("native-author")
         let work = app.buttons["tangxin.video.neutral1"]
         XCTAssertTrue(work.waitForExistence(timeout:5)); work.tap()
-        XCTAssertTrue(app.buttons["tangxin.play"].waitForExistence(timeout:5)); shot("native-detail-NO-playback")
+        XCTAssertTrue(app.buttons["tangxin.play"].waitForExistence(timeout:5))
+        XCTAssertEqual(app.navigationBars.count,1,"No outer More navigation wrapper")
+        XCTAssertEqual(app.tabBars.count,0,"Only the native six-button bar, no hidden/duplicate system bar")
+        shot("native-detail-NO-playback")
         app.navigationBars.buttons.element(boundBy:0).tap()
         XCTAssertTrue(app.staticTexts["tangxin.author.heading"].waitForExistence(timeout:5))
         app.navigationBars.buttons.element(boundBy:0).tap()
