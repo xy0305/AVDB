@@ -14,7 +14,7 @@ import Foundation
         precondition(detail.stream.host == TangxinPolicy.cdn)
         let author = try TangxinParser.list(TangxinFixtures261.authorPage,at:first.videos[0].author!.url)
         precondition(author.videos.count == 1 && author.next == nil)
-        for word in ["未成年","偷拍","私密流出","迷奸","泄露"] {
+        for word in ["未成年","偷拍","私密流出","迷奸","泄露","17岁","高中生","未满18"] {
             let page = try TangxinParser.list("<div class=\"grid\">"+TangxinFixtures261.card("bad",title:word)+"</div>",at:root)
             precondition(page.videos.isEmpty)
             reject { _ = try TangxinParser.detail(TangxinFixtures261.detail.replacingOccurrences(of:"成人自愿演示作品",with:word),at:first.videos[0].url) }
