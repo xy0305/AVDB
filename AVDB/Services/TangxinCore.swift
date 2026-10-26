@@ -46,8 +46,9 @@ enum TangxinPolicy {
     static let headers = ["User-Agent": OnlinePolicy.ua, "Referer": origin.absoluteString]
     // Nicknames are deliberately NOT inspected. Generic 黑料 alone is not a verdict.
     static func permitted(_ metadata: String) -> Bool {
-        let s = metadata.lowercased().replacingOccurrences(of: " ", with: "")
-        return !["未成年", "幼女", "幼童", "儿童", "小学生", "初中", "高中生", "萝莉", "蘿莉", "偷拍", "偷录", "盜攝", "盗摄", "泄露", "洩露", "私密流出", "隐私流出", "非自愿", "非自願", "迷奸", "强奸", "強姦", "下药", "下藥", "醉奸", "rape", "underage", "hidden camera", "revenge porn"].contains { s.contains($0.replacingOccurrences(of: " ", with: "")) }
+        let s = metadata.folding(options: [.widthInsensitive], locale: nil).lowercased().replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
+        if s.range(of: #"(?:^|[^0-9])(?:[0-9]|1[0-7])(?:岁|歲|years?old|yo)(?:[^0-9]|$)"#, options: .regularExpression) != nil { return false }
+        return !["未成年", "未满18", "未滿18", "幼女", "幼童", "儿童", "兒童", "小学生", "小學生", "初中", "高中生", "中学生", "中學生", "萝莉", "蘿莉", "偷拍", "偷录", "偷錄", "盜攝", "盗摄", "泄露", "洩露", "流出", "外流", "非自愿", "非自願", "迷奸", "强奸", "強姦", "下药", "下藥", "醉奸", "rape", "underage", "hidden camera", "revenge porn"].contains { s.contains($0.replacingOccurrences(of: " ", with: "")) }
     }
     static func page(_ url: URL) -> Bool {
         guard OnlinePolicy.secure(url), url.host == origin.host, url.query == nil, url.fragment == nil else { return false }

@@ -161,7 +161,7 @@ struct TangxinDetailView: View {
                         guard !loading else { return }; loading = true; error = nil
                         playTask = Task {
                             do { let plan = try await client.playback(detail); try Task.checkCancellation(); playback = plan }
-                            catch { if !Task.isCancelled { error = error.localizedDescription } }
+                            catch { if !Task.isCancelled { self.error = error.localizedDescription } }
                             loading = false
                         }
                     } label: { Label("播放",systemImage:"play.fill").frame(maxWidth:.infinity,minHeight:44) }
@@ -175,7 +175,7 @@ struct TangxinDetailView: View {
         .task(id:request) {
             loading = true; error = nil; detail = nil
             do { let value = try await client.detail(video.url); try Task.checkCancellation(); detail = value }
-            catch { if !Task.isCancelled { error = error.localizedDescription } }
+            catch { if !Task.isCancelled { self.error = error.localizedDescription } }
             loading = false
         }
         .onDisappear { playTask?.cancel() }

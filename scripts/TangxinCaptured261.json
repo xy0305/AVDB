@@ -1,0 +1,13 @@
+{
+  "kind": "captured-safe-structural-metadata-only",
+  "capturedAt": "2026-10-26T07:52:28+08:00",
+  "origin": "https://tangxinvlog.app/",
+  "requests": [
+    {"route": "/featured/", "httpStatus": 200, "cardCount": 24, "cardSelector": "article.card a.cover-link", "titleAttribute": "img.alt", "authorSelector": "a.nickname", "nextHref": "/featured/2", "paginationTextShape": "1 / 153", "sha256": "7b601117fd376bd9b4e2cef24d61c1400820597606ea583518e35a6fd7b473a4"},
+    {"routeShape": "/v/<issued-id>/", "httpStatus": 200, "primarySelector": "article.info", "headingSelector": "h1", "descriptionSelector": "p.description", "authorSelector": "article.info a.nickname", "issuedStreamHost": "t.5gcdn.xyz", "issuedStreamPathShape": "/videos/<issued-id>/index.m3u8", "sha256": "0ce0b47e44db457487e4f1d12ca00e26ca27b8c4bae26a78a7a89f4fb6af0d66"},
+    {"routeShape": "/a/<issued-percent-encoded-name>/", "httpStatus": 200, "headingSelector": "header.artist-head h1", "cardCount": 1, "hasNext": false, "avatarIssued": false, "sha256": "005d701fc6da600c546d477c674c3b47ccfdb98701c7899c3d3bc326d0f19dc1"},
+    {"routeShape": "https://t.5gcdn.xyz/videos/<issued-id>/index.m3u8", "requestReferer": "https://tangxinvlog.app/", "httpStatus": 200, "isHLS": true, "encryption": "AES-128", "variantCount": 0, "segmentCount": 976, "downloadedSegments": 0, "downloadedKeys": 0}
+  ],
+  "notCaptured": ["raw HTML", "video titles", "author identities", "thumbnails", "encryption keys", "signed stream URLs", "cookies", "accounts", "video frames"],
+  "limitations": ["No real playback or first frame verified", "No prohibited category endpoints probed", "HTTP success does not establish consent", "UI screenshots use entirely synthetic fixtures"]
+}
