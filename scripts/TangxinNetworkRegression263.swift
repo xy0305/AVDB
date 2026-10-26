@@ -16,6 +16,10 @@ enum TangxinNetworkRegression263 {
         let copied = NSError(domain:bridged.domain,code:bridged.code,userInfo:bridged.userInfo)
         precondition(OnlineFailure.classify(copied).presentation(at:.discovery) == original)
         precondition(!raw.localizedDescription.contains("原因未确定"))
+        let oldKeyStage = OnlineMediaScope.diagnostic(root,stage:"密钥/DNS",reason:"解析无结果（空地址集）").presentation(at:.unknown)
+        precondition(oldKeyStage.stage == .key && oldKeyStage.category == .dns && oldKeyStage.detail == .dnsEmpty)
+        precondition(PlaybackDiagnostic(stage:.dns,category:.unsafe,host:"192.168.0.1").host == nil)
+        precondition(PlaybackDiagnostic(stage:.dns,category:.unsafe,host:"fd27::1").host == nil)
         func rejection(_ addresses:[String],mode:OnlineDNSMode = .strict,approved:Bool = true) -> PlaybackDiagnostic {
             do { try OnlineMediaScope.validateAddresses(addresses,root:root,mode:mode,approvedOrigin:approved); fatalError("unsafe addresses accepted") }
             catch { return OnlineFailure.classify(error).presentation(at:.discovery) }
