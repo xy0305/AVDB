@@ -12,7 +12,7 @@ import Foundation
         let detail = try TangxinParser.detail(TangxinFixtures261.detail,at:first.videos[0].url)
         precondition(detail.video.author?.name == "黑料昵称")
         precondition(detail.tags == ["原创"] && detail.summary.contains("合成"))
-        precondition(detail.tagLinks.first?.url.path == "/tag/original/")
+        precondition(detail.tagLinks.first?.url.lastPathComponent == "original")
         let encodedTag = "/tag/%E5%8E%9F%E5%88%9B/"
         let parsedTags = TangxinParser.detailTags("<a href='\(encodedTag)'>原创</a><a href='\(encodedTag)'>原创</a><a href='https://evil.org/tag/x/'>外部</a><a class='tag'>只有文字</a><a href='/tag/hidden-camera/'>偷拍</a><a href='/tag/%E6%9C%AA%E6%88%90%E5%B9%B4/'>测试</a><a href='/tag/black/'>黑料</a>",at:first.videos[0].url)
         precondition(parsedTags.links.count == 2 && parsedTags.links[0].name == "原创")

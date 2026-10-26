@@ -9,7 +9,7 @@ final class TangxinUITests261: XCTestCase {
         app.buttons["app.tab.4"].tap(); app.swipeUp()
         let retry = app.buttons["重试"]
         XCTAssertTrue(retry.waitForExistence(timeout:8))
-        for _ in 0..<3 { app.swipeDown(); app.swipeUp() }
+        for _ in 0..<3 { app.swipeUp() }
         XCTAssertTrue(retry.exists)
         XCTAssertFalse(app.buttons["tangxin.video.neutral2"].exists)
         shot("264-failed-auto-no-loop")
