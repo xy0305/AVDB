@@ -4,7 +4,7 @@ R=Path(__file__).resolve().parents[1]; O=R/'evidence261';O.mkdir(exist_ok=True)
 assert platform.system()=='Darwin','Requires real Xcode simulator'
 s=(R/'AVDB/Services/CatalogueMetadata.swift').read_text()
 (O/'Identity.swift').write_text('import Foundation\nenum CatalogueIdentity {'+s.split('enum CatalogueIdentity {',1)[1].split('\nstruct ScrapedMetadata:',1)[0])
-files=['AVDB/Services/PlaybackDiagnostic.swift','AVDB/Services/JavRankingCore.swift','AVDB/Services/MissAVCore.swift','AVDB/Services/OnlinePlaybackCore.swift','AVDB/Services/OnlineAdditionalProviders.swift','AVDB/Services/DetailOnlineAdapters.swift','AVDB/Services/TangxinCore.swift','AVDB/Views/TangxinView.swift','AVDB/Views/ContentView.swift','AVDB/Views/AVDBNativeTabBar.swift','scripts/TangxinFixtures261.swift','scripts/TangxinUIHost261.swift','evidence261/Identity.swift']
+files=['AVDB/Services/PlaybackDiagnostic.swift','AVDB/Services/JavRankingCore.swift','AVDB/Services/MissAVCore.swift','AVDB/Services/OnlinePlaybackCore.swift','AVDB/Services/OnlineAdditionalProviders.swift','AVDB/Services/DetailOnlineAdapters.swift','AVDB/Services/TangxinCore.swift','AVDB/Views/TangxinView.swift','AVDB/Views/Player/PlaybackVideoMetrics.swift','AVDB/Views/ContentView.swift','AVDB/Views/AVDBNativeTabBar.swift','scripts/TangxinFixtures261.swift','scripts/TangxinUIHost261.swift','evidence261/Identity.swift']
 ruby="""require 'xcodeproj'
 r=ENV.fetch('GITHUB_WORKSPACE',Dir.pwd); o=File.join(r,'evidence261');p=Xcodeproj::Project.new(File.join(o,'Tangxin261.xcodeproj'))
 a=p.new_target(:application,'Tangxin261',:ios,'17.0')
@@ -39,7 +39,7 @@ for kind in ['iPhone','iPad']:
  if kind == 'iPhone':
   sdk=subprocess.check_output(['xcrun','--sdk','iphonesimulator','--show-sdk-path'],text=True).strip()
   binary=O/'model261'
-  model_files=files[:8]+['scripts/TangxinFixtures261.swift','evidence261/Identity.swift','scripts/TangxinModelRegression261.swift']
+  model_files=files[:9]+['scripts/TangxinFixtures261.swift','evidence261/Identity.swift','scripts/TangxinModelRegression261.swift']
   subprocess.run(['xcrun','--sdk','iphonesimulator','swiftc','-parse-as-library','-swift-version','5','-target',platform.machine()+'-apple-ios17.0-simulator','-sdk',sdk,*[str(R/f) for f in model_files],'-o',str(binary)],check=True)
   subprocess.run(['xcrun','simctl','spawn',d['udid'],str(binary)],check=True,timeout=60)
  xc=O/(kind+'.xcresult');shots=O/(kind+'-screenshots');shots.mkdir(exist_ok=True)
