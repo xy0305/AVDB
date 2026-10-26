@@ -12,7 +12,8 @@ enum TangxinFixtures261 {
     static let detail = "<video poster='https://t.5gcdn.xyz/videos/neutral1/cover.jpg'></video><article class='info'><h1>成人自愿演示作品</h1><a class='nickname' href='" + author + "'>@黑料昵称</a><p class='desc'>明确合成测试，无真实人物</p><a href='/tag/original/'>原创</a></article><script type='application/json'>{\"src\":\"https://t.5gcdn.xyz/videos/neutral1/index.m3u8\"}</script><section>" + card("unrelated",authorPath:"/a/Other/") + "</section>"
     static let playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:5,\nsegment.ts\n#EXT-X-ENDLIST\n"
     static func client() -> TangxinClient {
-        TangxinClient(transport:OnlineTransport(loader: { request in
+        let resolver: (@Sendable (String) async throws -> [String])? = ProcessInfo.processInfo.arguments.contains("--network263") ? { _ in ["198.18.0.1"] } : nil
+        return TangxinClient(transport:OnlineTransport(resolver:resolver,loader: { request in
             if ProcessInfo.processInfo.arguments.contains("--empty-states262") {
                 let path = request.url!.path
                 let next: (Int) -> String = { "<a rel='next' href='/featured/\($0)'>Next</a>" }

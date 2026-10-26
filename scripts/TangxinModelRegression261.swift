@@ -29,7 +29,7 @@ actor TangxinModelFixture261 {
         await state.setWaiting(true)
         let cancelled = Task { await m.refresh() }
         try await Task.sleep(nanoseconds:30_000_000); cancelled.cancel(); await cancelled.value
-        precondition(!m.loading && m.error == nil)
+        precondition(!m.loading && m.error?.contains("取消") == true)
         let stale = Task { await m.refresh() }
         try await Task.sleep(nanoseconds:30_000_000)
         await state.setWaiting(false); await m.refresh(); await stale.value
@@ -40,7 +40,7 @@ actor TangxinModelFixture261 {
         let pending = Task { await reentry.start() }
         try await Task.sleep(nanoseconds:30_000_000)
         reentry.cancel(); await pending.value
-        precondition(!reentry.loading && reentry.error == nil)
+        precondition(!reentry.loading && reentry.error?.contains("取消") == true)
         await state.setWaiting(false); await reentry.start()
         precondition(reentry.videos.count == 1 && !reentry.loading)
         // No automatic scan: each empty page advances only when more() is requested.

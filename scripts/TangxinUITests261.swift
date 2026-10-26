@@ -4,6 +4,33 @@ final class TangxinUITests261: XCTestCase {
     func shot(_ name:String) {
         let a = XCTAttachment(screenshot:XCUIApplication().screenshot()); a.name = "SYNTHETIC-261-"+name; a.lifetime = .keepAlways; add(a)
     }
+    func testNetworkDiagnostics263() {
+        let app = XCUIApplication(); app.launchArguments = ["--network263"]; app.launch()
+        app.buttons["app.tab.4"].tap()
+        XCTAssertTrue(app.buttons["tangxin.network.open"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "严格模式拒绝合成")).firstMatch.waitForExistence(timeout:8))
+        XCTAssertTrue(app.buttons["tangxin.retry"].exists || app.buttons["重试"].exists)
+        shot("263-strict-exact-diagnostic")
+        app.buttons["tangxin.network.open"].tap()
+        let toggle = app.switches["tangxin.network.compatibility"]
+        XCTAssertTrue(toggle.waitForExistence(timeout:5)); XCTAssertEqual(toggle.value as? String,"0")
+        XCTAssertTrue(app.buttons["tangxin.network.run"].waitForExistence(timeout:8))
+        app.buttons["tangxin.network.run"].tap()
+        XCTAssertTrue(app.staticTexts["tangxin.network.status"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts["tangxin.network.status"].label.contains("严格模式拒绝合成"))
+        shot("263-native-network-sheet")
+        toggle.tap()
+        let success = app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "HTTP 200")).firstMatch
+        XCTAssertTrue(success.waitForExistence(timeout:8))
+        shot("263-explicit-compatible-diagnostic")
+        app.buttons["完成"].tap()
+        XCTAssertTrue(app.buttons["tangxin.video.neutral1"].waitForExistence(timeout:8))
+        app.buttons["tangxin.network.open"].tap()
+        let off = app.switches["tangxin.network.compatibility"]
+        XCTAssertTrue(off.waitForExistence(timeout:5)); off.tap(); app.buttons["完成"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@", "严格模式拒绝合成")).firstMatch.waitForExistence(timeout:8))
+        shot("263-strict-restored-no-blank-state")
+    }
     func testEmptyStatesAndManualAdvance262() {
         let app = XCUIApplication(); app.launchArguments = ["--empty-states262"]; app.launch()
         app.buttons["app.tab.4"].tap()
