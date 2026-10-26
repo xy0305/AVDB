@@ -143,7 +143,7 @@ struct TangxinNetworkSettings: View {
 }
 struct TangxinListView: View {
     @StateObject private var model: TangxinListModel
-    @State private var viewportHeight: CGFloat = 0
+    @State private var hasScrolled = false
     let title: String
     let isAuthor: Bool
     init(root:URL,title:String,client:TangxinClient,isAuthor:Bool = false) {
@@ -151,8 +151,12 @@ struct TangxinListView: View {
         _model = StateObject(wrappedValue:TangxinListModel(root:root,client:client))
     }
     var body: some View {
+        GeometryReader { viewport in
         ScrollView {
-            LazyVStack(alignment:.leading,spacing:16) {
+            // Only the grid virtualizes. Nesting it inside a LazyVStack makes
+            // the footer's estimated position feed back into lazy realization
+            // during scrolling / accessibility snapshots.
+            VStack(alignment:.leading,spacing:16) {
                 if isAuthor {
                     Label(model.heading ?? title,systemImage:"person.crop.circle")
                         .font(.title2.bold()).padding(.horizontal)
@@ -218,7 +222,7 @@ struct TangxinListView: View {
                             .id(tail)
                             .onGeometryChange(for:Bool.self) { proxy in
                                 let frame = proxy.frame(in:.named("tangxin.scroll"))
-                                return viewportHeight > 0 && frame.minY <= viewportHeight + 100 && frame.maxY >= 0
+                                return hasScrolled && viewport.size.height > 0 && frame.minY <= viewport.size.height + 100 && frame.maxY >= 0
                             } action: { visible in
                                 if visible { Task { await model.nearBottom(tail:tail) } }
                             }
@@ -236,7 +240,10 @@ struct TangxinListView: View {
             }.padding(.vertical)
         }
         .coordinateSpace(name:"tangxin.scroll")
-        .onGeometryChange(for:CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
+        .simultaneousGesture(DragGesture(minimumDistance:10).onChanged { value in
+            if value.translation.height < -10 && !hasScrolled { hasScrolled = true }
+        })
+        }
         .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.refresh() }.task { await model.start() }
         .onDisappear { model.cancel() }

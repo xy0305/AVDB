@@ -18,9 +18,13 @@ swift=r'''
 actor DeliveryProbe {
  var nativeTime=0.0; var winnerTime=0.0; var metadataCalls=0; var imageCalls=0
  var winner: String?; var poster: Task<Void,Never>?
- func native() { nativeTime=ProcessInfo.processInfo.systemUptime }
+ var metadataFinished=false; var nativeBeforeMetadata=false; var imageBeforeMetadata=false
+ func native() { nativeTime=ProcessInfo.processInfo.systemUptime; nativeBeforeMetadata = !metadataFinished }
  func metadata() { metadataCalls += 1 }
- func image() { imageCalls += 1 }
+ func finishMetadata() { metadataFinished=true }
+ func waitForImage() async { while imageCalls == 0 && !Task.isCancelled { await Task.yield() } }
+ func image() { if imageCalls == 0 { imageBeforeMetadata = !metadataFinished }; imageCalls += 1 }
+ func ordering() -> (Bool,Bool) { (nativeBeforeMetadata,imageBeforeMetadata) }
  func result(_ source: String?) { winner=source; winnerTime=ProcessInfo.processInfo.systemUptime }
  func launch(_ work: @escaping @Sendable () async -> Void) { poster=Task { await work() } }
  func join() async { await poster?.value }
@@ -42,7 +46,10 @@ actor DeliveryGate {
   let lookup: @Sendable () async -> Int? = {
    await metadata.value(key:"ABF-378#avbase") {
     await p.metadata()
-    do { try await Task.sleep(nanoseconds:180_000_000); return 1 } catch { return nil }
+    // Deterministic overlap rendezvous, not a race between two CI wall clocks.
+    // A regression to serial delivery deadlocks here and fails the process timeout.
+    if early { await p.waitForImage() }
+    do { try await Task.sleep(nanoseconds:180_000_000); await p.finishMetadata(); return 1 } catch { return nil }
    }
   }
   let select: @Sendable () async -> Void = {
@@ -64,6 +71,8 @@ actor DeliveryGate {
   if !early { await p.native(); await p.launch(select) }
   await p.join()
   let v=await p.values()
+  let ordering=await p.ordering()
+  assert(ordering.0 == early && ordering.1 == early, "native delivery and image work must overlap metadata iff early delivery is enabled")
   assert(v.2 == 1 && v.3 == 4 && v.4 == "amazon")
   let warmBegin=ProcessInfo.processInfo.systemUptime
   assert(artwork.snapshot(key:key).artwork == "amazon")
@@ -76,8 +85,12 @@ actor DeliveryGate {
  }
  static func main() async {
   let before=await run(early:false); let after=await run(early:true)
-  assert((after["native_first_display_ms"] as! Double) < (before["native_first_display_ms"] as! Double))
-  assert((after["stable_hq_winner_ms"] as! Double) < (before["stable_hq_winner_ms"] as! Double))
+  print("DELIVERY220_TIMING before=\(before) after=\(after)")
+  // Independent runs on a shared runner are not an ordering oracle (old line
+  // 2959 compared ~290ms vs ~190ms with zero scheduling tolerance). Causal
+  // ordering is asserted inside run; retain a separate bounded latency gate.
+  assert((after["stable_hq_winner_ms"] as! Double) < 5_000, "correct HQ selection exceeded correctness budget")
+  assert((after["native_first_display_ms"] as! Double) < 500, "early native delivery blocked on metadata")
   // Leased metadata lookup: cancelling the detail consumer keeps the poster
   // consumer alive; cancelling the last consumer cancels I/O without a miss.
   let cache=DetailPosterCache<Int>();let probe=DeliveryProbe();let gate=DeliveryGate()

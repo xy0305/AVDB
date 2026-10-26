@@ -22,6 +22,9 @@ final class TangxinUITests261: XCTestCase {
         app.buttons["app.tab.4"].tap()
         XCTAssertTrue(app.buttons["tangxin.video.scroll1"].waitForExistence(timeout:8))
         XCTAssertFalse(app.buttons["tangxin.video.tail264"].exists, "Must not fetch next at the top")
+        app.swipeUp()
+        XCTAssertFalse(app.buttons["tangxin.video.tail264"].exists, "One swipe through 48 cards must not count as near-bottom")
+        shot("264-first-scroll-no-prefetch")
         for _ in 0..<16 {
             if app.buttons["tangxin.video.tail264"].exists { break }
             app.swipeUp()
