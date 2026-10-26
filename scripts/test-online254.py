@@ -3,7 +3,8 @@ import platform,subprocess,tempfile,plistlib
 R=Path(__file__).resolve().parents[1]
 core=(R/'AVDB/Services/OnlinePlaybackCore.swift').read_text();panel=(R/'AVDB/Views/Player/OnlinePlaybackPanel.swift').read_text();adapters=(R/'AVDB/Services/DetailOnlineAdapters.swift').read_text()
 assert 'case jable, missav, av123, memojav' in core
-assert 'OnlinePlaybackSheet(number: movie.displayNumber, model: onlinePlaybackModel, versions: $onlineVersions)' in (R/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
+assert 'OnlinePlaybackSheet(number: movie.displayNumber, model: model, versions: $onlineVersions)' in (R/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
+assert 'resourceCards.model = OnlinePlaybackModel()' in (R/'AVDB/Views/Detail/MovieDetailView.swift').read_text()
 assert 'headers: plan.headers' in panel and '.id(plan.id)' in panel and 'cancelSelection()' in panel
 assert 'epochs[source] == epoch' in panel and 'selectionEpoch == epoch' in panel
 assert 'c.httpShouldSetCookies = false' in core and 'completionHandler(nil)' in core
