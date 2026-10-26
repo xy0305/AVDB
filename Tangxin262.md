@@ -5,13 +5,13 @@
 ## 已确认的缺陷与修复
 
 - 261把来源真正空列表、全部筛除及解析失败统一显示为“暂无可显示内容”，缺少证据分类；262生产parser返回content/sourceEmpty/filtered/structureChanged以及只含数量的report。
-- 261首次加载离开时cancel未重置loading/loaded，可能使再入start跳过或load被loading挡住；262取消使未完成页面可再次加载，保留成功页面与导航状态，generation隔离旧响应。
+- 生命周期防御性加固：262新增显式cancel，取消时使未完成页面可再次加载，保留成功页面与导航状态，generation隔离旧响应。取消初次加载再入已由新生产模型回归覆盖；未证明用户261截图由生命周期导致。
 - 标题提取支持card局部h3.title内同一作品链接，过滤空aria-label/alt后回退；全部候选标题和卡片局部标签都筛查，不能用安全alt掩盖风险heading，不扫描全局标签或普通作者昵称。
 - 空/筛除/结构变化页保留经同源集合及相邻页验证的真实next，显式手动每次推进一页，不自动扫描填满。
 
 ## 根因边界
 
-用户手机261截图只证明当时为空，不能证明24张卡全部被策略筛除。先前Python复算不是生产Swift结果。CI新增只读GET（生产相同UA和Referer，无cookies/redirect/标题日志/HTML artifact），在macOS分别编译261原生产parser和262生产parser；只输出HTTP与计数。最终交付以CI实际计数记录为准。即使实站当次能够解析，也不能倒推截图当时的网络、响应及设备生命周期唯一根因。
+用户手机261截图只证明当时为空，不能证明24张卡全部被策略筛除。先前Python复算不是生产Swift结果。CI新增只读GET（生产相同UA和Referer，无cookies/redirect/标题日志/HTML artifact），在macOS分别编译261原生产parser和262生产parser；只输出HTTP与计数。macOS CI `40254061382`实测（2026-10-26 01:24–01:25 UTC）：HTTP200；原261生产Swift parser显示23项、next=true、rootAllowed=true；262生产Swift parser为content、cards=24、extracted=24、blocked=1、malformed=0、duplicates=0、displayed=23、next=true。该次运行的UI断言误把SwiftUI非独立AX容器当otherElements，已改为验证实际渲染的状态文案；该运行整体不是通过记录。上述生产计数排除了该次响应“全部被筛”或原Swift正则普遍失效的推断，不能倒推截图当时的网络、响应及设备生命周期唯一根因。最终IPA仍须通过修正后的整套CI。
 
 ## 安全与保留范围
 
