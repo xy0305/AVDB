@@ -920,7 +920,7 @@ struct KSChromePlayer: View {
         guard let choice = onlineQuality, let av = coordinator.playerLayer?.player as? KSAVPlayer,
               let item = av.player.currentItem else { return }
         let generation = qualityGeneration
-        let applied = OnlineQualitySession.apply(choice, generation: generation, to: item)
+        let applied = OnlineQualitySession.apply(peakBitRate: choice.peakBitRate, maximumResolution: choice.maximumResolution, label: choice.label, generation: generation, to: item)
         guard generation == qualityGeneration else { return }
         appliedQuality = choice
         _ = applied
@@ -929,7 +929,7 @@ struct KSChromePlayer: View {
     }
 
     var onlineQualityStatus: String {
-        OnlinePlaybackQualityStatus.display(choice: appliedQuality ?? onlineQuality, observed: observedResolution)
+        OnlinePlaybackQualityStatus.display(mode: (appliedQuality ?? onlineQuality)?.mode.rawValue ?? "automatic", label: (appliedQuality ?? onlineQuality)?.label ?? "自动", cap: (appliedQuality ?? onlineQuality)?.maximumResolution, observed: observedResolution)
     }
 
     @MainActor

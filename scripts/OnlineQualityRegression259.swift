@@ -94,16 +94,16 @@ import AVFoundation
         check(model.qualityStatus.contains("已开启"), "advanced status")
 
         let item = AVPlayerItem(url: URL(string: "https://cdn.example.net/neutral/high.m3u8")!)
-        let applied = OnlineQualitySession.apply(highest, generation: 7, to: item)
+        let applied = OnlineQualitySession.apply(peakBitRate: highest.peakBitRate, maximumResolution: highest.maximumResolution, label: highest.label, generation: 7, to: item)
         check(applied.generation == 7 && item.preferredPeakBitRate == 4_500_000, "player item peak applied")
         check(item.preferredMaximumResolution == CGSize(width: 1920, height: 1080), "player item resolution applied")
-        let cleared = OnlineQualitySession.apply(.automatic, generation: 8, to: item)
+        let cleared = OnlineQualitySession.apply(peakBitRate: nil, maximumResolution: nil, label: "自动", generation: 8, to: item)
         check(cleared.generation == 8 && item.preferredPeakBitRate == 0 && item.preferredMaximumResolution == .zero, "automatic clears hint")
         let plain = AVPlayerItem(url: URL(string: "https://cdn.example.net/neutral/plain.mp4")!)
         check(plain.preferredPeakBitRate == 0 && plain.preferredMaximumResolution == .zero, "115/plain session starts unconstrained")
-        let dropped = OnlinePlaybackQualityStatus.display(choice: highest, observed: CGSize(width: 1280, height: 720))
+        let dropped = OnlinePlaybackQualityStatus.display(mode: highest.mode.rawValue, label: highest.label, cap: highest.maximumResolution, observed: CGSize(width: 1280, height: 720))
         check(dropped.contains("最高") && dropped.contains("720p") && dropped.contains("网络降档"), "downshift is not labeled as still highest")
-        let steady = OnlinePlaybackQualityStatus.display(choice: highest, observed: CGSize(width: 1920, height: 1080))
+        let steady = OnlinePlaybackQualityStatus.display(mode: highest.mode.rawValue, label: highest.label, cap: highest.maximumResolution, observed: CGSize(width: 1920, height: 1080))
         check(steady.contains("最高") && steady.contains("1080p") && !steady.contains("网络降档"), "matching rendition is not a false downshift")
 
         // Late selection cannot publish after cancel, and preference toggle does not query.

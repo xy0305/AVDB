@@ -62,26 +62,16 @@ struct PlaybackMetricsState {
     }
 }
 
-
 /// Displayed selection is the session hint, not a promise that adaptation never drops.
-/// Observed presentation size is shown separately and may be lower on a constrained network.
+/// This file stays independently compilable for the 115 metrics regression.
 enum OnlinePlaybackQualityStatus {
-    static func display(choice: OnlineQualityChoice?, observed: CGSize) -> String {
-        let selected: String
-        if let choice {
-            switch choice.mode {
-            case .automatic: selected = "自动"
-            case .unavailable: selected = choice.label
-            case .highest: selected = choice.label
-            case .specific: selected = "手动·" + choice.label
-            }
-        } else { selected = "自动" }
+    static func display(mode: String, label: String, cap: CGSize?, observed: CGSize) -> String {
+        let selected = mode == "specific" ? "手动·" + label : (mode == "automatic" ? "自动" : label)
         var text = "画质 " + selected
         if observed.width > 1, observed.height > 1 {
             let grade = PlaybackVideoMetrics(width: observed.width, height: observed.height, evidence: .presentation)?.grade ?? "\(Int(min(observed.width, observed.height)))p"
             text += " · 当前 " + grade
-            if let choice, choice.mode == .highest || choice.mode == .specific,
-               let cap = choice.maximumResolution, cap.height > 1,
+            if (mode == "highest" || mode == "specific"), let cap, cap.height > 1,
                min(observed.width, observed.height) + 8 < min(cap.width, cap.height) {
                 text += "（网络降档）"
             }
@@ -90,9 +80,7 @@ enum OnlinePlaybackQualityStatus {
     }
 }
 
-
-/// Applies a finite session hint to one AVPlayerItem. Zero peak/size clears the hint
-/// (Apple's automatic path). Never writes Double.greatestFiniteMagnitude.
+/// Applies a finite session hint to one AVPlayerItem. Zero peak/size clears the hint.
 enum OnlineQualitySession {
     struct Applied: Equatable {
         var generation: Int
@@ -100,13 +88,13 @@ enum OnlineQualitySession {
         var maximumResolution: CGSize
         var label: String
     }
-    static func apply(_ choice: OnlineQualityChoice, generation: Int, to item: AVPlayerItem) -> Applied {
-        let peak = choice.peakBitRate ?? 0
-        let size = choice.maximumResolution ?? .zero
+    static func apply(peakBitRate: Double?, maximumResolution: CGSize?, label: String, generation: Int, to item: AVPlayerItem) -> Applied {
+        let peak = peakBitRate ?? 0
+        let size = maximumResolution ?? .zero
         precondition(peak.isFinite && peak >= 0 && peak < 1_000_000_000)
         precondition(size.width.isFinite && size.height.isFinite && size.width >= 0 && size.height >= 0)
         if item.preferredPeakBitRate != peak { item.preferredPeakBitRate = peak }
         if item.preferredMaximumResolution != size { item.preferredMaximumResolution = size }
-        return Applied(generation: generation, peakBitRate: item.preferredPeakBitRate, maximumResolution: item.preferredMaximumResolution, label: choice.label)
+        return Applied(generation: generation, peakBitRate: item.preferredPeakBitRate, maximumResolution: item.preferredMaximumResolution, label: label)
     }
 }
