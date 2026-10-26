@@ -4,6 +4,71 @@ final class TangxinUITests261: XCTestCase {
     func shot(_ name:String) {
         let a = XCTAttachment(screenshot:XCUIApplication().screenshot()); a.name = "SYNTHETIC-261-"+name; a.lifetime = .keepAlways; add(a)
     }
+    func scrollToPlay265(_ app: XCUIApplication) -> XCUIElement {
+        let play = app.buttons["tangxin.play"]
+        XCTAssertTrue(play.waitForExistence(timeout:8))
+        // Real viewport swipes, not scroll-to-accessibility or only isHittable.
+        for _ in 0..<12 {
+            let frame = play.frame
+            let tabTop = app.buttons["app.tab.4"].frame.minY
+            if play.isHittable && frame.minY > 0 && frame.maxY + 8 <= tabTop { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(play.isHittable)
+        XCTAssertGreaterThan(play.frame.height,43)
+        XCTAssertLessThanOrEqual(play.frame.maxY + 8, app.buttons["app.tab.4"].frame.minY,
+                                 "Entire playback target must clear native tab bar")
+        return play
+    }
+    func testCompactTagsAndActualPlaybackTap265() {
+        let app = XCUIApplication(); app.launchArguments = ["--layout265", "--reset-network263"]; app.launch()
+        app.buttons["app.tab.4"].tap()
+        let video = app.buttons["tangxin.video.neutral1"]
+        XCTAssertTrue(video.waitForExistence(timeout:8)); video.tap()
+        let play = scrollToPlay265(app)
+        let chips = (1...12).map { app.buttons["tangxin.tag.layout\($0)"] }
+        for chip in chips { XCTAssertTrue(chip.exists); XCTAssertGreaterThanOrEqual(chip.frame.height,44) }
+        let frames = chips.map { $0.frame }
+        let rows = Set(frames.map { Int($0.minY.rounded()) })
+        XCTAssertGreaterThanOrEqual(rows.count,2,"Twelve chips must wrap on both selected devices")
+        XCTAssertLessThan(rows.count,12,"Regression: one full-width vertical row per chip")
+        XCTAssertEqual(frames[0].minY,frames[1].minY,accuracy:2)
+        XCTAssertGreaterThan(frames[1].minX,frames[0].maxX)
+        let top = frames.map { $0.minY }.min()!, bottom = frames.map { $0.maxY }.max()!
+        XCTAssertLessThanOrEqual(bottom-top,CGFloat(rows.count)*52+2,"Compact 44pt chips + 8pt row gap")
+        XCTAssertLessThanOrEqual(bottom-top,312,"Bounded total chip block height")
+        print("LAYOUT265 viewport=\(app.frame) chips=\(frames) rows=\(rows.count) totalHeight=\(bottom-top) play=\(play.frame) tab=\(app.buttons["app.tab.4"].frame)")
+        shot("265-compact-chips-play-clears-tab")
+        // Tag navigation uses the real production NavigationLink, then returns.
+        let tag = chips[0]
+        for _ in 0..<4 { if tag.isHittable { break }; app.swipeDown() }
+        XCTAssertTrue(tag.isHittable); tag.tap()
+        XCTAssertTrue(app.buttons["tangxin.video.neutral1"].waitForExistence(timeout:8))
+        shot("265-tag-navigation")
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        XCTAssertTrue(app.buttons["tangxin.tag.layout1"].waitForExistence(timeout:8))
+        // Author round trip must also retain the detail destination.
+        let author = app.buttons["tangxin.detail.author"]
+        for _ in 0..<8 { if author.isHittable { break }; app.swipeDown() }
+        XCTAssertTrue(author.isHittable); author.tap()
+        XCTAssertTrue(app.staticTexts["tangxin.author.heading"].waitForExistence(timeout:8))
+        app.navigationBars.buttons.element(boundBy:0).tap()
+        let actualPlay = scrollToPlay265(app)
+        actualPlay.tap()
+        XCTAssertTrue(app.staticTexts["tangxin.fixture.player"].waitForExistence(timeout:10),
+                      "Tap must finish real Tangxin HLS/key preflight and enter inert KSChromePlayer substitute")
+        shot("265-actual-play-tap-entered-player-substitute")
+    }
+    func testPlaybackKeyFailureDoesNotEnterPlayer265() {
+        let app = XCUIApplication(); app.launchArguments = ["--layout265", "--playback-fail265", "--reset-network263"]; app.launch()
+        app.buttons["app.tab.4"].tap()
+        let video = app.buttons["tangxin.video.neutral1"]
+        XCTAssertTrue(video.waitForExistence(timeout:8)); video.tap()
+        scrollToPlay265(app).tap()
+        XCTAssertTrue(app.buttons["重试"].waitForExistence(timeout:8),"Key preflight failure must be shown, not mistaken for tab occlusion")
+        XCTAssertFalse(app.staticTexts["tangxin.fixture.player"].exists)
+        shot("265-key-preflight-failure-is-not-hit-testing")
+    }
     func testAutomaticFailureRequiresManualRetry264() {
         let app = XCUIApplication(); app.launchArguments = ["--failure264", "--reset-network263"]; app.launch()
         app.buttons["app.tab.4"].tap(); app.swipeUp()

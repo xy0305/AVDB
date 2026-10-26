@@ -23,7 +23,7 @@ import UIKit
     }
     let root: URL
     let client: TangxinClient
-    init(root: URL, client: TangxinClient) { self.root = root; self.client = client }
+    init(root: URL, client: TangxinClient) { self.root = TangxinPolicy.canonicalPage(root) ?? root; self.client = client }
     deinit { task?.cancel() }
     func start() async { if !loaded { await refresh() } }
     func cancel() {
@@ -42,7 +42,7 @@ import UIKit
     func more() async { if let next { await load(next,replacing:false) } }
     func retry() async { if loaded { await more() } else { await refresh() } }
     private func load(_ url: URL, replacing: Bool) async {
-        guard !loading, !visited.contains(url) else { return }
+        guard let url = TangxinPolicy.canonicalPage(url), !loading, !visited.contains(url) else { return }
         let token = generation; loading = true; error = nil
         task = Task { [weak self, client] in
             do {
@@ -53,7 +53,7 @@ import UIKit
                 let fresh = page.videos.filter { seen.insert($0.id).inserted }
                 self.videos = replacing ? fresh : self.videos + fresh
                 self.visited.insert(url)
-                self.next = page.next.flatMap { self.visited.contains($0) ? nil : $0 }
+                self.next = page.next.flatMap(TangxinPolicy.canonicalPage).flatMap { self.visited.contains($0) ? nil : $0 }
                 self.heading = page.heading; self.pageState = page.state; self.report = page.report
                 // Empty, filtered, malformed or duplicate-only pages require a deliberate one-page advance.
                 self.canAutomaticallyAdvance = page.state == .content && !fresh.isEmpty
@@ -289,13 +289,19 @@ struct TangxinDetailView: View {
                             .accessibilityIdentifier("tangxin.detail.author")
                     }
                     if !detail.summary.isEmpty { Text(detail.summary).font(.body) }
-                    VStack(alignment:.leading,spacing:8) {
+                    FlowLayout(spacing:8) {
                         ForEach(detail.tagLinks) { tag in
-                            NavigationLink(value:tag) { Text(tag.name).font(.caption).frame(minHeight:44) }
+                            NavigationLink(value:tag) {
+                                Text(tag.name).font(.caption).padding(.horizontal,12)
+                                    .frame(minHeight:44).background(.quaternary,in:Capsule())
+                            }
+                                .buttonStyle(.plain)
                                 .accessibilityIdentifier("tangxin.tag.\(tag.url.lastPathComponent)")
                         }
                         ForEach(detail.tags.filter { name in !detail.tagLinks.contains { $0.name == name } },id:\.self) { name in
                             Text(name).font(.caption).foregroundStyle(.secondary)
+                                .padding(.horizontal,12).frame(minHeight:44)
+                                .background(.quaternary,in:Capsule())
                         }
                     }
                     Button {
@@ -312,6 +318,10 @@ struct TangxinDetailView: View {
                 if let error { Text(error).font(.footnote); Button("重试") { request = UUID() }.frame(minWidth:44,minHeight:44) }
             }.padding()
         }
+        // ContentView's measured safeAreaInset owns the custom tab bar height.
+        // Respect that region (no ignoresSafeArea / fixed screen-height spacer),
+        // with a small extra scroll clearance so the final button is fully tappable.
+        .safeAreaPadding(.bottom,16)
         .navigationTitle("视频详情").navigationBarTitleDisplayMode(.inline)
         .task(id:request) {
             loading = true; error = nil; detail = nil

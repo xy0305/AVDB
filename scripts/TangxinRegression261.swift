@@ -5,6 +5,47 @@ import Foundation
     static func main() async throws {
         try await TangxinNetworkRegression263.run()
         let root = TangxinPolicy.featured
+        // Live-confirmed 307 spellings must be normalized BEFORE transport.
+        for path in ["/featured/2", "/a/neutral", "/tag/original", "/tag/original/2"] {
+            let raw = URL(string:"https://tangxinvlog.app" + path)!
+            let canonical = TangxinPolicy.canonicalPage(raw)!
+            precondition(canonical.absoluteString == raw.absoluteString + "/")
+            precondition(TangxinPolicy.canonicalPage(canonical) == canonical)
+            let normalizationClient = TangxinClient(transport:OnlineTransport(resolver:{ _ in ["93.184.216.34"] },loader:{ request in
+                precondition(request.url == canonical, "Noncanonical URL would hit real HTTP 307")
+                return Data("<div class='grid'></div>".utf8)
+            }))
+            _ = try await normalizationClient.list(raw)
+        }
+        for raw in ["http://tangxinvlog.app/featured/2", "https://evil.org/featured/2", "https://127.0.0.1/featured/2", "https://tangxinvlog.app:8443/featured/2", "https://tangxinvlog.app/featured/2?q=1", "https://tangxinvlog.app/featured/2#fragment", "https://tangxinvlog.app/tag/%2F/2"] {
+            precondition(TangxinPolicy.canonicalPage(URL(string:raw)!) == nil)
+        }
+        // Production delegate rejects every redirect destination, including slash-only.
+        // No task is resumed and no real network request occurs in this test.
+        let redirectTransport = OnlineTransport()
+        let session = URLSession(configuration:.ephemeral)
+        let task = session.dataTask(with:root)
+        for status in [301,302,303,307,308] {
+            for target in ["https://tangxinvlog.app/featured/2/", "https://other.example.org/", "http://tangxinvlog.app/", "https://127.0.0.1/"] {
+                let response = HTTPURLResponse(url:root,statusCode:status,httpVersion:"HTTP/1.1",headerFields:["Location":target])!
+                var completed = false
+                redirectTransport.urlSession(session,task:task,willPerformHTTPRedirection:response,newRequest:URLRequest(url:URL(string:target)!)) { redirected in
+                    precondition(redirected == nil,"Redirect must remain fail-closed")
+                    completed = true
+                }
+                precondition(completed)
+            }
+        }
+        session.invalidateAndCancel()
+        // Parsing must use the actual directory request URL, not the slashless input.
+        let relativeClient = TangxinClient(transport:OnlineTransport(loader:{ request in
+            precondition(request.url!.absoluteString == "https://tangxinvlog.app/featured/")
+            return Data("<div class='grid'></div><a rel='next' href='2'>Next</a>".utf8)
+        }))
+        let relativePage = try await relativeClient.list(URL(string:"https://tangxinvlog.app/featured")!)
+        precondition(relativePage.next?.absoluteString == "https://tangxinvlog.app/featured/2/")
+        let slashDuplicates = TangxinParser.detailTags("<a href='/tag/original'>原创</a><a href='/tag/original/'>原创</a>",at:root)
+        precondition(slashDuplicates.links.count == 1 && slashDuplicates.links[0].url.absoluteString.hasSuffix("/"))
         let first = try TangxinParser.list(TangxinFixtures261.first,at:root)
         precondition(first.videos.count == 1 && first.next?.path == "/featured/2")
         precondition(first.videos[0].author?.name == "黑料昵称")

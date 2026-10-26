@@ -11,6 +11,11 @@ enum TangxinFixtures261 {
     static let authorPage = "<h1>@黑料昵称</h1><div class=\"grid\">" + card("neutral1") + "</div>"
     static let detail = "<video poster='https://t.5gcdn.xyz/videos/neutral1/cover.jpg'></video><article class='info'><h1>成人自愿演示作品</h1><a class='nickname' href='" + author + "'>@黑料昵称</a><p class='desc'>明确合成测试，无真实人物</p><a href='/tag/original/'>原创</a></article><script type='application/json'>{\"src\":\"https://t.5gcdn.xyz/videos/neutral1/index.m3u8\"}</script><section>" + card("unrelated",authorPath:"/a/Other/") + "</section>"
     static let playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:5,\nsegment.ts\n#EXT-X-ENDLIST\n"
+    static var layoutDetail265: String {
+        let chips = (1...12).map { "<a href='/tag/layout\($0)/'>合成标签\($0)</a>" }.joined()
+        return detail.replacingOccurrences(of:"<a href='/tag/original/'>原创</a>",with:chips)
+            .replacingOccurrences(of:"明确合成测试，无真实人物",with:String(repeating:"明确合成版面测试，无真实人物。",count:32))
+    }
     static func client() -> TangxinClient {
         let attempts = TangxinUIAttempts264()
         let resolver: (@Sendable (String) async throws -> [String])? = ProcessInfo.processInfo.arguments.contains("--network263") ? { _ in ["198.18.0.1"] } : nil
@@ -43,10 +48,15 @@ enum TangxinFixtures261 {
                 if ProcessInfo.processInfo.arguments.contains("--failure264"), await attempts.failFirst() { throw TangxinError.structure }
                 return Data(second.utf8)
             }
-            if url.path.hasPrefix("/a/") { return Data(authorPage.utf8) }
-            if url.path == "/v/neutral1" || url.path == "/v/neutral1/" { return Data(detail.utf8) }
+            if url.path.hasPrefix("/a/") || url.path.hasPrefix("/tag/") { return Data(authorPage.utf8) }
+            if url.path == "/v/neutral1" || url.path == "/v/neutral1/" {
+                return Data((ProcessInfo.processInfo.arguments.contains("--layout265") ? layoutDetail265 : detail).utf8)
+            }
             if url.path.hasSuffix(".m3u8") { return Data(playlist.utf8) }
-            if url.path.hasSuffix("key.bin") { return Data(repeating:0,count:16) }
+            if url.path.hasSuffix("key.bin") {
+                if ProcessInfo.processInfo.arguments.contains("--playback-fail265") { throw TangxinError.structure }
+                return Data(repeating:0,count:16)
+            }
             // No external IO, even for images. Neutral SF Symbol placeholders in UI.
             throw TangxinError.structure
         }))

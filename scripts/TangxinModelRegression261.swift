@@ -6,6 +6,7 @@ actor TangxinModelFixture261 {
     var secondCount = 0
     var waiting = false
     func fetch(_ url:URL) async throws -> Data {
+        precondition(url.absoluteString.hasSuffix("/"),"Model must fetch the canonical URL stored in visited")
         if url.path == "/featured" || url.path == "/featured/" {
             firstCount += 1
             if waiting { try await Task.sleep(nanoseconds:2_000_000_000) }
@@ -21,7 +22,8 @@ actor TangxinModelFixture261 {
     @MainActor static func main() async throws {
         let state = TangxinModelFixture261()
         let client = TangxinClient(transport:OnlineTransport(loader:{ request in try await state.fetch(request.url!) }))
-        let m = TangxinListModel(root:TangxinPolicy.featured,client:client)
+        let m = TangxinListModel(root:URL(string:"https://tangxinvlog.app/featured")!,client:client)
+        precondition(m.root.absoluteString == "https://tangxinvlog.app/featured/")
         await m.start(); precondition(m.videos.count == 1 && m.next != nil && !m.loading)
         async let firstAuto: Void = m.nearBottom(tail:m.videos.last!.id)
         async let concurrentAuto: Void = m.nearBottom(tail:m.videos.last!.id)
@@ -69,6 +71,9 @@ actor TangxinModelFixture261 {
         precondition(pages.pageState == .filtered && pages.next?.path == "/featured/2")
         await pages.more()
         precondition(pages.videos.isEmpty && pages.pageState == .sourceEmpty && pages.next?.path == "/featured/3")
+        precondition(!pages.canAutomaticallyAdvance)
+        for _ in 0..<20 { await pages.nearBottom(tail:TangxinPolicy.featured) }
+        precondition(pages.pageState == .sourceEmpty && pages.next?.absoluteString == "https://tangxinvlog.app/featured/3/")
         await pages.more()
         precondition(pages.videos.isEmpty && pages.pageState == .structureChanged && pages.next?.path == "/featured/4")
         await pages.more()

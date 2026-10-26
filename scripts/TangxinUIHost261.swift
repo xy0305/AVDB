@@ -26,5 +26,8 @@ struct KSChromePlayer: View {
     var headers: [String:String] = [:]
     var progressID: String? = nil
     var publicSubtitleQuery = ""
-    var body: some View { Text("播放器替身；未播放任何真实视频") }
+    var body: some View {
+        Text("播放器替身；未播放任何真实视频")
+            .accessibilityIdentifier("tangxin.fixture.player")
+    }
 }

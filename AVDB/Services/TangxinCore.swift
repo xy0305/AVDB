@@ -77,6 +77,15 @@ enum TangxinPolicy {
         if p.first == "featured" { return p.count == 1 || (p.count == 2 && Int(p[1]).map { $0 > 1 } == true) }
         return ["a", "tag"].contains(p.first ?? "") && (p.count == 2 || (p.count == 3 && Int(p[2]).map { $0 > 1 } == true)) && slug(p[1]) && (p.first != "tag" || permitted(p[1]))
     }
+    // Live GET (2026-10-26): collection routes without a terminal slash return
+    // HTTP 307 to the identical HTTPS path plus '/'. Normalize only validated
+    // collection URLs; transport still refuses every redirect and rechecks DNS.
+    static func canonicalPage(_ url: URL) -> URL? {
+        guard page(url) else { return nil }
+        if url.absoluteString.hasSuffix("/") { return url }
+        guard let canonical = URL(string: url.absoluteString + "/"), page(canonical) else { return nil }
+        return canonical
+    }
     static func slug(_ s: String) -> Bool {
         !s.isEmpty && s.count <= 150 && s != "." && s != ".." && !s.contains(where: { $0 == "/" || $0 == "\\" || $0.isNewline || $0.asciiValue.map { $0 < 32 } == true })
     }
@@ -140,8 +149,9 @@ enum TangxinParser {
             if seenNames.insert(name).inserted { names.append(name) }
             guard !raw.isEmpty, let url, url.path.hasPrefix("/tag/"),
                   TangxinPolicy.page(url), TangxinPolicy.permitted(name),
-                  seenURLs.insert(url).inserted else { continue }
-            result.append(TangxinTag(url:url,name:name))
+                  let canonical = TangxinPolicy.canonicalPage(url),
+                  seenURLs.insert(canonical).inserted else { continue }
+            result.append(TangxinTag(url:canonical,name:name))
         }
         return (names,result)
     }
@@ -149,7 +159,7 @@ enum TangxinParser {
         for (a,body) in links(html) where (a["class"] ?? "").split(separator:" ").contains("nickname") {
             guard let raw = a["href"], let u = TangxinPolicy.resolve(raw,at:page), TangxinPolicy.page(u), u.path.split(separator:"/").count == 2, u.path.hasPrefix("/a/") else { continue }
             let name = clean(body).trimmingCharacters(in: CharacterSet(charactersIn:"@ "))
-            if !name.isEmpty { return TangxinAuthor(url:u,name:name) }
+            if !name.isEmpty, let canonical = TangxinPolicy.canonicalPage(u) { return TangxinAuthor(url:canonical,name:name) }
         }
         return nil
     }
@@ -182,7 +192,7 @@ enum TangxinParser {
         let next = links(html).compactMap { a,body -> URL? in
             guard a["rel"] == "next" || clean(body).contains("下一页") else { return nil }
             guard let href = a["href"], let url = TangxinPolicy.resolve(href,at:page), TangxinPolicy.next(url,from:page) else { return nil }
-            return url
+            return TangxinPolicy.canonicalPage(url)
         }.first
         // A recognized empty grid is not proof that the policy blocked anything.
         // Unknown/partial markup keeps an independently validated next link for manual advance.
@@ -219,11 +229,16 @@ struct TangxinClient: Sendable {
     func withDNSMode(_ mode: OnlineDNSMode) -> TangxinClient { TangxinClient(transport: transport.withDNSMode(mode)) }
     func document(_ url: URL) async throws -> String {
         guard TangxinPolicy.page(url) || TangxinPolicy.video(url) else { throw TangxinError.unsafe }
-        let bytes = try await transport.fetch(url,cap:2*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:TangxinPolicy.origin),context:TangxinPolicy.video(url) ? .document : .discovery)
+        let requestURL = TangxinPolicy.page(url) ? TangxinPolicy.canonicalPage(url)! : url
+        let bytes = try await transport.fetch(requestURL,cap:2*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:TangxinPolicy.origin),context:TangxinPolicy.video(requestURL) ? .document : .discovery)
         guard let html = String(data:bytes,encoding:.utf8) else { throw TangxinError.structure }
         return html
     }
-    func list(_ url: URL) async throws -> TangxinPage { try TangxinParser.list(await document(url),at:url) }
+    func list(_ url: URL) async throws -> TangxinPage {
+        guard let canonical = TangxinPolicy.canonicalPage(url) else { throw TangxinError.unsafe }
+        // Relative links must resolve against the actual fetched directory URL.
+        return try TangxinParser.list(await document(canonical),at:canonical)
+    }
     func detail(_ url: URL) async throws -> TangxinDetail { try TangxinParser.detail(await document(url),at:url) }
     func image(_ url: URL) async throws -> Data {
         guard TangxinPolicy.image(url) else { throw TangxinError.unsafe }
