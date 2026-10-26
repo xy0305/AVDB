@@ -14,10 +14,10 @@ enum TangxinFixtures261 {
     static func client() -> TangxinClient {
         TangxinClient(transport:OnlineTransport(loader: { request in
             guard let url = request.url, request.value(forHTTPHeaderField:"Referer") == TangxinPolicy.origin.absoluteString, request.value(forHTTPHeaderField:"Cookie") == nil else { throw TangxinError.unsafe }
-            if url.path == "/featured/" { return Data(first.utf8) }
+            if url.path == "/featured" || url.path == "/featured/" { return Data(first.utf8) }
             if url.path == "/featured/2" { return Data(second.utf8) }
             if url.path.hasPrefix("/a/") { return Data(authorPage.utf8) }
-            if url.path == "/v/neutral1/" { return Data(detail.utf8) }
+            if url.path == "/v/neutral1" || url.path == "/v/neutral1/" { return Data(detail.utf8) }
             if url.path.hasSuffix(".m3u8") { return Data(playlist.utf8) }
             if url.path.hasSuffix("key.bin") { return Data(repeating:0,count:16) }
             // No external IO, even for images. Neutral SF Symbol placeholders in UI.
