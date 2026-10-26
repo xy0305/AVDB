@@ -51,3 +51,21 @@ jobs:
         with:
           name: dmm-build-logs
           path: /tmp/dmm-*.log
+  native-fixture-ui:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native offline import to exact-detail boundary
+        run: |
+          gem install xcodeproj --no-document
+          set -euo pipefail
+          python3 scripts/test-dmm-ui266.py > /tmp/dmm-ui.log 2>&1 || { tail -120 /tmp/dmm-ui.log; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dmm-native-fixture-ui
+          path: |
+            /tmp/dmm-ui.log
+            evidence-dmm266/status.json
+            evidence-dmm266/screenshots/

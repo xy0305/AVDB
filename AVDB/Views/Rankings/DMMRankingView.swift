@@ -2,7 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 @MainActor struct DMMRankingView: View {
-    @StateObject private var store = DMMRankingStore()
+    @StateObject private var store: DMMRankingStore
+    init(store: DMMRankingStore = DMMRankingStore()) { _store = StateObject(wrappedValue: store) }
     @State private var importing = false
     @State private var importError: String?
     @AppStorage("dmm.authorizedAdultDeclaration") private var adultAuthorization = false
