@@ -4,7 +4,7 @@ import shutil, subprocess, tempfile, json
 root=Path(__file__).resolve().parents[1]
 services=root/'AVDB/Services'
 resolver=(services/'DetailPosterResolver.swift').read_text()
-for s in ['TenhowPoster.pages','actor.name, actor.otherName, actor.keyword','movie.actorNames','tenhowPaths(movie)','discover: discover','positiveTTL: 6 * 3600, negativeTTL: 300','namespace + path','768 * 1024','config.httpCookieStorage = nil','config.urlCredentialStorage = nil']:
+for s in ['TenhowPoster.pages','actor.name, actor.otherName, actor.keyword','movie.actorNames','tenhowPaths(movie)','discover: discover','positiveTTL: 6 * 3600, negativeTTL: 300','namespace + path','768 * 1024','config.httpCookieStorage = nil','config.urlCredentialStorage = nil','AmazonPoster.directHQ','MAIN._SCRM_']:
     assert s in resolver,s
 assert 'displayName' not in resolver.replace('// actor_names is the API\'s original identity fallback, never UI displayName.','')
 core='\n'.join((services/f).read_text() for f in ['JavRankingCore.swift','TenhowPoster.swift','TenhowActorLinks.swift','DetailPosterPolicy.swift','DetailPosterCache.swift'])
@@ -115,12 +115,23 @@ tests += r'''
   }
   assert(AmazonPoster.originalImage(URL(string:media+"._SL1500_.jpg?token=x")!) == nil)
   assert(AmazonPoster.originalImage(URL(string:media.replacingOccurrences(of:"m.media-amazon.com",with:"evil.test")+".jpg")!) == nil)
+  // Build 273: exact-ASIN MAIN._SCRM_ CDN (no HTML). Fixture ASINs match Build196 originals.
+  assert(AmazonPoster.directHQ(asin:"B09HS8HBR7") == "https://m.media-amazon.com/images/P/B09HS8HBR7.01.MAIN._SCRM_.jpg")
+  assert(AmazonPoster.directHQ(asin:"B0B92LKJT8") == "https://m.media-amazon.com/images/P/B0B92LKJT8.01.MAIN._SCRM_.jpg")
+  assert(AmazonPoster.directHQ(asin:"bad") == nil)
+  assert(AmazonPoster.directHQ(asin:"B09HS8HBR7!") == nil)
+  assert(AmazonPoster.allowedImage(URL(string:"https://m.media-amazon.com/images/P/B09HS8HBR7.01.MAIN._SCRM_.jpg")!))
+  assert(AmazonPoster.allowedImage(URL(string:"https://m.media-amazon.com/images/P/B09HS8HBR7.09.MAIN._SCRM_.jpg")!))
+  assert(AmazonPoster.originalImage(URL(string:"https://m.media-amazon.com/images/P/B09HS8HBR7.01.MAIN._SCRM_.jpg")!)?.absoluteString == "https://m.media-amazon.com/images/P/B09HS8HBR7.01.MAIN._SCRM_.jpg")
+  for bad in ["https://m.media-amazon.com/images/P/B09HS8HBR7.09._SL1500_.jpg", "https://m.media-amazon.com/images/P/B09HS8HBR7.09.LZZZZZZZ.jpg", "https://m.media-amazon.com/images/P/B09HS8HBR7.02.MAIN._SCRM_.jpg", "https://ec2.images-amazon.com/images/P/B09HS8HBR7.01.MAIN._SCRM_.jpg", "https://m.media-amazon.com/images/P/B09HS8HBR7.01.MAIN._SCRM_.jpg?x=1"] {
+    assert(!AmazonPoster.allowedImage(URL(string:bad)!))
+  }
   let native=DetailPosterQuality(source:"native2530",width:1778,height:2530,originalPortrait:true)
   let capped=DetailPosterQuality(source:"native1800",width:1260,height:1800,originalPortrait:true)
   assert(native.score > capped.score && DetailPosterQuality.winner([capped,native])?.source == native.source)
   let both: [String] = await DetailPosterSelection.collect(sources:["a","b","c","d","e","f"],budget:0.2,discover:{ _ in ["tenhow","amazon"] }) { source,_ in source }
   assert(both.count == 6 && both.contains("tenhow") && both.contains("amazon") && !both.contains("e") && !both.contains("f"))
-  print("PASS production Tenhow: 9 live-record fixtures, 1740 explicit actor paths, exact CID/ASIN, adversarial records, aliases, HTTPS/redirects, late high-resolution winner, six images/two jobs, shared budget/cancellation, one publication; Amazon exact main ASIN, canonical, primary image, captcha, CDN, two reserved opportunities")
+  print("PASS production Tenhow: 9 live-record fixtures, 1740 explicit actor paths, exact CID/ASIN, adversarial records, aliases, HTTPS/redirects, late high-resolution winner, six images/two jobs, shared budget/cancellation, one publication; Amazon exact ASIN MAIN._SCRM_ directHQ + HTML fixture path, two reserved opportunities")
  }
 }
 '''

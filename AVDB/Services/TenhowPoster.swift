@@ -127,11 +127,24 @@ enum TenhowPoster {
     }
 }
 
-/// Optional exact-ASIN Japanese Amazon enrichment. No search, no URL size guessing.
+/// Optional exact-ASIN Japanese Amazon enrichment. No search, no title/keyword guess.
+/// HQ path: same-record Tenhow ASIN → public CDN `images/P/{ASIN}.01.MAIN._SCRM_.jpg`
+/// (calibre / bookfere / Cover-Downloader convention). HTML landingImage parser
+/// remains for offline fixtures; resolver hot path uses directHQ only.
+/// Independently implemented; no code copied.
 enum AmazonPoster {
     static func asin(_ url: URL) -> String? {
         guard TenhowPoster.allowedImage(url) else { return nil }
         return String(url.deletingPathExtension().lastPathComponent)
+    }
+    /// Proven ASIN→CDN large front. Verified equal to Build196 bare I/ originals
+    /// for fixture ASINs (1778×2530 / 1778×2529). Country `.01` is the documented
+    /// MAIN._SCRM_ form; `.09` is JP-equivalent and also admitted.
+    static func directHQ(asin: String) -> String? {
+        guard asin.range(of: #"^[A-Z0-9]{10}$"#, options: .regularExpression) != nil else { return nil }
+        let url = "https://m.media-amazon.com/images/P/" + asin + ".01.MAIN._SCRM_.jpg"
+        guard let parsed = URL(string: url), allowedImage(parsed) else { return nil }
+        return url
     }
     static func allowedPage(_ url: URL, asin: String) -> Bool {
         guard asin.range(of: #"^[A-Z0-9]{10}$"#, options: .regularExpression) != nil,
@@ -144,7 +157,11 @@ enum AmazonPoster {
         guard url.scheme == "https", ["m.media-amazon.com", "images-na.ssl-images-amazon.com"].contains(url.host ?? ""),
               url.user == nil, url.password == nil, url.port == nil, url.query == nil, url.fragment == nil,
               !url.absoluteString.contains("%") else { return false }
-        return url.path.range(of: #"^/images/I/[A-Za-z0-9+_.-]{1,150}\.jpg$"#, options: .regularExpression) != nil
+        if url.path.range(of: #"^/images/I/[A-Za-z0-9+_.-]{1,150}\.jpg$"#, options: .regularExpression) != nil {
+            return true
+        }
+        // Exact-ASIN MAIN._SCRM_ only — not LZZZZZZZ / SL1500 thumbs or guessed sizes.
+        return url.path.range(of: #"^/images/P/[A-Z0-9]{10}\.0[19]\.MAIN\._SCRM_\.jpg$"#, options: .regularExpression) != nil
     }
     /// Strip only a proven size-only Amazon rendition from the exact ASIN's
     /// primary image. Preserve image ID and host; never request synthetic upscale.

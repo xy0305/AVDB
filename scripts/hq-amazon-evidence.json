@@ -45,6 +45,21 @@
       "sha256": "2f82486bde5f7a4033f84b3d234a5709608689fa9ab24dfab39d2d98d4c0f827",
       "bytes": 658679,
       "decode": "Pillow complete load + EXIF transpose"
+    },
+    "direct_scrm": {
+      "url": "https://m.media-amazon.com/images/P/B09HS8HBR7.01.MAIN._SCRM_.jpg",
+      "original_pixels": [
+        1778,
+        2530
+      ],
+      "front_pixels": [
+        1778,
+        2530
+      ],
+      "sha256": "2f82486bde5f7a4033f84b3d234a5709608689fa9ab24dfab39d2d98d4c0f827",
+      "bytes": 658679,
+      "decode": "Pillow complete load + EXIF transpose",
+      "note": "Complete GET 2026-10-27: byte-identical to original I/ bare JPEG; no Amazon HTML"
     }
   },
   {
@@ -93,6 +108,21 @@
       "sha256": "53729fefab3adb10dd06f2b2950b95955b4ea266bcfdb51d1f0ffe1c937104ab",
       "bytes": 333488,
       "decode": "Pillow complete load + EXIF transpose"
+    },
+    "direct_scrm": {
+      "url": "https://m.media-amazon.com/images/P/B0B92LKJT8.01.MAIN._SCRM_.jpg",
+      "original_pixels": [
+        1778,
+        2529
+      ],
+      "front_pixels": [
+        1778,
+        2529
+      ],
+      "sha256": "53729fefab3adb10dd06f2b2950b95955b4ea266bcfdb51d1f0ffe1c937104ab",
+      "bytes": 333488,
+      "decode": "Pillow complete load + EXIF transpose",
+      "note": "Complete GET 2026-10-27: byte-identical to original I/ bare JPEG; no Amazon HTML"
     }
   }
 ]

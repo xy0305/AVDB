@@ -32,25 +32,8 @@ private final class PosterRedirectGuard: NSObject, URLSessionTaskDelegate {
     }
 }
 
-private final class AmazonPosterRedirectGuard: NSObject, URLSessionTaskDelegate {
-    let asin: String
-    private var redirects = 0
-    init(asin: String) { self.asin = asin }
-    func urlSession(_ session: URLSession, task: URLSessionTask,
-                    willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest,
-                    completionHandler: @escaping (URLRequest?) -> Void) {
-        redirects += 1
-        guard redirects <= 2, let url = request.url, AmazonPoster.allowedPage(url, asin: asin) else {
-            completionHandler(nil); return
-        }
-        completionHandler(request)
-    }
-}
-
 enum DetailPosterResolver {
     private static let cache = DetailPosterCache<DetailPosterArtwork>()
-    private static let amazonPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
     private static let javbusPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 30 * 60)
     private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
 
@@ -245,42 +228,19 @@ enum DetailPosterResolver {
         var result = [tenhow]
         let remaining = deadline - ProcessInfo.processInfo.systemUptime
         if remaining > 0.1, let url = URL(string: tenhow), let asin = AmazonPoster.asin(url) {
-            // Exactly one record-verified ASIN; no title/keyword search, no year
-            // guess. Both sources receive reserved slots, including 2021–2024.
-            let html = await amazonPages.value(key: namespace + "#amazon#" + asin) {
-                await amazonHTML(asin: asin, timeout: min(1.5, remaining))
+            // Exact same-record ASIN only → public CDN MAIN._SCRM_ (calibre /
+            // bookfere convention). Same pixels as Build196 bare I/ originals;
+            // no product HTML / captcha in the hot path. Parser helpers for the
+            // HTML landingImage path remain for fixtures and offline tests.
+            // Never title/keyword/ASIN search.
+            if let hq = AmazonPoster.directHQ(asin: asin) {
+                result.append(hq)
             }
-            if !Task.isCancelled, let html, let images = try? AmazonPoster.images(html: html, asin: asin) { result += images.prefix(1) }
         }
         // Tenhow and Amazon always lead. Do not enumerate alternate CIDs, pl
         // jackets or classifications. Ambiguous cross-page products add nothing.
         if official.count <= 2 { result += official.sorted() }
         return Task.isCancelled ? [] : result
-    }
-
-    private static func amazonHTML(asin: String, timeout: TimeInterval) async -> String? {
-        guard let url = URL(string: "https://www.amazon.co.jp/dp/" + asin), AmazonPoster.allowedPage(url, asin: asin) else { return nil }
-        let config = URLSessionConfiguration.ephemeral
-        config.httpCookieStorage = nil; config.httpShouldSetCookies = false
-        config.urlCredentialStorage = nil; config.urlCache = nil
-        config.timeoutIntervalForRequest = timeout; config.timeoutIntervalForResource = timeout
-        let session = URLSession(configuration: config, delegate: AmazonPosterRedirectGuard(asin: asin), delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
-        do {
-            var request = URLRequest(url: url); request.timeoutInterval = timeout
-            request.setValue("text/html", forHTTPHeaderField: "Accept")
-            let (bytes, response) = try await session.bytes(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-                  let final = response.url, AmazonPoster.allowedPage(final, asin: asin),
-                  response.expectedContentLength <= 2 * 1024 * 1024 else { return nil }
-            var data = Data()
-            for try await byte in bytes {
-                try Task.checkCancellation()
-                guard data.count < 2 * 1024 * 1024 else { return nil }
-                data.append(byte)
-            }
-            return String(data: data, encoding: .utf8)
-        } catch { return nil }
     }
 
     private static func tenhowHTML(path: String, timeout: TimeInterval) async -> String? {
