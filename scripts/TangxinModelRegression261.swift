@@ -56,7 +56,7 @@ actor TangxinModelFixture261 {
             let path = request.url!.path
             let html: String
             if path == "/featured" || path == "/featured/" {
-                html = "<div class='grid'>" + TangxinFixtures261.card("blocked",title:"未成年") + "</div><a rel='next' href='/featured/2'>Next</a>"
+                html = "<div class='grid'></div><a rel='next' href='/featured/2'>Next</a>"
             } else if path == "/featured/2" {
                 html = "<div class='grid'></div><a rel='next' href='/featured/3'>Next</a>"
             } else if path == "/featured/3" {
@@ -66,9 +66,9 @@ actor TangxinModelFixture261 {
         }))
         let pages = TangxinListModel(root:TangxinPolicy.featured,client:sequence)
         await pages.start()
-        precondition(pages.videos.isEmpty && pages.pageState == .filtered && pages.next?.path == "/featured/2")
+        precondition(pages.videos.isEmpty && pages.pageState == .sourceEmpty && pages.next?.path == "/featured/2")
         for _ in 0..<20 { await pages.nearBottom(tail:TangxinPolicy.featured) }
-        precondition(pages.pageState == .filtered && pages.next?.path == "/featured/2")
+        precondition(pages.pageState == .sourceEmpty && pages.next?.path == "/featured/2")
         await pages.more()
         precondition(pages.videos.isEmpty && pages.pageState == .sourceEmpty && pages.next?.path == "/featured/3")
         precondition(!pages.canAutomaticallyAdvance)

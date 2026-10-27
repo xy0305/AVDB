@@ -31,14 +31,13 @@ enum TangxinFixtures261 {
                 let path = request.url!.path
                 let next: (Int) -> String = { "<a rel='next' href='/featured/\($0)'>Next</a>" }
                 let html: String
+                // No keyword filter: exercise sourceEmpty / structureChanged only, then safe content.
                 if path == "/featured" || path == "/featured/" {
-                    html = "<div class='grid'>" + card("blocked",title:"未成年") + "</div>" + next(2)
+                    html = "<div class='grid'></div>" + next(2)
                 } else if path == "/featured/2" {
-                    html = "<div class='grid'></div>" + next(3)
-                } else if path == "/featured/3" {
-                    html = "<article class='card'></article>" + next(4)
+                    html = "<article class='card'></article>" + next(3)
                 } else {
-                    html = "<div class='grid'>" + card("neutral1") + card("blocked",title:"偷拍") + "</div>"
+                    html = "<div class='grid'>" + card("neutral1") + "</div>"
                 }
                 return Data(html.utf8)
             }

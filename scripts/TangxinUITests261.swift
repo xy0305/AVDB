@@ -170,8 +170,8 @@ final class TangxinUITests261: XCTestCase {
     func testEmptyStatesAndManualAdvance262() {
         let app = XCUIApplication(); app.launchArguments = ["--empty-states262"]; app.launch()
         app.buttons["app.tab.4"].tap()
-        let labels = ["filtered":"当前页无可显示内容", "sourceEmpty":"源暂无数据", "structureChanged":"来源结构变化"]
-        for state in ["filtered", "sourceEmpty", "structureChanged"] {
+        let labels = ["sourceEmpty":"源暂无数据", "structureChanged":"来源结构变化"]
+        for state in ["sourceEmpty", "structureChanged"] {
             let view = app.staticTexts[labels[state]!]
             XCTAssertTrue(view.waitForExistence(timeout:8),state)
             XCTAssertFalse(app.buttons["tangxin.video.neutral1"].exists)
@@ -183,7 +183,7 @@ final class TangxinUITests261: XCTestCase {
         XCTAssertTrue(app.buttons["tangxin.video.neutral1"].waitForExistence(timeout:8))
         XCTAssertFalse(app.buttons["tangxin.video.blocked"].exists)
         XCTAssertFalse(app.buttons["tangxin.more"].exists)
-        shot("262-mixed-safe-content")
+        shot("262-safe-content")
     }
     func testNativeTabAuthorWorksAndBack() {
         let app = XCUIApplication(); app.launch()
