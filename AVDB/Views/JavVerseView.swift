@@ -58,6 +58,9 @@ private enum JavVerseRankingTab: String, CaseIterable {
     @State private var failure: String?
     @State private var tab: JavVerseRankingTab = .daily
     @State private var periods: [String: String] = [:]
+    @State private var statusText = "加载中…"
+    @State private var isLive = false
+    @State private var refreshing = false
     private var available: [JavVerseBoard] {
         snapshot?.boards.filter { ($0.term ?? $0.id) == tab.rawValue } ?? []
     }
@@ -84,42 +87,93 @@ private enum JavVerseRankingTab: String, CaseIterable {
                         if tab == .monthly { Text("原站仅一期").font(.caption2).foregroundStyle(.secondary) }
                     } else { Text("Grok 主观评分").font(.caption).foregroundStyle(.secondary) }
                     Spacer(minLength: 4)
-                    NavigationLink { JavVerseHomeView() } label: { Text("精选 / 其他榜单").font(.caption) }
+                    NavigationLink { JavVerseHomeView(sharedSnapshot: snapshot, sharedStatus: statusText, sharedLive: isLive) } label: { Text("精选 / 其他榜单").font(.caption) }
                         .accessibilityIdentifier("javverse-other-boards")
-                }.padding(.horizontal, 16).padding(.vertical, 10)
+                }.padding(.horizontal, 16).padding(.vertical, 4)
+                HStack(spacing: 8) {
+                    Text(statusText).font(.caption2)
+                        .foregroundStyle(isLive ? Color.green : Color.orange)
+                        .accessibilityIdentifier("javverse-live-status")
+                    Spacer()
+                    Button(refreshing ? "刷新中…" : "刷新") { Task { await reload(forceLive: true) } }
+                        .font(.caption2).disabled(refreshing)
+                        .accessibilityIdentifier("javverse-refresh")
+                }.padding(.horizontal, 16).padding(.bottom, 8)
                 if tab == .grok {
-                    if let grok = snapshot.grok { JavVerseGrokView(snapshot: grok) }
+                    if let grok = snapshot.grok { JavVerseGrokView(snapshot: grok, isLive: isLive) }
                     else { Text("该快照尚无已核实的Grok名单").foregroundStyle(.secondary); Spacer() }
                 } else if let selected {
                     // Identity replacement cancels old image work and resets paging before a new period renders.
-                    JavVerseBoardView(board: selected).id(selected.selectionKey)
+                    JavVerseBoardView(board: selected, isLive: isLive).id(selected.selectionKey)
                 } else { Text("该期暂无已核实快照"); Spacer() }
             } else if let failure { Text(failure).foregroundStyle(.red).accessibilityIdentifier("javverse-load-failure"); Spacer() }
-            else { ProgressView("读取本地榜单…"); Spacer() }
+            else { ProgressView("拉取榜单…"); Spacer() }
         }
         .navigationTitle("JavVerse 榜单")
         // Do not tag the parent container: SwiftUI propagates its identifier over child controls.
         .task {
             guard snapshot == nil else { return }
-            let start = ProcessInfo.processInfo.systemUptime
-            do {
-                #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") { snapshot = try JavVerseNeutralFixture.snapshot() }
-                else { snapshot = try JavVerseSnapshot.bundled() }
-                #else
-                snapshot = try JavVerseSnapshot.bundled()
-                #endif
-                #if DEBUG
-                print("JAVVERSE241 metadataReadyMs=\((ProcessInfo.processInfo.systemUptime-start)*1000) rows=\(snapshot?.boards.reduce(0) { $0+$1.entries.count } ?? 0) noArtworkWait=true")
-                #endif
-            } catch { failure = JavVerseFailure.diagnostic(error) }
+            await reload(forceLive: true)
         }
+    }
+    @MainActor private func reload(forceLive: Bool) async {
+        refreshing = true
+        defer { refreshing = false }
+        let start = ProcessInfo.processInfo.systemUptime
+        failure = nil
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
+            do {
+                snapshot = try JavVerseNeutralFixture.snapshot()
+                isLive = false
+                statusText = "中性夹具 · 非实时"
+            } catch { failure = JavVerseFailure.diagnostic(error) }
+            return
+        }
+        #endif
+        if forceLive {
+            do {
+                let live = try await JavVerseLiveClient.fetchSnapshot()
+                snapshot = live
+                isLive = true
+                statusText = "实时 · \(Self.shortStamp(live.preparedAt))"
+                #if DEBUG
+                print("JAVVERSE241 metadataReadyMs=\((ProcessInfo.processInfo.systemUptime-start)*1000) rows=\(live.boards.reduce(0) { $0+$1.entries.count }) live=true")
+                #endif
+                return
+            } catch {
+                // Fall through to offline snapshot; keep a short Chinese reason.
+                statusText = "实时失败，改用离线快照"
+            }
+        }
+        do {
+            let bundled = try JavVerseSnapshot.bundled()
+            snapshot = bundled
+            isLive = false
+            if !statusText.hasPrefix("实时失败") {
+                statusText = "离线快照 · \(Self.shortStamp(bundled.preparedAt))"
+            } else {
+                statusText = "离线快照（实时不可用）· \(Self.shortStamp(bundled.preparedAt))"
+            }
+            #if DEBUG
+            print("JAVVERSE241 metadataReadyMs=\((ProcessInfo.processInfo.systemUptime-start)*1000) rows=\(bundled.boards.reduce(0) { $0+$1.entries.count }) live=false")
+            #endif
+        } catch { failure = JavVerseFailure.diagnostic(error) }
+    }
+    private static func shortStamp(_ iso: String) -> String {
+        String(iso.prefix(19)).replacingOccurrences(of: "T", with: " ") + " UTC"
     }
 }
 
 @MainActor private struct JavVerseHomeView: View {
     @StateObject private var mapper = JavVerseMapper()
-    init() {
+    private let sharedSnapshot: JavVerseSnapshot?
+    private let sharedStatus: String
+    private let sharedLive: Bool
+    init(sharedSnapshot: JavVerseSnapshot? = nil, sharedStatus: String = "离线快照", sharedLive: Bool = false) {
+        self.sharedSnapshot = sharedSnapshot
+        self.sharedStatus = sharedStatus
+        self.sharedLive = sharedLive
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
             _mapper = StateObject(wrappedValue: JavVerseNeutralFixture.mapper())
@@ -128,16 +182,21 @@ private enum JavVerseRankingTab: String, CaseIterable {
     }
     @State private var snapshot: JavVerseSnapshot?
     @State private var failure: String?
-    @State private var probe = "未测试设备HTTP；当前仅显示离线快照"
+    @State private var probe = "未测试设备HTTP；打开页时会优先实时拉取"
     @State private var probing = false
     @State private var probeGeneration = UUID()
+    @State private var statusText = "加载中…"
+    @State private var isLive = false
     var body: some View {
         List {
             Section {
-                Text("静态快照，非实时").font(.headline).foregroundStyle(.orange)
+                Text(isLive ? "实时榜单" : "静态快照，非实时").font(.headline)
+                    .foregroundStyle(isLive ? Color.green : Color.orange)
+                    .accessibilityIdentifier("javverse-home-mode")
                 Text("原站名单及顺序来自 JavVerse 公开文字；图片、资料和播放只通过 AVDB 核验。无网站账户或社区同步。")
                     .font(.footnote).foregroundStyle(.secondary)
-                Text(probe).font(.caption)
+                Text(statusText).font(.caption)
+                Text(probe).font(.caption2).foregroundStyle(.secondary)
                 Button(probing ? "检测中…" : "检测普通HTTP（不刷新快照）") { probing = true }
                     .disabled(probing)
                     .accessibilityIdentifier("javverse-http-probe")
@@ -148,7 +207,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                     Button("重试首页未匹配项") { mapper.resolve(snapshot.boards.filter { ["featured", "recent"].contains($0.id) }.flatMap(\.entries), retry: true) }.disabled(mapper.busy)
                     ForEach(snapshot.boards.filter { ["featured", "recent"].contains($0.id) }) { board in
                         VStack(alignment: .leading, spacing: 10) {
-                            NavigationLink { JavVerseBoardView(board: board) } label: { boardLabel(board) }
+                            NavigationLink { JavVerseBoardView(board: board, isLive: isLive) } label: { boardLabel(board) }
                                 .accessibilityIdentifier("javverse-board-\(board.id)")
                             if board.entries.allSatisfy({ $0.kind == "movie" }) {
                                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3), spacing: 16) {
@@ -184,12 +243,14 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 }
                 Section("其他 FANZA 榜单") {
                     ForEach(snapshot.boards.filter { ["actresses", "series"].contains($0.id) }) { board in
-                        NavigationLink { JavVerseBoardView(board: board) } label: { boardLabel(board) }
+                        NavigationLink { JavVerseBoardView(board: board, isLive: isLive) } label: { boardLabel(board) }
                             .accessibilityIdentifier("javverse-board-\(board.id)")
                     }
                 }
                 Section("来源边界") {
-                    Text("销量历史期与Grok五分榜在榜单首页切换。所有名单均为带采集时间的静态快照；其他目录、社区、账户同步未接入。")
+                    Text(isLive
+                         ? "销量历史期与Grok五分榜在榜单首页切换。当前为实时拉取（失败时回退离线快照）；其他目录、社区、账户同步未接入。"
+                         : "销量历史期与Grok五分榜在榜单首页切换。当前为带采集时间的离线快照；其他目录、社区、账户同步未接入。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -214,9 +275,9 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 }
                 try Task.checkCancellation()
                 guard probeGeneration == epoch else { return }
-                probe = "设备普通HTTP诊断（\(statuses.count)次，最多3次）：\(statuses.map(String.init).joined(separator: ", "))。" + (statuses.contains(403) ? "原站拒绝请求，仍为静态快照。" : "状态不证明有可用实时名单接口，仍为静态快照。")
+                probe = "设备普通HTTP诊断（\(statuses.count)次，最多3次）：\(statuses.map(String.init).joined(separator: ", "))。" + (statuses.contains(403) ? "无cookie探测被拒属预期；实时通道另走年龄门。" : "无cookie探测仅作诊断；实时通道另走年龄门。")
             } catch {
-                if !Task.isCancelled && probeGeneration == epoch { probe = "检测失败：\(error.localizedDescription)。仍为静态快照。" }
+                if !Task.isCancelled && probeGeneration == epoch { probe = "检测失败：\(error.localizedDescription)。静态快照仍可作离线回退。" }
             }
         }
         .onDisappear { probeGeneration = UUID(); probing = false; mapper.cancel() }
@@ -226,15 +287,34 @@ private enum JavVerseRankingTab: String, CaseIterable {
         }
         .task {
             guard snapshot == nil else { return }
-            do {
-                #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
+                do {
                     snapshot = try JavVerseNeutralFixture.snapshot()
-                    return
-                }
-                #endif
-                snapshot = try JavVerseSnapshot.bundled()
-            } catch { failure = JavVerseFailure.diagnostic(error) }
+                    isLive = false
+                    statusText = "中性夹具 · 非实时"
+                } catch { failure = JavVerseFailure.diagnostic(error) }
+                return
+            }
+            #endif
+            if let sharedSnapshot {
+                snapshot = sharedSnapshot
+                isLive = sharedLive
+                statusText = sharedStatus
+                return
+            }
+            do {
+                let live = try await JavVerseLiveClient.fetchSnapshot()
+                snapshot = live
+                isLive = true
+                statusText = "实时 · \(live.preparedAt.prefix(19))"
+            } catch {
+                do {
+                    snapshot = try JavVerseSnapshot.bundled()
+                    isLive = false
+                    statusText = "离线快照（实时不可用）"
+                } catch { failure = JavVerseFailure.diagnostic(error) }
+            }
         }
     }
     private func boardLabel(_ board: JavVerseBoard) -> some View {
@@ -247,11 +327,13 @@ private enum JavVerseRankingTab: String, CaseIterable {
 
 @MainActor private struct JavVerseBoardView: View {
     let board: JavVerseBoard
+    var isLive: Bool = false
     @StateObject private var mapper = JavVerseMapper()
     @State private var page = 0
     private var rows: [JavVerseEntry] { JavVersePagination.rows(board.entries, page: page) }
-    init(board: JavVerseBoard) {
+    init(board: JavVerseBoard, isLive: Bool = false) {
         self.board = board
+        self.isLive = isLive
         _mapper = StateObject(wrappedValue: JavVerseMapper(scope: board.selectionKey))
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
@@ -263,7 +345,8 @@ private enum JavVerseRankingTab: String, CaseIterable {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("静态快照，非实时").font(.caption).foregroundStyle(.orange)
+                Text(isLive ? "实时榜单" : "静态快照，非实时").font(.caption)
+                    .foregroundStyle(isLive ? Color.green : Color.orange)
                 Text("期间：\(board.period)").font(.subheadline)
                     .accessibilityIdentifier("javverse-selected-period")
                 DisclosureGroup("采集时间与来源") {
@@ -393,6 +476,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
 
 @MainActor private struct JavVerseGrokView: View {
     let snapshot: JavVerseGrokSnapshot
+    var isLive: Bool = false
     @State private var metric: JavVerseGrokMetric = .total
     @State private var status: JavVerseGrokStatus = .all
     @State private var page = 0
@@ -411,7 +495,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 Spacer()
                 Text("\(rows.count)位 · Grok \(metric.title)分").font(.caption).foregroundStyle(.secondary)
             }.padding(.horizontal, 16)
-            JavVerseGrokPage(rows: current, metric: metric, capturedAt: snapshot.capturedAt, scope: key)
+            JavVerseGrokPage(rows: current, metric: metric, capturedAt: snapshot.capturedAt, scope: key, isLive: isLive)
                 .id("\(key)|\(page)")
             HStack {
                 Button("上一页") { page -= 1 }.disabled(page == 0)
@@ -431,9 +515,10 @@ private enum JavVerseRankingTab: String, CaseIterable {
     let rows: [JavVerseGrokRow]
     let metric: JavVerseGrokMetric
     let capturedAt: String
+    var isLive: Bool = false
     @StateObject private var mapper: JavVerseMapper
-    init(rows: [JavVerseGrokRow], metric: JavVerseGrokMetric, capturedAt: String, scope: String) {
-        self.rows = rows; self.metric = metric; self.capturedAt = capturedAt
+    init(rows: [JavVerseGrokRow], metric: JavVerseGrokMetric, capturedAt: String, scope: String, isLive: Bool = false) {
+        self.rows = rows; self.metric = metric; self.capturedAt = capturedAt; self.isLive = isLive
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
             _mapper = StateObject(wrappedValue: JavVerseNeutralFixture.mapper())
@@ -445,7 +530,8 @@ private enum JavVerseRankingTab: String, CaseIterable {
     var body: some View {
         List {
             Section {
-                Text("静态快照，非实时 · Grok 来源，非 AVDB 分数").font(.caption).foregroundStyle(.orange)
+                Text(isLive ? "实时 · Grok 来源，非 AVDB 分数" : "静态快照，非实时 · Grok 来源，非 AVDB 分数").font(.caption)
+                    .foregroundStyle(isLive ? Color.green : Color.orange)
                 DisclosureGroup("采集时间与评分规则") {
                     Text("采集 UTC：\(capturedAt)").font(.caption)
                     Text("来源：https://javverse.com/actresses/top250").font(.caption).textSelection(.enabled)

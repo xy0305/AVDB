@@ -56,7 +56,10 @@ class JavVerseTests(unittest.TestCase):
   self.assertIn('httpShouldHandleCookies = false',self.source)
   self.assertIn('statuses.contains(403)',self.view)
   self.assertIn('for _ in 0..<3',self.view)
-  self.assertGreaterEqual(self.view.count('静态快照'),5)
+  self.assertGreaterEqual(self.view.count('静态快照'),3)
+  self.assertIn('JavVerseLiveClient',self.view)
+  self.assertIn('liveFetch',self.source)
+  self.assertIn('离线快照',self.view)
  def test_schema_validation_contract(self):
   for text in ['Set(boards.map(\\.id))', 'Self.timestamp(preparedAt)', 'Self.sourceURL(entry.sourceURL)', 'board.coverage == "complete"', 'board.entries.map(\\.rank) == Array(1...board.entries.count)']:
    self.assertIn(text,self.source)
@@ -93,5 +96,5 @@ class JavVerseTests(unittest.TestCase):
   self.assertNotIn('Image(',label)
   self.assertNotIn('Label(',label)
   self.assertNotIn('chevron',label)
-  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 264;'),2)
+  self.assertEqual((ROOT/'AVDB.xcodeproj/project.pbxproj').read_text().count('CURRENT_PROJECT_VERSION = 266;'),2)
 if __name__=='__main__':unittest.main()

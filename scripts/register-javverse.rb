@@ -8,6 +8,7 @@ root = project.main_group.children.find { |g| g.respond_to?(:path) && g.path == 
 raise 'AVDB group missing' unless root
 [['Services', 'JavVerseSource.swift', target.source_build_phase],
  ['Services', 'JavVersePolicy.swift', target.source_build_phase],
+ ['Services', 'JavVerseLiveClient.swift', target.source_build_phase],
  ['Views', 'JavVerseView.swift', target.source_build_phase],
  ['Resources', 'JavVerseSnapshot.json', target.resources_build_phase]].each do |group_name, name, phase|
  group = root.children.find { |g| g.respond_to?(:path) && g.path == group_name }

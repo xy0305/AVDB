@@ -25,6 +25,16 @@ struct JavVerseSnapshot: Decodable {
     enum CodingKeys: String, CodingKey {
         case schemaVersion, mode, origin, preparedAt, boards, grok, resourceRevision
     }
+    init(schemaVersion: Int, mode: String, origin: String, preparedAt: String,
+         boards: [JavVerseBoard], grok: JavVerseGrokSnapshot?, resourceRevision: Int? = nil) {
+        self.schemaVersion = schemaVersion
+        self.mode = mode
+        self.origin = origin
+        self.preparedAt = preparedAt
+        self.boards = boards
+        self.grok = grok
+        self.resourceRevision = resourceRevision
+    }
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
@@ -57,7 +67,7 @@ struct JavVerseSnapshot: Decodable {
         return value
     }
     func validate() throws {
-        guard [1, 2].contains(schemaVersion), mode == "staticSnapshot", origin == "https://javverse.com",
+        guard [1, 2].contains(schemaVersion), ["staticSnapshot", "liveFetch"].contains(mode), origin == "https://javverse.com",
               Self.timestamp(preparedAt), !boards.isEmpty,
               Set(boards.map(\.id)).count == boards.count else {
             throw JavVerseFailure.message("不支持的快照格式或时间")

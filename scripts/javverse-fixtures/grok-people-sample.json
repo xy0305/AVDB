@@ -1,0 +1,120 @@
+[
+  {
+    "id": "aika",
+    "nameJa": "AIKA",
+    "nameZh": "AIKA",
+    "years": "2011–",
+    "status": "现役",
+    "scores": {
+      "works": 8530,
+      "pop": 7600,
+      "face": 6700,
+      "body": 6600,
+      "award": 10000,
+      "years": 10000,
+      "total": 7950
+    },
+    "scoreText": {
+      "works": "8.53",
+      "pop": "7.60",
+      "face": "6.70",
+      "body": "6.60",
+      "award": "10.00",
+      "years": "10.00",
+      "total": "7.95"
+    },
+    "actressId": 409,
+    "imageUrl": "/grok/portraits/aika.jpg",
+    "works": [
+      {
+        "code": "LULU-136",
+        "workId": 361521,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/lulu00136/lulu00136pl.jpg",
+        "releaseDate": "2022-04-30"
+      },
+      {
+        "code": "JUQ-501",
+        "workId": 372822,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/juq00501/juq00501pl.jpg",
+        "releaseDate": "2023-11-24"
+      },
+      {
+        "code": "BIJN-273",
+        "workId": 383226,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/bijn00273/bijn00273pl.jpg",
+        "releaseDate": "2025-05-03"
+      },
+      {
+        "code": "CLUB-880",
+        "workId": 384329,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/club00880/club00880pl.jpg",
+        "releaseDate": "2025-08-29"
+      },
+      {
+        "code": "PRED-550",
+        "workId": 137955,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/pred00550/pred00550pl.jpg",
+        "releaseDate": "2024-01-12"
+      }
+    ]
+  },
+  {
+    "id": "hitomi",
+    "nameJa": "Hitomi",
+    "nameZh": "田中瞳",
+    "years": "2004–2021",
+    "status": "引退",
+    "scores": {
+      "works": 8670,
+      "pop": 7700,
+      "face": 6800,
+      "body": 7930,
+      "award": 5500,
+      "years": 10000,
+      "total": 7790
+    },
+    "scoreText": {
+      "works": "8.67",
+      "pop": "7.70",
+      "face": "6.80",
+      "body": "7.93",
+      "award": "5.50",
+      "years": "10.00",
+      "total": "7.79"
+    },
+    "actressId": 3399,
+    "imageUrl": "/grok/portraits/hitomi.jpg",
+    "works": [
+      {
+        "code": "PPPD-996",
+        "workId": 38813,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/pppd00996/pppd00996pl.jpg",
+        "releaseDate": "2022-01-14"
+      },
+      {
+        "code": "PPPD-888",
+        "workId": 352307,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/pppd00888/pppd00888pl.jpg",
+        "releaseDate": "2020-12-17"
+      },
+      {
+        "code": "PPPD-964",
+        "workId": 30528,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/pppd00964/pppd00964pl.jpg",
+        "releaseDate": "2021-10-15"
+      },
+      {
+        "code": "PPPE-023",
+        "workId": 48756,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/pppe00023/pppe00023pl.jpg",
+        "releaseDate": "2022-04-15"
+      },
+      {
+        "code": "PPPD-788",
+        "workId": 343864,
+        "coverUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/pppd00788/pppd00788pl.jpg",
+        "releaseDate": "2019-09-14"
+      }
+    ]
+  }
+]

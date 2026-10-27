@@ -247,7 +247,7 @@ struct RankingsView: View {
             }
             Section("JavVerse") {
                 Button { sourceDestination = .javVerse } label: {
-                    Label("原站名单 · 静态快照", systemImage: "list.number")
+                    Label("原站名单 · 实时优先", systemImage: "list.number")
                 }
                 .accessibilityIdentifier("javverse-source-entry")
             }
