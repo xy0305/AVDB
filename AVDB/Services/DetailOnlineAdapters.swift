@@ -33,13 +33,33 @@ enum MissAVAdapter {
     static func lines(_ data:Data,page:URL,number:String,versions:Bool) throws -> [OnlineLine] {
         let text=try OnlineAdditional.html(data);try OnlineAdapters.rejectChallenge(text)
         let dom=try JRHTML.tree(text);var seen=Set<URL>()
-        return dom.all { $0.tag == "a" }.compactMap { node in
+        var rows=dom.all { $0.tag == "a" }.compactMap { node -> OnlineLine? in
             guard let raw=node.attrs["href"], let url=URL(string:raw,relativeTo:page)?.absoluteURL,
                   OnlinePolicy.metadata(url,source:.missav),!url.path.contains("/search/"),
                   let slug=url.path.split(separator:"/").last,
                   let version=OnlineIdentity.version(String(slug),number:number,allowVersions:versions),seen.insert(url).inserted else { return nil }
             return OnlineLine(source:.missav,recordID:String(slug),code:String(slug).uppercased(),version:version,lineKey:"primary",detailURL:url)
-        }.prefix(5).map { $0 }
+        }
+        // Build 271: EN search sometimes lists only labelled editions (IPX-697 → uncensored-leak)
+        // while /en/<code> primary still exists. When search evidence matches the number under
+        // allowVersions:true, synthesize the primary /en/<code> candidate (no mirror rewrite).
+        let primarySlug=number.lowercased()
+        let primaryURL=URL(string:"https://missav.fans/en/"+primarySlug)!
+        let hasPrimary=rows.contains { $0.version == "原始版本" }
+        if !hasPrimary, OnlinePolicy.metadata(primaryURL,source:.missav),
+           let version=OnlineIdentity.version(primarySlug,number:number,allowVersions:versions) {
+            let evidence=dom.all { $0.tag == "a" }.contains { node in
+                guard let raw=node.attrs["href"], let url=URL(string:raw,relativeTo:page)?.absoluteURL,
+                      OnlinePolicy.metadata(url,source:.missav),!url.path.contains("/search/"),
+                      let slug=url.path.split(separator:"/").last,
+                      OnlineIdentity.version(String(slug),number:number,allowVersions:true) != nil else { return false }
+                return true
+            }
+            if evidence, seen.insert(primaryURL).inserted {
+                rows.insert(OnlineLine(source:.missav,recordID:primarySlug,code:primarySlug.uppercased(),version:version,lineKey:"primary",detailURL:primaryURL),at:0)
+            }
+        }
+        return Array(rows.prefix(5))
     }
 }
 enum MemoJavAdapter {

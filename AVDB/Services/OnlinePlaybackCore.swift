@@ -91,6 +91,9 @@ enum OnlineIdentity {
     static func version(_ candidate: String, number: String, allowVersions: Bool) -> String? {
         guard let wanted = key(number) else { return nil }
         if key(candidate) == wanted { return "原始版本" }
+        // Jable detail slugs append opaque letters after the exact serial (ipx-697ntum).
+        // Serial digits must be complete and must not continue; hyphenated labelled editions stay opt-in.
+        if opaquePrimary(candidate, wanted: wanted) { return "原始版本" }
         guard allowVersions else { return nil }
         for suffix in ["ENGLISH-SUBTITLE", "UNCENSORED-LEAK", "CHINESE-SUBTITLE"] {
             let tail = "-" + suffix
@@ -98,6 +101,14 @@ enum OnlineIdentity {
             if c.hasSuffix(tail), key(String(c.dropLast(tail.count))) == wanted { return suffix }
         }
         return nil
+    }
+    /// Wanted PREFIX + exact SERIAL digits, then an immediate A-Z run (no hyphen). Rejects DEMO-1230 / DEMO-123-LEAK.
+    static func opaquePrimary(_ candidate: String, wanted: String) -> Bool {
+        guard let parts = CatalogueIdentity.parts(wanted) else { return false }
+        let escapedPrefix = NSRegularExpression.escapedPattern(for: parts.prefix)
+        let escapedSerial = NSRegularExpression.escapedPattern(for: parts.serial)
+        let pattern = "^" + escapedPrefix + "[-_]?" + escapedSerial + "[A-Z][A-Z0-9]*$"
+        return !JRHTML.matches(pattern, candidate.uppercased()).isEmpty
     }
     static func heading(_ text: String, number: String) -> Bool {
         guard let wanted = key(number) else { return false }

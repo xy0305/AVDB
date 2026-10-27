@@ -23,11 +23,13 @@ actor OnlineLog254 {
     static func response(_ r:URLRequest) throws -> Data {
         let u=r.url!,h=u.host!
         if h=="fs1.app" {
-            if u.path.hasPrefix("/search/") { return Data("<a href='https://jable.tv/videos/demo-123/'>wrong mirror</a><a href='/videos/demo-1230/'>wrong</a><a href='/videos/demo-123/'>neutral</a>".utf8) }
-            return Data("<link rel='canonical' href='https://fs1.app/videos/demo-123/'><section class='video-info'><h4>DEMO-123 Neutral</h4></section><script>var hlsUrl='https://neutral.jable-cdn.net/demo/index.m3u8';</script>".utf8)
+            if u.path.hasPrefix("/search/") { return Data("<a href='https://jable.tv/videos/demo-123/'>wrong mirror</a><a href='/videos/demo-1230/'>wrong</a><a href='/videos/demo-123ntum/'>neutral</a>".utf8) }
+            // Live Jable mirrors append opaque letters after the serial (ipx-697ntum); heading still carries DEMO-123.
+            return Data("<link rel='canonical' href='https://fs1.app/videos/demo-123ntum/'><section class='video-info'><h4>DEMO-123 Neutral</h4></section><script>var hlsUrl='https://neutral.jable-cdn.net/demo/index.m3u8';</script>".utf8)
         }
         if h=="missav.fans" {
-            if u.path.contains("/search/") { return Data("<a href='https://missav.ws/en/demo-123'>wrong mirror</a><a href='https://missav.media/en/demo-123'>wrong mirror</a><a href='/en/demo-123'>neutral</a>".utf8) }
+            // Live EN search for some titles lists only labelled editions; primary /en/<code> still 200.
+            if u.path.contains("/search/") { return Data("<a href='https://missav.ws/en/demo-123'>wrong mirror</a><a href='https://missav.media/en/demo-123'>wrong mirror</a><a href='/en/demo-123-uncensored-leak'>labelled only</a>".utf8) }
             return Data(("<link rel='canonical' href='https://missav.fans/en/demo-123'><h1>DEMO-123 Neutral</h1><script>"+packed+"</script>").utf8)
         }
         if h=="123av.com" {
@@ -65,6 +67,9 @@ actor OnlineLog254 {
         check(OnlineSource.allCases.count==5,"exactly five sources")
         check(OnlineIdentity.key("ssis_001")=="SSIS-001","full digits preserved")
         for bad in ["DEMO-1230","XDEMO-123","DEMO-0123","DEMO-123-LEAK","../DEMO-123"] { check(OnlineIdentity.version(bad,number:"DEMO-123",allowVersions:false)==nil,"wrong number") }
+        check(OnlineIdentity.version("DEMO-123NTUM",number:"DEMO-123",allowVersions:false)=="原始版本","jable opaque slug")
+        check(OnlineIdentity.version("demo-123abc",number:"DEMO-123",allowVersions:false)!=nil,"jable opaque casefold")
+        check(OnlineIdentity.version("DEMO-123-UNCENSORED-LEAK",number:"DEMO-123",allowVersions:false)==nil,"labelled still opt-in")
         check(OnlineIdentity.version("DEMO-123-UNCENSORED-LEAK",number:"DEMO-123",allowVersions:true) != nil,"explicit edition")
         for a in ["127.0.0.1","10.0.0.1","192.168.1.1","198.18.8.8","198.19.0.1","fd27:712::1","::1","169.254.169.254","2001:db8::1"] { check(!OnlineMediaScope.publicAddress(a),"private/FakeIP forbidden") }
         check(OnlineMediaScope.publicAddress("8.8.8.8"),"public address")
