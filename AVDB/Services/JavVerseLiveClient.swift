@@ -464,12 +464,12 @@ enum JavVerseHTMLParser {
         return result
     }
 
-    private static func inferPeriodKey(label: String, term: String, year: Int, siblingPeriods: [String]) -> (key: String, end: String?) {
+    private static func inferPeriodKey(label: String, term: String, year fallbackYear: Int, siblingPeriods: [String]) -> (key: String, end: String?) {
         let cleaned = label
             .replacingOccurrences(of: "–", with: "-")
             .replacingOccurrences(of: "—", with: "-")
             .replacingOccurrences(of: " ", with: "")
-        let yHint = siblingPeriods.compactMap { year(in: $0) }.max() ?? year
+        let yHint = siblingPeriods.compactMap { year(in: $0) }.max() ?? fallbackYear
         if term == "daily" {
             if let parts = matches(#"(\d{1,2})\.(\d{1,2})"#, in: cleaned).first, parts.count >= 3,
                let mo = Int(parts[1]), let day = Int(parts[2]) {
@@ -498,13 +498,13 @@ enum JavVerseHTMLParser {
         return (String(format: "%04d-01-01", yHint), nil)
     }
 
-    private static func inferredEnd(label: String, start: String, term: String, year: Int) -> String? {
+    private static func inferredEnd(label: String, start: String, term: String, year fallbackYear: Int) -> String? {
         if term == "daily" { return start }
         let cleaned = label.replacingOccurrences(of: "–", with: "-").replacingOccurrences(of: "—", with: "-")
         if let parts = matches(#"(\d{1,2})\.(\d{1,2})\s*-\s*(\d{1,2})\.(\d{1,2})"#, in: cleaned).first,
            parts.count >= 5,
            let m1 = Int(parts[1]), let m2 = Int(parts[3]), let d2 = Int(parts[4]) {
-                var endYear = year(in: start) ?? year
+                var endYear = year(in: start) ?? fallbackYear
                 if m2 < m1 { endYear += 1 }
                 return String(format: "%04d-%02d-%02d", endYear, m2, d2)
         }
