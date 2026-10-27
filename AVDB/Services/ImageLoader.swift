@@ -322,7 +322,7 @@ public actor ImageLoader {
             return await task.value
         }
 
-        let task = Task.detached(priority: .utility) { [userAgent] in
+        let task = Task.detached(priority: .utility) { [userAgent] () -> UIImage? in
             let raw = await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent, maxPixelSize: pixelSize)
             guard let raw else { return nil }
             return JavDBCoverEnhance.maybeApply(raw, source: urlString)
