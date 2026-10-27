@@ -14,14 +14,18 @@ final class DMMUITests266: XCTestCase {
         XCTAssertTrue(app.staticTexts["dmm-fixture-detail-id"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["dmm-fixture-detail-id"].label, "详情ID: avdb-real-fixture-id")
         app.navigationBars.buttons.firstMatch.tap()
-        for _ in 0..<4 { app.buttons["下一页"].tap() }
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '#81 · DMM'")).firstMatch.waitForExistence(timeout: 5))
-        for _ in 0..<12 {
-            if app.staticTexts.containing(NSPredicate(format: "label CONTAINS '#100 · DMM'")).firstMatch.exists { break }
-            app.swipeUp()
+        // Auto-paging replaces 下一页: scroll near bottom to reveal progressive windows of 20.
+        func reveal(_ needle: String, swipes: Int = 40) {
+            for _ in 0..<swipes {
+                if app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", needle)).firstMatch.exists { return }
+                app.swipeUp()
+            }
         }
+        reveal("#81 · DMM")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '#81 · DMM'")).firstMatch.waitForExistence(timeout: 5))
+        reveal("#100 · DMM")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '#100 · DMM'")).firstMatch.exists)
-        XCTAssertFalse(app.buttons["下一页"].isEnabled)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '已显示 100 / 100'")).firstMatch.waitForExistence(timeout: 5))
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = "DMM266-offline-rank100"; attachment.lifetime = .keepAlways; add(attachment)
     }
 }
