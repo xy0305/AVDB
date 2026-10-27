@@ -11,6 +11,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Online noMatch IPX-697 guards + production five-adapter regression
+        run: |
+          set -euo pipefail
+          python3 scripts/test-online271.py
+          python3 scripts/test-missav269.py
+          python3 scripts/test-jable270.py
+          python3 scripts/test-online254.py
       - name: Production parser regression
         run: |
           set -euo pipefail
