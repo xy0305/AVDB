@@ -130,7 +130,8 @@ enum OnlinePolicy {
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             return items.isEmpty || items == JableAdapter.searchItems(String(parts[1]))
         case .missav:
-            return url.host == "missav.ws" && url.query == nil && (p.hasPrefix("/en/") || p.hasPrefix("/dm339/en/")) && (parts.count == 2 || parts.count == 3 || parts.count == 4)
+            // Declared online apex is missav.fans (Build 269). Reject other MissAV mirrors.
+            return url.host == "missav.fans" && url.query == nil && (p.hasPrefix("/en/") || p.hasPrefix("/dm339/en/")) && (parts.count == 2 || parts.count == 3 || parts.count == 4)
         case .av123:
             guard url.host == "123av.com" else { return false }
             if p.hasPrefix("/en/v/") { return parts.count == 3 && url.query == nil }
@@ -206,7 +207,7 @@ enum OnlinePolicy {
     static func headers(referrer:URL, source: OnlineSource? = nil) -> [String:String] {
         let agent = source == .javday ? chromeUA : ua
         var h = ["User-Agent":agent,"Referer":referrer.absoluteString]
-        if let host=referrer.host, ["jable.tv","missav.ws","javday.app"].contains(host) { h["Origin"]="https://"+host }
+        if let host=referrer.host, ["jable.tv","missav.fans","javday.app"].contains(host) { h["Origin"]="https://"+host }
         return h
     }
 }
@@ -670,7 +671,7 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         guard body == nil else { throw OnlineFailure.unsafe }
         request.setValue(OnlinePolicy.ua, forHTTPHeaderField: "User-Agent")
         for (key,value) in headers where ["User-Agent","Referer","Origin","Accept"].contains(key) {
-            if key == "Origin" && !["https://jable.tv", "https://missav.ws", "https://javday.app"].contains(value) { throw OnlineFailure.unsafe }
+            if key == "Origin" && !["https://jable.tv", "https://missav.fans", "https://javday.app"].contains(value) { throw OnlineFailure.unsafe }
             request.setValue(value, forHTTPHeaderField: key)
         }
         if let loader {

@@ -40,7 +40,7 @@ actor CompatibilityLog256 {
    check(plan.source==source && plan.headers["Cookie"]==nil,"compat prepare same source")
   }
   let urls=await log.all()
-  for host in ["jable.tv","missav.ws","123av.com","memojav.org","javday.app","javday.homes","sadie-shop.site","video10.memojav.net","jzxz.freeboldspirit.site","neutral.jable-cdn.net","surrit.neutral.media"] { check(urls.contains { $0.host==host },"mode propagated through approved source "+host) }
+  for host in ["jable.tv","missav.fans","123av.com","memojav.org","javday.app","javday.homes","sadie-shop.site","video10.memojav.net","jzxz.freeboldspirit.site","neutral.jable-cdn.net","surrit.neutral.media"] { check(urls.contains { $0.host==host },"mode propagated through approved source "+host) }
   check(urls.contains { $0.path.hasSuffix("leaf.m3u8") },"child manifest preflight")
   check(urls.allSatisfy { $0.scheme=="https" && $0.host != "198.18.3.139" && !$0.path.hasSuffix(".ts") },"original HTTPS hostname; no segment fetch")
   let keyLog=CompatibilityLog256()

@@ -5,11 +5,11 @@ import Foundation
   func check(_ value:Bool,_ reason:String) { count += 1;precondition(value,reason) }
   for ip in ["8.8.8.8","1.1.1.1","2606:4700:4700::1111","::ffff:8.8.8.8","::ffff:808:808","64:ff9b::808:808"] { check(OnlineMediaScope.publicAddress(ip),"public/mapped/NAT64 public rejected") }
   for ip in ["::ffff:127.0.0.1","::ffff:192.168.1.1","::ffff:c612:303","::ffff:198.18.3.3","64:ff9b::a00:1","64:ff9b::c612:303","fd27::1","198.18.3.139","198.19.0.1","10.0.0.1","169.254.169.254","192.0.2.1","2001:db8::1","::1","not-an-address"] { check(!OnlineMediaScope.publicAddress(ip),"private/reserved/malformed address accepted") }
-  let root=URL(string:"https://missav.ws/en/search/PRWF-017")!
+  let root=URL(string:"https://missav.fans/en/search/PRWF-017")!
   try OnlineMediaScope.validateAddresses(["8.8.8.8","::ffff:1.1.1.1"],root:root)
   for addresses in [[],["8.8.8.8","10.0.0.1"],["198.18.3.139"]] {
    do { try OnlineMediaScope.validateAddresses(addresses,root:root);preconditionFailure("DNS must stop before request") }
-   catch { let text=OnlineFailure.classify(error).localizedDescription;check(text.contains("DNS") && text.contains("missav.ws"),"missing exact DNS reason") }
+   catch { let text=OnlineFailure.classify(error).localizedDescription;check(text.contains("DNS") && text.contains("missav.fans"),"missing exact DNS reason") }
   }
   let urls:[(OnlineSource,URL)]=[(.jable,JableAdapter.search("PRWF-017")),(.missav,MissAVAdapter.search("PRWF-017")),(.av123,OneTwoThreeAVAdapter.search("PRWF-017")),(.memojav,MemoJavAdapter.page("PRWF-017")),(.javday,JavDayAdapter.search("PRWF-017"))]
   for (source,url) in urls { check(OnlinePolicy.metadata(url,source:source),"production search URL rejected") }
@@ -18,9 +18,9 @@ import Foundation
   let err=OnlineMediaScope.diagnostic(signed.url!,stage:"清单/DNS",reason:"中性失败")
   let label=OnlinePlaybackModel.State.failed(err).label
   check(label.contains("video10.memojav.net") && label.contains("清单/DNS") && !label.contains("NEUTRAL_SIGNED_SECRET") && !label.contains("neutral.m3u8"),"UI diagnostic leaked URL query/path")
-  check(OnlinePolicy.addressRejection(URL(string:"http://missav.ws/en/PRWF-017")!).contains("格式"),"format reason missing")
+  check(OnlinePolicy.addressRejection(URL(string:"http://missav.fans/en/PRWF-017")!).contains("格式"),"format reason missing")
   check(OnlinePolicy.addressRejection(URL(string:"https://127.0.0.1/x")!).contains("host"),"host reason missing")
-  check(OnlinePolicy.addressRejection(URL(string:"https://missav.ws/private?x=1")!).contains("path/query"),"path/query reason missing")
+  check(OnlinePolicy.addressRejection(URL(string:"https://missav.fans/private?x=1")!).contains("path/query"),"path/query reason missing")
   let model=OnlinePlaybackModel(provider:OnlineProvider(transport:OnlineTransport(loader:{ request in
    throw OnlineMediaScope.diagnostic(request.url!,stage:"查询/DNS",reason:"中性无结果")
   })))

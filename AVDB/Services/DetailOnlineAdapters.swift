@@ -21,8 +21,11 @@ enum JableAdapter {
     }
 }
 enum MissAVAdapter {
-    // User explicitly chose missav.ws/dm339. No fans/media mirror rewrite or cookies.
-    static func search(_ code:String) -> URL { URL(string:"https://missav.ws/en/search/"+code)! }
+    // Build 269: explicit online host is missav.fans (same verified apex as ranking default).
+    // missav.ws remains CF-challenged for anonymous URLSession; this is not a silent
+    // response-link rewrite — search/detail URLs are issued on the declared host only.
+    static let site = URL(string: "https://missav.fans")!
+    static func search(_ code:String) -> URL { URL(string:"https://missav.fans/en/search/"+code)! }
     static func lines(_ data:Data,page:URL,number:String,versions:Bool) throws -> [OnlineLine] {
         let text=try OnlineAdditional.html(data);try OnlineAdapters.rejectChallenge(text)
         let dom=try JRHTML.tree(text);var seen=Set<URL>()
@@ -116,7 +119,7 @@ extension OnlineProvider {
         case .jable:
             let page=JableAdapter.search(code);return try JableAdapter.lines(try await transport.fetch(page,cap:2*1024*1024),page:page,number:code,versions:versions)
         case .missav:
-            let page=MissAVAdapter.search(code);return try MissAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:URL(string:"https://missav.ws/dm339")!)),page:page,number:code,versions:versions)
+            let page=MissAVAdapter.search(code);return try MissAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:MissAVAdapter.site)),page:page,number:code,versions:versions)
         case .av123:
             let page=OneTwoThreeAVAdapter.search(code)
             return try OneTwoThreeAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024),page:page,number:code)

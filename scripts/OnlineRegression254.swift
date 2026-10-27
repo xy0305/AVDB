@@ -26,9 +26,9 @@ actor OnlineLog254 {
             if u.path.hasPrefix("/search/") { return Data("<a href='/videos/demo-1230/'>wrong</a><a href='/videos/demo-123/'>neutral</a>".utf8) }
             return Data("<meta property='og:url' content='https://jable.tv/videos/demo-123/'><section class='video-info'><h4>DEMO-123 Neutral</h4></section><script>var hlsUrl='https://neutral.jable-cdn.net/demo/index.m3u8';</script>".utf8)
         }
-        if h=="missav.ws" {
-            if u.path.contains("/search/") { return Data("<a href='https://missav.fans/en/demo-123'>wrong mirror</a><a href='/en/demo-123'>neutral</a>".utf8) }
-            return Data(("<link rel='canonical' href='https://missav.ws/en/demo-123'><h1>DEMO-123 Neutral</h1><script>"+packed+"</script>").utf8)
+        if h=="missav.fans" {
+            if u.path.contains("/search/") { return Data("<a href='https://missav.ws/en/demo-123'>wrong mirror</a><a href='https://missav.media/en/demo-123'>wrong mirror</a><a href='/en/demo-123'>neutral</a>".utf8) }
+            return Data(("<link rel='canonical' href='https://missav.fans/en/demo-123'><h1>DEMO-123 Neutral</h1><script>"+packed+"</script>").utf8)
         }
         if h=="123av.com" {
             if u.path=="/en/search" { return Data("<a href='/en/v/demo-1230'>wrong</a><a href='/en/v/demo-123'>neutral</a><a href='/en/v/demo-123-uncensored-leaked'>different edition</a>".utf8) }
@@ -131,7 +131,7 @@ actor OnlineLog254 {
                     print("LIVE254 source=\(s.rawValue) stage=\(stage) result=\(OnlineFailure.classify(error)) FIRST-FRAME=UNVERIFIED")
                     if s == .missav && OnlineFailure.classify(error) == .tooLarge {
                         do {
-                            let page=URL(string:"https://missav.ws/en/fns-249")!
+                            let page=URL(string:"https://missav.fans/en/fns-249")!
                             let data=try await real.transport.fetch(page,cap:2*1024*1024)
                             let text=try OnlineAdditional.html(data)
                             print("DIAG254 missav public-detail-bytes=\(data.count)")

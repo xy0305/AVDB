@@ -61,6 +61,9 @@ jobs:
       - name: Offline production contracts and synthetic Swift regression (no source probes)
         run: python3 scripts/test-online254.py
 
+      - name: MissAV online fans apex static guards (Build 269)
+        run: python3 scripts/test-missav269.py
+
       - name: Generic diagnostics and preserved 254-256 neutral guards on macOS and iOS
         run: |
           set -euo pipefail
