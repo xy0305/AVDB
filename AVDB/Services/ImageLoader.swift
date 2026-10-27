@@ -8,6 +8,7 @@
 
 import Foundation
 import ImageIO
+import CoreImage
 import SwiftUI
 
 /// 图片加载错误
@@ -184,6 +185,56 @@ extension String {
     }
 }
 
+/// Fast Core Image clarity for soft / early **JavDB-native** movie covers only.
+/// Off by default. Never touches DMM, Amazon, JavBus, Tenhow, TPDB, Avbase, MGS,
+/// actor portraits, or any non-JavDB host. Uses system CISharpenLuminance (no ML).
+public enum JavDBCoverEnhance {
+    public static let defaultsKey = "javdb.cover.enhance.enabled"
+    /// Mild luminance sharpen; same filter family as player NativeLUT, kept light for ≤~200ms.
+    public static let sharpness: Double = 0.35
+    /// Skip when the longer edge already looks high-res (HQ replacements need no help).
+    public static let highResSkipPixels = 1200
+
+    public static var isEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: defaultsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
+    }
+
+    /// Cache-key tag so toggling on/off never serves the wrong raster.
+    public static var cacheTag: String { isEnabled ? "e1" : "e0" }
+
+    public static func isJavDBNativeCover(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return false }
+        let path = url.path.lowercased()
+        guard host == JavDBConstants.imageCDNHost || host == JavDBConstants.webCDNHost else { return false }
+        // Movie jackets only — never actress/avatar or unrelated CDN paths.
+        return path.contains("/covers/") || path.contains("/small_covers/")
+    }
+
+    public static func shouldEnhance(source: String, width: Int, height: Int) -> Bool {
+        guard isEnabled, isJavDBNativeCover(source), width > 0, height > 0 else { return false }
+        return max(width, height) < highResSkipPixels
+    }
+
+    private static let context = CIContext(options: [.cacheIntermediates: false])
+
+    public static func apply(_ image: UIImage) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let ci = CIImage(cgImage: cg)
+        let sharpened = ci.clampedToExtent()
+            .applyingFilter("CISharpenLuminance", parameters: [kCIInputSharpnessKey: sharpness])
+            .cropped(to: ci.extent)
+        guard let out = context.createCGImage(sharpened, from: sharpened.extent) else { return image }
+        return UIImage(cgImage: out, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    public static func maybeApply(_ image: UIImage, source: String) -> UIImage {
+        guard let cg = image.cgImage,
+              shouldEnhance(source: source, width: cg.width, height: cg.height) else { return image }
+        return apply(image)
+    }
+}
+
 /// List-only artwork policy, independently implemented after researching Amane.
 /// Metadata is not rewritten: detail screens still request the untouched original.
 public enum FrontPosterPolicy {
@@ -260,18 +311,21 @@ public actor ImageLoader {
             return nil
         }
         let pixelSize = max(320, maxPixelSize)
-        let cacheKey = "\(urlString)#\(pixelSize)" as NSString
+        let tag = JavDBCoverEnhance.cacheTag
+        let cacheKey = "\(urlString)#\(pixelSize)#\(tag)" as NSString
         if let img = cache.object(forKey: cacheKey) {
             return img
         }
 
-        let flightKey = "\(urlString)#\(pixelSize)"
+        let flightKey = "\(urlString)#\(pixelSize)#\(tag)"
         if let task = inFlight[flightKey] {
             return await task.value
         }
 
         let task = Task.detached(priority: .utility) { [userAgent] in
-            await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent, maxPixelSize: pixelSize)
+            let raw = await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent, maxPixelSize: pixelSize)
+            guard let raw else { return nil }
+            return JavDBCoverEnhance.maybeApply(raw, source: urlString)
         }
         inFlight[flightKey] = task
         let image = await task.value
@@ -286,10 +340,12 @@ public actor ImageLoader {
 
     /// Decoded source cache stays separate from bounded list-only derivatives.
     public func loadPoster(_ source: String, maxPixelSize: Int) async -> UIImage? {
-        let key = "front-v1#\(source)#\(maxPixelSize)"
+        let tag = JavDBCoverEnhance.cacheTag
+        let key = "front-v1#\(tag)#\(source)#\(maxPixelSize)"
         if let cached = posterCache.object(forKey: key as NSString) { return cached }
         if let flight = posterInFlight[key] { return await flight.value }
         let flight = Task { () -> UIImage? in
+            // load() already applies JavDB enhance when enabled; crop the enhanced raster.
             guard let original = await self.load(source, maxPixelSize: maxPixelSize) else { return nil }
             return await Task.detached(priority: .utility) {
                 guard let cg = original.cgImage,
@@ -356,9 +412,15 @@ public actor ImageLoader {
 
     /// Read-only detail reuse: no network, no catalog mutations, original decoding unchanged.
     func cachedDetailPoster(source: String) -> UIImage? {
+        let tag = JavDBCoverEnhance.cacheTag
         for size in [2048, 1600, 1200, 1000, 720, 640] {
-            if let image = posterCache.object(forKey: "front-v1#\(source)#\(size)" as NSString) { return image }
-            if let image = cache.object(forKey: "\(source)#\(size)" as NSString) { return image }
+            if let image = posterCache.object(forKey: "front-v1#\(tag)#\(source)#\(size)" as NSString) { return image }
+            if let image = cache.object(forKey: "\(source)#\(size)#\(tag)" as NSString) { return image }
+            // Legacy untagged keys (pre-Build272) still warm when enhance is off.
+            if tag == "e0" {
+                if let image = posterCache.object(forKey: "front-v1#\(source)#\(size)" as NSString) { return image }
+                if let image = cache.object(forKey: "\(source)#\(size)" as NSString) { return image }
+            }
         }
         return nil
     }

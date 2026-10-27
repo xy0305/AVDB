@@ -20,6 +20,7 @@ jobs:
           python3 scripts/test-online254.py
           python3 scripts/test-actor-hq-portraits266.py
           python3 scripts/test-javbus-actors251.py
+          python3 scripts/test-javdb-cover-enhance272.py
       - name: Production parser regression
         run: |
           set -euo pipefail

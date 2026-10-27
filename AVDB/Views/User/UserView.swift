@@ -719,15 +719,22 @@ struct ExternalLibrarySettingsView: View {
 /// Shared by the production settings page and neutral UI fixture.
 struct CoverTitleSettingsSection: View {
     @AppStorage("detail.showCoverTitle") private var showCoverTitle = true
+    @AppStorage("javdb.cover.enhance.enabled") private var coverEnhance = false
 
     var body: some View {
         Section {
             Toggle("显示封面标题", isOn: $showCoverTitle)
                 .accessibilityIdentifier("detail-cover-title-setting")
+            Toggle("JavDB 早期封面清晰化", isOn: $coverEnhance)
+                .accessibilityIdentifier("javdb-cover-enhance-setting")
+                .onChange(of: coverEnhance) { _, _ in
+                    Task { await ImageLoader.shared.clearCache() }
+                    DetailPosterResolver.invalidateCoverCaches()
+                }
         } header: {
             Text("详情显示")
         } footer: {
-            Text("仅控制 App 叠加的影片标题；海报图片本身印刷的文字无法通过此开关隐藏。")
+            Text("封面标题仅控制 App 叠加文字。清晰化默认关闭，只对 JavDB 原生封面（tp.spfcas.com / c0.jdbstatic.com 的 covers）做系统 Core Image 轻度锐化并缓存；不处理 DMM / Amazon / JavBus / Tenhow / TPDB / 头像等其它来源。高分辨率封面会自动跳过。")
         }
     }
 }

@@ -93,7 +93,13 @@ enum DetailPosterResolver {
         // Opaque memory-only account namespace; never log credentials.
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
         let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + "#" + (movie.catalogueMetadata?.images.joined(separator: "|") ?? "")
+        // Separate enhanced vs raw JavDB cover rasters in the detail cache.
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + "#" + (movie.catalogueMetadata?.images.joined(separator: "|") ?? "") + "#" + JavDBCoverEnhance.cacheTag
+    }
+
+    /// Drop detail poster winners when the JavDB cover-enhance toggle flips.
+    static func invalidateCoverCaches() {
+        cache.invalidate()
     }
 
     static func validatedSources(_ movie: Movie) -> [String] {
@@ -409,7 +415,9 @@ enum DetailPosterResolver {
             let input = CIImage(cgImage: cg).transformed(by: CGAffineTransform(scaleX: 0.08, y: 0.08))
             let blurred = input.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 12]).cropped(to: input.extent)
             let backdrop = CIContext(options: [.cacheIntermediates: false]).createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) } ?? UIImage(cgImage: cg)
-            return DetailPosterArtwork(image: UIImage(cgImage: cg), backdrop: backdrop, tint: tint, provenance: PosterProvenance(source: source))
+            // Enhance only the displayed JavDB-native winner; quality score already used raw pixels.
+            let display = JavDBCoverEnhance.maybeApply(UIImage(cgImage: cg), source: source)
+            return DetailPosterArtwork(image: display, backdrop: backdrop, tint: tint, provenance: PosterProvenance(source: source))
         }.value
     }
 }
