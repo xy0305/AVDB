@@ -1,0 +1,169 @@
+{
+  "data": {
+    "ppvContentRanking": {
+      "__typename": "PPVContentDailyRanking",
+      "items": [
+        {
+          "id": "neutral00001",
+          "rank": 1,
+          "content": {
+            "id": "neutral00001",
+            "title": "Neutral Title 1"
+          }
+        },
+        {
+          "id": "neutral00002",
+          "rank": 2,
+          "content": {
+            "id": "neutral00002",
+            "title": "Neutral Title 2"
+          }
+        },
+        {
+          "id": "neutral00003",
+          "rank": 3,
+          "content": {
+            "id": "neutral00003",
+            "title": "Neutral Title 3"
+          }
+        },
+        {
+          "id": "neutral00004",
+          "rank": 4,
+          "content": {
+            "id": "neutral00004",
+            "title": "Neutral Title 4"
+          }
+        },
+        {
+          "id": "neutral00005",
+          "rank": 5,
+          "content": {
+            "id": "neutral00005",
+            "title": "Neutral Title 5"
+          }
+        },
+        {
+          "id": "neutral00006",
+          "rank": 6,
+          "content": {
+            "id": "neutral00006",
+            "title": "Neutral Title 6"
+          }
+        },
+        {
+          "id": "neutral00007",
+          "rank": 7,
+          "content": {
+            "id": "neutral00007",
+            "title": "Neutral Title 7"
+          }
+        },
+        {
+          "id": "neutral00008",
+          "rank": 8,
+          "content": {
+            "id": "neutral00008",
+            "title": "Neutral Title 8"
+          }
+        },
+        {
+          "id": "neutral00009",
+          "rank": 9,
+          "content": {
+            "id": "neutral00009",
+            "title": "Neutral Title 9"
+          }
+        },
+        {
+          "id": "neutral00010",
+          "rank": 10,
+          "content": {
+            "id": "neutral00010",
+            "title": "Neutral Title 10"
+          }
+        },
+        {
+          "id": "neutral00011",
+          "rank": 11,
+          "content": {
+            "id": "neutral00011",
+            "title": "Neutral Title 11"
+          }
+        },
+        {
+          "id": "neutral00012",
+          "rank": 12,
+          "content": {
+            "id": "neutral00012",
+            "title": "Neutral Title 12"
+          }
+        },
+        {
+          "id": "neutral00013",
+          "rank": 13,
+          "content": {
+            "id": "neutral00013",
+            "title": "Neutral Title 13"
+          }
+        },
+        {
+          "id": "neutral00014",
+          "rank": 14,
+          "content": {
+            "id": "neutral00014",
+            "title": "Neutral Title 14"
+          }
+        },
+        {
+          "id": "neutral00015",
+          "rank": 15,
+          "content": {
+            "id": "neutral00015",
+            "title": "Neutral Title 15"
+          }
+        },
+        {
+          "id": "neutral00016",
+          "rank": 16,
+          "content": {
+            "id": "neutral00016",
+            "title": "Neutral Title 16"
+          }
+        },
+        {
+          "id": "neutral00017",
+          "rank": 17,
+          "content": {
+            "id": "neutral00017",
+            "title": "Neutral Title 17"
+          }
+        },
+        {
+          "id": "neutral00018",
+          "rank": 18,
+          "content": {
+            "id": "neutral00018",
+            "title": "Neutral Title 18"
+          }
+        },
+        {
+          "id": "neutral00019",
+          "rank": 19,
+          "content": {
+            "id": "neutral00019",
+            "title": "Neutral Title 19"
+          }
+        },
+        {
+          "id": "neutral00020",
+          "rank": 20,
+          "content": {
+            "id": "neutral00020",
+            "title": "Neutral Title 20"
+          }
+        }
+      ]
+    }
+  }
+}

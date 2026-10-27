@@ -1,28 +1,42 @@
 import Foundation
 import Combine
 
-/// Public metadata only. Ephemeral requests never borrow browser cookies or persist sessions.
+enum DMMRankingFetchSource: String, Sendable {
+    case webView, graphql, direct, imported
+}
+
+/// Public metadata only. Ephemeral requests never borrow Safari cookies or persist sessions.
 @MainActor final class DMMRankingStore: ObservableObject {
     @Published var kind: DMMRankingKind = .weekly
     @Published private(set) var board: DMMRankingBoard?
     @Published private(set) var evidence: [String: DMMManufacturerEvidence] = [:]
     @Published private(set) var messages: [String: String] = [:]
-    @Published private(set) var status = "来源访问受限时可导入自行正常取得的日/周/月榜或月间女优榜HTML；不会使用浏览器会话。"
+    @Published private(set) var status = "授权成年自声明后可自动刷新日/周/月榜与月间女优榜；HTML导入仅作手动后备。"
     @Published private(set) var imported = false
+    @Published private(set) var fetchSource: DMMRankingFetchSource?
     private var generation = UUID()
     private var queue: [DMMContentRow] = []
     private var tasks: [String: Task<Void, Never>] = [:]
     private var cache: [String: (DMMManufacturerEvidence, Date)] = [:]
     private let transport: DMMTransport
+    /// Optional overrides for regressions (macOS / offline).
+    var hydrateOverride: ((DMMRankingKind, Bool) async throws -> (String, URL))?
+    var graphqlOverride: ((DMMRankingKind) async throws -> DMMRankingBoard)?
+
     var authorizeAdultDeclaration: Bool {
         get { UserDefaults.standard.bool(forKey: "dmm.authorizedAdultDeclaration") }
         set { UserDefaults.standard.set(newValue, forKey: "dmm.authorizedAdultDeclaration") }
     }
-    func forgetSession() async { cancel(); await transport.clear() }
+    func forgetSession() async {
+        cancel()
+        await transport.clear()
+        DMMRankingHydrator.cancelActive()
+    }
     init(transport: DMMTransport = DMMTransport()) { self.transport = transport }
     func cancel() {
         generation = UUID(); queue.removeAll()
         tasks.values.forEach { $0.cancel() }; tasks.removeAll()
+        DMMRankingHydrator.cancelActive()
     }
     private func document(_ url: URL) async throws -> (String, URL) {
         try await transport.document(url, authorizeAdultDeclaration: authorizeAdultDeclaration)
@@ -31,24 +45,86 @@ import Combine
         guard next != kind else { return }
         cancel()
         kind = next
-        board = nil; evidence.removeAll(); messages.removeAll(); imported = false
-        status = "已切换到\(next.periodLabel)。可直连或导入对应完整榜单HTML。"
+        board = nil; evidence.removeAll(); messages.removeAll(); imported = false; fetchSource = nil
+        status = "已切换到\(next.periodLabel)。可刷新或导入对应完整榜单HTML。"
     }
+
+    /// Refresh order: WKWebView hydrate → verified GraphQL → URLSession document. HTML import stays manual.
     func refresh() async {
         cancel(); let epoch = generation
         let target = kind
-        status = "正在请求\(target.periodLabel)来源（不带浏览器Cookie）…"
+        guard authorizeAdultDeclaration else {
+            status = "请先开启成年自声明授权，才能自动刷新官方榜单。"
+            return
+        }
+        status = "正在通过页面渲染读取\(target.periodLabel)…"
+        if let board = await refreshViaWebView(target, epoch: epoch) { return apply(board, source: .webView, epoch: epoch) }
+        guard epoch == generation else { return }
+        status = "页面渲染未取得完整榜单，改用 GraphQL…"
+        if let board = await refreshViaGraphQL(target, epoch: epoch) { return apply(board, source: .graphql, epoch: epoch) }
+        guard epoch == generation else { return }
+        status = "正在尝试直连文档（不带浏览器Cookie）…"
         do {
             let (html, url) = try await document(target.sourceURL)
             let result = try DMMRankingCore.board(html: html, responseURL: url, observedAt: Date())
             guard epoch == generation, result.kind == target else { return }
-            board = result; evidence.removeAll(); messages.removeAll(); imported = false
-            status = "本次直连读取\(result.count)个榜位（\(target.periodLabel)）；统计起止未提供。"
+            apply(result, source: .direct, epoch: epoch)
         } catch {
             guard epoch == generation else { return }
-            status = "来源访问受限或文档未通过完整性验证。可导入自行正常取得的HTML。现有导入不会被冒充实时。"
+            board = nil; evidence.removeAll(); messages.removeAll(); imported = false; fetchSource = nil
+            status = "LIVE_BLOCKED：自动刷新未取得完整\(target.periodLabel)。可稍后重试，或导入自行正常取得的HTML。不编造榜行。"
         }
     }
+
+    private func apply(_ result: DMMRankingBoard, source: DMMRankingFetchSource, epoch: UUID) {
+        guard epoch == generation, result.kind == kind else { return }
+        board = result; evidence.removeAll(); messages.removeAll(); imported = (source == .imported); fetchSource = source
+        let label: String
+        switch source {
+        case .webView: label = "页面渲染"
+        case .graphql: label = "GraphQL"
+        case .direct: label = "直连文档"
+        case .imported: label = "用户导入"
+        }
+        status = "\(label)读取\(result.count)个榜位（\(result.periodLabel)）；统计起止未提供。"
+    }
+
+    private func refreshViaWebView(_ target: DMMRankingKind, epoch: UUID) async -> DMMRankingBoard? {
+        do {
+            let (html, url): (String, URL)
+            if let hydrateOverride {
+                (html, url) = try await hydrateOverride(target, authorizeAdultDeclaration)
+            } else {
+                #if canImport(UIKit) && canImport(WebKit)
+                (html, url) = try await DMMRankingHydrator.shared.document(kind: target, authorizeAdultDeclaration: authorizeAdultDeclaration)
+                #else
+                throw DMMRankingError.accessGate
+                #endif
+            }
+            guard epoch == generation else { return nil }
+            let result = try DMMRankingCore.board(html: html, responseURL: url, observedAt: Date())
+            guard result.kind == target else { return nil }
+            return result
+        } catch {
+            return nil
+        }
+    }
+
+    private func refreshViaGraphQL(_ target: DMMRankingKind, epoch: UUID) async -> DMMRankingBoard? {
+        do {
+            let result: DMMRankingBoard
+            if let graphqlOverride {
+                result = try await graphqlOverride(target)
+            } else {
+                result = try await DMMRankingGraphQL.fetch(target)
+            }
+            guard epoch == generation, result.kind == target else { return nil }
+            return result
+        } catch {
+            return nil
+        }
+    }
+
     /// Imported detail must declare one canonical identity; file names and sku are not evidence.
     func importHTML(_ data: Data) throws {
         guard data.count <= 8_000_000, let html = String(data: data, encoding: .utf8) else { throw DMMRankingError.malformed }
@@ -56,7 +132,7 @@ import Combine
         for candidate in candidates {
             if let result = try? DMMRankingCore.board(html: html, responseURL: candidate.sourceURL, observedAt: Date()) {
                 cancel(); kind = result.kind; board = result
-                evidence.removeAll(); messages.removeAll(); imported = true
+                evidence.removeAll(); messages.removeAll(); imported = true; fetchSource = .imported
                 status = "用户导入\(result.count)榜位 · \(result.periodLabel) · 导入时间不是采集时间，来源统计起止未知。"
                 return
             }

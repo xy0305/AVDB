@@ -1,0 +1,17 @@
+{
+  "data": {
+    "ppvContentRanking": {
+      "__typename": "PPVContentDailyRanking",
+      "items": [
+        {
+          "id": "neutral00001",
+          "rank": 1,
+          "content": {
+            "id": "neutral00001",
+            "title": "Only One"
+          }
+        }
+      ]
+    }
+  }
+}

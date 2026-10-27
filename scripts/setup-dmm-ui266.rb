@@ -3,7 +3,7 @@ r = ENV.fetch('GITHUB_WORKSPACE', Dir.pwd)
 d = File.join(r, 'evidence-dmm266')
 p = Xcodeproj::Project.new(File.join(d, 'DMM266.xcodeproj'))
 a = p.new_target(:application, 'DMM266', :ios, '17.0')
-['AVDB/Services/DMMRankingCore.swift', 'AVDB/Services/DMMTransport.swift', 'AVDB/Services/DMMRankingStore.swift', 'AVDB/Views/Rankings/DMMRankingView.swift', 'scripts/DMMUIHost266.swift'].each { |f| a.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r,f))) }
+['AVDB/Services/DMMRankingCore.swift', 'AVDB/Services/DMMTransport.swift', 'AVDB/Services/DMMRankingGraphQL.swift', 'AVDB/Services/DMMRankingHydrator.swift', 'AVDB/Services/DMMRankingStore.swift', 'AVDB/Views/Rankings/DMMRankingView.swift', 'scripts/DMMUIHost266.swift'].each { |f| a.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r,f))) }
 a.source_build_phase.add_file_reference(p.main_group.new_file(File.join(d,'MovieResolver.swift')))
 t = p.new_target(:ui_test_bundle, 'DMMUITests266', :ios, '17.0'); t.add_dependency(a)
 t.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r,'scripts/DMMUITests266.swift')))

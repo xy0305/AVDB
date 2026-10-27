@@ -30,14 +30,16 @@ actor DMMTransport {
                 return id.count <= 20 && id.range(of: "^[0-9]+$", options: .regularExpression) != nil
             }
         }
-        if url.host == "www.dmm.co.jp", ["/age_check/=/", "/age_check/=/declared=yes/"].contains(c.path),
+        if url.host == "www.dmm.co.jp",
+           ["/age_check/=/", "/age_check/=/declared=yes/", "/en/age_check/=/", "/en/age_check/=/declared=yes/"].contains(c.path),
            let q = c.queryItems, q.count == 1, q[0].name == "rurl", let raw = q[0].value, let target = URL(string: raw), target.host == "video.dmm.co.jp" {
             return allowed(target)
         }
         return false
     }
     static func declaration(html: String, ageURL: URL) throws -> URL {
-        guard ageURL.host == "www.dmm.co.jp", allowed(ageURL), html.contains("18歳以上") else { throw DMMRankingError.accessGate }
+        let ageOK = ageURL.host == "www.dmm.co.jp" && allowed(ageURL) && (html.contains("18歳以上") || html.contains("18 years") || html.contains("yesButtonLink"))
+        guard ageOK else { throw DMMRankingError.accessGate }
         let re = try NSRegularExpression(pattern: "<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>", options: [.dotMatchesLineSeparators])
         let ns = html as NSString
         guard let m = re.firstMatch(in: html, range: NSRange(location: 0, length: ns.length)),
@@ -45,7 +47,8 @@ actor DMMTransport {
               let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let props = object["props"] as? [String: Any], let page = props["pageProps"] as? [String: Any],
               let link = page["yesButtonLink"] as? String, let url = URL(string: link), allowed(url),
-              URLComponents(url: url, resolvingAgainstBaseURL: false)?.path == "/age_check/=/declared=yes/",
+              let yesPath = URLComponents(url: url, resolvingAgainstBaseURL: false)?.path,
+              yesPath == "/age_check/=/declared=yes/" || yesPath == "/en/age_check/=/declared=yes/",
               URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems == URLComponents(url: ageURL, resolvingAgainstBaseURL: false)?.queryItems else { throw DMMRankingError.accessGate }
         return url
     }
@@ -57,7 +60,8 @@ actor DMMTransport {
             try Task.checkCancellation()
             guard Self.allowed(url) else { throw DMMRankingError.accessGate }
             // Only a parsed official age page may authorize this state transition.
-            if URLComponents(url: url, resolvingAgainstBaseURL: false)?.path == "/age_check/=/declared=yes/" {
+            let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.path
+            if path == "/age_check/=/declared=yes/" || path == "/en/age_check/=/declared=yes/" {
                 guard authorizeAdultDeclaration, declared else { throw DMMRankingError.accessGate }
             }
             var request = URLRequest(url: url)

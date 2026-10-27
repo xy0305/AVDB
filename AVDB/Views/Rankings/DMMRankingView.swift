@@ -12,6 +12,15 @@ import UniformTypeIdentifiers
         guard let board = store.board else { return 1 }
         return max(1, (board.count + 19) / 20)
     }
+    private var sourceLabel: String {
+        switch store.fetchSource {
+        case .webView: return "页面渲染"
+        case .graphql: return "GraphQL"
+        case .direct: return "直连文档"
+        case .imported: return "用户导入"
+        case nil: return store.imported ? "用户导入" : "未加载"
+        }
+    }
     var body: some View {
         VStack(spacing: 8) {
             Picker("榜单", selection: Binding(get: { store.kind }, set: { store.select($0); page = 0 })) {
@@ -29,7 +38,8 @@ import UniformTypeIdentifiers
                 if !value { Task { await store.forgetSession() } }
             })).font(.caption).accessibilityIdentifier("dmm-adult-authorization")
             HStack {
-                Button("尝试直连") { Task { await store.refresh() } }
+                Button("刷新榜单") { Task { await store.refresh() } }
+                    .accessibilityIdentifier("dmm-refresh")
                 Button("导入HTML") { importing = true }.accessibilityIdentifier("dmm-import")
                 Link("正常访问来源", destination: store.kind.sourceURL)
             }.font(.caption)
@@ -38,7 +48,7 @@ import UniformTypeIdentifiers
                 HStack {
                     Button("上一页") { store.cancel(); page -= 1 }.disabled(page == 0)
                     Spacer()
-                    Text("\(page + 1) / \(pageCount) · \(store.imported ? "用户导入" : "本次直连")").font(.caption)
+                    Text("\(page + 1) / \(pageCount) · \(sourceLabel)").font(.caption)
                     Spacer()
                     Button("下一页") { store.cancel(); page += 1 }.disabled(page >= pageCount - 1)
                 }
@@ -50,7 +60,7 @@ import UniformTypeIdentifiers
                         .id("\(board.kind.rawValue)|\(board.observedAt.timeIntervalSince1970)|\(page)")
                 }
             } else {
-                ContentUnavailableView("来源访问受限", systemImage: "doc.badge.arrow.up", description: Text("未加载实时榜单。可导入合法取得的完整日/周/月作品榜或月间女优榜HTML；详情HTML需包含同CID的canonical及厂家品番表格。实时/系列尚未接入。"))
+                ContentUnavailableView("尚未加载榜单", systemImage: "arrow.clockwise", description: Text("开启成年授权后点「刷新榜单」：优先隐藏网页渲染，其次 GraphQL；仍失败可导入合法取得的完整日/周/月作品榜或月间女优榜HTML。实时/系列尚未接入。"))
             }
         }
         .padding(.horizontal)

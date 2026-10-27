@@ -76,6 +76,29 @@ final class DMMMockProtocol: URLProtocol, @unchecked Sendable {
         let confirmed = try DMMTransport.declaration(html: age, ageURL: ageURL)
         precondition(confirmed.absoluteString == yes)
         do { _ = try DMMTransport.declaration(html: age.replacingOccurrences(of: "www.dmm.co.jp", with: "evil.example"), ageURL: ageURL); preconditionFailure() } catch { }
-        print("PASS: production import daily/weekly/actress, bounded2, CID inflight dedup, cache, cancellation generation, manufacturer identity, official declaration link and cross-domain allowlist")
+        // Automatic refresh prefers GraphQL override when WebView unavailable (macOS harness).
+        let gqlStore = DMMRankingStore(transport: transport)
+        gqlStore.authorizeAdultDeclaration = true
+        gqlStore.hydrateOverride = { _, _ in throw DMMRankingError.accessGate }
+        gqlStore.graphqlOverride = { kind in
+            let name: String
+            switch kind {
+            case .daily: name = "graphql-daily-neutral.json"
+            case .weekly: name = "graphql-weekly-neutral.json"
+            case .monthly: name = "graphql-monthly-neutral.json"
+            case .actress: name = "graphql-actress-monthly-neutral.json"
+            }
+            return try DMMRankingGraphQL.board(data: try Data(contentsOf: base.appendingPathComponent(name)), kind: kind, observedAt: Date())
+        }
+        await gqlStore.refresh()
+        precondition(gqlStore.fetchSource == .graphql && gqlStore.board?.contentRows.count == 100 && gqlStore.kind == .weekly)
+        gqlStore.select(.actress)
+        await gqlStore.refresh()
+        precondition(gqlStore.fetchSource == .graphql && gqlStore.board?.actressRows.count == 100)
+        gqlStore.authorizeAdultDeclaration = false
+        await gqlStore.refresh()
+        precondition(gqlStore.board == nil)
+
+        print("PASS: production import daily/weekly/actress, GraphQL refresh override, bounded2, CID inflight dedup, cache, cancellation generation, manufacturer identity, official declaration link and cross-domain allowlist")
     }
 }
