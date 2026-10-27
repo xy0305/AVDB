@@ -32,6 +32,8 @@ final class DMMMockProtocol: URLProtocol, @unchecked Sendable {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [DMMMockProtocol.self]
         let transport = DMMTransport(session: URLSession(configuration: config))
         let store = DMMRankingStore(transport: transport)
+        // Keep HTML detail path for bounded mock transport (empty map ⇒ no makerContentId).
+        store.makerCodeOverride = { _ in [:] }
         try store.importHTML(weekly)
         precondition(store.imported && store.board?.contentRows.count == 100 && store.kind == .weekly)
         let rows = store.board!.contentRows
