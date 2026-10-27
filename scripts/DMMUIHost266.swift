@@ -31,8 +31,9 @@ enum ExternalActorResolver {
     struct Match { let actor: Actor }
     static func inspect(identity: ExternalActorIdentity, search: @escaping (String, Int) async throws -> [Actor]) async throws -> Resolution { .notFound }
 }
-enum JavDBSDK {
+final class JavDBSDK {
     static let shared = JavDBSDK()
+    private init() {}
     func searchActors(keyword: String, page: Int) async throws -> [Actor] { [] }
 }
 struct LiquidGlassBackground: View { var body: some View { Color.clear } }

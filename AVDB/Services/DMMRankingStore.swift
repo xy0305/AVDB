@@ -54,6 +54,7 @@ enum DMMRankingFetchSource: String, Sendable {
         cancel(); let epoch = generation
         let target = kind
         guard authorizeAdultDeclaration else {
+            board = nil; evidence.removeAll(); messages.removeAll(); imported = false; fetchSource = nil
             status = "请先开启成年自声明授权，才能自动刷新官方榜单。"
             return
         }
