@@ -154,7 +154,7 @@ struct ActorAvatarLookup: Sendable {
     private static var cache: [String: Cached] = [:]
     private static var order: [String] = []
     static let ttl: TimeInterval = 60 * 60 * 24 * 7
-    static let imageBase = "https://image.tmdb.org/t/p/w185"
+    static let imageBase = "https://image.tmdb.org/t/p/h632"
 
     static func resetCache() { cache.removeAll(); order.removeAll() }
 

@@ -17,6 +17,13 @@ for refresh in ['numbers.joined', 'worksChanged', 'revision += 1', 'ImageLoader.
  assert refresh in ui,refresh
 for safety in ['active >= 2','cache.count >= 120','600','86400','session.bytes(for:', 'http.statusCode == 200','httpShouldSetCookies = false','urlCredentialStorage = nil','768 * 1024','2 * 1024 * 1024','completionHandler(nil)', 'ActorAvatarRedirectPolicy', 'existingFailed', 'GfriendsPortraits', 'maxWorks = 6','Task.checkCancellation()']:
  assert safety in service,safety
+assert '1-FALENO' in service and '0-Hand-Storage' in service and '2-Juicy-Honey' in service
+assert 'y-Minnano' not in service and 'z-DMM' not in service and '9-Javrave' not in service
+assert 'select(index:' in service
+assert 'Walk curated agencies' in service
+resolver=read('AVDB/Services/ExternalActorResolver.swift')
+assert 'https://image.tmdb.org/t/p/h632' in resolver
+assert 'https://image.tmdb.org/t/p/w185' not in resolver
 if not shutil.which('swiftc'):
  print('PASS Swift source wiring/security checks; Swift runtime NOT RUN locally (requires macOS CI)');raise SystemExit(0)
 stubs='''

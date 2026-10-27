@@ -114,6 +114,16 @@ import ImageIO
         expect(GfriendsPortraits.select(rows,names:["中性演員"]) == nil,"portrait substring rejected")
         expect(GfriendsPortraits.select(["中性演員甲.jpg":"../evil.jpg?t=123"],names:["中性演員甲"]) == nil,"index path traversal rejected")
         expect(GfriendsPortraits.select(rows.merging(["別名.jpg":"other.jpg?t=123"]) { a,_ in a },names:["中性演員甲","別名"]) == nil,"two different alias images ambiguous")
+        expect(GfriendsPortraits.groups.contains("1-FALENO") && GfriendsPortraits.groups.contains("0-Hand-Storage"), "HQ agency collections registered")
+        expect(!GfriendsPortraits.groups.contains("y-Minnano") && !GfriendsPortraits.groups.contains("z-DMM(骑)"), "scraper jacket dumps stay excluded")
+        let faleno = GfriendsPortraits.select(["中性演員甲.jpg":"neutral.jpg?t=123"], names:["中性演員甲"], group:"1-FALENO")
+        expect(faleno?.path.contains("/Content/1-FALENO/") == true, "FALENO exact portrait path")
+        expect(GfriendsPortraits.select(["中性演員甲.jpg":"neutral.jpg?t=123"], names:["中性演員甲"], group:"y-Minnano") == nil, "non-curated group rejected")
+        let multi = GfriendsPortraits.select(index: ["6-Tpowers":[:], "1-FALENO":["中性演員甲.jpg":"faleno.jpg?t=9"]], names:["中性演員甲"])
+        expect(multi?.group == "1-FALENO" && multi?.url.path.hasSuffix("/faleno.jpg") == true, "priority walk uses first unique curated hit")
+        let prefer = GfriendsPortraits.select(index: ["6-Tpowers":["中性演員甲.jpg":"tp.jpg?t=1"], "1-FALENO":["中性演員甲.jpg":"fa.jpg?t=2"]], names:["中性演員甲"])
+        expect(prefer?.group == "6-Tpowers", "earlier curated agency wins over later")
+
         let chinese = try actor("alias-test", "池田萬裡奈")
         expect(JavBusActorService.names(chinese).contains("池田マリナ"), "real bundled verified Chinese/Japanese alias")
         JavBusActorService.reset()
@@ -143,7 +153,7 @@ import ImageIO
                 object["actorID"] = id; object["name"] = name; object["names"] = JavBusActorService.names(real); object["numbers"] = numbers
                 object["javbusLookup"] = try await JavBusActorService.lookup(actor:real,numbers:numbers) ?? ""
                 if let hit = try await GfriendsPortraits.lookup(names:JavBusActorService.names(real)), let src = CGImageSourceCreateWithData(hit.data as CFData,nil), let image = CGImageSourceCreateImageAtIndex(src,0,nil) {
-                    object["onlineSuccess"] = true;object["source"] = "Gfriends public 6-Tpowers agency portrait index";object["imageURL"] = hit.url; object["imageBytes"] = hit.data.count;object["imageSHA256"] = SHA256.hash(data:hit.data).map { String(format:"%02x",$0) }.joined();object["width"] = image.width;object["height"] = image.height
+                    object["onlineSuccess"] = true;object["source"] = "Gfriends curated agency portrait index"; object["gfriendsGroup"] = hit.group;object["imageURL"] = hit.url; object["imageBytes"] = hit.data.count;object["imageSHA256"] = SHA256.hash(data:hit.data).map { String(format:"%02x",$0) }.joined();object["width"] = image.width;object["height"] = image.height
                     try hit.data.write(to:URL(fileURLWithPath:"native-portrait252.jpg"))
                 }
             } catch { object["error"] = error.localizedDescription }

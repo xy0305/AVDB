@@ -70,7 +70,7 @@ class Alias243(unittest.TestCase):
         self.assertIn("hits.count == 1", resolver)
         self.assertIn(".missingKey", resolver)
         self.assertIn("Cancellation is intentionally not cached", resolver)
-        self.assertIn("https://image.tmdb.org/t/p/w185", resolver)
+        self.assertIn("https://image.tmdb.org/t/p/h632", resolver)
         self.assertIn("TMDBAvatarSettings.shared.currentKey()", resolver)
         self.assertNotIn("TMDB_API_KEY", resolver)
         self.assertIn("tmdb-avatar-settings-entry", (R / "AVDB/Views/User/UserView.swift").read_text())

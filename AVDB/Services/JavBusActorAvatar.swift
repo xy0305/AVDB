@@ -308,37 +308,65 @@ private final class AgencyPortraitDownload: NSObject, URLSessionDataDelegate, @u
 }
 
 @MainActor enum GfriendsPortraits {
-    struct Result { let url: String; let data: Data }
+    struct Result { let url: String; let data: Data; let group: String }
     nonisolated static let root = "https://raw.githubusercontent.com/gfriends/gfriends/master/"
+    /// Curated public agency / card portrait collections only. Wiki scrapes and
+    /// retail jacket dumps stay out of scope: lower fidelity and multi-person
+    /// wraps are not treated as single-person HQ portraits.
+    nonisolated static let groups: [String] = [
+        "6-Tpowers", "1-FALENO", "0-Hand-Storage", "2-Juicy-Honey", "3-MUTEKI",
+        "1-Diaz", "2-Dahlia", "3-Allpro", "3-Arrows", "3-Lovepop", "6-Capsule", "6-Mines",
+        "4-Kawaii", "5-Premium", "5-Ebody", "5-痴女天堂",
+        "7-S1", "7-Madonna", "7-Moodyz", "7-未満",
+        "8-Ideapocket", "8-GRAPHIS", "8-Honnaka", "8-KiraKira", "8-Bambi", "8-Cmore", "8-Digigra",
+        "v-Prestige", "v-Attackers", "v-Fitch", "v-桃太郎",
+        "w-OPPAI", "w-えむっ娘ラボ",
+        "x-BeFree", "x-DAS", "x-WANZ", "x-KMP", "x-溜池ゴロー",
+        "2-Nanairo", "y-Attractive",
+    ]
+    /// Compatibility alias for older probes that named only the first agency.
     nonisolated static let group = "6-Tpowers"
     private(set) static var diagnostics: [String:String] = [:]
-    private static var index: [String:String]?
+    private static var index: [String: [String: String]]?
     private static var expiry = Date.distantPast
     private static var busy = false
     private static var epoch = 0
     private static var cache: [String:(Result?,Date)] = [:]
-    static func reset() { epoch += 1; index = nil; expiry = .distantPast; cache.removeAll() }
+    static func reset() { epoch += 1; index = nil; expiry = .distantPast; cache.removeAll(); diagnostics.removeAll() }
+    nonisolated static func allowedGroup(_ name: String) -> Bool { groups.contains(name) }
     static func allowed(_ url: URL) -> Bool {
         guard url.scheme == "https", url.host == "raw.githubusercontent.com", url.port == nil,
               url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else { return false }
         let path = url.path
         if path == "/gfriends/gfriends/master/Filetree.json" { return true }
-        let prefix = "/gfriends/gfriends/master/Content/" + group + "/"
-        guard path.hasPrefix(prefix) else { return false }
-        let file = String(path.dropFirst(prefix.count))
+        let rootPrefix = "/gfriends/gfriends/master/Content/"
+        guard path.hasPrefix(rootPrefix) else { return false }
+        let rest = String(path.dropFirst(rootPrefix.count))
+        guard let slash = rest.firstIndex(of: "/") else { return false }
+        let groupName = String(rest[..<slash])
+        guard allowedGroup(groupName) else { return false }
+        let file = String(rest[rest.index(after: slash)...])
         return file.count < 180 && !file.contains("/") && !file.contains("\\") && !file.contains("..") && !file.contains("%") && !file.contains("?") && !file.contains("#") && !file.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) && file.lowercased().hasSuffix(".jpg")
     }
-    nonisolated static func parse(_ data: Data) throws -> [String:String] {
+    nonisolated static func parse(_ data: Data) throws -> [String: [String: String]] {
         try Task.checkCancellation()
         guard data.count <= 8 * 1024 * 1024,
               let object = try JSONSerialization.jsonObject(with: data) as? [String:Any],
-              let content = object["Content"] as? [String:Any], let rows = content[group] as? [String:String], rows.count <= 5000 else { return [:] }
-        return rows
+              let content = object["Content"] as? [String:Any] else { return [:] }
+        var result: [String: [String: String]] = [:]
+        for group in groups {
+            try Task.checkCancellation()
+            guard let rows = content[group] as? [String:String], !rows.isEmpty, rows.count <= 25000 else { continue }
+            result[group] = rows
+        }
+        return result
     }
-    static func select(_ rows: [String:String], names: [String]) -> URL? {
+    /// Single-collection exact match. Conflicting alias targets inside one group stay rejected.
+    static func select(_ rows: [String:String], names: [String], group: String = "6-Tpowers") -> URL? {
+        guard allowedGroup(group) else { return nil }
         let wanted = Set(names.map(ActorNameNormalizer.key).filter { !$0.isEmpty })
         var hits = Set<URL>()
-        for (name,value) in rows {
+        for (name, value) in rows {
             guard name.lowercased().hasSuffix(".jpg"), wanted.contains(ActorNameNormalizer.key(String(name.dropLast(4)))) else { continue }
             let pieces = value.components(separatedBy: "?t=")
             guard pieces.count == 2, !pieces[1].isEmpty, pieces[1].allSatisfy(\.isNumber) else { continue }
@@ -347,6 +375,15 @@ private final class AgencyPortraitDownload: NSObject, URLSessionDataDelegate, @u
             if allowed(url) { hits.insert(url) }
         }
         return hits.count == 1 ? hits.first : nil
+    }
+    /// Walk curated agencies in priority order; first group with a unique exact hit wins.
+    /// Cross-group duplicates never auto-merge; later agencies are not consulted after a hit.
+    static func select(index: [String: [String: String]], names: [String]) -> (url: URL, group: String)? {
+        for group in groups {
+            guard let rows = index[group], let url = select(rows, names: names, group: group) else { continue }
+            return (url, group)
+        }
+        return nil
     }
     private static func download(_ url: URL, image: Bool) async throws -> Data? {
         guard allowed(url) else { return nil }
@@ -382,25 +419,29 @@ private final class AgencyPortraitDownload: NSObject, URLSessionDataDelegate, @u
         let key = names.map(ActorNameNormalizer.key).sorted().joined(separator:"|")
         if let hit = cache[key], hit.1 > Date() { return hit.0 }
         if expiry < Date() {
-            let rows: [String:String]
+            let rows: [String: [String: String]]
             if let data = try? await download(URL(string:root+"Filetree.json")!,image:false) {
                 let parser = Task.detached(priority: .utility) { try parse(data) }
                 rows = try await withTaskCancellationHandler(operation: { try await parser.value }, onCancel: { parser.cancel() })
             } else { rows = [:] }
             try Task.checkCancellation()
             guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
-            diagnostics["indexedRows"] = String(rows.count)
+            diagnostics["indexedGroups"] = String(rows.count)
+            diagnostics["indexedRows"] = String(rows.values.reduce(0) { $0 + $1.count })
             index = rows
             expiry = Date().addingTimeInterval(rows.isEmpty ? 600 : 86400)
         }
         try Task.checkCancellation()
         guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
-        var result:Result?
-        if let index, let url = select(index,names:names), let data = try? await download(url,image:true) { result = Result(url:url.absoluteString,data:data) }
+        var result: Result?
+        if let index, let hit = select(index: index, names: names), let data = try? await download(hit.url, image: true) {
+            diagnostics["selectedGroup"] = hit.group
+            result = Result(url: hit.url.absoluteString, data: data, group: hit.group)
+        }
         try Task.checkCancellation()
         guard starting == epoch, scope == JavBusActorService.currentScope else { throw CancellationError() }
         if cache.count >= 60 { cache.removeAll() }
-        cache[key] = (result,Date().addingTimeInterval(result == nil ? 600 : 86400))
+        cache[key] = (result, Date().addingTimeInterval(result == nil ? 600 : 86400))
         return result
     }
 }

@@ -10,7 +10,7 @@ let names = ["中性演员甲", "Neutral Actor A"]
 let unique = [TMDBPerson(id: 7, name: "Neutral Actor A", alsoKnownAs: ["中性演员甲"], gender: 1, profilePath: "/neutral.png")]
 let selected = TMDBPersonSelector.select(unique, names: names)
 precondition(selected.status == .matched && selected.personID == 7)
-precondition(selected.url == "https://image.tmdb.org/t/p/w185/neutral.png")
+precondition(selected.url == "https://image.tmdb.org/t/p/h632/neutral.png")
 let many = unique + [TMDBPerson(id: 8, name: "中性演员甲", alsoKnownAs: [], gender: nil, profilePath: "/other.png")]
 precondition(TMDBPersonSelector.select(many, names: names).status == .ambiguous)
 let noPath = [TMDBPerson(id: 9, name: "中性演员甲", alsoKnownAs: [], gender: 0, profilePath: nil)]
@@ -38,7 +38,7 @@ precondition(first.status == .notFound && second.status == .notFound && calls ==
 ActorAvatarFallback.resetCache()
 let cancelled = await ActorAvatarFallback.resolve(actor: missing, names: names) { _ in throw CancellationError() }
 let afterCancel = await ActorAvatarFallback.resolve(actor: missing, names: names) { _ in
-    ActorAvatarLookup(status: .matched, url: "https://image.tmdb.org/t/p/w185/neutral.png", personID: 7)
+    ActorAvatarLookup(status: .matched, url: "https://image.tmdb.org/t/p/h632/neutral.png", personID: 7)
 }
 precondition(cancelled.status == .cancelled && afterCancel.status == .matched, "cancellation is not cached")
 let missingKey = try await TMDBPersonClient.search(names: names, apiKey: nil)
