@@ -53,6 +53,10 @@ final class DMMAgeMock: URLProtocol, @unchecked Sendable {
             precondition(DMMAgeMock.paths.count <= 8)
             precondition(!DMMAgeMock.paths.contains("/login/"))
         }
+                for kind in [URL(string: "https://video.dmm.co.jp/av/ranking/?term=daily")!, URL(string: "https://video.dmm.co.jp/av/ranking/?term=monthly")!, URL(string: "https://video.dmm.co.jp/av/ranking/?term=monthly&type=actress")!] {
+            precondition(DMMTransport.allowed(kind))
+        }
+        precondition(!DMMTransport.allowed(URL(string: "https://video.dmm.co.jp/av/ranking/?term=weekly&type=actress")!))
         print("PASS official GET self-declaration runtime: consent, Set-Cookie, reuse, revocation, bounded redirects, cross-host rejection, no credentials")
     }
 }

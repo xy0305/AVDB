@@ -3,7 +3,7 @@ final class DMMUITests266: XCTestCase {
     func testImportedWeeklyRankAndExactDetailBoundary() {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.staticTexts["周榜 · 100榜位 · 统计起止未知"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["週間 · 100榜位 · 统计起止未知"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["dmm-source-status"].label.contains("用户导入100"))
         XCTAssertTrue(app.buttons["精确核对AVDB"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["精确核对AVDB"].firstMatch.tap()

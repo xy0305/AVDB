@@ -1,7 +1,7 @@
 name: DMM native preview 266
 on:
   push:
-    branches: [feat/dmm-ranking-from261]
+    branches: [feat/dmm-ranking-from261, feat/dmm-ranking-terms-from266]
   workflow_dispatch:
 permissions:
   contents: read

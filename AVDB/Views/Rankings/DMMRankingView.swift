@@ -8,9 +8,20 @@ import UniformTypeIdentifiers
     @State private var importError: String?
     @AppStorage("dmm.authorizedAdultDeclaration") private var adultAuthorization = false
     @State private var page = 0
+    private var pageCount: Int {
+        guard let board = store.board else { return 1 }
+        return max(1, (board.count + 19) / 20)
+    }
     var body: some View {
         VStack(spacing: 8) {
-            Text("周榜 · 100榜位 · 统计起止未知").font(.headline)
+            Picker("榜单", selection: Binding(get: { store.kind }, set: { store.select($0); page = 0 })) {
+                ForEach(DMMRankingKind.allCases) { kind in
+                    Text(kind.periodLabel).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("dmm-kind-picker")
+            Text("\(store.kind.periodLabel) · \(store.kind.expectedCount)榜位 · 统计起止未知").font(.headline)
             Text(store.status).font(.footnote).foregroundStyle(.secondary)
                 .accessibilityIdentifier("dmm-source-status")
             Toggle("我已满18岁，授权按官方自声明并记住选择", isOn: Binding(get: { adultAuthorization }, set: { value in
@@ -20,26 +31,31 @@ import UniformTypeIdentifiers
             HStack {
                 Button("尝试直连") { Task { await store.refresh() } }
                 Button("导入HTML") { importing = true }.accessibilityIdentifier("dmm-import")
-                Link("正常访问来源", destination: DMMRankingStore.weeklyURL)
+                Link("正常访问来源", destination: store.kind.sourceURL)
             }.font(.caption)
             if let importError { Text(importError).font(.caption).foregroundStyle(.red) }
             if let board = store.board {
                 HStack {
                     Button("上一页") { store.cancel(); page -= 1 }.disabled(page == 0)
                     Spacer()
-                    Text("\(page + 1) / 5 · \(store.imported ? "用户导入" : "本次直连")").font(.caption)
+                    Text("\(page + 1) / \(pageCount) · \(store.imported ? "用户导入" : "本次直连")").font(.caption)
                     Spacer()
-                    Button("下一页") { store.cancel(); page += 1 }.disabled(page == 4)
+                    Button("下一页") { store.cancel(); page += 1 }.disabled(page >= pageCount - 1)
                 }
-                DMMRankingPage(store: store, rows: Array(board.rows.dropFirst(page * 20).prefix(20)))
-                    .id("\(board.observedAt.timeIntervalSince1970)|\(page)")
+                if board.kind.isActress {
+                    DMMActressRankingPage(rows: Array(board.actressRows.dropFirst(page * 20).prefix(20)))
+                        .id("\(board.kind.rawValue)|\(board.observedAt.timeIntervalSince1970)|\(page)")
+                } else {
+                    DMMRankingPage(store: store, rows: Array(board.contentRows.dropFirst(page * 20).prefix(20)), kind: board.kind)
+                        .id("\(board.kind.rawValue)|\(board.observedAt.timeIntervalSince1970)|\(page)")
+                }
             } else {
-                ContentUnavailableView("来源访问受限", systemImage: "doc.badge.arrow.up", description: Text("未加载实时榜单。可导入合法取得的完整周榜HTML；详情HTML需包含同CID的canonical及厂家品番表格。日/月/实时/女优/系列尚未接入。"))
+                ContentUnavailableView("来源访问受限", systemImage: "doc.badge.arrow.up", description: Text("未加载实时榜单。可导入合法取得的完整日/周/月作品榜或月间女优榜HTML；详情HTML需包含同CID的canonical及厂家品番表格。实时/系列尚未接入。"))
             }
         }
         .padding(.horizontal)
         .background { LiquidGlassBackground() }
-        .navigationTitle("DMM 周榜 · Preview")
+        .navigationTitle("DMM 榜单 · Preview")
         .fileImporter(isPresented: $importing, allowedContentTypes: [.html], allowsMultipleSelection: true) { result in
             do {
                 let urls = try result.get()
@@ -49,7 +65,7 @@ import UniformTypeIdentifiers
                     try store.importHTML(Data(contentsOf: url))
                 }
                 page = 0; importError = nil
-            } catch { importError = "未导入：需要完整100榜位，或具有唯一canonical、同CID配信品番和唯一厂家品番的详情HTML。" }
+            } catch { importError = "未导入：需要完整日榜20/周月榜100/女优榜100，或具有唯一canonical、同CID配信品番和唯一厂家品番的详情HTML。" }
         }
         .onDisappear { store.cancel() }
     }
@@ -58,9 +74,14 @@ import UniformTypeIdentifiers
 @MainActor private struct DMMRankingPage: View {
     @ObservedObject var store: DMMRankingStore
     @State private var manualSearch = false
-    let rows: [DMMRankingRow]
-    @StateObject private var mapper = JavVerseMapper(scope: "dmm|weekly|manufacturer-verified")
-    private func entry(_ row: DMMRankingRow) -> JavVerseEntry? {
+    let rows: [DMMContentRow]
+    let kind: DMMRankingKind
+    @StateObject private var mapper: JavVerseMapper
+    init(store: DMMRankingStore, rows: [DMMContentRow], kind: DMMRankingKind) {
+        self.store = store; self.rows = rows; self.kind = kind
+        _mapper = StateObject(wrappedValue: JavVerseMapper(scope: "dmm|\(kind.rawValue)|manufacturer-verified"))
+    }
+    private func entry(_ row: DMMContentRow) -> JavVerseEntry? {
         guard let item = store.evidence[row.cid], item.cid == row.cid else { return nil }
         return JavVerseEntry(rank: row.rank, kind: "movie", label: item.code, sourceURL: row.sourceURL.absoluteString, code: item.code)
     }
@@ -91,6 +112,94 @@ import UniformTypeIdentifiers
                     Text(store.messages[row.cid] ?? "按需核对，不从CID推号").font(.caption)
                     Button("获取 / 重试详情") { store.request(row) }
                 }
+                Button("手动搜索核对（不自动认领）") { manualSearch = true }.font(.caption)
+            }.padding(.vertical, 4)
+        }.listStyle(.plain)
+        .buttonStyle(.borderless)
+        .navigationDestination(isPresented: $manualSearch) { SearchView() }
+        .onDisappear { mapper.cancel() }
+    }
+}
+
+@MainActor private final class DMMActressMapper: ObservableObject {
+    @Published var actors: [String: Actor] = [:]
+    @Published var candidates: [String: [Actor]] = [:]
+    @Published var messages: [String: String] = [:]
+    @Published var busy = false
+    private var tasks: [String: Task<Void, Never>] = [:]
+    func cancel() { tasks.values.forEach { $0.cancel() }; tasks.removeAll() }
+    func resolve(_ row: DMMActressRow, retry: Bool = false) {
+        let key = row.actressID
+        if !retry, actors[key] != nil || tasks[key] != nil { return }
+        tasks[key]?.cancel()
+        busy = true
+        messages[key] = "正在精确核对AVDB演员…"
+        tasks[key] = Task { [weak self] in
+            guard let self else { return }
+            defer { Task { @MainActor in self.tasks.removeValue(forKey: key); self.busy = !self.tasks.isEmpty } }
+            do {
+                let identity = ExternalActorIdentity.resolve(sourceName: row.name, aliases: [], catalog: .bundled())
+                let resolution = try await ExternalActorResolver.inspect(identity: identity, search: { keyword, page in
+                    try await JavDBSDK.shared.searchActors(keyword: keyword, page: page)
+                })
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    switch resolution {
+                    case .matched(let match):
+                        self.actors[key] = match.actor
+                        self.candidates[key] = []
+                        self.messages[key] = "AVDB 演员精确匹配"
+                    case .notFound:
+                        self.actors.removeValue(forKey: key)
+                        self.candidates[key] = []
+                        self.messages[key] = "未匹配唯一AVDB演员 · 保留源榜位；不发明演员ID"
+                    case .ambiguous(let list):
+                        self.actors.removeValue(forKey: key)
+                        self.candidates[key] = list
+                        self.messages[key] = "多个精确姓名候选，待手动确认"
+                    case .incomplete(let list, _):
+                        self.actors.removeValue(forKey: key)
+                        self.candidates[key] = list
+                        self.messages[key] = "查询未完成 · 待手动核对；不发明演员ID"
+                    }
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self.messages[key] = "演员核对失败 · 可重试；不发明演员ID"
+                }
+            }
+        }
+    }
+}
+
+@MainActor private struct DMMActressRankingPage: View {
+    let rows: [DMMActressRow]
+    @StateObject private var mapper = DMMActressMapper()
+    @State private var manualSearch = false
+    var body: some View {
+        List(rows) { row in
+            VStack(alignment: .leading, spacing: 6) {
+                Text("#\(row.rank) · DMM女優 · \(row.actressID)").font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("dmm-actress-rank-\(row.rank)")
+                Text(row.name).font(.headline)
+                if let actor = mapper.actors[row.actressID] {
+                    NavigationLink { ActorDetailView(actorID: actor.id) } label: {
+                        Text(actor.displayName)
+                    }.accessibilityIdentifier("dmm-actress-\(row.rank)")
+                } else if let choices = mapper.candidates[row.actressID], !choices.isEmpty {
+                    Text(mapper.messages[row.actressID] ?? "候选待确认").font(.caption)
+                    ForEach(choices.prefix(5), id: \.id) { actor in
+                        NavigationLink { ActorDetailView(actorID: actor.id) } label: {
+                            Text(actor.displayName).font(.caption)
+                        }
+                    }
+                } else {
+                    Text(mapper.messages[row.actressID] ?? "未匹配 · 保留源榜位；按姓名精确核对，不发明演员ID").font(.caption)
+                    Button("精确核对AVDB演员") { mapper.resolve(row, retry: true) }
+                        .disabled(mapper.busy)
+                }
+                Link("来源女优列表", destination: row.sourceURL).font(.caption)
                 Button("手动搜索核对（不自动认领）") { manualSearch = true }.font(.caption)
             }.padding(.vertical, 4)
         }.listStyle(.plain)

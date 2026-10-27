@@ -21,9 +21,13 @@ actor DMMTransport {
         guard url.scheme == "https", url.user == nil, url.password == nil, url.port == nil,
               let c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
         if url.host == "video.dmm.co.jp" {
-            if c.path == "/av/ranking/" { return c.queryItems == [URLQueryItem(name: "term", value: "weekly")] }
+            if c.path == "/av/ranking/" { return DMMRankingKind.from(url: url) != nil }
             if c.path == "/av/content/", let q = c.queryItems, q.count == 1, q[0].name == "id", let id = q[0].value {
                 return id.count <= 100 && id.range(of: "^[a-z0-9_]+$", options: .regularExpression) != nil
+            }
+            // Actress destination from ranking cards; single numeric actress filter only.
+            if c.path == "/av/list/", let q = c.queryItems, q.count == 1, q[0].name == "actress", let id = q[0].value {
+                return id.count <= 20 && id.range(of: "^[0-9]+$", options: .regularExpression) != nil
             }
         }
         if url.host == "www.dmm.co.jp", ["/age_check/=/", "/age_check/=/declared=yes/"].contains(c.path),

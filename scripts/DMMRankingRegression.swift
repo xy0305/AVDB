@@ -4,18 +4,53 @@ import Foundation
     static func main() throws {
         let base = URL(fileURLWithPath: CommandLine.arguments[1])
         func read(_ name: String) throws -> String { try String(contentsOf: base.appendingPathComponent(name), encoding: .utf8) }
-        let weeklyURL = URL(string: "https://video.dmm.co.jp/av/ranking/?term=weekly")!
-        let html = try read("weekly-neutral.html")
-        let board = try DMMRankingCore.weekly(html: html, responseURL: weeklyURL, observedAt: Date(timeIntervalSince1970: 0))
-        precondition(board.rows.count == 100 && board.rows.last?.rank == 100)
-        precondition(board.periodStart == nil && board.periodEnd == nil)
         func fails(_ expected: DMMRankingError, _ action: () throws -> Void) {
             do { try action(); preconditionFailure("Expected rejection") }
-            catch { precondition(error as? DMMRankingError == expected) }
+            catch { precondition(error as? DMMRankingError == expected, "got \(error)") }
         }
-        fails(.incomplete) { _ = try DMMRankingCore.weekly(html: html.replacingOccurrences(of: "100位", with: "99位"), responseURL: weeklyURL, observedAt: Date()) }
-        fails(.unsupportedURL) { _ = try DMMRankingCore.weekly(html: html, responseURL: URL(string: "https://video.dmm.co.jp/av/ranking/?term=weekly&page=2")!, observedAt: Date()) }
-        fails(.accessGate) { _ = try DMMRankingCore.weekly(html: "", responseURL: URL(string: "https://www.dmm.co.jp/age_check/=/")!, observedAt: Date()) }
+
+        // Content: daily 20 / weekly 100 / monthly 100
+        for (file, kind) in [("daily-neutral.html", DMMRankingKind.daily), ("weekly-neutral.html", .weekly), ("monthly-neutral.html", .monthly)] {
+            let url = kind.sourceURL
+            let html = try read(file)
+            let board = try DMMRankingCore.board(html: html, responseURL: url, observedAt: Date(timeIntervalSince1970: 0))
+            precondition(board.kind == kind)
+            precondition(board.contentRows.count == kind.expectedCount)
+            precondition(board.contentRows.map(\.rank) == Array(1...kind.expectedCount))
+            precondition(board.actressRows.isEmpty)
+            precondition(board.periodStart == nil && board.periodEnd == nil)
+            fails(.incomplete) {
+                let broken = html.replacingOccurrences(of: "\(kind.expectedCount)位", with: "\(kind.expectedCount - 1)位")
+                _ = try DMMRankingCore.board(html: broken, responseURL: url, observedAt: Date())
+            }
+            fails(.unsupportedURL) {
+                _ = try DMMRankingCore.board(html: html, responseURL: URL(string: url.absoluteString + "&page=2")!, observedAt: Date())
+            }
+        }
+
+        // Actress monthly-only board: 100 numeric actress ids + names; no invented AVDB ids.
+        let actressURL = DMMRankingKind.actress.sourceURL
+        let actressHTML = try read("actress-monthly-neutral.html")
+        let actress = try DMMRankingCore.board(html: actressHTML, responseURL: actressURL, observedAt: Date(timeIntervalSince1970: 0))
+        precondition(actress.kind == .actress)
+        precondition(actress.actressRows.count == 100 && actress.contentRows.isEmpty)
+        precondition(actress.actressRows.first?.actressID == "900001")
+        precondition(actress.actressRows.first?.name == "Neutral Actress 1")
+        precondition(actress.actressRows.last?.rank == 100)
+        fails(.incomplete) {
+            // Real DOM is "100</span>位"; drop the last card entirely to violate 1...100 continuum.
+            let truncated = actressHTML.replacingOccurrences(of: "Neutral Actress 100", with: "")
+                .replacingOccurrences(of: "actress=900100", with: "actress=900099")
+            _ = try DMMRankingCore.board(html: truncated, responseURL: actressURL, observedAt: Date())
+        }
+        fails(.unsupportedURL) {
+            // Actress boards are monthly-only in official routing.
+            _ = try DMMRankingCore.board(html: actressHTML, responseURL: URL(string: "https://video.dmm.co.jp/av/ranking/?term=weekly&type=actress")!, observedAt: Date())
+        }
+        fails(.accessGate) { _ = try DMMRankingCore.board(html: "", responseURL: URL(string: "https://www.dmm.co.jp/age_check/=/")!, observedAt: Date()) }
+
+        let weeklyURL = DMMRankingKind.weekly.sourceURL
+        let weeklyHTML = try read("weekly-neutral.html")
         for (cid, code) in [("ssis00760", "SSIS-760"), ("1sdnm00554", "SDNM-554"), ("h_1758jjgg00009", "JJGG-009"), ("snos00489", "SNOS-489")] {
             let source = URL(string: "https://video.dmm.co.jp/av/content/?id=\(cid)")!
             let detail = try read("detail-\(cid).html")
@@ -25,9 +60,15 @@ import Foundation
             fails(.conflictingIdentity) { _ = try DMMRankingCore.manufacturer(html: detail + "<tr><th>メーカー品番</th><td>OTHER-999</td></tr>", responseURL: source, expectedCID: cid) }
         }
         // Same CID at another real rank must remain a separate source row; no dedup by work/version.
-        let duplicates = html.replacingOccurrences(of: "sone00269", with: "mfyd00204")
-        let duplicateBoard = try DMMRankingCore.weekly(html: duplicates, responseURL: weeklyURL, observedAt: Date())
-        precondition(duplicateBoard.rows.count == 100)
-        print("PASS: full ranking, period unknown, gates, unsupported paging, four authoritative manufacturer examples, conflicts, duplicate source rows")
+        let duplicates = weeklyHTML.replacingOccurrences(of: "sone00269", with: "mfyd00204")
+        let duplicateBoard = try DMMRankingCore.board(html: duplicates, responseURL: weeklyURL, observedAt: Date())
+        precondition(duplicateBoard.contentRows.count == 100)
+
+        // Kind URL recognition
+        precondition(DMMRankingKind.from(url: DMMRankingKind.daily.sourceURL) == .daily)
+        precondition(DMMRankingKind.from(url: DMMRankingKind.actress.sourceURL) == .actress)
+        precondition(DMMRankingKind.from(url: URL(string: "https://video.dmm.co.jp/av/ranking/?term=realtime")!) == nil)
+
+        print("PASS: daily20/weekly100/monthly100 content, actress100 monthly-only, period unknown, gates, unsupported paging/terms, manufacturer examples, conflicts, duplicate source rows")
     }
 }

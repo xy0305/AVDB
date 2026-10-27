@@ -242,7 +242,7 @@ struct RankingsView: View {
                 .accessibilityIdentifier("javranking-topics-shortcut")
             }
             Section("DMM") {
-                Button { sourceDestination = .dmm } label: { Label("周榜100 · 导入 / 受限预览", systemImage: "list.number") }
+                Button { sourceDestination = .dmm } label: { Label("日/周/月/女优 · 导入 / 受限预览", systemImage: "list.number") }
                     .accessibilityIdentifier("dmm-ranking-entry")
             }
             Section("JavVerse") {

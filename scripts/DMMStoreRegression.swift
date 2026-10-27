@@ -27,20 +27,20 @@ final class DMMMockProtocol: URLProtocol, @unchecked Sendable {
     @MainActor static func main() async throws {
         let base = URL(fileURLWithPath: CommandLine.arguments[1])
         let weekly = try Data(contentsOf: base.appendingPathComponent("weekly-neutral.html"))
+        let daily = try Data(contentsOf: base.appendingPathComponent("daily-neutral.html"))
+        let actress = try Data(contentsOf: base.appendingPathComponent("actress-monthly-neutral.html"))
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [DMMMockProtocol.self]
         let transport = DMMTransport(session: URLSession(configuration: config))
         let store = DMMRankingStore(transport: transport)
         try store.importHTML(weekly)
-        precondition(store.imported && store.board?.rows.count == 100)
-        let rows = store.board!.rows
+        precondition(store.imported && store.board?.contentRows.count == 100 && store.kind == .weekly)
+        let rows = store.board!.contentRows
         for row in rows.prefix(12) { store.request(row); store.request(row) }
         for _ in 0..<100 where store.evidence.count < 12 { try await Task.sleep(nanoseconds: 20_000_000) }
         precondition(store.evidence.count == 12)
         precondition(DMMMockProtocol.peak <= 2 && DMMMockProtocol.calls == 12)
-        // Imported new snapshot resets UI evidence, but public successful CID metadata cache is reusable.
         try store.importHTML(weekly); store.request(rows[0]); precondition(store.evidence[rows[0].cid] != nil)
         precondition(DMMMockProtocol.calls == 12)
-        // Cancel generation: no late evidence may reappear.
         try store.importHTML(weekly); store.request(rows[20]); store.request(rows[21]); store.cancel()
         try await Task.sleep(nanoseconds: 150_000_000)
         precondition(store.evidence.isEmpty)
@@ -52,10 +52,22 @@ final class DMMMockProtocol: URLProtocol, @unchecked Sendable {
             do { try store.importHTML(Data((canonical + detail + "<tr><th>メーカー品番</th><td>NO-001</td></tr>").utf8)); preconditionFailure() } catch { }
             precondition(store.evidence[cid]?.code == "SNOS-489")
         }
-        for bad in ["http://video.dmm.co.jp/av/ranking/?term=weekly", "https://evil.example/", "https://video.dmm.co.jp.evil.example/av/ranking/?term=weekly", "https://accounts.dmm.co.jp/", "https://www.dmm.co.jp/age_check/=/declared=yes/?rurl=https%3A%2F%2Fevil.example"] {
+        // Term switching + daily / actress imports
+        store.select(.daily)
+        precondition(store.board == nil)
+        try store.importHTML(daily)
+        precondition(store.kind == .daily && store.board?.contentRows.count == 20)
+        try store.importHTML(actress)
+        precondition(store.kind == .actress && store.board?.actressRows.count == 100)
+
+        for bad in ["http://video.dmm.co.jp/av/ranking/?term=weekly", "https://evil.example/", "https://video.dmm.co.jp.evil.example/av/ranking/?term=weekly", "https://accounts.dmm.co.jp/", "https://www.dmm.co.jp/age_check/=/declared=yes/?rurl=https%3A%2F%2Fevil.example", "https://video.dmm.co.jp/av/ranking/?term=weekly&type=actress"] {
             precondition(!DMMTransport.allowed(URL(string: bad)!))
         }
-        let returnURL = "https%3A%2F%2Fvideo.dmm.co.jp%2Fav%2Franking%2F%3Fterm%3Dweekly"
+        for kind in DMMRankingKind.allCases {
+            precondition(DMMTransport.allowed(kind.sourceURL))
+        }
+        precondition(DMMTransport.allowed(URL(string: "https://video.dmm.co.jp/av/list/?actress=900001")!))
+        let returnURL = "https%3A%2F%2Fvideo.dmm.co.jp%2Fav%2Franking%2F%3Fterm%3Dmonthly%26type%3Dactress"
         let ageURL = URL(string: "https://www.dmm.co.jp/age_check/=/?rurl=" + returnURL)!
         let yes = "https://www.dmm.co.jp/age_check/=/declared=yes/?rurl=" + returnURL
         let object: [String: Any] = ["props": ["pageProps": ["yesButtonLink": yes]]]
@@ -64,6 +76,6 @@ final class DMMMockProtocol: URLProtocol, @unchecked Sendable {
         let confirmed = try DMMTransport.declaration(html: age, ageURL: ageURL)
         precondition(confirmed.absoluteString == yes)
         do { _ = try DMMTransport.declaration(html: age.replacingOccurrences(of: "www.dmm.co.jp", with: "evil.example"), ageURL: ageURL); preconditionFailure() } catch { }
-        print("PASS: production import100, bounded2, CID inflight dedup, cache, cancellation generation, manufacturer identity, official declaration link and cross-domain allowlist")
+        print("PASS: production import daily/weekly/actress, bounded2, CID inflight dedup, cache, cancellation generation, manufacturer identity, official declaration link and cross-domain allowlist")
     }
 }
