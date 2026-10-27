@@ -78,7 +78,7 @@ enum OneTwoThreeAVAdapter {
     static func stream(_ data:Data) throws -> URL {
         guard let obj=try? JSONSerialization.jsonObject(with:data) as? [String:Any],obj["status"] as? String == "ok",
               let media=obj["media"] as? [String:Any],let raw=media["stream"] as? String,
-              let url=URL(string:raw),OnlinePolicy.media(url,source:.av123) else { throw OnlineFailure.incomplete }
+              let url=URL(string:raw),OnlinePolicy.discoveredMedia(url,source:.av123) else { throw OnlineFailure.incomplete }
         return url
     }
 }

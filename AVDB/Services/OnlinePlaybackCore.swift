@@ -184,7 +184,10 @@ enum OnlinePolicy {
         guard secure(url), url.path.hasSuffix(".m3u8"), !url.path.contains("..") else { return false }
         switch source {
         case .memojav: return url.host == "video10.memojav.net" && url.path.hasPrefix("/stream/")
-        case .av123: return url.host == "jzxz.freeboldspirit.site" && url.path.hasPrefix("/oo5/")
+        // 123AV HLS edge hosts rotate per title (observed freeboldspirit / cleartruevision /
+        // deeptrueforce / grayson-store, …). Do not pin a single host here; stream-issued
+        // /oo5/*.m3u8 is accepted via discoveredMedia after sadie-shop.site /stream.
+        case .av123: return false
         default: return false
         }
     }
@@ -195,6 +198,9 @@ enum OnlinePolicy {
         if source == .missav { return url.host?.hasPrefix("surrit.") == true }
         // JavDay page issues HTTPS playlists on javday.homes (edge hosts under the same apex).
         if source == .javday { return javdayCDN(url.host) }
+        // 123AV: exact /oo5/ playlist path issued by approved sadie-shop.site /stream JSON.
+        // Hostnames rotate; children stay bound to the issued origin via OnlineMediaScope.
+        if source == .av123 { return url.path.hasPrefix("/oo5/") }
         return media(url,source:source)
     }
     static func headers(referrer:URL, source: OnlineSource? = nil) -> [String:String] {

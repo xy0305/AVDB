@@ -70,7 +70,18 @@ actor OnlineLog254 {
         check(OnlineMediaScope.publicAddress("8.8.8.8"),"public address")
         for u in ["http://jable.tv/videos/demo-123/","https://jable.tv.evil.net/videos/demo-123/","https://u:p@jable.tv/videos/demo-123/","https://127.0.0.1/video/DEMO-123","https://jable.tv:444/videos/demo-123/"] { check(!OnlinePolicy.metadata(URL(string:u)!,source:.jable),"unsafe metadata") }
         check(!OnlinePolicy.embed(URL(string:"https://unknown.site/e/Neutral1")!),"unknown embed does not widen hosts")
+        // Stream-issued /oo5/ hosts rotate; accept shape via discoveredMedia, not a fixed allowlist.
+        for host in ["jzxz.freeboldspirit.site","85kq.cleartruevision.site","8vpr.deeptrueforce.site","jmv1.grayson-store.site"] {
+            let issued=URL(string:"https://"+host+"/oo5/neutral/video.m3u8")!
+            check(OnlinePolicy.discoveredMedia(issued,source:.av123),"stream-issued /oo5/ accepted for "+host)
+            check(!OnlinePolicy.media(issued,source:.av123),"unscoped media allowlist stays closed for rotating "+host)
+        }
+        check(!OnlinePolicy.discoveredMedia(URL(string:"https://85kq.cleartruevision.site/other/video.m3u8")!,source:.av123),"non-/oo5/ path rejected")
+        check(!OnlinePolicy.discoveredMedia(URL(string:"http://85kq.cleartruevision.site/oo5/video.m3u8")!,source:.av123),"non-HTTPS rejected")
         fails(.incomplete) { _=try OneTwoThreeAVAdapter.embeds(playerHTML(host:"unknown.site"),page:URL(string:"https://123av.com/en/v/demo-123")!,number:"DEMO-123") }
+        fails(.incomplete) { _=try OneTwoThreeAVAdapter.stream(Data("{\"status\":\"ok\",\"media\":{\"stream\":\"https://evil.example/other/x.m3u8\"}}".utf8)) }
+        let rotated=try OneTwoThreeAVAdapter.stream(Data("{\"status\":\"ok\",\"media\":{\"stream\":\"https://85kq.cleartruevision.site/oo5/neutral/video.m3u8\"}}".utf8))
+        check(rotated.host=="85kq.cleartruevision.site" && rotated.path.hasPrefix("/oo5/"),"rotating CDN host from stream JSON")
         fails(.noMatch) { _=try OneTwoThreeAVAdapter.embeds(playerHTML("DEMO-1230"),page:URL(string:"https://123av.com/en/v/demo-123")!,number:"DEMO-123") }
         fails(.blocked) { try OnlineAdapters.rejectChallenge("<title>Just a moment...</title><div id='challenge-form'></div>") }
         let unrelated = #"eval(function(p,a,c,k,e,d){return p}('ad',62,9999,'advert|library'.split('|'),0,{}))"#
