@@ -86,12 +86,13 @@ struct JavRankingSettingsView: View {
 // Same native poster card and responsive column policy as JavDB, separate destinations.
 struct JRPosterGrid: View {
     let videos: [JRVideo]
+    var onAppearLast: (() -> Void)? = nil
     var body: some View {
         GeometryReader { geometry in
             Color.clear
                 .preference(key: JRWidthKey.self, value: geometry.size.width)
         }.frame(height: 0)
-        JRMeasuredGrid(videos: videos)
+        JRMeasuredGrid(videos: videos, onAppearLast: onAppearLast)
     }
 }
 private struct JRWidthKey: PreferenceKey {
@@ -100,13 +101,14 @@ private struct JRWidthKey: PreferenceKey {
 }
 private struct JRMeasuredGrid: View {
     let videos: [JRVideo]
+    var onAppearLast: (() -> Void)? = nil
     @State private var width: CGFloat = 390
     @ObservedObject private var source = JavRankingSource.shared
     @State private var mapped: [String: Movie] = [:]
     @State private var completed = Set<String>()
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
-            ForEach(videos) { video in
+            ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                 VStack(alignment: .leading, spacing: 4) {
                     NavigationLink { posterDestination(video) } label: {
                         // Keep the source card geometry and metadata stable after verification.
@@ -119,6 +121,7 @@ private struct JRMeasuredGrid: View {
                             .font(.caption2).foregroundStyle(.secondary).lineLimit(2).frame(height: 30, alignment: .topLeading)
                     }
                 }.id(video.path).frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).contentShape(Rectangle()).clipped()
+                .onAppear { if index == videos.count - 1 { onAppearLast?() } }
             }
         }.scrollTargetLayout().padding(.horizontal, AdaptiveLayout.gridPadding)
         .background { GeometryReader { g in Color.clear.preference(key: JRWidthKey.self, value: g.size.width) } }
@@ -338,8 +341,13 @@ struct JRPageView: View {
                     }
                     if !page.videos.isEmpty {
                         Text(isPreview ? "首批 \(page.videos.count) 部 · 正在读取完整榜单" : "\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                        JRPosterGrid(videos: Array(page.videos.prefix(limit)))
-                        if limit < page.videos.count { Button("加载更多") { state.limit += 12 }.accessibilityIdentifier("jr-load-more").frame(maxWidth: .infinity).padding() }
+                        JRPosterGrid(videos: Array(page.videos.prefix(limit)), onAppearLast: {
+                            if state.limit < page.videos.count { state.limit += 12 }
+                        })
+                        if limit < page.videos.count {
+                            Button("加载更多（滑到底也会自动加载）") { state.limit += 12 }
+                                .accessibilityIdentifier("jr-load-more").frame(maxWidth: .infinity).padding()
+                        }
                     }
                     if !page.links.isEmpty {
                         if page.videos.isEmpty { sourceNavigation(page) }
@@ -476,6 +484,9 @@ struct JRBackendView: View {
     @State private var error = ""
     @State private var loading = false
     @State private var page = 1
+    @State private var feedItems: [JRBackendVideo] = []
+    @State private var feedEntities: [JRBackendEntity] = []
+    @State private var feedNext: Int? = nil
     @State private var query = ""
     @State private var submitted = ""
     @State private var category = ""
@@ -553,7 +564,7 @@ struct JRBackendView: View {
         .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { JavRankingSettingsView() } label: { Image(systemName: "gearshape") } } }
         .task(id: requestKey) { await load() }
-        .onChange(of: backend.generation) { _, _ in envelope = nil; pick = nil; randomBatch = nil; error = ""; page = 1 }
+        .onChange(of: backend.generation) { _, _ in envelope = nil; pick = nil; randomBatch = nil; error = ""; page = 1; feedItems = []; feedEntities = []; feedNext = nil }
         .onChange(of: category) { _, _ in page = 1 }
         .onChange(of: year) { _, _ in page = 1 }
         .onChange(of: sort) { _, _ in page = 1 }
@@ -608,16 +619,40 @@ struct JRBackendView: View {
         }
         if let topics = payload.topics { links(topics) }
         if let links = payload.links { self.links(links) }
-        if let items = payload.items { films(items, context: title) }
-        if let entities = payload.entities { self.entities(entities) }
-        if let total = payload.total { Text("索引共 \(total) 项 · 第 \(payload.page ?? page) 页").font(.caption) }
-        HStack {
-            if page > 1 { Button("上一页") { page -= 1 } }
-            if let next = payload.nextPage { Button("下一页") { page = next } }
-            if let next = payload.nextSourcePath {
-                NavigationLink("来源下一页") { JRBackendView(route: "page", title: title, fixedQuery: [.init(name: "path", value: next)]) }
+        if route == "explore" || route == "index" {
+            if !feedItems.isEmpty { films(feedItems, context: title) }
+            if !feedEntities.isEmpty { self.entities(feedEntities) }
+            if let total = payload.total {
+                Text("索引共 \(total) 项 · 已加载 \(max(feedItems.count, feedEntities.count))").font(.caption)
             }
-        }.buttonStyle(.bordered).controlSize(.large)
+            if feedNext != nil || payload.nextSourcePath != nil {
+                HStack {
+                    if loading { ProgressView().controlSize(.small) }
+                    Text(feedNext != nil ? "滑到底自动加载下一页" : "本列表已到底").font(.caption).foregroundStyle(JRPalette.muted)
+                    Spacer()
+                    if let next = feedNext { Button("加载下一页") { page = next }.disabled(loading) }
+                    if let next = payload.nextSourcePath {
+                        NavigationLink("来源下一页") { JRBackendView(route: "page", title: title, fixedQuery: [.init(name: "path", value: next)]) }
+                    }
+                }.buttonStyle(.bordered).controlSize(.large)
+                Color.clear.frame(height: 1)
+                    .onAppear {
+                        if let next = feedNext, !loading { page = next }
+                    }
+                    .accessibilityIdentifier("jr-auto-page-sentinel")
+            }
+        } else {
+            if let items = payload.items { films(items, context: title) }
+            if let entities = payload.entities { self.entities(entities) }
+            if let total = payload.total { Text("索引共 \(total) 项 · 第 \(payload.page ?? page) 页").font(.caption) }
+            HStack {
+                if page > 1 { Button("上一页") { page -= 1 } }
+                if let next = payload.nextPage { Button("下一页") { page = next } }
+                if let next = payload.nextSourcePath {
+                    NavigationLink("来源下一页") { JRBackendView(route: "page", title: title, fixedQuery: [.init(name: "path", value: next)]) }
+                }
+            }.buttonStyle(.bordered).controlSize(.large)
+        }
     }
     private func sectionTitle(_ section: JRBackendSection) -> String {
         if section.id == "monthly", let link = section.links.first {
@@ -738,6 +773,20 @@ struct JRBackendView: View {
             let result = try await backend.fetch(route, query: args)
             guard !Task.isCancelled, key == requestKey else { return }
             envelope = result
+            if route == "explore" || route == "index" {
+                let items = result.data?.items ?? []
+                let entities = result.data?.entities ?? []
+                if page <= 1 {
+                    feedItems = items
+                    feedEntities = entities
+                } else {
+                    let seenV = Set(feedItems.map(\.sourcePath))
+                    feedItems.append(contentsOf: items.filter { !seenV.contains($0.sourcePath) })
+                    let seenE = Set(feedEntities.map(\.sourcePath))
+                    feedEntities.append(contentsOf: entities.filter { !seenE.contains($0.sourcePath) })
+                }
+                feedNext = result.data?.nextPage
+            }
         } catch {
             guard !Task.isCancelled, key == requestKey else { return }
             self.error = error.localizedDescription

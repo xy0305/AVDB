@@ -7,10 +7,11 @@ import UniformTypeIdentifiers
     @State private var importing = false
     @State private var importError: String?
     @AppStorage("dmm.authorizedAdultDeclaration") private var adultAuthorization = false
-    @State private var page = 0
-    private var pageCount: Int {
-        guard let board = store.board else { return 1 }
-        return max(1, (board.count + 19) / 20)
+    @State private var visibleCount = 20
+    private var autoRefreshKey: String { "\(store.kind.rawValue)|\(adultAuthorization)" }
+    private func growVisible(total: Int) {
+        guard visibleCount < total else { return }
+        visibleCount = min(visibleCount + 20, total)
     }
     private var sourceLabel: String {
         switch store.fetchSource {
@@ -23,7 +24,7 @@ import UniformTypeIdentifiers
     }
     var body: some View {
         VStack(spacing: 8) {
-            Picker("榜单", selection: Binding(get: { store.kind }, set: { store.select($0); page = 0 })) {
+            Picker("榜单", selection: Binding(get: { store.kind }, set: { store.select($0); visibleCount = 20 })) {
                 ForEach(DMMRankingKind.allCases) { kind in
                     Text(kind.periodLabel).tag(kind)
                 }
@@ -46,21 +47,28 @@ import UniformTypeIdentifiers
             if let importError { Text(importError).font(.caption).foregroundStyle(.red) }
             if let board = store.board {
                 HStack {
-                    Button("上一页") { store.cancelDetails(); page -= 1 }.disabled(page == 0)
+                    Text("已显示 \(min(visibleCount, board.count)) / \(board.count) · \(sourceLabel)").font(.caption)
                     Spacer()
-                    Text("\(page + 1) / \(pageCount) · \(sourceLabel)").font(.caption)
-                    Spacer()
-                    Button("下一页") { store.cancelDetails(); page += 1 }.disabled(page >= pageCount - 1)
+                    if store.status.contains("正在") { ProgressView().controlSize(.small) }
                 }
+                .accessibilityIdentifier("dmm-visible-count")
                 if board.kind.isActress {
-                    DMMActressRankingPage(rows: Array(board.actressRows.dropFirst(page * 20).prefix(20)))
-                        .id("\(board.kind.rawValue)|\(board.observedAt.timeIntervalSince1970)|\(page)")
+                    DMMActressRankingPage(
+                        rows: Array(board.actressRows.prefix(visibleCount)),
+                        onNearEnd: { growVisible(total: board.count) }
+                    )
+                    .id("\(board.kind.rawValue)|\(board.observedAt.timeIntervalSince1970)")
                 } else {
-                    DMMRankingPage(store: store, rows: Array(board.contentRows.dropFirst(page * 20).prefix(20)), kind: board.kind)
-                        .id("\(board.kind.rawValue)|\(board.observedAt.timeIntervalSince1970)|\(page)")
+                    DMMRankingPage(
+                        store: store,
+                        rows: Array(board.contentRows.prefix(visibleCount)),
+                        kind: board.kind,
+                        onNearEnd: { growVisible(total: board.count) }
+                    )
+                    .id("\(board.kind.rawValue)|\(board.observedAt.timeIntervalSince1970)")
                 }
             } else {
-                ContentUnavailableView("尚未加载榜单", systemImage: "arrow.clockwise", description: Text("开启成年授权后点「刷新榜单」：优先隐藏网页渲染，其次 GraphQL；仍失败可导入合法取得的完整日/周/月作品榜或月间女优榜HTML。实时/系列尚未接入。"))
+                ContentUnavailableView("尚未加载榜单", systemImage: "arrow.clockwise", description: Text(adultAuthorization ? "正在自动静默刷新：优先隐藏网页渲染，其次 GraphQL；失败可点「刷新榜单」或导入合法取得的完整日/周/月作品榜或月间女优榜HTML。实时/系列尚未接入。" : "开启成年授权后进入本页会自动静默刷新：优先隐藏网页渲染，其次 GraphQL；仍失败可导入合法取得的完整日/周/月作品榜或月间女优榜HTML。实时/系列尚未接入。"))
             }
         }
         .padding(.horizontal)
@@ -74,9 +82,15 @@ import UniformTypeIdentifiers
                     defer { if access { url.stopAccessingSecurityScopedResource() } }
                     try store.importHTML(Data(contentsOf: url))
                 }
-                page = 0; importError = nil
+                visibleCount = 20; importError = nil
             } catch { importError = "未导入：需要完整日榜20/周月榜100/女优榜100，或具有唯一canonical、同CID配信品番和唯一厂家品番的详情HTML。" }
         }
+        .task(id: autoRefreshKey) {
+            guard adultAuthorization else { return }
+            visibleCount = 20
+            await store.refresh()
+        }
+        .onChange(of: store.board?.observedAt) { _, _ in visibleCount = 20 }
         .onDisappear { store.cancel() }
     }
 }
@@ -86,10 +100,11 @@ import UniformTypeIdentifiers
     @State private var manualSearch = false
     let rows: [DMMContentRow]
     let kind: DMMRankingKind
+    var onNearEnd: () -> Void = {}
     @StateObject private var mapper: JavVerseMapper
     private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3)
-    init(store: DMMRankingStore, rows: [DMMContentRow], kind: DMMRankingKind) {
-        self.store = store; self.rows = rows; self.kind = kind
+    init(store: DMMRankingStore, rows: [DMMContentRow], kind: DMMRankingKind, onNearEnd: @escaping () -> Void = {}) {
+        self.store = store; self.rows = rows; self.kind = kind; self.onNearEnd = onNearEnd
         _mapper = StateObject(wrappedValue: JavVerseMapper(scope: "dmm|\(kind.rawValue)|manufacturer-verified"))
     }
     private func entry(_ row: DMMContentRow) -> JavVerseEntry? {
@@ -107,6 +122,9 @@ import UniformTypeIdentifiers
                         mapper: mapper,
                         onManualSearch: { manualSearch = true }
                     )
+                    .onAppear {
+                        if row.cid == rows.last?.cid { onNearEnd() }
+                    }
                 }
             }
             .padding(.vertical, 4)
@@ -115,6 +133,7 @@ import UniformTypeIdentifiers
         .navigationDestination(isPresented: $manualSearch) { SearchView() }
         .onAppear { resolveMapped() }
         .onChange(of: store.evidence.count) { _, _ in resolveMapped() }
+        .onChange(of: rows.map(\.cid)) { _, _ in resolveMapped() }
         .onDisappear { mapper.cancel() }
     }
     private func resolveMapped() {
@@ -290,6 +309,7 @@ import UniformTypeIdentifiers
 
 @MainActor private struct DMMActressRankingPage: View {
     let rows: [DMMActressRow]
+    var onNearEnd: () -> Void = {}
     @StateObject private var mapper = DMMActressMapper()
     @State private var manualSearch = false
     private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3)
@@ -298,6 +318,9 @@ import UniformTypeIdentifiers
             LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 ForEach(rows) { row in
                     DMMActressCard(row: row, mapper: mapper, onManualSearch: { manualSearch = true })
+                        .onAppear {
+                            if row.actressID == rows.last?.actressID { onNearEnd() }
+                        }
                 }
             }
             .padding(.vertical, 4)

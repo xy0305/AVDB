@@ -80,11 +80,13 @@ struct MissAVRankingView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     MissAVActressGrid(actors: state.actresses, metadata: metadata)
                 } else {
-                    MissAVGrid(videos: state.videos, metadata: metadata, scrollTargets: true)
+                    MissAVGrid(videos: state.videos, metadata: metadata, scrollTargets: true, onAppearLast: {
+                        if state.next != nil { loadNext() }
+                    })
                 }
                 if state.next != nil && !state.loading {
                     Button { loadNext() } label: {
-                        if state.paging { AnyView(ProgressView()) } else { AnyView(Text("加载下一页")) }
+                        if state.paging { AnyView(ProgressView()) } else { AnyView(Text("加载下一页（滑到底也会自动加载）")) }
                     }.disabled(state.paging).buttonStyle(.bordered).accessibilityIdentifier("missav-load-more")
                 }
             }.padding(.vertical, 8)
@@ -194,6 +196,7 @@ struct MissAVGrid: View {
     var ranks: [String: Int] = [:]
     var identityPrefix = "missav"
     var scrollTargets = false
+    var onAppearLast: (() -> Void)? = nil
     @State private var width: CGFloat = 390
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
@@ -228,7 +231,10 @@ struct MissAVGrid: View {
                         Button("重试 AVDB 匹配") { metadata.enqueue(.movie(video), retry: true) }.font(.caption)
                     }
                 }.frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).clipped()
-                    .onAppear { metadata.enqueue(.movie(video)) }.id(video.path)
+                    .onAppear {
+                        metadata.enqueue(.movie(video))
+                        if index == videos.count - 1 { onAppearLast?() }
+                    }.id(video.path)
             }
         }.scrollTargetLayout(isEnabled: scrollTargets).padding(.horizontal, AdaptiveLayout.gridPadding)
         .background { GeometryReader { g in Color.clear.onAppear { width = g.size.width }.onChange(of: g.size.width) { _, value in width = value } } }
@@ -321,6 +327,7 @@ struct MissAVActressGrid: View {
     @ObservedObject var metadata: MissAVMetadata
     var sourceName = "MissAV"
     var identityPrefix = "missav"
+    var onAppearLast: (() -> Void)? = nil
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 20) {
             ForEach(Array(actors.enumerated()), id: \.element.path) { index, source in
@@ -365,7 +372,10 @@ struct MissAVActressGrid: View {
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .topLeading)
-                    .onAppear { metadata.enqueue(.actor(source)) }
+                    .onAppear {
+                        metadata.enqueue(.actor(source))
+                        if index == actors.count - 1 { onAppearLast?() }
+                    }
                     .accessibilityIdentifier("\(identityPrefix)-actress-\(source.rank ?? (index + 1))")
             }
         }.padding(.horizontal)

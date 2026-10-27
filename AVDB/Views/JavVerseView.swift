@@ -329,8 +329,12 @@ private enum JavVerseRankingTab: String, CaseIterable {
     let board: JavVerseBoard
     var isLive: Bool = false
     @StateObject private var mapper = JavVerseMapper()
-    @State private var page = 0
-    private var rows: [JavVerseEntry] { JavVersePagination.rows(board.entries, page: page) }
+    @State private var visibleCount = JavVersePagination.size
+    private var rows: [JavVerseEntry] { Array(board.entries.prefix(visibleCount)) }
+    private func growVisible() {
+        guard visibleCount < board.entries.count else { return }
+        visibleCount = min(visibleCount + JavVersePagination.size, board.entries.count)
+    }
     init(board: JavVerseBoard, isLive: Bool = false) {
         self.board = board
         self.isLive = isLive
@@ -352,7 +356,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 DisclosureGroup("采集时间与来源") {
                     Text("采集时间 UTC：\(board.capturedAt)").font(.caption)
                     Text("来源：\(board.sourceURL)").font(.caption).textSelection(.enabled)
-                    Text("保留原站名次，不补位。先显示名单；当前页全部自动核验，最多20项、同时最多4项。系列不猜映射。")
+                    Text("保留原站名次，不补位。先显示名单；滑到底自动加载下一批并核验，每批最多20项、同时最多4项。系列不猜映射。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if mapper.busy {
@@ -362,13 +366,14 @@ private enum JavVerseRankingTab: String, CaseIterable {
                         Button("取消核验") { mapper.cancel() }.font(.caption)
                     }
                 } else {
-                    Button("重试本页未匹配项（当前页全部，最多20项）") { mapper.resolve(rows, retry: true) }
+                    Button("重试可见未匹配项（最多本批）") { mapper.resolve(rows, retry: true) }
                         .font(.caption)
                 }
                 if isMovieBoard {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3), alignment: .leading, spacing: 16) {
                         ForEach(rows) { entry in
                             JavVerseMovieCard(entry: entry, mapper: mapper)
+                                .onAppear { if entry.id == rows.last?.id { growVisible() } }
                         }
                     }
                 } else {
@@ -398,14 +403,17 @@ private enum JavVerseRankingTab: String, CaseIterable {
                                 }
                             }
                         }
+                        .onAppear { if entry.id == rows.last?.id { growVisible() } }
                     }
                 }
                 HStack {
-                    Button("上一页") { mapper.cancel(); page -= 1 }.disabled(page == 0)
+                    Text("已显示 \(rows.count) / \(board.entries.count)").font(.caption)
+                        .accessibilityIdentifier("javverse-visible-count")
                     Spacer()
-                    Text("\(page + 1) / \(JavVersePagination.count(board.entries))").font(.caption)
-                    Spacer()
-                    Button("下一页") { mapper.cancel(); page += 1 }.disabled((page + 1) * 20 >= board.entries.count)
+                    if visibleCount < board.entries.count {
+                        ProgressView().controlSize(.small)
+                        Text("滑到底加载更多").font(.caption2).foregroundStyle(.secondary)
+                    }
                 }.padding(.vertical, 8)
             }
             .padding(.horizontal, 16).padding(.vertical, 8)
@@ -413,7 +421,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
             .frame(maxWidth: .infinity)
         }
         .navigationTitle(board.title)
-        .task(id: page) { await mapper.resolve(rows)?.value }
+        .task(id: visibleCount) { await mapper.resolve(rows)?.value }
         .onDisappear { mapper.cancel() }
     }
 }
@@ -479,11 +487,14 @@ private enum JavVerseRankingTab: String, CaseIterable {
     var isLive: Bool = false
     @State private var metric: JavVerseGrokMetric = .total
     @State private var status: JavVerseGrokStatus = .all
-    @State private var page = 0
+    @State private var visibleCount = 20
     private var rows: [JavVerseGrokRow] { snapshot.rows(metric: metric, status: status) }
-    private var pages: Int { max(1, (rows.count + 19) / 20) }
-    private var current: [JavVerseGrokRow] { Array(rows.dropFirst(page * 20).prefix(20)) }
+    private var current: [JavVerseGrokRow] { Array(rows.prefix(visibleCount)) }
     private var key: String { "javverse|grok250|\(metric.rawValue)|static|\(snapshot.capturedAt)|\(status.rawValue)" }
+    private func growVisible() {
+        guard visibleCount < rows.count else { return }
+        visibleCount = min(visibleCount + 20, rows.count)
+    }
     var body: some View {
         VStack(spacing: 0) {
             UnderlineTabBar(tabs: JavVerseGrokMetric.allCases.map { ($0, $0.title) }, selection: $metric, scrolls: false)
@@ -495,19 +506,19 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 Spacer()
                 Text("\(rows.count)位 · Grok \(metric.title)分").font(.caption).foregroundStyle(.secondary)
             }.padding(.horizontal, 16)
-            JavVerseGrokPage(rows: current, metric: metric, capturedAt: snapshot.capturedAt, scope: key, isLive: isLive)
-                .id("\(key)|\(page)")
+            JavVerseGrokPage(rows: current, metric: metric, capturedAt: snapshot.capturedAt, scope: key, isLive: isLive, onNearEnd: growVisible)
+                .id(key)
             HStack {
-                Button("上一页") { page -= 1 }.disabled(page == 0)
-                Spacer()
-                Text("\(page + 1) / \(pages)").font(.caption)
+                Text("已显示 \(current.count) / \(rows.count)").font(.caption)
                     .accessibilityIdentifier("javverse-grok-page")
                 Spacer()
-                Button("下一页") { page += 1 }.disabled(page + 1 >= pages)
+                if visibleCount < rows.count {
+                    Text("滑到底加载更多").font(.caption2).foregroundStyle(.secondary)
+                }
             }.padding(.horizontal, 20).padding(.vertical, 10)
         }
-        .onChange(of: metric) { _ in page = 0 }
-        .onChange(of: status) { _ in page = 0 }
+        .onChange(of: metric) { _ in visibleCount = 20 }
+        .onChange(of: status) { _ in visibleCount = 20 }
     }
 }
 
@@ -516,9 +527,10 @@ private enum JavVerseRankingTab: String, CaseIterable {
     let metric: JavVerseGrokMetric
     let capturedAt: String
     var isLive: Bool = false
+    var onNearEnd: () -> Void = {}
     @StateObject private var mapper: JavVerseMapper
-    init(rows: [JavVerseGrokRow], metric: JavVerseGrokMetric, capturedAt: String, scope: String, isLive: Bool = false) {
-        self.rows = rows; self.metric = metric; self.capturedAt = capturedAt; self.isLive = isLive
+    init(rows: [JavVerseGrokRow], metric: JavVerseGrokMetric, capturedAt: String, scope: String, isLive: Bool = false, onNearEnd: @escaping () -> Void = {}) {
+        self.rows = rows; self.metric = metric; self.capturedAt = capturedAt; self.isLive = isLive; self.onNearEnd = onNearEnd
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--javverse-neutral-ui") {
             _mapper = StateObject(wrappedValue: JavVerseNeutralFixture.mapper())
@@ -570,10 +582,11 @@ private enum JavVerseRankingTab: String, CaseIterable {
                             }
                         }
                     }
+                    .onAppear { if row.id == rows.last?.id { onNearEnd() } }
                 }
             }
         }
-        .task { await mapper.resolve(rows.map(\.entry))?.value }
+        .task(id: rows.count) { await mapper.resolve(rows.map(\.entry))?.value }
         .onDisappear { mapper.cancel() }
     }
 }

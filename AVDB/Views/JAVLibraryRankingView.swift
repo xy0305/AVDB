@@ -73,12 +73,16 @@ struct JAVLibraryRankingView: View {
                     if snapshot.items.isEmpty { Text("服务器当前快照为空") }
                     let entries = Array(snapshot.items.prefix(visibleCount))
                     if kind == .actors {
-                        MissAVActressGrid(actors: entries.map(\.actor), metadata: metadata, sourceName: "JAVLibrary", identityPrefix: "javlibrary")
+                        MissAVActressGrid(actors: entries.map(\.actor), metadata: metadata, sourceName: "JAVLibrary", identityPrefix: "javlibrary", onAppearLast: {
+                            if visibleCount < snapshot.items.count { visibleCount += 25 }
+                        })
                     } else {
-                        MissAVGrid(videos: entries.map(\.video), metadata: metadata, sourceName: "JAVLibrary", ranks: Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.rank) }), identityPrefix: "javlibrary")
+                        MissAVGrid(videos: entries.map(\.video), metadata: metadata, sourceName: "JAVLibrary", ranks: Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.rank) }), identityPrefix: "javlibrary", onAppearLast: {
+                            if visibleCount < snapshot.items.count { visibleCount += 25 }
+                        })
                     }
                     if visibleCount < snapshot.items.count {
-                        Button("加载下一页（本次快照）") { visibleCount += 25 }
+                        Button("加载下一页（本次快照 · 滑到底也会自动加载）") { visibleCount += 25 }
                             .buttonStyle(.bordered).accessibilityIdentifier("javlibrary-load-more")
                     }
                 }

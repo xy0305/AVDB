@@ -53,7 +53,9 @@ enum DMMRankingFetchSource: String, Sendable {
         cancel()
         kind = next
         board = nil; evidence.removeAll(); messages.removeAll(); imported = false; fetchSource = nil
-        status = "已切换到\(next.periodLabel)。可刷新或导入对应完整榜单HTML。"
+        status = authorizeAdultDeclaration
+            ? "已切换到\(next.periodLabel)，准备自动静默刷新…"
+            : "已切换到\(next.periodLabel)。开启成年授权后将自动静默刷新，也可导入对应完整榜单HTML。"
     }
 
     /// Refresh order: WKWebView hydrate → verified GraphQL → URLSession document. HTML import stays manual.
