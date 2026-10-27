@@ -269,7 +269,7 @@ private enum JavVerseRankingTab: String, CaseIterable {
                 DisclosureGroup("采集时间与来源") {
                     Text("采集时间 UTC：\(board.capturedAt)").font(.caption)
                     Text("来源：\(board.sourceURL)").font(.caption).textSelection(.enabled)
-                    Text("保留原站名次，不补位。先显示名单；当前页全部自动核验，最多20项、同时最多2项。系列不猜映射。")
+                    Text("保留原站名次，不补位。先显示名单；当前页全部自动核验，最多20项、同时最多4项。系列不猜映射。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if mapper.busy {

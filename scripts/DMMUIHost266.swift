@@ -2,7 +2,7 @@ import SwiftUI
 
 // Neutral, offline Simulator boundary stubs. Production DMM view/store/core are linked unchanged.
 struct Movie { let id: String; let number: String?; var title: String? = "中性AVDB匹配"; var coverURL: String? = nil; var thumbURL: String? = nil }
-struct Actor: Identifiable { let id: String; var name: String? = nil; var displayName: String { name ?? id } }
+struct Actor: Identifiable { let id: String; var name: String? = nil; var avatarURL: String? = nil; var coverURL: String? = nil; var displayName: String { name ?? id } }
 struct JavVerseEntry { let rank: Int; let kind: String; let label: String; let sourceURL: String; let code: String?; var id: String { "\(rank)|\(sourceURL)" } }
 enum JavVerseIdentity { static func code(_ value: String) -> String? { value.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() } }
 enum JavVerseFailure: Error { case message(String) }
@@ -38,7 +38,7 @@ final class JavDBSDK {
 }
 struct LiquidGlassBackground: View { var body: some View { Color.clear } }
 struct JavDBImage: View {
-    init(url: String, fallbackURL: String?, contentMode: ContentMode, frontPoster: Bool) {}
+    init(url: String?, fallbackURL: String? = nil, contentMode: ContentMode = .fit, frontPoster: Bool = false) {}
     var body: some View { Color.gray }
 }
 struct SearchView: View { var body: some View { Text("人工核对") } }

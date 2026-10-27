@@ -87,6 +87,7 @@ import UniformTypeIdentifiers
     let rows: [DMMContentRow]
     let kind: DMMRankingKind
     @StateObject private var mapper: JavVerseMapper
+    private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3)
     init(store: DMMRankingStore, rows: [DMMContentRow], kind: DMMRankingKind) {
         self.store = store; self.rows = rows; self.kind = kind
         _mapper = StateObject(wrappedValue: JavVerseMapper(scope: "dmm|\(kind.rawValue)|manufacturer-verified"))
@@ -96,35 +97,20 @@ import UniformTypeIdentifiers
         return JavVerseEntry(rank: row.rank, kind: "movie", label: item.code, sourceURL: row.sourceURL.absoluteString, code: item.code)
     }
     var body: some View {
-        List(rows) { row in
-            VStack(alignment: .leading, spacing: 6) {
-                Text("#\(row.rank) · DMM · \(row.cid)").font(.caption).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("dmm-rank-\(row.rank)")
-                if let item = entry(row) {
-                    Text(item.label).font(.headline)
-                    if let movie = mapper.movie(for: item) {
-                        NavigationLink { MovieDetailView(movieID: movie.id) } label: {
-                            HStack {
-                                if let cover = movie.coverURL {
-                                    JavDBImage(url: cover, fallbackURL: movie.thumbURL, contentMode: .fit, frontPoster: true)
-                                        .frame(width: 64, height: 90)
-                                }
-                                Text(movie.title ?? item.label)
-                            }
-                        }.accessibilityIdentifier("dmm-movie-\(row.rank)")
-                    } else {
-                        Text(mapper.messages[item.id] ?? "未匹配 · 保留源榜位").font(.caption)
-                        Button("精确核对AVDB") { mapper.resolve([item], retry: true) }
-                            .disabled(mapper.busy)
-                    }
-                } else {
-                    Text("厂家品番未知 · 未匹配").font(.headline)
-                    Text(store.messages[row.cid] ?? "按需核对，不从CID推号").font(.caption)
-                    Button("获取 / 重试详情") { store.request(row) }
+        ScrollView {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                ForEach(rows) { row in
+                    DMMMovieCard(
+                        row: row,
+                        entry: entry(row),
+                        store: store,
+                        mapper: mapper,
+                        onManualSearch: { manualSearch = true }
+                    )
                 }
-                Button("手动搜索核对（不自动认领）") { manualSearch = true }.font(.caption)
-            }.padding(.vertical, 4)
-        }.listStyle(.plain)
+            }
+            .padding(.vertical, 4)
+        }
         .buttonStyle(.borderless)
         .navigationDestination(isPresented: $manualSearch) { SearchView() }
         .onAppear { resolveMapped() }
@@ -138,54 +124,166 @@ import UniformTypeIdentifiers
     }
 }
 
+@MainActor private struct DMMMovieCard: View {
+    let row: DMMContentRow
+    let entry: JavVerseEntry?
+    @ObservedObject var store: DMMRankingStore
+    @ObservedObject var mapper: JavVerseMapper
+    let onManualSearch: () -> Void
+    private var movie: Movie? { entry.flatMap(mapper.movie(for:)) }
+    private var codeLabel: String { entry?.label ?? row.cid }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Group {
+                if let movie, let entry {
+                    NavigationLink { MovieDetailView(movieID: movie.id) } label: { poster(movie: movie) }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("dmm-movie-\(row.rank)")
+                } else if let entry {
+                    Button { mapper.resolve([entry], retry: true) } label: { poster(movie: nil) }
+                        .buttonStyle(.plain)
+                        .disabled(mapper.busy)
+                } else {
+                    Button { store.request(row) } label: { poster(movie: nil) }
+                        .buttonStyle(.plain)
+                }
+            }
+            Text("#\(row.rank) · DMM · \(codeLabel)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .accessibilityIdentifier("dmm-rank-\(row.rank)")
+            if let entry {
+                Text(entry.label).font(.caption.weight(.semibold)).lineLimit(1)
+                if movie == nil {
+                    Text(mapper.messages[entry.id] ?? "未匹配 · 保留源榜位").font(.caption2).foregroundStyle(.secondary)
+                    Button("精确核对AVDB") { mapper.resolve([entry], retry: true) }
+                        .font(.caption2)
+                        .disabled(mapper.busy)
+                } else {
+                    Text(mapper.messages[entry.id] ?? "已核验").font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                }
+            } else {
+                Text("厂家品番未知 · 未匹配").font(.caption.weight(.semibold)).lineLimit(2)
+                Text(store.messages[row.cid] ?? "按需核对，不从CID推号").font(.caption2).foregroundStyle(.secondary)
+                Button("获取 / 重试详情") { store.request(row) }.font(.caption2)
+            }
+            Button("手动搜索核对（不自动认领）") { onManualSearch() }.font(.caption2)
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+    }
+    @ViewBuilder private func poster(movie: Movie?) -> some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.secondary.opacity(0.12))
+                .aspectRatio(0.7, contentMode: .fit)
+                .overlay {
+                    if let movie, let cover = [movie.coverURL, movie.thumbURL].compactMap({ $0 }).first(where: { !$0.isEmpty }) {
+                        JavDBImage(url: cover, fallbackURL: movie.thumbURL, contentMode: .fit, frontPoster: true)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    } else if mapper.messages[entry?.id ?? ""] == "请求中…" || mapper.messages[entry?.id ?? ""] == "排队中" {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "film")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            Text("\(row.rank)")
+                .font(.caption2.bold())
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(row.rank <= 3 ? Color.orange.opacity(0.85) : Color.blue.opacity(0.75), in: Capsule())
+                .foregroundStyle(.white)
+                .padding(6)
+        }
+    }
+}
+
 @MainActor private final class DMMActressMapper: ObservableObject {
     @Published var actors: [String: Actor] = [:]
     @Published var candidates: [String: [Actor]] = [:]
     @Published var messages: [String: String] = [:]
     @Published var busy = false
-    private var tasks: [String: Task<Void, Never>] = [:]
-    func cancel() { tasks.values.forEach { $0.cancel() }; tasks.removeAll() }
+    private var generation = UUID()
+    private var task: Task<Void, Never>?
+    func cancel() {
+        task?.cancel(); task = nil; generation = UUID(); busy = false
+        for (key, value) in messages where value == "排队中" || value == "正在精确核对AVDB演员…" {
+            messages.removeValue(forKey: key)
+        }
+    }
     func resolve(_ row: DMMActressRow, retry: Bool = false) {
-        let key = row.actressID
-        if !retry, actors[key] != nil || tasks[key] != nil { return }
-        tasks[key]?.cancel()
+        resolveVisible([row], retry: retry)
+    }
+    func resolveVisible(_ rows: [DMMActressRow], retry: Bool = false) {
+        guard !busy else { return }
+        let batch = Array(rows.filter {
+            actors[$0.actressID] == nil && (retry || messages[$0.actressID] == nil)
+        }.prefix(20))
+        guard !batch.isEmpty else { return }
+        let epoch = generation
         busy = true
-        messages[key] = "正在精确核对AVDB演员…"
-        tasks[key] = Task { [weak self] in
+        for row in batch { messages[row.actressID] = "排队中" }
+        task = Task { [weak self] in
             guard let self else { return }
-            defer { Task { @MainActor in self.tasks.removeValue(forKey: key); self.busy = !self.tasks.isEmpty } }
-            do {
-                let identity = ExternalActorIdentity.resolve(sourceName: row.name, aliases: [], catalog: .bundled())
-                let resolution = try await ExternalActorResolver.inspect(identity: identity, search: { keyword, page in
-                    try await JavDBSDK.shared.searchActors(keyword: keyword, page: page)
-                })
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    switch resolution {
-                    case .matched(let match):
-                        self.actors[key] = match.actor
-                        self.candidates[key] = []
-                        self.messages[key] = "AVDB 演员精确匹配"
-                    case .notFound:
-                        self.actors.removeValue(forKey: key)
-                        self.candidates[key] = []
-                        self.messages[key] = "未匹配唯一AVDB演员 · 保留源榜位；不发明演员ID"
-                    case .ambiguous(let list):
-                        self.actors.removeValue(forKey: key)
-                        self.candidates[key] = list
-                        self.messages[key] = "多个精确姓名候选，待手动确认"
-                    case .incomplete(let list, _):
-                        self.actors.removeValue(forKey: key)
-                        self.candidates[key] = list
-                        self.messages[key] = "查询未完成 · 待手动核对；不发明演员ID"
+            defer {
+                if self.generation == epoch {
+                    self.busy = false; self.task = nil
+                    for (key, value) in self.messages where value == "排队中" || value == "正在精确核对AVDB演员…" {
+                        self.messages.removeValue(forKey: key)
                     }
                 }
-            } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    self.messages[key] = "演员核对失败 · 可重试；不发明演员ID"
+            }
+            await withTaskGroup(of: Void.self) { group in
+                var index = 0
+                func startNext() {
+                    guard index < batch.count else { return }
+                    let row = batch[index]
+                    index += 1
+                    group.addTask { @MainActor in await self.verify(row, epoch: epoch) }
+                }
+                startNext(); startNext(); startNext(); startNext()
+                while await group.next() != nil {
+                    if Task.isCancelled || self.generation != epoch { break }
+                    startNext()
                 }
             }
+        }
+    }
+    private func verify(_ row: DMMActressRow, epoch: UUID) async {
+        let key = row.actressID
+        messages[key] = "正在精确核对AVDB演员…"
+        do {
+            try Task.checkCancellation()
+            guard generation == epoch else { throw CancellationError() }
+            let identity = ExternalActorIdentity.resolve(sourceName: row.name, aliases: [], catalog: .bundled())
+            let resolution = try await ExternalActorResolver.inspect(identity: identity, search: { keyword, page in
+                try await JavDBSDK.shared.searchActors(keyword: keyword, page: page)
+            })
+            guard !Task.isCancelled, generation == epoch else { return }
+            switch resolution {
+            case .matched(let match):
+                actors[key] = match.actor
+                candidates[key] = []
+                messages[key] = "AVDB 演员精确匹配"
+            case .notFound:
+                actors.removeValue(forKey: key)
+                candidates[key] = []
+                messages[key] = "未匹配唯一AVDB演员 · 保留源榜位；不发明演员ID"
+            case .ambiguous(let list):
+                actors.removeValue(forKey: key)
+                candidates[key] = list
+                messages[key] = "多个精确姓名候选，待手动确认"
+            case .incomplete(let list, _):
+                actors.removeValue(forKey: key)
+                candidates[key] = list
+                messages[key] = "查询未完成 · 待手动核对；不发明演员ID"
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled, generation == epoch else { return }
+            messages[key] = "演员核对失败 · 可重试；不发明演员ID"
         }
     }
 }
@@ -194,34 +292,95 @@ import UniformTypeIdentifiers
     let rows: [DMMActressRow]
     @StateObject private var mapper = DMMActressMapper()
     @State private var manualSearch = false
+    private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3)
     var body: some View {
-        List(rows) { row in
-            VStack(alignment: .leading, spacing: 6) {
-                Text("#\(row.rank) · DMM女優 · \(row.actressID)").font(.caption).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("dmm-actress-rank-\(row.rank)")
-                Text(row.name).font(.headline)
-                if let actor = mapper.actors[row.actressID] {
-                    NavigationLink { ActorDetailView(actorID: actor.id) } label: {
-                        Text(actor.displayName)
-                    }.accessibilityIdentifier("dmm-actress-\(row.rank)")
-                } else if let choices = mapper.candidates[row.actressID], !choices.isEmpty {
-                    Text(mapper.messages[row.actressID] ?? "候选待确认").font(.caption)
-                    ForEach(choices.prefix(5), id: \.id) { actor in
-                        NavigationLink { ActorDetailView(actorID: actor.id) } label: {
-                            Text(actor.displayName).font(.caption)
-                        }
-                    }
-                } else {
-                    Text(mapper.messages[row.actressID] ?? "未匹配 · 保留源榜位；按姓名精确核对，不发明演员ID").font(.caption)
-                    Button("精确核对AVDB演员") { mapper.resolve(row, retry: true) }
-                        .disabled(mapper.busy)
+        ScrollView {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                ForEach(rows) { row in
+                    DMMActressCard(row: row, mapper: mapper, onManualSearch: { manualSearch = true })
                 }
-                Link("来源女优列表", destination: row.sourceURL).font(.caption)
-                Button("手动搜索核对（不自动认领）") { manualSearch = true }.font(.caption)
-            }.padding(.vertical, 4)
-        }.listStyle(.plain)
+            }
+            .padding(.vertical, 4)
+        }
         .buttonStyle(.borderless)
         .navigationDestination(isPresented: $manualSearch) { SearchView() }
+        .onAppear { mapper.resolveVisible(rows, retry: false) }
+        .onChange(of: rows.map(\.actressID)) { _, _ in mapper.resolveVisible(rows, retry: false) }
         .onDisappear { mapper.cancel() }
+    }
+}
+
+@MainActor private struct DMMActressCard: View {
+    let row: DMMActressRow
+    @ObservedObject var mapper: DMMActressMapper
+    let onManualSearch: () -> Void
+    private var actor: Actor? { mapper.actors[row.actressID] }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Group {
+                if let actor {
+                    NavigationLink { ActorDetailView(actorID: actor.id) } label: { portrait(actor: actor) }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("dmm-actress-\(row.rank)")
+                } else {
+                    Button { mapper.resolve(row, retry: true) } label: { portrait(actor: nil) }
+                        .buttonStyle(.plain)
+                        .disabled(mapper.busy)
+                }
+            }
+            Text("#\(row.rank) · DMM女優 · \(row.actressID)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .accessibilityIdentifier("dmm-actress-rank-\(row.rank)")
+            Text(row.name).font(.caption.weight(.semibold)).lineLimit(2)
+            if let actor {
+                Text(actor.displayName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                Text(mapper.messages[row.actressID] ?? "已匹配").font(.caption2).foregroundStyle(.secondary)
+            } else if let choices = mapper.candidates[row.actressID], !choices.isEmpty {
+                Text(mapper.messages[row.actressID] ?? "候选待确认").font(.caption2)
+                ForEach(choices.prefix(3), id: \.id) { choice in
+                    NavigationLink { ActorDetailView(actorID: choice.id) } label: {
+                        Text(choice.displayName).font(.caption2)
+                    }
+                }
+            } else {
+                Text(mapper.messages[row.actressID] ?? "未匹配 · 保留源榜位；按姓名精确核对，不发明演员ID")
+                    .font(.caption2).foregroundStyle(.secondary)
+                Button("精确核对AVDB演员") { mapper.resolve(row, retry: true) }
+                    .font(.caption2)
+                    .disabled(mapper.busy)
+            }
+            Link("来源女优列表", destination: row.sourceURL).font(.caption2)
+            Button("手动搜索核对（不自动认领）") { onManualSearch() }.font(.caption2)
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+    }
+    @ViewBuilder private func portrait(actor: Actor?) -> some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.secondary.opacity(0.12))
+                .aspectRatio(0.75, contentMode: .fit)
+                .overlay {
+                    if let actor, let source = [actor.avatarURL, actor.coverURL].compactMap({ $0 }).first(where: { !$0.isEmpty }) {
+                        JavDBImage(url: source, contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    } else if mapper.messages[row.actressID] == "请求中…"
+                                || mapper.messages[row.actressID] == "排队中"
+                                || mapper.messages[row.actressID] == "正在精确核对AVDB演员…" {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "person.crop.square")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            Text("\(row.rank)")
+                .font(.caption2.bold())
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(row.rank <= 3 ? Color.orange.opacity(0.85) : Color.blue.opacity(0.75), in: Capsule())
+                .foregroundStyle(.white)
+                .padding(6)
+        }
     }
 }

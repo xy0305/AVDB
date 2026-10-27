@@ -284,6 +284,7 @@ enum JavVerseIdentity {
     private let sharedCache: Bool
     private let movieHydration: Bool
     private let actorHydration: Bool
+    private let preferExactMovie: Bool
     private let accountProvider: @MainActor () -> String?
     private let scope: String
     init(scope: String = "javverse|legacy", search: JavVerseMovieResolver.Search? = nil,
@@ -293,6 +294,8 @@ enum JavVerseIdentity {
          shareCache: Bool? = nil,
          accountProvider: @escaping @MainActor () -> String? = { APIClient.shared.token }) {
         self.scope = scope
+        // Production (nil search) uses JavDBSDK.exactMovie: exact identity, stops on first unique page.
+        self.preferExactMovie = search == nil
         self.search = search ?? { source, page in
             try await JavDBSDK.shared.search(keyword: source, page: page, type: "movie", limit: 20)
         }
@@ -350,7 +353,7 @@ enum JavVerseIdentity {
         guard !busy else { return nil }
         if account != accountProvider() { clear() }
         let epoch = generation, token = account
-        // Current visible page only. At most two requests run together; paging cancels this generation.
+        // Current visible page only. At most four requests run together; paging cancels this generation.
         let batch = Array(entries.filter { ($0.kind == "movie" || $0.kind == "actor") && movies[$0.id] == nil && actors[$0.id] == nil && (retry || messages[$0.id] == nil) }.prefix(20))
         guard !batch.isEmpty else { return nil }
         busy = true; completed = 0; total = batch.count
@@ -371,7 +374,7 @@ enum JavVerseIdentity {
                     index += 1
                     group.addTask { @MainActor in await self.verify(entry, epoch: epoch, token: token) }
                 }
-                startNext(); startNext()
+                startNext(); startNext(); startNext(); startNext()
                 while await group.next() != nil {
                     if Task.isCancelled || self.generation != epoch { break }
                     startNext()
@@ -395,10 +398,19 @@ enum JavVerseIdentity {
             if cached == nil {
                 if entry.kind == "movie" {
                     guard let source = entry.code else { throw JavVerseFailure.message("原始完整番号不可核验") }
-                    movie = try await JavVerseMovieResolver.resolve(code: source) { source, page in
-                        try Task.checkCancellation()
-                        guard self.generation == epoch, self.accountProvider() == token else { throw CancellationError() }
-                        return try await self.search(source, page)
+                    if preferExactMovie {
+                        // Fail-closed exact identity via SDK; early-exit on first unique page (never fuzzy first-hit).
+                        do {
+                            movie = try await JavDBSDK.shared.exactMovie(code: source)
+                        } catch let error as JRError {
+                            throw JavVerseFailure.message(error.errorDescription ?? "番号核验失败")
+                        }
+                    } else {
+                        movie = try await JavVerseMovieResolver.resolve(code: source) { source, page in
+                            try Task.checkCancellation()
+                            guard self.generation == epoch, self.accountProvider() == token else { throw CancellationError() }
+                            return try await self.search(source, page)
+                        }
                     }
                     if movieHydration, let found = movie, (found.coverURL ?? "").isEmpty && (found.thumbURL ?? "").isEmpty {
                         let detail = try await hydrateMovie(found.id)
