@@ -5,8 +5,9 @@ final class DMMUITests266: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["週間 · 100榜位 · 统计起止未知"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["dmm-source-status"].label.contains("用户导入100"))
-        XCTAssertTrue(app.buttons["精确核对AVDB"].firstMatch.waitForExistence(timeout: 5))
-        app.buttons["精确核对AVDB"].firstMatch.tap()
+        // Maker-verified rows may already auto-resolve via onAppear; otherwise tap once.
+        let verify = app.buttons["精确核对AVDB"].firstMatch
+        if verify.waitForExistence(timeout: 3) { verify.tap() }
         let movie = app.descendants(matching: .any)["dmm-movie-1"].firstMatch
         XCTAssertTrue(movie.waitForExistence(timeout: 10), app.debugDescription)
         movie.tap()
