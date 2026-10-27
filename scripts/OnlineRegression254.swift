@@ -104,7 +104,8 @@ actor OnlineLog254 {
             let lines=try await provider.discover(s,number:"DEMO-123",versions:false);check(lines.count==1,"exact source match \(s)")
             let plan=try await provider.resolve(lines[0],number:"DEMO-123",versions:false)
             check(plan.source==s && plan.number=="DEMO-123","no source switch")
-            check(plan.headers["Referer"] != nil && plan.headers["User-Agent"]==OnlinePolicy.ua,"native headers")
+            let expectedUA = s == .javday ? OnlinePolicy.chromeUA : OnlinePolicy.ua
+            check(plan.headers["Referer"] != nil && plan.headers["User-Agent"]==expectedUA,"native headers")
             check(plan.headers["Cookie"]==nil && plan.headers["Authorization"]==nil,"no account leakage")
         }
         let requests=await log.all()
