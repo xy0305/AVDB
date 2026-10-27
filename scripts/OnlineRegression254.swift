@@ -68,7 +68,7 @@ actor OnlineLog254 {
         check(OnlineIdentity.key("ssis_001")=="SSIS-001","full digits preserved")
         for bad in ["DEMO-1230","XDEMO-123","DEMO-0123","DEMO-123-LEAK","../DEMO-123"] { check(OnlineIdentity.version(bad,number:"DEMO-123",allowVersions:false)==nil,"wrong number") }
         check(OnlineIdentity.version("DEMO-123NTUM",number:"DEMO-123",allowVersions:false)=="原始版本","jable opaque slug")
-        check(OnlineIdentity.version("demo-123abc",number:"DEMO-123",allowVersions:false)!=nil,"jable opaque casefold")
+        check(OnlineIdentity.version("demo-123abc",number:"DEMO-123",allowVersions:false) != nil,"jable opaque casefold")
         check(OnlineIdentity.version("DEMO-123-UNCENSORED-LEAK",number:"DEMO-123",allowVersions:false)==nil,"labelled still opt-in")
         check(OnlineIdentity.version("DEMO-123-UNCENSORED-LEAK",number:"DEMO-123",allowVersions:true) != nil,"explicit edition")
         for a in ["127.0.0.1","10.0.0.1","192.168.1.1","198.18.8.8","198.19.0.1","fd27:712::1","::1","169.254.169.254","2001:db8::1"] { check(!OnlineMediaScope.publicAddress(a),"private/FakeIP forbidden") }
