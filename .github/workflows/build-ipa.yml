@@ -225,7 +225,9 @@ jobs:
   tangxin-native-ui:
     if: github.ref == 'refs/heads/feat/tangxin-javverse-from261'
     runs-on: macos-26
-    timeout-minutes: 25
+    # Run 40348767288 completed Release but exhausted 25m during device two,
+    # with no assertion failure; retain all seven tests and 48-card assertions.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Install isolated test project generator
