@@ -2,11 +2,15 @@ import Foundation
 
 // Each adapter owns its public protocol; a failure never falls through to another source.
 enum JableAdapter {
+    // Build 270: explicit online host is fs1.app (documented Jable.TV mirror).
+    // jable.tv remains CF-challenged for anonymous URLSession; this is not a silent
+    // response-link rewrite — search/detail URLs are issued on the declared host only.
+    static let site = URL(string: "https://fs1.app")!
     static func searchItems(_ code: String) -> [URLQueryItem] {
         [URLQueryItem(name:"mode",value:"async"),URLQueryItem(name:"function",value:"get_block"),URLQueryItem(name:"block_id",value:"list_videos_videos_list_search_result"),URLQueryItem(name:"q",value:code)]
     }
     static func search(_ code:String) -> URL {
-        var c=URLComponents(string:"https://jable.tv/search/"+code+"/")!;c.queryItems=searchItems(code);return c.url!
+        var c=URLComponents(string:"https://fs1.app/search/"+code+"/")!;c.queryItems=searchItems(code);return c.url!
     }
     static func lines(_ data:Data, page:URL, number:String, versions:Bool) throws -> [OnlineLine] {
         let text=try OnlineAdditional.html(data); try OnlineAdapters.rejectChallenge(text)
@@ -117,7 +121,7 @@ extension OnlineProvider {
         guard let code=OnlineIdentity.key(number) else { throw OnlineFailure.noMatch }
         switch source {
         case .jable:
-            let page=JableAdapter.search(code);return try JableAdapter.lines(try await transport.fetch(page,cap:2*1024*1024),page:page,number:code,versions:versions)
+            let page=JableAdapter.search(code);return try JableAdapter.lines(try await transport.fetch(page,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:JableAdapter.site)),page:page,number:code,versions:versions)
         case .missav:
             let page=MissAVAdapter.search(code);return try MissAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:MissAVAdapter.site)),page:page,number:code,versions:versions)
         case .av123:

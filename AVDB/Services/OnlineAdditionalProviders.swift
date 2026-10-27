@@ -155,7 +155,7 @@ enum OnlineAdditional {
     }
     static func jableMedia(_ text: String) throws -> URL {
         var found = Set<URL>()
-        let page = URL(string: "https://jable.tv/")!
+        let page = URL(string: "https://fs1.app/")!
         for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
             for match in JRHTML.matches(#"\b(?:var|let|const)\s+hlsUrl\s*=\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')\s*(?:;|$)"#, block[1]) {
                 let raw = try jsURLLiteral(match[1])

@@ -4,7 +4,7 @@ import Darwin
  @MainActor static func main() async {
   do { try await OnlineRegression254.main(); try await OnlineCompatibilityRegression256.run() } catch { preconditionFailure("neutral256 tests failed") }
   print("PLATFORM", ProcessInfo.processInfo.operatingSystemVersionString)
-  for host in ["jable.tv","missav.fans","123av.com","memojav.org"] {
+  for host in ["fs1.app","missav.fans","123av.com","memojav.org"] {
    var result:UnsafeMutablePointer<addrinfo>?
    let rc=getaddrinfo(host,nil,nil,&result)
    var records:[String]=[];var cur=result

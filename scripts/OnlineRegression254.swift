@@ -22,9 +22,9 @@ actor OnlineLog254 {
     }
     static func response(_ r:URLRequest) throws -> Data {
         let u=r.url!,h=u.host!
-        if h=="jable.tv" {
-            if u.path.hasPrefix("/search/") { return Data("<a href='/videos/demo-1230/'>wrong</a><a href='/videos/demo-123/'>neutral</a>".utf8) }
-            return Data("<meta property='og:url' content='https://jable.tv/videos/demo-123/'><section class='video-info'><h4>DEMO-123 Neutral</h4></section><script>var hlsUrl='https://neutral.jable-cdn.net/demo/index.m3u8';</script>".utf8)
+        if h=="fs1.app" {
+            if u.path.hasPrefix("/search/") { return Data("<a href='https://jable.tv/videos/demo-123/'>wrong mirror</a><a href='/videos/demo-1230/'>wrong</a><a href='/videos/demo-123/'>neutral</a>".utf8) }
+            return Data("<link rel='canonical' href='https://fs1.app/videos/demo-123/'><section class='video-info'><h4>DEMO-123 Neutral</h4></section><script>var hlsUrl='https://neutral.jable-cdn.net/demo/index.m3u8';</script>".utf8)
         }
         if h=="missav.fans" {
             if u.path.contains("/search/") { return Data("<a href='https://missav.ws/en/demo-123'>wrong mirror</a><a href='https://missav.media/en/demo-123'>wrong mirror</a><a href='/en/demo-123'>neutral</a>".utf8) }
@@ -68,7 +68,8 @@ actor OnlineLog254 {
         check(OnlineIdentity.version("DEMO-123-UNCENSORED-LEAK",number:"DEMO-123",allowVersions:true) != nil,"explicit edition")
         for a in ["127.0.0.1","10.0.0.1","192.168.1.1","198.18.8.8","198.19.0.1","fd27:712::1","::1","169.254.169.254","2001:db8::1"] { check(!OnlineMediaScope.publicAddress(a),"private/FakeIP forbidden") }
         check(OnlineMediaScope.publicAddress("8.8.8.8"),"public address")
-        for u in ["http://jable.tv/videos/demo-123/","https://jable.tv.evil.net/videos/demo-123/","https://u:p@jable.tv/videos/demo-123/","https://127.0.0.1/video/DEMO-123","https://jable.tv:444/videos/demo-123/"] { check(!OnlinePolicy.metadata(URL(string:u)!,source:.jable),"unsafe metadata") }
+        for u in ["http://fs1.app/videos/demo-123/","https://jable.tv/videos/demo-123/","https://jable.tv.evil.net/videos/demo-123/","https://u:p@fs1.app/videos/demo-123/","https://127.0.0.1/video/DEMO-123","https://fs1.app:444/videos/demo-123/"] { check(!OnlinePolicy.metadata(URL(string:u)!,source:.jable),"unsafe metadata") }
+        check(OnlinePolicy.metadata(URL(string:"https://fs1.app/videos/demo-123/")!,source:.jable),"declared fs1.app detail accepted")
         check(!OnlinePolicy.embed(URL(string:"https://unknown.site/e/Neutral1")!),"unknown embed does not widen hosts")
         // Stream-issued /oo5/ hosts rotate; accept shape via discoveredMedia, not a fixed allowlist.
         for host in ["jzxz.freeboldspirit.site","85kq.cleartruevision.site","8vpr.deeptrueforce.site","jmv1.grayson-store.site"] {
@@ -104,7 +105,7 @@ actor OnlineLog254 {
         let requests=await log.all()
         check(requests.allSatisfy { $0.value(forHTTPHeaderField:"Cookie")==nil && $0.value(forHTTPHeaderField:"Authorization")==nil },"requests anonymous")
         check(requests.allSatisfy { !$0.url!.path.hasSuffix(".ts") },"no segment download")
-        let isolated=OnlinePlaybackModel(provider:OnlineProvider(transport:OnlineTransport(loader:{ r in if r.url?.host=="jable.tv" { throw OnlineFailure.blocked };return try response(r) })))
+        let isolated=OnlinePlaybackModel(provider:OnlineProvider(transport:OnlineTransport(loader:{ r in if r.url?.host=="fs1.app" { throw OnlineFailure.blocked };return try response(r) })))
         isolated.query(.jable,number:"DEMO-123",versions:false);isolated.query(.av123,number:"DEMO-123",versions:false);try await settle(isolated)
         check(isolated.states[.jable] == .failed(.blocked),"source failure isolated")
         if case .found(let lines)=isolated.states[.av123] { check(lines.count==1,"other source survives") } else { preconditionFailure("other source lost") }

@@ -124,7 +124,8 @@ enum OnlinePolicy {
         let p = url.path, parts = p.split(separator: "/")
         switch source {
         case .jable:
-            guard url.host == "jable.tv", parts.count == 2 else { return false }
+            // Declared online apex is fs1.app (Build 270). Reject jable.tv / other mirrors.
+            guard url.host == "fs1.app", parts.count == 2 else { return false }
             if p.hasPrefix("/videos/") { return url.query == nil }
             guard p.hasPrefix("/search/"), OnlineIdentity.key(String(parts[1])) != nil else { return false }
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
@@ -207,7 +208,7 @@ enum OnlinePolicy {
     static func headers(referrer:URL, source: OnlineSource? = nil) -> [String:String] {
         let agent = source == .javday ? chromeUA : ua
         var h = ["User-Agent":agent,"Referer":referrer.absoluteString]
-        if let host=referrer.host, ["jable.tv","missav.fans","javday.app"].contains(host) { h["Origin"]="https://"+host }
+        if let host=referrer.host, ["fs1.app","missav.fans","javday.app"].contains(host) { h["Origin"]="https://"+host }
         return h
     }
 }
@@ -671,7 +672,7 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         guard body == nil else { throw OnlineFailure.unsafe }
         request.setValue(OnlinePolicy.ua, forHTTPHeaderField: "User-Agent")
         for (key,value) in headers where ["User-Agent","Referer","Origin","Accept"].contains(key) {
-            if key == "Origin" && !["https://jable.tv", "https://missav.fans", "https://javday.app"].contains(value) { throw OnlineFailure.unsafe }
+            if key == "Origin" && !["https://fs1.app", "https://missav.fans", "https://javday.app"].contains(value) { throw OnlineFailure.unsafe }
             request.setValue(value, forHTTPHeaderField: key)
         }
         if let loader {

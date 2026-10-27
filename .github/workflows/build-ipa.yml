@@ -64,6 +64,9 @@ jobs:
       - name: MissAV online fans apex static guards (Build 269)
         run: python3 scripts/test-missav269.py
 
+      - name: Jable online fs1.app apex static guards (Build 270)
+        run: python3 scripts/test-jable270.py
+
       - name: Generic diagnostics and preserved 254-256 neutral guards on macOS and iOS
         run: |
           set -euo pipefail
