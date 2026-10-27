@@ -22,6 +22,8 @@ enum DMMRankingFetchSource: String, Sendable {
     /// Optional overrides for regressions (macOS / offline).
     var hydrateOverride: ((DMMRankingKind, Bool) async throws -> (String, URL))?
     var graphqlOverride: ((DMMRankingKind) async throws -> DMMRankingBoard)?
+    /// Offline/macOS harness: CID -> official makerContentId / メーカー品番.
+    var makerCodeOverride: (([String]) async throws -> [String: String])?
 
     var authorizeAdultDeclaration: Bool {
         get { UserDefaults.standard.bool(forKey: "dmm.authorizedAdultDeclaration") }
@@ -37,6 +39,11 @@ enum DMMRankingFetchSource: String, Sendable {
         generation = UUID(); queue.removeAll()
         tasks.values.forEach { $0.cancel() }; tasks.removeAll()
         DMMRankingHydrator.cancelActive()
+    }
+    /// Cancel on-demand detail/maker retries without aborting board-level makerContentId resolve.
+    func cancelDetails() {
+        queue.removeAll()
+        tasks.values.forEach { $0.cancel() }; tasks.removeAll()
     }
     private func document(_ url: URL) async throws -> (String, URL) {
         try await transport.document(url, authorizeAdultDeclaration: authorizeAdultDeclaration)
@@ -88,6 +95,43 @@ enum DMMRankingFetchSource: String, Sendable {
         case .imported: label = "用户导入"
         }
         status = "\(label)读取\(result.count)个榜位（\(result.periodLabel)）；统计起止未提供。"
+        if !result.kind.isActress {
+            Task { await self.resolveMakerCodes(rows: result.contentRows, epoch: epoch) }
+        }
+    }
+
+    /// Prefer official GraphQL makerContentId (メーカー品番). Never invent from CID.
+    private func resolveMakerCodes(rows: [DMMContentRow], epoch: UUID) async {
+        let missing = rows.filter { evidence[$0.cid] == nil }
+        guard epoch == generation, !missing.isEmpty else { return }
+        status = "正在读取厂家品番（makerContentId）…"
+        do {
+            let map: [String: String]
+            if let makerCodeOverride {
+                map = try await makerCodeOverride(missing.map(\.cid))
+            } else {
+                map = try await DMMRankingGraphQL.makerCodes(cids: missing.map(\.cid))
+            }
+            guard epoch == generation else { return }
+            var got = 0
+            for row in missing {
+                guard let raw = map[row.cid], let code = DMMRankingCore.manufacturerCode(raw) else { continue }
+                evidence[row.cid] = DMMManufacturerEvidence(cid: row.cid, code: code, sourceURL: row.sourceURL)
+                messages[row.cid] = "厂家品番已核对"
+                got += 1
+            }
+            guard epoch == generation else { return }
+            if got == missing.count {
+                status = "厂家品番已全部核对（\(got)/\(missing.count)），未从CID推号。"
+            } else if got > 0 {
+                status = "厂家品番已核对 \(got)/\(missing.count)；其余保留未知，可点详情重试。未从CID推号。"
+            } else {
+                status = "厂家品番暂未取得；可点「获取 / 重试详情」。未从CID推号。"
+            }
+        } catch {
+            guard epoch == generation else { return }
+            status = "厂家品番读取受限；可点「获取 / 重试详情」或导入详情HTML。未从CID推号。"
+        }
     }
 
     private func refreshViaWebView(_ target: DMMRankingKind, epoch: UUID) async -> DMMRankingBoard? {
@@ -132,9 +176,12 @@ enum DMMRankingFetchSource: String, Sendable {
         let candidates = [kind] + DMMRankingKind.allCases.filter { $0 != kind }
         for candidate in candidates {
             if let result = try? DMMRankingCore.board(html: html, responseURL: candidate.sourceURL, observedAt: Date()) {
-                cancel(); kind = result.kind; board = result
+                cancel(); let epoch = generation; kind = result.kind; board = result
                 evidence.removeAll(); messages.removeAll(); imported = true; fetchSource = .imported
                 status = "用户导入\(result.count)榜位 · \(result.periodLabel) · 导入时间不是采集时间，来源统计起止未知。"
+                if !result.kind.isActress {
+                    Task { await self.resolveMakerCodes(rows: result.contentRows, epoch: epoch) }
+                }
                 return
             }
         }
@@ -159,9 +206,19 @@ enum DMMRankingFetchSource: String, Sendable {
             tasks[row.cid] = Task { [weak self] in
                 guard let self else { return }
                 do {
-                    let (html, url) = try await self.document(row.sourceURL)
-                    let item = try DMMRankingCore.manufacturer(html: html, responseURL: url, expectedCID: row.cid)
-                    guard !Task.isCancelled, epoch == self.generation else { return }
+                    var item: DMMManufacturerEvidence?
+                    if let override = self.makerCodeOverride {
+                        if let raw = try await override([row.cid])[row.cid], let code = DMMRankingCore.manufacturerCode(raw) {
+                            item = DMMManufacturerEvidence(cid: row.cid, code: code, sourceURL: row.sourceURL)
+                        }
+                    } else if let raw = try await DMMRankingGraphQL.makerCodes(cids: [row.cid])[row.cid], let code = DMMRankingCore.manufacturerCode(raw) {
+                        item = DMMManufacturerEvidence(cid: row.cid, code: code, sourceURL: row.sourceURL)
+                    }
+                    if item == nil {
+                        let (html, url) = try await self.document(row.sourceURL)
+                        item = try DMMRankingCore.manufacturer(html: html, responseURL: url, expectedCID: row.cid)
+                    }
+                    guard let item, !Task.isCancelled, epoch == self.generation else { return }
                     self.evidence[row.cid] = item; self.cache[row.cid] = (item, Date())
                     if self.cache.count > 160, let oldest = self.cache.min(by: { $0.value.1 < $1.value.1 })?.key { self.cache.removeValue(forKey: oldest) }
                     self.messages[row.cid] = "厂家品番已核对"

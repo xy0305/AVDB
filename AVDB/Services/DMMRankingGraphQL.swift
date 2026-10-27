@@ -174,4 +174,78 @@ enum DMMRankingGraphQL {
         }
         return try board(data: data, kind: kind, observedAt: Date())
     }
+
+    /// Ranking summary type lacks makerContentId; full ppvContent exposes official メーカー品番.
+    static func makerCodes(cids: [String]) async throws -> [String: String] {
+        var out: [String: String] = [:]
+        let unique = cids.filter { $0.range(of: "^[a-z0-9_]+$", options: .regularExpression) != nil && $0.count <= 100 }
+        var index = 0
+        while index < unique.count {
+            let end = min(index + 10, unique.count)
+            let chunk = Array(unique[index..<end])
+            index = end
+            let body = try makerCodePayload(cids: chunk)
+            let data = try await post(body: body, referer: URL(string: "https://video.dmm.co.jp/av/ranking/?term=weekly")!)
+            let part = try makerCodes(data: data, expectedCIDs: chunk)
+            for (cid, code) in part { out[cid] = code }
+        }
+        return out
+    }
+
+    static func makerCodePayload(cids: [String]) throws -> Data {
+        var selections: [String] = []
+        var variables: [String: Any] = [:]
+        var defs: [String] = []
+        for (i, cid) in cids.enumerated() {
+            defs.append("$id\(i): ID!")
+            selections.append("c\(i): ppvContent(id: $id\(i)) { id makerContentId }")
+            variables["id\(i)"] = cid
+        }
+        let query = "query AVDBMakerCodes(\(defs.joined(separator: ", "))) { \(selections.joined(separator: " ")) }"
+        return try JSONSerialization.data(withJSONObject: [
+            "query": query,
+            "operationName": "AVDBMakerCodes",
+            "variables": variables
+        ])
+    }
+
+    static func makerCodes(data: Data, expectedCIDs: [String]) throws -> [String: String] {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw DMMRankingError.malformed }
+        if let errors = root["errors"] as? [Any], !errors.isEmpty { throw DMMRankingError.accessGate }
+        guard let dataObj = root["data"] as? [String: Any] else { throw DMMRankingError.accessGate }
+        var out: [String: String] = [:]
+        for (i, cid) in expectedCIDs.enumerated() {
+            guard let record = dataObj["c\(i)"] as? [String: Any],
+                  let id = record["id"] as? String, id == cid,
+                  let raw = record["makerContentId"] as? String,
+                  let code = DMMRankingCore.manufacturerCode(raw) else { continue }
+            out[cid] = code
+        }
+        return out
+    }
+
+    private static func post(body: Data, referer: URL) async throws -> Data {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.urlCredentialStorage = nil
+        config.urlCache = nil
+        config.timeoutIntervalForRequest = 25
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        let session = URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("https://video.dmm.co.jp", forHTTPHeaderField: "Origin")
+        request.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              response.url == endpoint, data.count <= 8_000_000 else {
+            throw DMMRankingError.accessGate
+        }
+        return data
+    }
 }

@@ -90,15 +90,22 @@ final class DMMMockProtocol: URLProtocol, @unchecked Sendable {
             }
             return try DMMRankingGraphQL.board(data: try Data(contentsOf: base.appendingPathComponent(name)), kind: kind, observedAt: Date())
         }
+        gqlStore.makerCodeOverride = { cids in
+            Dictionary(uniqueKeysWithValues: cids.enumerated().map { ($0.element, String(format: "NEUT-%03d", $0.offset + 1)) })
+        }
         await gqlStore.refresh()
+        for _ in 0..<100 where gqlStore.evidence.count < 100 { try await Task.sleep(nanoseconds: 20_000_000) }
         precondition(gqlStore.fetchSource == .graphql && gqlStore.board?.contentRows.count == 100 && gqlStore.kind == .weekly)
+        precondition(gqlStore.evidence.count == 100)
+        precondition(gqlStore.evidence["neutral00001"]?.code == "NEUT-001")
         gqlStore.select(.actress)
         await gqlStore.refresh()
         precondition(gqlStore.fetchSource == .graphql && gqlStore.board?.actressRows.count == 100)
+        precondition(gqlStore.evidence.isEmpty)
         gqlStore.authorizeAdultDeclaration = false
         await gqlStore.refresh()
         precondition(gqlStore.board == nil)
 
-        print("PASS: production import daily/weekly/actress, GraphQL refresh override, bounded2, CID inflight dedup, cache, cancellation generation, manufacturer identity, official declaration link and cross-domain allowlist")
+        print("PASS: production import daily/weekly/actress, GraphQL refresh + makerContentId evidence, bounded2, CID inflight dedup, cache, cancellation generation, manufacturer identity, official declaration link and cross-domain allowlist")
     }
 }

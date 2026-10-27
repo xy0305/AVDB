@@ -217,11 +217,16 @@ enum DMMRankingCore {
             fields[text(label), default: []].insert(text(value))
         }
         guard fields["配信品番"] == Set([expectedCID]), let values = fields["メーカー品番"], values.count == 1,
-              let raw = values.first else { throw DMMRankingError.conflictingIdentity }
-        let code = raw.uppercased()
-        guard code.unicodeScalars.allSatisfy({ $0.isASCII }),
-              code.range(of: "^[A-Z0-9]+-[A-Z0-9]+$", options: .regularExpression) != nil else { throw DMMRankingError.conflictingIdentity }
+              let raw = values.first, let code = manufacturerCode(raw) else { throw DMMRankingError.conflictingIdentity }
         // Preserve every digit and suffix. No CID prefix stripping, zero removal or guessed aliases.
         return DMMManufacturerEvidence(cid: expectedCID, code: code, sourceURL: responseURL)
+    }
+
+    /// Official メーカー品番 / GraphQL makerContentId only. Never derived from CID.
+    static func manufacturerCode(_ raw: String) -> String? {
+        let code = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !code.isEmpty, code.unicodeScalars.allSatisfy({ $0.isASCII }),
+              code.range(of: "^[A-Z0-9]+-[A-Z0-9]+$", options: .regularExpression) != nil else { return nil }
+        return code
     }
 }

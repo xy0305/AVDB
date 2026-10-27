@@ -46,11 +46,11 @@ import UniformTypeIdentifiers
             if let importError { Text(importError).font(.caption).foregroundStyle(.red) }
             if let board = store.board {
                 HStack {
-                    Button("上一页") { store.cancel(); page -= 1 }.disabled(page == 0)
+                    Button("上一页") { store.cancelDetails(); page -= 1 }.disabled(page == 0)
                     Spacer()
                     Text("\(page + 1) / \(pageCount) · \(sourceLabel)").font(.caption)
                     Spacer()
-                    Button("下一页") { store.cancel(); page += 1 }.disabled(page >= pageCount - 1)
+                    Button("下一页") { store.cancelDetails(); page += 1 }.disabled(page >= pageCount - 1)
                 }
                 if board.kind.isActress {
                     DMMActressRankingPage(rows: Array(board.actressRows.dropFirst(page * 20).prefix(20)))
@@ -127,7 +127,14 @@ import UniformTypeIdentifiers
         }.listStyle(.plain)
         .buttonStyle(.borderless)
         .navigationDestination(isPresented: $manualSearch) { SearchView() }
+        .onAppear { resolveMapped() }
+        .onChange(of: store.evidence.count) { _, _ in resolveMapped() }
         .onDisappear { mapper.cancel() }
+    }
+    private func resolveMapped() {
+        let items = rows.compactMap(entry)
+        guard !items.isEmpty else { return }
+        mapper.resolve(items, retry: false)
     }
 }
 

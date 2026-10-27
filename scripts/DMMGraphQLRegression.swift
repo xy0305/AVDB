@@ -41,6 +41,13 @@ import Foundation
         precondition(actressPayload["operationName"] as? String == "AVDBActressRanking")
         precondition(DMMRankingGraphQL.endpoint.host == "api.video.dmm.co.jp")
 
-        print("PASS: GraphQL neutral parse daily20/weekly100/monthly100/actress100, incomplete+blocked fail-closed, verified payload shapes")
+        let maker = try DMMRankingGraphQL.makerCodes(data: try read("graphql-maker-codes-neutral.json"), expectedCIDs: ["neutral00001", "neutral00002"])
+        precondition(maker["neutral00001"] == "NEUT-001" && maker["neutral00002"] == "NEUT-002")
+        let invalid = try DMMRankingGraphQL.makerCodes(data: try read("graphql-maker-codes-invalid.json"), expectedCIDs: ["neutral00001"])
+        precondition(invalid.isEmpty)
+        precondition(DMMRankingCore.manufacturerCode("snos-377") == "SNOS-377")
+        precondition(DMMRankingCore.manufacturerCode("snos00377") == nil)
+
+        print("PASS: GraphQL neutral parse daily20/weekly100/monthly100/actress100, incomplete+blocked fail-closed, verified payload shapes, makerContentId")
     }
 }
