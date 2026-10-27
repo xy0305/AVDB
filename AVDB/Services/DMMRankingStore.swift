@@ -95,7 +95,7 @@ enum DMMRankingFetchSource: String, Sendable {
         case .imported: label = "用户导入"
         }
         status = "\(label)读取\(result.count)个榜位（\(result.periodLabel)）；统计起止未提供。"
-        if !result.kind.isActress {
+        if !result.kind.isActress, source != .imported {
             Task { await self.resolveMakerCodes(rows: result.contentRows, epoch: epoch) }
         }
     }
@@ -176,12 +176,9 @@ enum DMMRankingFetchSource: String, Sendable {
         let candidates = [kind] + DMMRankingKind.allCases.filter { $0 != kind }
         for candidate in candidates {
             if let result = try? DMMRankingCore.board(html: html, responseURL: candidate.sourceURL, observedAt: Date()) {
-                cancel(); let epoch = generation; kind = result.kind; board = result
+                                cancel(); kind = result.kind; board = result
                 evidence.removeAll(); messages.removeAll(); imported = true; fetchSource = .imported
                 status = "用户导入\(result.count)榜位 · \(result.periodLabel) · 导入时间不是采集时间，来源统计起止未知。"
-                if !result.kind.isActress {
-                    Task { await self.resolveMakerCodes(rows: result.contentRows, epoch: epoch) }
-                }
                 return
             }
         }
