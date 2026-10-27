@@ -32,12 +32,20 @@ enum MissAVHTML {
         return clean
     }
     static func isChallenge(_ html: String) -> Bool {
-        let lower = html.lowercased()
-        // Cloudflare also injects challenge-platform/scripts/jsd/main.js into valid lists.
-        // That passive script alone is NOT an interstitial and must never hide real cards.
-        return lower.contains("cf-chl-") || lower.contains("_cf_chl_opt") ||
-            !JRHTML.matches(#"<title[^>]*>\s*(?:just a moment|attention required)[^<]*</title>"#, lower).isEmpty ||
-            lower.contains("id=\"challenge-form\"")
+        let raw = html
+        guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let lower = raw.lowercased()
+        // Success lists also embed cdn-cgi/challenge-platform jsd; never treat that alone as a block.
+        let hasCards = lower.contains("text-secondary") || lower.contains("thumbnail")
+            || lower.contains("videodetails") || lower.contains("surrit")
+        if hasCards && raw.count > 12_000 { return false }
+        let titleChallenge = !JRHTML.matches(#"<title[^>]*>\s*(?:just a moment|attention required|please wait)[^<]*</title>"#, lower).isEmpty
+        let human = lower.contains("cf-chl-") || lower.contains("_cf_chl_opt")
+            || lower.contains("id=\"challenge-form\"") || lower.contains("cf-browser-verification")
+            || lower.contains("verify you are human") || lower.contains("performing security verification")
+            || lower.contains("checking your browser before accessing")
+        if titleChallenge { return true }
+        return human && raw.count < 20_000
     }
     static func responseError(_ response: HTTPURLResponse, _ data: Data) -> Error? {
         let status = response.statusCode

@@ -43,6 +43,16 @@ actor OnlineLog254 {
             if u.path.hasPrefix("/embed/") { return Data("<script>var config={id:'DEMO-123'};</script>".utf8) }
             return Data("{\"success\":true,\"type\":\"hls\",\"url\":\"https://video10.memojav.net/stream/neutral/index.m3u8\"}".utf8)
         }
+        if h=="javday.app" {
+            if u.path.contains("/search/") {
+                return Data("<a class='videoBox' href='/videos/DEMO123/'><div class='videoBox-info'><div class='title'>DEMO-123 Neutral</div></div></a><a class='videoBox' href='/videos/WRONG999/'><div class='videoBox-info'><div class='title'>WRONG-999</div></div></a>".utf8)
+            }
+            return Data("<meta property='og:url' content='https://javday.app/videos/DEMO123/'><meta property='og:title' content='DEMO-123 Neutral'><h1>DEMO-123 Neutral</h1><video id='J_prismPlayer'><source src='https://javday.homes/videos/neutral/index.m3u8' type='application/x-mpegURL'/></video><script>url: 'https://javday.homes/videos/neutral/index.m3u8'</script>".utf8)
+        }
+        if h=="javday.homes" || h.hasSuffix(".javday.homes") {
+            if u.path.hasSuffix("leaf.m3u8") { return Data("#EXTM3U\n#EXTINF:4,\nhttps://edge.javday.homes/videos/neutral/seg.ts\n#EXT-X-ENDLIST\n".utf8) }
+            return Data("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nleaf.m3u8\n".utf8)
+        }
         if u.path.hasSuffix("leaf.m3u8") { return Data("#EXTM3U\n#EXTINF:4,\n../neutral.ts\n#EXT-X-ENDLIST\n".utf8) }
         if u.path.hasSuffix(".m3u8") { return Data("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\n720/leaf.m3u8\n".utf8) }
         throw OnlineFailure.unsafe
@@ -52,7 +62,7 @@ actor OnlineLog254 {
         preconditionFailure("model did not settle")
     }
     @MainActor static func main() async throws {
-        check(OnlineSource.allCases.count==4,"exactly four sources")
+        check(OnlineSource.allCases.count==5,"exactly five sources")
         check(OnlineIdentity.key("ssis_001")=="SSIS-001","full digits preserved")
         for bad in ["DEMO-1230","XDEMO-123","DEMO-0123","DEMO-123-LEAK","../DEMO-123"] { check(OnlineIdentity.version(bad,number:"DEMO-123",allowVersions:false)==nil,"wrong number") }
         check(OnlineIdentity.version("DEMO-123-UNCENSORED-LEAK",number:"DEMO-123",allowVersions:true) != nil,"explicit edition")
@@ -91,11 +101,11 @@ actor OnlineLog254 {
         slow.query(.av123,number:"DEMO-123",versions:false);slow.query(.av123,number:"DEMO-123",versions:false);slow.cancel(.av123)
         try await Task.sleep(nanoseconds:300_000_000);check(slow.states[.av123] == .idle && slow.plan==nil,"cancel prevents late result")
         slow.query(.av123,number:"DEMO-123",versions:false);slow.reset();try await Task.sleep(nanoseconds:300_000_000);check(slow.states.isEmpty,"reset prevents late account result")
-        print("PASS \(count) production four-adapter assertions; neutral HTML/HLS only; no adult media or first-frame claim")
+        print("PASS \(count) production five-adapter assertions; neutral HTML/HLS only; no adult media or first-frame claim")
         try await OnlineSafetyRegression255.run()
         if ProcessInfo.processInfo.environment["ONLINE254_LIVE"]=="1" {
             for s in OnlineSource.allCases {
-                let code=s == .memojav ? "START-642" : "FNS-249";let real=OnlineProvider();var stage="exact-search"
+                let code:String; switch s { case .memojav: code="START-642"; case .javday: code="ABF-378"; default: code="FNS-249" };let real=OnlineProvider();var stage="exact-search"
                 do {
                     let rows=try await OnlinePlaybackModel.bounded { try await real.discover(s,number:code,versions:false) }
                     print("LIVE254 source=\(s.rawValue) number=\(code) search-candidates=\(rows.count)")

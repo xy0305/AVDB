@@ -24,7 +24,7 @@ actor CompatibilityLog256 {
   for addresses in [[],["8.8.8.8","198.18.1.1","10.0.0.1"],["198.18.1.1","127.0.0.1"],["fd27::1"],["169.254.169.254"],["192.168.1.1"],["172.16.0.1"],["224.0.0.1"],["2001:db8::1"],["not-an-ip"],Array(repeating:"198.18.1.1",count:33)] { rejects(addresses,root:root) }
   rejects(["198.18.1.1"],root:URL(string:"https://198.18.1.1/a")!)
   let queries=OnlineSource.allCases.map { s -> URL in
-   switch s {case .jable:return JableAdapter.search("DEMO-123");case .missav:return MissAVAdapter.search("DEMO-123");case .av123:return OneTwoThreeAVAdapter.search("DEMO-123");case .memojav:return MemoJavAdapter.page("DEMO-123")}
+   switch s {case .jable:return JableAdapter.search("DEMO-123");case .missav:return MissAVAdapter.search("DEMO-123");case .av123:return OneTwoThreeAVAdapter.search("DEMO-123");case .memojav:return MemoJavAdapter.page("DEMO-123");case .javday:return JavDayAdapter.search("DEMO-123")}
   }
   let log=CompatibilityLog256()
   let transport=OnlineTransport(resolver:{ _ in ["198.18.3.139"] },loader:{ r in await log.add(r.url!);return try OnlineRegression254.response(r) })
@@ -40,7 +40,7 @@ actor CompatibilityLog256 {
    check(plan.source==source && plan.headers["Cookie"]==nil,"compat prepare same source")
   }
   let urls=await log.all()
-  for host in ["jable.tv","missav.ws","123av.com","memojav.org","sadie-shop.site","video10.memojav.net","jzxz.freeboldspirit.site","neutral.jable-cdn.net","surrit.neutral.media"] { check(urls.contains { $0.host==host },"mode propagated through approved source "+host) }
+  for host in ["jable.tv","missav.ws","123av.com","memojav.org","javday.app","javday.homes","sadie-shop.site","video10.memojav.net","jzxz.freeboldspirit.site","neutral.jable-cdn.net","surrit.neutral.media"] { check(urls.contains { $0.host==host },"mode propagated through approved source "+host) }
   check(urls.contains { $0.path.hasSuffix("leaf.m3u8") },"child manifest preflight")
   check(urls.allSatisfy { $0.scheme=="https" && $0.host != "198.18.3.139" && !$0.path.hasSuffix(".ts") },"original HTTPS hostname; no segment fetch")
   let keyLog=CompatibilityLog256()

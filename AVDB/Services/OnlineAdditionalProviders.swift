@@ -11,19 +11,26 @@ enum OnlineAdditional {
         let urls = dom.all { ($0.tag == "link" && $0.attrs["rel"] == "canonical") || ($0.tag == "meta" && $0.attrs["property"] == "og:url") }.compactMap { $0.attrs["href"] ?? $0.attrs["content"] }
         let jableHeadings = source == .jable ? dom.all { $0.tag == "section" && $0.cls("video-info") }.flatMap { $0.all { $0.tag == "h4" } }.map(\.text)
             + dom.all { $0.tag == "meta" && $0.attrs["property"] == "og:title" }.compactMap { $0.attrs["content"] } : []
-        let headings = dom.all { $0.tag == "h1" }.map(\.text) + jableHeadings
-        let slug = page.lastPathComponent.uppercased()
+        let javdayHeadings = source == .javday ? dom.all { $0.tag == "meta" && $0.attrs["property"] == "og:title" }.compactMap { $0.attrs["content"] } : []
+        let headings = dom.all { $0.tag == "h1" }.map(\.text) + jableHeadings + javdayHeadings
+        let slug = OnlinePolicy.pathSlug(page).uppercased()
         let exactVersionHeading = OnlineIdentity.version(slug, number: code, allowVersions: true) != nil
             && headings.contains { !JRHTML.matches("(?<![A-Z0-9_-])" + NSRegularExpression.escapedPattern(for: slug) + "(?![A-Z0-9_-])", $0).isEmpty }
-        guard urls.contains(page.absoluteString), headings.contains(where: { OnlineIdentity.heading($0, number: code) }) || exactVersionHeading else {
-            if text.lowercased().contains("just a moment") || text.contains("cf-chl-") { throw OnlineFailure.blocked }
+        let pageMatch = urls.contains(page.absoluteString)
+            || urls.contains(where: { URL(string: $0)?.absoluteURL.absoluteString == page.absoluteString })
+            || (source == .javday && urls.contains(where: {
+                guard let u = URL(string: $0)?.absoluteURL else { return false }
+                return OnlinePolicy.javdaySlug(u)?.caseInsensitiveCompare(OnlinePolicy.pathSlug(page)) == .orderedSame
+            }))
+        guard pageMatch, headings.contains(where: { OnlineIdentity.heading($0, number: code) }) || exactVersionHeading else {
+            if MissAVHTML.isChallenge(text) { throw OnlineFailure.blocked }
             throw OnlineFailure.noMatch
         }
         return text
     }
     static func searchLinks(_ data: Data, base: URL, source: OnlineSource, number: String) throws -> [URL] {
         let text = try html(data)
-        if text.lowercased().contains("just a moment") || text.contains("cf-chl-") { throw OnlineFailure.blocked }
+        if MissAVHTML.isChallenge(text) { throw OnlineFailure.blocked }
         let dom = try JRHTML.tree(text); var seen = Set<URL>()
         return dom.all { $0.tag == "a" }.compactMap { node in
             guard let href = node.attrs["href"], let url = URL(string: href, relativeTo: base)?.absoluteURL,
@@ -154,6 +161,34 @@ enum OnlineAdditional {
                 let raw = try jsURLLiteral(match[1])
                 guard let url = OnlineProvider.issuedPlaylist(raw, relativeTo: page, source: .jable) else { throw OnlineFailure.unsafe }
                 found.insert(url)
+            }
+        }
+        guard found.count == 1, let media = found.first else { throw OnlineFailure.unsupported }
+        return media
+    }
+    // JavDay: page-issued HLS only (source/.m3u8 / DPlayer url / Artplayer url). No guessed CDN paths.
+    static func javdayMedia(_ text: String, page: URL) throws -> URL {
+        var found = Set<URL>()
+        func consider(_ raw: String) throws {
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\\/", with: "/")
+            guard let url = OnlineProvider.issuedPlaylist(value, relativeTo: page, source: .javday) else { throw OnlineFailure.unsafe }
+            found.insert(url)
+        }
+        let dom = try JRHTML.tree(text)
+        for node in dom.all({ $0.tag == "source" || $0.tag == "video" }) {
+            for name in ["src", "data-src"] {
+                guard let raw = node.attrs[name], raw.lowercased().contains(".m3u8") else { continue }
+                try consider(raw)
+            }
+        }
+        for block in JRHTML.matches(#"<script\b[^>]*>(.*?)</script\s*>"#, text) {
+            let body = block[1]
+            for match in JRHTML.matches(#"\burl\s*:\s*(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')"#, body) {
+                let raw = try jsURLLiteral(match[1])
+                if raw.lowercased().contains(".m3u8") { try consider(raw) }
+            }
+            for match in JRHTML.matches(#"['\"](https?://[^'\"]+\.m3u8[^'\"]*)['\"]"#, body) {
+                try consider(match[1])
             }
         }
         guard found.count == 1, let media = found.first else { throw OnlineFailure.unsupported }

@@ -6,9 +6,9 @@ import Darwin
 #endif
 
 enum OnlineSource: String, CaseIterable, Identifiable, Sendable {
-    case jable, missav, av123, memojav
+    case jable, missav, av123, memojav, javday
     var id: String { rawValue }
-    var label: String { switch self { case .jable: return "Jable"; case .missav: return "MissAV"; case .av123: return "123AV"; case .memojav: return "MemoJav" } }
+    var label: String { switch self { case .jable: return "Jable"; case .missav: return "MissAV"; case .av123: return "123AV"; case .memojav: return "MemoJav"; case .javday: return "JavDay" } }
 }
 enum OnlineFailure: Error, LocalizedError, CustomNSError, Equatable {
     static var errorDomain: String { "AVDB.OnlineFailure" }
@@ -106,7 +106,9 @@ enum OnlineIdentity {
     }
 }
 enum OnlinePolicy {
-    static let ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    static let ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1"
+    // JavDay listing/detail prefers a desktop Chrome UA (observed public pages).
+    static let chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     static func secure(_ url: URL) -> Bool {
         guard url.scheme == "https", url.user == nil, url.password == nil, url.fragment == nil,
               url.port == nil || url.port == 443, let h = url.host?.lowercased(), OnlineMediaScope.publicHost(h) else { return false }
@@ -139,7 +141,35 @@ enum OnlinePolicy {
             if p.hasPrefix("/video/") || p.hasPrefix("/embed/") { return parts.count == 2 && url.query == nil && OnlineIdentity.key(String(parts[1])) != nil }
             let q = URLComponents(url:url,resolvingAgainstBaseURL:false)?.queryItems ?? []
             return p == "/hls/get_video_info.php" && q.count == 3 && Set(q.map(\.name)) == Set(["id","sig","sts"]) && q.allSatisfy { ($0.value?.count ?? 0) <= 64 }
+        case .javday:
+            guard url.host == "javday.app" else { return false }
+            // Detail: /videos/<slug>/ or legacy /index.php/videos/<slug>/
+            if let slug = javdaySlug(url) {
+                return url.query == nil && slug.range(of: #"^[A-Za-z0-9_-]{2,80}$"#, options: .regularExpression) != nil
+            }
+            let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            // Path search /search/wd/<keyword>/ (preferred; query form often CF-challenged).
+            if parts.count == 3 && parts[0] == "search" && parts[1] == "wd",
+               OnlineIdentity.key(String(parts[2])) != nil { return q.isEmpty }
+            if parts.count == 5 && parts[0] == "search" && parts[1] == "page" && parts[3] == "wd",
+               Int(parts[2]).map({ (1...100).contains($0) }) == true,
+               OnlineIdentity.key(String(parts[4])) != nil { return q.isEmpty }
+            // Widget-compatible /search/?wd=
+            return p == "/search/" && q.count == 1 && q[0].name == "wd" && OnlineIdentity.key(q[0].value ?? "") != nil
         }
+    }
+    static func pathSlug(_ url: URL) -> String {
+        url.path.split(separator: "/").last.map(String.init) ?? url.lastPathComponent
+    }
+    static func javdaySlug(_ url: URL) -> String? {
+        let parts = url.path.split(separator: "/").map(String.init)
+        if parts.count == 2, parts[0] == "videos" { return parts[1] }
+        if parts.count == 3, parts[0] == "index.php", parts[1] == "videos" { return parts[2] }
+        return nil
+    }
+    static func javdayCDN(_ host: String?) -> Bool {
+        guard let host = host?.lowercased(), OnlineMediaScope.publicHost(host) else { return false }
+        return host == "javday.homes" || host.hasSuffix(".javday.homes")
     }
     static func embed(_ url: URL) -> Bool {
         guard secure(url), url.host == "sadie-shop.site" else { return false }
@@ -163,11 +193,14 @@ enum OnlinePolicy {
         guard secure(url), url.path.lowercased().hasSuffix(".m3u8"), !url.path.contains("..") else { return false }
         if source == .jable { return true } // Exact page-issued HTTPS origin, DNS and all HLS children checked; no wildcard list.
         if source == .missav { return url.host?.hasPrefix("surrit.") == true }
+        // JavDay page issues HTTPS playlists on javday.homes (edge hosts under the same apex).
+        if source == .javday { return javdayCDN(url.host) }
         return media(url,source:source)
     }
-    static func headers(referrer:URL) -> [String:String] {
-        var h = ["User-Agent":ua,"Referer":referrer.absoluteString]
-        if let host=referrer.host, ["jable.tv","missav.ws"].contains(host) { h["Origin"]="https://"+host }
+    static func headers(referrer:URL, source: OnlineSource? = nil) -> [String:String] {
+        let agent = source == .javday ? chromeUA : ua
+        var h = ["User-Agent":agent,"Referer":referrer.absoluteString]
+        if let host=referrer.host, ["jable.tv","missav.ws","javday.app"].contains(host) { h["Origin"]="https://"+host }
         return h
     }
 }
@@ -181,7 +214,16 @@ enum OnlineDNSMode: String, Sendable { case strict, systemProxy }
 
 struct OnlineMediaScope: Sendable {
     let root: URL
-    func contains(_ url: URL) -> Bool { OnlinePolicy.bound(url, to: root) }
+    /// When set (e.g. javday.homes), children may use root or any public subdomain of that apex.
+    let apex: String?
+    init(root: URL, apex: String? = nil) { self.root = root; self.apex = apex }
+    func contains(_ url: URL) -> Bool {
+        if let apex {
+            guard OnlinePolicy.secure(url), let host = url.host?.lowercased() else { return false }
+            return host == apex || host.hasSuffix("." + apex)
+        }
+        return OnlinePolicy.bound(url, to: root)
+    }
     static func publicHost(_ host: String) -> Bool {
         let h = host.lowercased()
         guard h.count <= 253, h.contains("."), !h.hasSuffix("."),
@@ -352,20 +394,21 @@ struct OnlineManifest {
         }
         return result
     }
-    static func parse(_ data: Data, at url: URL, root: URL) throws -> OnlineManifest {
+    static func parse(_ data: Data, at url: URL, root: URL, scope: OnlineMediaScope? = nil) throws -> OnlineManifest {
         guard data.count <= 512 * 1024 else { throw OnlineFailure.tooLarge }
         guard let text = String(data: data, encoding: .utf8) else { throw OnlineFailure.parse }
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard t.hasPrefix("#EXTM3U"), !t.lowercased().contains("<html"), !t.lowercased().contains("<!doctype") else { throw OnlineFailure.parse }
         let lines = t.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard lines.first == "#EXTM3U" else { throw OnlineFailure.parse }
+        let mediaScope = scope ?? OnlineMediaScope(root: root)
         var variants: [URL] = []; var ladder: [HLSVariant] = []; var keys: [URL] = []; var expectsVariant = false
         var pendingVariant: HLSVariant?; var segments = 0; var streamOrder = 0
         func scoped(_ raw: String) throws -> URL {
             if raw.lowercased().hasPrefix("skd:") { throw OnlineFailure.drm }
             guard !raw.contains("{$"), !raw.contains("\\"), !raw.contains(where: { $0.isWhitespace }),
                   let child = URL(string: raw, relativeTo: url)?.absoluteURL.standardized,
-                  OnlinePolicy.bound(child, to: root) else { throw OnlineFailure.unsafe }
+                  mediaScope.contains(child) else { throw OnlineFailure.unsafe }
             return child
         }
         func appendVariant(_ child: URL, capture: Bool = false) throws {
@@ -621,7 +664,7 @@ final class OnlineTransport: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         guard body == nil else { throw OnlineFailure.unsafe }
         request.setValue(OnlinePolicy.ua, forHTTPHeaderField: "User-Agent")
         for (key,value) in headers where ["User-Agent","Referer","Origin","Accept"].contains(key) {
-            if key == "Origin" && !["https://jable.tv", "https://missav.ws"].contains(value) { throw OnlineFailure.unsafe }
+            if key == "Origin" && !["https://jable.tv", "https://missav.ws", "https://javday.app"].contains(value) { throw OnlineFailure.unsafe }
             request.setValue(value, forHTTPHeaderField: key)
         }
         if let loader {
@@ -660,8 +703,9 @@ struct OnlineProvider: Sendable {
     }
     func validatedPlan(media: URL, referrer: URL, line: OnlineLine, number: String, pageIssued: Bool = false) async throws -> OnlinePlaybackPlan {
         guard OnlinePolicy.media(media, source: line.source) || (pageIssued && OnlinePolicy.discoveredMedia(media, source: line.source)) else { throw OnlineFailure.unsafe }
-        let headers = OnlinePolicy.headers(referrer: referrer)
-        let scope = OnlineMediaScope(root: media)
+        let headers = OnlinePolicy.headers(referrer: referrer, source: line.source)
+        let apex: String? = (line.source == .javday && OnlinePolicy.javdayCDN(media.host)) ? "javday.homes" : nil
+        let scope = OnlineMediaScope(root: media, apex: apex)
         var pending: [(URL,Int)] = [(media,0)]; var seen = Set<URL>(); var keys = Set<URL>(); var hasLeaf = false
         var rootLadder: [HLSVariant] = []
         // Validate every adaptive/rendition playlist, bounded across the whole graph.
@@ -672,7 +716,7 @@ struct OnlineProvider: Sendable {
             seen.insert(url)
             let bytes = try await transport.fetch(url, cap: 512*1024, headers: headers, scope: scope)
             let manifest: OnlineManifest
-            do { manifest = try OnlineManifest.parse(bytes, at: url, root: media) }
+            do { manifest = try OnlineManifest.parse(bytes, at: url, root: media, scope: scope) }
             catch { throw OnlineMediaScope.diagnostic(url, stage: "清单解析", reason: OnlineFailure.classify(error).localizedDescription) }
             for key in manifest.keys { keys.insert(key) }
             guard keys.count <= 16 else { throw OnlineFailure.tooLarge }

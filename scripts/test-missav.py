@@ -25,6 +25,8 @@ for name in ['MissAVCore.swift','MissAVSource.swift','MissAVRankingView.swift']:
 assert 'httpShouldSetCookies = true' in source and 'httpCookieStorage = cookieStorage' in source
 assert 'HTTPCookieStorage.shared' not in source.replace('// Independent in-memory store: never URLSession.shared, HTTPCookieStorage.shared or WebKit.', '')
 assert 'forHTTPHeaderField: "Referer"' in source and 'Mozilla/5.0' in source
+assert 'for attempt in 0...2' in source and 'isChallenge(text)' in source
+assert 'hasCards' in core and 'please wait' in core
 assert 'AVDB-readonly' not in source and 'responseValidator: MissAVHTML.responseError' in source
 print('PASS isolated HTTP session, browser-compatible headers and bounded response classification contracts')
 print('PASS additional source only, native exact route/search fallback, original ranking entrypoints, ordered pagination/cancellation and 115 preflight source contracts')

@@ -82,6 +82,28 @@ enum OneTwoThreeAVAdapter {
         return url
     }
 }
+
+enum JavDayAdapter {
+    // Path search avoids the query-form CF interstitial observed on /search/?wd=
+    static func search(_ code: String) -> URL {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        let encoded = code.addingPercentEncoding(withAllowedCharacters: allowed) ?? code
+        return URL(string: "https://javday.app/search/wd/" + encoded + "/")!
+    }
+    static func lines(_ data: Data, page: URL, number: String, versions: Bool) throws -> [OnlineLine] {
+        let text = try OnlineAdditional.html(data); try OnlineAdapters.rejectChallenge(text)
+        let dom = try JRHTML.tree(text); var seen = Set<URL>()
+        return dom.all { $0.tag == "a" }.compactMap { node in
+            guard let raw = node.attrs["href"], let url = URL(string: raw, relativeTo: page)?.absoluteURL,
+                  OnlinePolicy.metadata(url, source: .javday), OnlinePolicy.javdaySlug(url) != nil,
+                  let slug = OnlinePolicy.javdaySlug(url),
+                  let version = OnlineIdentity.version(slug, number: number, allowVersions: versions),
+                  seen.insert(url).inserted else { return nil }
+            return OnlineLine(source: .javday, recordID: slug, code: slug.uppercased(), version: version, lineKey: "primary", detailURL: url)
+        }.prefix(5).map { $0 }
+    }
+}
 enum OnlineAdapters {
     static func rejectChallenge(_ text:String) throws {
         if MissAVHTML.isChallenge(text) { throw OnlineFailure.blocked }
@@ -100,6 +122,10 @@ extension OnlineProvider {
             return try OneTwoThreeAVAdapter.lines(try await transport.fetch(page,cap:2*1024*1024),page:page,number:code)
         case .memojav:
             let page=MemoJavAdapter.page(code);return [try MemoJavAdapter.line(try await transport.fetch(page,cap:2*1024*1024),page:page,number:code)]
+        case .javday:
+            let page=JavDayAdapter.search(code)
+            let headers=OnlinePolicy.headers(referrer:URL(string:"https://javday.app/")!, source:.javday)
+            return try JavDayAdapter.lines(try await transport.fetch(page,cap:2*1024*1024,headers:headers),page:page,number:code,versions:versions)
         }
     }
     func resolve(_ line:OnlineLine,number:String,versions:Bool) async throws -> OnlinePlaybackPlan {
@@ -108,10 +134,11 @@ extension OnlineProvider {
     }
     func resolveMedia(_ line:OnlineLine,number:String,versions:Bool) async throws -> (media:URL,referrer:URL) {
         try Task.checkCancellation()
+        let slug = line.detailURL.map(OnlinePolicy.pathSlug) ?? ""
         guard OnlineIdentity.version(line.code,number:number,allowVersions:versions) != nil,
-              let detail=line.detailURL,OnlinePolicy.metadata(detail,source:line.source),detail.lastPathComponent == line.recordID,
-              detail.lastPathComponent.uppercased() == line.code.uppercased() else { throw OnlineFailure.noMatch }
-        let data=try await transport.fetch(detail,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:detail))
+              let detail=line.detailURL,OnlinePolicy.metadata(detail,source:line.source),slug == line.recordID,
+              slug.uppercased() == line.code.uppercased() else { throw OnlineFailure.noMatch }
+        let data=try await transport.fetch(detail,cap:2*1024*1024,headers:OnlinePolicy.headers(referrer:detail, source:line.source))
         try OnlineAdapters.rejectChallenge(OnlineAdditional.html(data))
         let media:URL;let referrer:URL
         switch line.source {
@@ -121,6 +148,9 @@ extension OnlineProvider {
         case .missav:
             let text=try OnlineAdditional.exactDetail(data,page:detail,code:number,source:.missav)
             media=try OnlineAdditional.missavMedia(text);referrer=detail
+        case .javday:
+            let text=try OnlineAdditional.exactDetail(data,page:detail,code:number,source:.javday)
+            media=try OnlineAdditional.javdayMedia(text, page:detail);referrer=detail
         case .av123:
             let embeds=try OneTwoThreeAVAdapter.embeds(data,page:detail,number:number)
             // One primary episode only; do not try alternate episode on failure.

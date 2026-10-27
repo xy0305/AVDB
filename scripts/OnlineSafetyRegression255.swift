@@ -11,9 +11,9 @@ import Foundation
    do { try OnlineMediaScope.validateAddresses(addresses,root:root);preconditionFailure("DNS must stop before request") }
    catch { let text=OnlineFailure.classify(error).localizedDescription;check(text.contains("DNS") && text.contains("missav.ws"),"missing exact DNS reason") }
   }
-  let urls:[(OnlineSource,URL)]=[(.jable,JableAdapter.search("PRWF-017")),(.missav,MissAVAdapter.search("PRWF-017")),(.av123,OneTwoThreeAVAdapter.search("PRWF-017")),(.memojav,MemoJavAdapter.page("PRWF-017"))]
+  let urls:[(OnlineSource,URL)]=[(.jable,JableAdapter.search("PRWF-017")),(.missav,MissAVAdapter.search("PRWF-017")),(.av123,OneTwoThreeAVAdapter.search("PRWF-017")),(.memojav,MemoJavAdapter.page("PRWF-017")),(.javday,JavDayAdapter.search("PRWF-017"))]
   for (source,url) in urls { check(OnlinePolicy.metadata(url,source:source),"production search URL rejected") }
-  for u in ["https://123av.com/en/search?keyword=PRWF-017&x=1","https://123av.com/en/search?keyword=PRWF-017&keyword=FNS-249","https://jable.tv/search/PRWF-017/?q=FNS-249","https://memojav.org/video/PRWF-017?url=https://internal.local"] { let url=URL(string:u)!;check(!OnlineSource.allCases.contains { OnlinePolicy.metadata(url,source:$0) },"unknown/duplicate/search-injection query accepted") }
+  for u in ["https://123av.com/en/search?keyword=PRWF-017&x=1","https://123av.com/en/search?keyword=PRWF-017&keyword=FNS-249","https://jable.tv/search/PRWF-017/?q=FNS-249","https://memojav.org/video/PRWF-017?url=https://internal.local","https://javday.app/search/wd/PRWF-017/?x=1","https://javday.app/videos/PRWF017/?token=x"] { let url=URL(string:u)!;check(!OnlineSource.allCases.contains { OnlinePolicy.metadata(url,source:$0) },"unknown/duplicate/search-injection query accepted") }
   var signed=URLComponents(string:"https://video10.memojav.net/stream/neutral.m3u8")!;signed.queryItems=[URLQueryItem(name:"token",value:"NEUTRAL_SIGNED_SECRET")]
   let err=OnlineMediaScope.diagnostic(signed.url!,stage:"清单/DNS",reason:"中性失败")
   let label=OnlinePlaybackModel.State.failed(err).label
