@@ -1,5 +1,5 @@
-// Port of 网页视频实时 LUT @author You @version 6.7.5.
-// Source metadata retained in THIRD_PARTY/lut-v6.7.5.txt; no license inferred.
+// Port of 网页视频实时 LUT @author You @version 6.7.8.
+// Source metadata retained in THIRD_PARTY/lut-v6.7.8.txt; no license inferred.
 import SwiftUI
 import AVFoundation
 import AVKit
@@ -88,7 +88,7 @@ final class LUTRevealState: @unchecked Sendable {
 @MainActor
 final class NativeLUTController: ObservableObject {
     @Published var enabled = false
-    @Published var status = "LUT 未启用（仅 SDR 文件视频）"
+    @Published var status = "LUT 未启用（SDR 文件 / 在线 HLS）"
     @Published var parameters = LUTParameters()
     @Published var strength = 1.0
     @Published var sharpen = false
@@ -147,7 +147,7 @@ final class NativeLUTController: ObservableObject {
         runtime.onSourceCheck = { [weak self, weak runtime] safe, message in
             guard let self, self.generation == token, self.surface === runtime else { return }
             self.supported = safe
-            self.status = safe ? "在线 SDR 等待：源检查通过，尚未呈现 LUT" : message
+            self.status = safe ? "在线 SDR 就绪：开启后自动分析当前帧" : message
             if safe && self.enabled { self.apply() }
         }
         runtime.onStatus = { [weak self, weak runtime] message in
@@ -156,7 +156,7 @@ final class NativeLUTController: ObservableObject {
         }
         runtime.onPresented = { [weak self, weak runtime] _ in
             guard let self, self.generation == token, self.surface === runtime else { return }
-            self.status = "在线 SDR LUT：Metal（原版 269 引擎）"
+            self.status = "在线 SDR LUT：Metal（原版 6.7.8）"
         }
         runtime.setNativeBypass(effectiveBypass)
         if let onlineFilter { runtime.setFilter(onlineFilter) }
@@ -263,7 +263,7 @@ final class NativeLUTController: ObservableObject {
                         finishFormatCheck(token, next, message: hdr ? "HDR 不支持 LUT" : "此视频不支持原生 composition LUT（HLS/非可合成流）")
                         return
                     }
-                    finishFormatCheck(token, next, message: "SDR 就绪，点击开启 LUT", ready: true)
+                    finishFormatCheck(token, next, message: "SDR 就绪：开启后自动分析当前帧", ready: true)
                 } catch {
                     guard !Task.isCancelled else { return }
                     finishFormatCheck(token, next, message: "格式检查失败，LUT 已禁用：\(error.localizedDescription)")
@@ -303,9 +303,16 @@ final class NativeLUTController: ObservableObject {
             requested = true
             buildGeneration += 1; buildTask?.cancel()
             restoreOriginalRendering()
+            surface?.prepareForcedAnalysisFrame()
+            status = onlineMode ? "在线：等待解码帧以便自动分析…" : "等待原始解码帧以便自动分析…"
             return
         }
-        if !enabled { analysisGeneration += 1; busy = false }
+        if !enabled {
+            analysisGeneration += 1; busy = false
+            restoreOriginalRendering()
+            status = "原画（LUT 已关闭）"
+            return
+        }
         apply()
     }
     func reanalyze() {
@@ -313,14 +320,15 @@ final class NativeLUTController: ObservableObject {
         analysisGeneration += 1; busy = false; reveal.cancel()
         buildGeneration += 1; buildTask?.cancel()
         restoreOriginalRendering()
-        requested = true; status = "等待原始解码帧…"
+        surface?.prepareForcedAnalysisFrame()
+        requested = true; status = "等待原始解码帧（一键自动分析）…"
     }
     func reset() {
         analysisGeneration += 1; busy = false; reveal.cancel()
         enabled = false; sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
         buildGeneration += 1; buildTask?.cancel()
         parameters = LUTParameters(); composition = nil; cachedCube = nil
-        restoreOriginalRendering(); requested = true; status = "已重置"
+        restoreOriginalRendering(); requested = true; status = "已恢复原画（LUT 关闭）"
     }
     func apply() {
         guard supported, let item else { return }
@@ -332,7 +340,7 @@ final class NativeLUTController: ObservableObject {
         let useDeband = deband && !constrained
         guard useLUT || useSharpen || useDeband else {
             reveal.cancel(); composition = nil; restoreOriginalRendering()
-            status = constrained && (sharpen || deband) ? "节能/高温保护：增强已旁路" : "原始画面（全部增强已旁路）"
+            status = constrained && (sharpen || deband) ? "节能/高温保护：增强已旁路" : "原画（LUT / 增强已关闭）"
             return
         }
         let params = parameters
@@ -344,7 +352,7 @@ final class NativeLUTController: ObservableObject {
             do { try await Task.sleep(nanoseconds: 100_000_000) } catch { return }
             let cube = useLUT ? await Task.detached(priority: .userInitiated) { NativeLUT.cube(params) }.value : nil
             guard let self, let item, !Task.isCancelled, self.generation == sourceGeneration, self.buildGeneration == revision, self.item === item else { return }
-            if useLUT && cube == nil { self.status = "原版 LUT 引擎失败"; return }
+            if useLUT && cube == nil { self.status = "原版 6.7.8 LUT 引擎失败"; return }
             if useDeband && kernel == nil { self.status = "Metal 去色带不可用；未伪装为模糊" }
             self.cachedCube = cube ?? self.cachedCube
             let cs = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -373,7 +381,7 @@ final class NativeLUTController: ObservableObject {
                 self.testAppliedBuild += 1
                 #endif
                 // onPresented, not source-check/build completion, announces online success.
-                self.status = "在线 SDR 等待：参数已提交，等待 GPU 呈现"
+                self.status = "在线 LUT 已提交，等待 GPU 呈现"
             } else {
                 let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
                     request.finish(with: render(request.sourceImage), context: ci)
@@ -389,7 +397,7 @@ final class NativeLUTController: ObservableObject {
         let buffer: CVPixelBuffer
         if onlineMode {
             // A nil/throttled frame must not consume the user's analysis request.
-            guard let frame = surface?.copyDecodedFrameForAnalysis() else { return }
+            guard let frame = surface?.copyDecodedFrameForAnalysis(force: true) else { return }
             buffer = frame
         } else {
             guard let output, item.videoComposition == nil else { return }
@@ -402,7 +410,7 @@ final class NativeLUTController: ObservableObject {
            transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
             enabled = false; supported = false; status = "HDR 解码帧已禁用 LUT"; return
         }
-        busy = true; requested = false; status = "获取 MediaPipe 关键点 → 原版动态 Cr / 分阶段搜索…"
+        busy = true; requested = false; status = "一键分析：MediaPipe 关键点 → 6.7.8 动态 Cr / 分阶段搜索…"
         let token = generation
         let analysisToken = analysisGeneration
         let ciImage = CIImage(cvPixelBuffer:buffer)
@@ -424,11 +432,11 @@ final class NativeLUTController: ObservableObject {
                 let detection = OriginalFaceLandmarker.shared.region(image: rgbaImage)
                 let roi = detection.box
                 guard let analysis = NativeLUT.analyze(bytes: bytes, width: w, height: h, box: roi) else { return nil }
-                return (analysis.0, "原版6.7.5 · \(analysis.1) · \(detection.description)")
+                return (analysis.0, "原版6.7.8 · \(analysis.1) · \(detection.description)")
             }.value
             guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
             busy = false
-            guard let result else { status = "原版肤色采样不足（<150）或引擎失败；保留旧 LUT"; return }
+            guard let result else { status = "肤色采样不足（<150）或引擎失败；保留当前画面 / 旧 LUT"; return }
             parameters = result.0; apply(); status = "33³ LUT · \(result.1) · SDR"
         }
     }
@@ -521,9 +529,9 @@ struct NativeLUTPanel: View {
         Form {
             Text(model.status).font(.footnote)
             Group {
-            Button(model.enabled ? "关闭 LUT" : "开启 LUT") { model.toggle() }
-            Button("重新分析原始帧") { model.reanalyze() }
-            Button("重置 / 原始画面") { model.reset() }
+            Button(model.enabled ? "关闭 LUT（恢复原画）" : "开启 LUT（自动分析）") { model.toggle() }
+            Button("重新分析当前帧") { model.reanalyze() }
+            Button("重置并恢复原画") { model.reset() }
             Section("画质增强 · SDR") {
                 Text("LUT 强度 \(model.strength, specifier: "%.2f")")
                 Slider(value: Binding(get: { model.strength }, set: { model.strength = $0; model.apply() }), in: 0...1)
@@ -541,15 +549,17 @@ struct NativeLUTPanel: View {
                 Button("暂停并比较同一帧") { model.pauseComparison() }
                 Text("原始分支直接使用解码请求 sourceImage；原始按钮关闭所有增强。")
             }
+            Section("手动微调（调节后立即应用）") {
             ForEach(0..<7,id:\.self) { i in
                 VStack(alignment:.leading) {
                     Text("\(LUTParameters.names[i]) \(Int(model.parameters.values[i]))")
                     Slider(value:Binding(get:{ model.parameters.values[i] },set:{ model.parameters.values[i] = $0; model.apply() }),in:-50...50,step:1)
                 }
             }
+            }
             }.disabled(!model.supported)
             Section {
-                Text("原文件的容器、编码及 HDR 支持取决于设备；LUT 仅支持可分析的 SDR。开启或分析后，点右上角返回播放；分析无需停留在此面板等待。")
+                Text("对齐参考：开启≈自动分析当前帧；关闭/重置≈恢复原画；下方滑杆为手动微调并立即应用。仅 SDR（文件 composition 或在线 Metal）。HDR/受保护内容走原画。分析无需停在此面板。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

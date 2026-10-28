@@ -1,6 +1,6 @@
 # 原版 MediaPipe FaceLandmarker 接入
 
-- 原版 `THIRD_PARTY/lut-v6.7.5.txt`：JS Tasks Vision 0.10.14，GPU，VIDEO，numFaces=1，detection/presence=0.3；tracking 默认0.5，blendshapes/transformation 默认关闭。
+- 原版 `THIRD_PARTY/lut-v6.7.8.txt`：JS Tasks Vision 0.10.14，GPU，VIDEO，numFaces=1，detection/presence=0.3；tracking 默认0.5，blendshapes/transformation 默认关闭。
 - 原生依赖：官方 CocoaPods `MediaPipeTasksVision` 0.10.14 + `MediaPipeTasksCommon` 0.10.14（Apache-2.0）。官方 podspec 支持 iOS12；本工程 iOS17。SDK 上游 https://github.com/google-ai-edge/mediapipe ，固定发布 https://dl.google.com/cpdc/20240510-090346/MediaPipeTasksVision-0.10.14.tar.gz 。使用 `pod install` 后 `AVDB.xcworkspace` 构建，不再直接构建 project。
 - 本地打包模型： https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task ，float16/1，3,758,596 bytes，SHA256 `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`。运行时没有网络请求、没有 Vision 替代算法。MediaPipe 模型来自官方发布；相关源码及 SDK Apache-2.0 许可全文 `MediaPipe-Apache-2.0.txt`。不能把原 LUT 用户脚本推定为 Apache 许可，其原来源信息另保留。
 

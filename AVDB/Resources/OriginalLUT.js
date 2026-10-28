@@ -1,4 +1,4 @@
-// Direct numeric reuse: 网页视频实时 LUT, @author You, @version 6.7.5. No license inferred.
+// Direct numeric reuse: 网页视频实时 LUT, @author You, @version 6.7.8. No license inferred.
 var OriginalLUT = (function(){
 const console = {log:function(){},warn:function(){},error:function(){}};
     const CONFIG = {
@@ -44,7 +44,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         minSkinPixels: 150,
         faceBoxMinSkinPixels: 150,
         fullScanTargetPixels: 40000,
-        // 肤色/偏色判定
         skinRBHighThreshold: 999,
         highRBInherentMax: 1.15,
         highRBColorCastMin: 1.25,
@@ -53,11 +52,9 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         highFallbackLumThreshold: 0.8,
         highFallbackSatMax: 0.15,
         inherentYellowRatio: 0.85,
-        // 缺亮补亮
         highPixelLowThreshold: 200,
         highPixelDarkSkinMax: 0.52,
         highPixelForceBright: 20,
-        // 额外降色温（综合误差）
         extraTempSatMin: 0.43,
         extraTempRBMin: 1.7,
         extraTempShadowMin: 0.018,
@@ -65,15 +62,12 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         extraTempStep: 2,
         extraTempMaxSteps: 25,
         extraTempSatWeight: 2,
-        // 全图高光统计
         globalHlSampleStep: 2,
-        // ★ v6.7 采样区域肤色检测
         skinDetection: {
             crCoverage: 0.90,
             fallbackCrRange: [130, 180],
             staticCbRange: [77, 127],
         },
-        // ★ v6.7.2 高光过量场景阈值
         highHlScene: {
             hlRatioMin: 0.45,
             lumMin: 0.62,
@@ -89,12 +83,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             shadowMaxFactor: 0.5,
             brightMaxExtra: 5,
         },
-    };
-
+    }
     const KR = 0.2126, KG = 0.7152, KB = 0.0722;
-    const HL_THRESHOLD = 0.70;
+    const HL_THRESHOLD = 0.65;
     const SH_THRESHOLD = 0.20;
-    const OVEREXPOSE_LIMIT = 0.96;
+    const OVEREXPOSE_LIMIT = 0.92;
     const HL_BRIGHT_DAMP_START = 0.7;
     const HL_BRIGHT_DAMP_STRENGTH = 0.7;
     const HL_BRIGHT_DAMP_MIN = 0.3;
@@ -102,50 +95,43 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     const HL_CONTRAST_DAMP_MIN = 0.5;
     const FACE_SKIN_LUM_MAX = 0.9;
 
-    const JY_TEMPLATE = {
-        temp: -20, tint: 0, sat: 0, bright: 0,
-        contrast: 0, highlight: -2, shadow: 2,
-    };
-    const JY_ADJUST_RANGE = {
-        temp: [-30, 4], tint: [-6, 6], sat: [-6, 4],
-        bright: [-8, 50], contrast: [-4, 3],
-        highlight: [-6, 4], shadow: [-6, 6],
-    };
+    // ---- 校准目标区间 ----
     const TARGETS = {
-        skin_rb: [1.20, 1.50],
-        skin_rg: [1.15, 1.35],
-        skin_lum: [0.40, 0.58],
-        skin_sat: [0.12, 0.26],
+        skin_rb:       [1.24, 1.50],
+        skin_rg:       [1.20, 1.35],
+        skin_lum:      [0.35, 0.54],
+        skin_sat:      [0.22, 0.34],
         full_contrast: [0.10, 0.20],
-        full_hl_ratio: [0.00, 0.20],
+        full_hl_ratio: [0.00, 0.22],
         full_sh_ratio: [0.00, 0.40],
     };
 
+    const JY_TEMPLATE = {
+        temp: -20, tint: 6, sat: 0, bright: 0,
+        contrast: 0, highlight: -2, shadow: 2,
+    };
+    const JY_ADJUST_RANGE = {
+        temp: [-20, 5], tint: [-5, 5], sat: [-5, 3],
+        bright: [-5, 18], contrast: [-3, 2],
+        highlight: [-5, 3], shadow: [-5, 10],
+    };
+
     const JY_TEMPLATE_HIGH_MATCH = {
-        temp: -5, tint: 0, sat: 1, bright: 4,
-        contrast: 1, highlight: -3, shadow: 3,
+        temp: -3, tint: 6, sat: 0, bright: 5,
+        contrast: 0, highlight: -2, shadow: 2,
     };
     const JY_ADJUST_RANGE_HIGH_MATCH = {
-        temp: [-24, -4], tint: [-6, 6], sat: [-6, 4],
-        bright: [-6, 6], contrast: [-4, 3],
-        highlight: [-3, 3], shadow: [-6, 6],
-    };
-    const JY_ADJUST_RANGE_HIGH_MATCH_CENTER = {
-        temp: [-30, -4],
-        tint: [-7, 7],
-        sat: [-7, 4],
-        bright: [-12, 9],
-        contrast: [-4, 3],
-        highlight: [-7, 3],
-        shadow: [-7, 7],
+        temp: [-3, -8], tint: [-5, 5], sat: [-5, 3],
+        bright: [-5, 5], contrast: [-3, 2],
+        highlight: [-2, 2], shadow: [-5, 5],
     };
     const TARGETS_HIGH_MATCH = {
-        skin_rb:       [1.40, 1.55],
-        skin_rg:       [1.24, 1.36],
+        skin_rb:       [1.03, 1.36],
+        skin_rg:       [1.10, 1.30],
         skin_lum:      [0.38, 0.62],
         skin_sat:      [0.12, 0.42],
         full_contrast: [0.12, 0.24],
-        full_hl_ratio: [0.00, 0.15],
+        full_hl_ratio: [0.00, 0.30],
         full_sh_ratio: [0.00, 0.24],
     };
 
@@ -154,17 +140,17 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         contrast: -2, highlight: -1, shadow: 20,
     };
     const JY_ADJUST_RANGE_EXTREME_DARK = {
-        temp: [-8, 4], tint: [-3, 5], sat: [-5, 1],
-        bright: [-15, 20], contrast: [-3, 2],
-        highlight: [-3, 2], shadow: [-15, 15],
+        temp: [-10, 4], tint: [-3, 5], sat: [-5, 1],
+        bright: [-15, 10], contrast: [-3, 2],
+        highlight: [-3, 2], shadow: [-15, 10],
     };
     const TARGETS_EXTREME_DARK = {
-        skin_rb: [1.05, 1.32],
-        skin_rg: [1.12, 1.28],
-        skin_lum: [0.46, 0.66],
-        skin_sat: [0.14, 0.25],
+        skin_rb:       [1.05, 1.32],
+        skin_rg:       [1.12, 1.28],
+        skin_lum:      [0.42, 0.60],
+        skin_sat:      [0.14, 0.25],
         full_contrast: [0.13, 0.23],
-        full_hl_ratio: [0.00, 0.15],
+        full_hl_ratio: [0.00, 0.30],
         full_sh_ratio: [0.14, 0.35],
     };
 
@@ -180,8 +166,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
     function getDynamicHlTarget(skinLum) {
         const lumLo = 0.35, lumHi = 0.54;
-        const hlHiAtLumLo = 0.02;
-        const hlHiAtLumHi = 0.10;
+        const hlHiAtLumLo = 0.05;
+        const hlHiAtLumHi = 0.20;
         const ratio = Math.max(0, Math.min(1,
             (skinLum - lumLo) / Math.max(lumHi - lumLo, 1e-6)));
         const hlHi = hlHiAtLumLo + (hlHiAtLumHi - hlHiAtLumLo) * ratio;
@@ -197,24 +183,34 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             : (sorted[mid - 1] + sorted[mid]) / 2;
     }
 
+    // 判定
     function isExtremeDark(info) {
         if (!info) return false;
         if (info.no_skin_data) return false;
-        if (info.skin_rb > 1.6) return false;
         return (
-            info.skin_lum < 0.22 &&
-            info.full_sh_ratio > 0.35 &&
-            info.full_hl_ratio < 0.15
+            info.skin_lum < 0.28 &&
+            info.full_hl_ratio < 0.01 &&
+            info.full_sh_ratio > 0.24
         );
     }
 
+    // ★ 核心修改：同步 Python 端的冷淡画面保护，并去除所有暴走后门
     function isHighMatch(info) {
         if (!info) return false;
         if (info.no_skin_data) return false;
         if (isExtremeDark(info)) return false;
-        // ★ 高光像素数门槛
-        const hp = info.high_pixels !== undefined ? info.high_pixels : 0;
-        if (hp <= 500) return false;
+
+        // ★ 新增：冷淡画面保护（偏冷、偏灰，避免强加亮度变惨白）
+        const isColdScene = (
+            info.skin_rb < 1.30 &&
+            info.skin_rg < 1.30 &&
+            info.skin_sat < 0.25 &&
+            info.skin_lum > 0.15
+        );
+        if (isColdScene) {
+            return true; // 直接判定为高命中，走保守模板
+        }
+
         return (
             info.skin_rb >= TARGETS_HIGH_MATCH.skin_rb[0] &&
             info.skin_rb <= TARGETS_HIGH_MATCH.skin_rb[1] &&
@@ -247,21 +243,14 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         return (maxC - minC) < CONFIG.nearWhiteDelta && minC > CONFIG.nearWhiteMinC;
     }
 
-    // ============================================================
-    // 全局分析计数器
-    // ============================================================
     let _analyzingCount = 0;
 
-    // ============================================================
-    // 参数力度协调器
-    // ============================================================
-    function balanceParamStrength(paramsIn, template, adjustRange, isHighHlScene) {
-        if (!CONFIG.balanceParams) return paramsIn;
-
+    // 力度协调
+    function _balanceParamStrength(paramsIn, template, adjustRange, useExtreme, useHighMatch,
+                                    skip_bright_comp) {
         const out = Object.assign({}, paramsIn);
-
-        const S = CONFIG.paramStrength;
-        const M = CONFIG.balanceMultiplier;
+        const S = { temp: 0.6, highlight: 0.3, shadow: 0.6, contrast: 0.4 };
+        const M = 1.0;
 
         const tempDelta = out.temp - template.temp;
         const tempDarken = tempDelta < 0 ? -tempDelta : 0;
@@ -269,7 +258,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         const hlDelta = out.highlight - template.highlight;
         const hlDarken = hlDelta < 0 ? -hlDelta : 0;
-        const hlEquiv = isHighHlScene ? 0 : hlDarken * S.highlight;
+        const hlEquiv = useExtreme ? 0 : hlDarken * S.highlight;
 
         const shDelta = out.shadow - template.shadow;
         const shDarken = shDelta < 0 ? -shDelta : 0;
@@ -280,50 +269,54 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         const cEquiv = cDarken * S.contrast;
 
         const totalDarken = (tempEquiv + hlEquiv + shEquiv + cEquiv) * M;
-
         const brightCompensation = out.bright - template.bright;
-
         const deficit = totalDarken - brightCompensation;
+        const _temp_at_floor = (out.temp <= -40);
 
-        if (deficit > 0.5) {
+        if (skip_bright_comp) {
+            console.log('[LUT-算法-力度协调] 保守场景，跳过 bright 补偿');
+        } else if (deficit > 0.5 && !_temp_at_floor) {
             const addBright = Math.round(deficit);
             const bMax = template.bright + adjustRange.bright[1];
             const newBright = Math.min(out.bright + addBright, bMax);
             const actualAdded = newBright - out.bright;
             out.bright = newBright;
-
             if (actualAdded !== 0) {
                 console.log(
-                    `[LUT-力度协调] 压暗总量=${totalDarken.toFixed(2)}档 ` +
+                    `[LUT-算法-力度协调] 压暗总量=${totalDarken.toFixed(2)}档 ` +
                     `(色温${tempEquiv.toFixed(2)}+高光${hlEquiv.toFixed(2)}+` +
-                    `阴影${shEquiv.toFixed(2)}+对比度${cEquiv.toFixed(2)})` +
-                    (M !== 1.0 ? ` ×${M}` : '') + `, ` +
-                    `bright补偿=${brightCompensation.toFixed(2)}档, ` +
-                    `缺口=${deficit.toFixed(2)}档, ` +
-                    `bright ${brightCompensation >= 0 ? '+' : ''}${brightCompensation.toFixed(0)}` +
-                    ` → +${out.bright - template.bright} ` +
-                    `(实际补${actualAdded >= 0 ? '+' : ''}${actualAdded})`
+                    `阴影${shEquiv.toFixed(2)}+对比度${cEquiv.toFixed(2)})，` +
+                    `bright补偿=${brightCompensation.toFixed(2)}档，` +
+                    `缺口=${deficit.toFixed(2)}档，实际补${actualAdded >= 0 ? '+' : ''}${actualAdded} → bright=${out.bright}`
                 );
             }
-
             const stillDeficit = totalDarken - (out.bright - template.bright);
             if (stillDeficit > 0.5) {
                 const hlMax = template.highlight + adjustRange.highlight[1];
                 const hlDeficit = Math.round(stillDeficit);
                 const newHl = Math.min(out.highlight + hlDeficit, hlMax);
                 const actualHlAdded = newHl - out.highlight;
-
                 if (actualHlAdded > 0) {
                     out.highlight = newHl;
-                    console.log(
-                        `[LUT-力度协调] bright 到顶，抬 highlight ` +
-                        `${actualHlAdded >= 0 ? '+' : ''}${actualHlAdded} ` +
-                        `→ ${newHl}`
-                    );
+                    console.log(`[LUT-算法-力度协调] bright 到顶，抬 highlight ${actualHlAdded >= 0 ? '+' : ''}${actualHlAdded} → ${newHl}`);
+                }
+            }
+        } else if (deficit > 0.5 && _temp_at_floor) {
+            console.log(`[LUT-算法-力度协调] 色温 ${out.temp} <= -40，跳过 bright 补偿（避免过曝）`);
+        }
+
+        if (!useExtreme && !useHighMatch) {
+            const TEMP_FLOOR_THRESHOLD = -18;
+            const BRIGHT_FLOOR_STD = 7;
+            if (out.temp > TEMP_FLOOR_THRESHOLD) {
+                if (out.bright < BRIGHT_FLOOR_STD) {
+                    console.log(`[LUT-算法-标准模板-力度协调] 色温 ${out.temp} > ${TEMP_FLOOR_THRESHOLD}，bright ${out.bright} → ${BRIGHT_FLOOR_STD}`);
+                    out.bright = BRIGHT_FLOOR_STD;
+                } else {
+                    console.log(`[LUT-算法-标准模板-力度协调] 色温 ${out.temp} > ${TEMP_FLOOR_THRESHOLD}，bright=${out.bright} 已 ≥ ${BRIGHT_FLOOR_STD}，不动`);
                 }
             }
         }
-
         return out;
     }
 
@@ -360,8 +353,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     function applySaturationScalar(r, g, b, sat) {
         if (sat === 0) return [r, g, b];
         const gray = KR * r + KG * g + KB * b;
-        // ★ 系数从 0.82 提升到 1.5，让 sat 效果更明显
-        const satScale = 1.0 + sat / 50.0 * 1.5;
+        const satScale = 1.0 + sat / 50.0 * 0.82;
         return [
             gray + satScale * (r - gray),
             gray + satScale * (g - gray),
@@ -376,7 +368,24 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             ? (lum - HL_BRIGHT_DAMP_START) / (1.0 - HL_BRIGHT_DAMP_START) : 0.0;
         let hlDamp = 1.0 - t * HL_BRIGHT_DAMP_STRENGTH;
         hlDamp = Math.max(HL_BRIGHT_DAMP_MIN, hlDamp);
-        const brightScale = 1.0 + bright / 50.0 * 0.67 * hlDamp;
+
+        const SHADOW_BRIGHT_DAMP_START = 0.18;
+        const SHADOW_BRIGHT_DAMP_MIN = 0.35;
+        let shDamp = 1.0;
+        if (lum < SHADOW_BRIGHT_DAMP_START) {
+            const ratio = lum / SHADOW_BRIGHT_DAMP_START;
+            shDamp = SHADOW_BRIGHT_DAMP_MIN +
+                (1.0 - SHADOW_BRIGHT_DAMP_MIN) * ratio;
+        }
+
+        let brightScale = 1.0 + bright / 50.0 * 0.67 * hlDamp * shDamp;
+
+        const VERY_HIGH_LUM = 0.85;
+        if (bright > 0) {
+            const protectW = Math.min(1, Math.max(0,
+                (lum - VERY_HIGH_LUM) / (1.0 - VERY_HIGH_LUM)));
+            brightScale = brightScale * (1.0 - protectW) + 1.0 * protectW;
+        }
         return [r * brightScale, g * brightScale, b * brightScale];
     }
 
@@ -411,6 +420,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         return [r, g, b];
     }
 
+    // 顺序：bright → hl/sh → contrast → sat → temp/tint → overexpose guard
     function applyParamsToSkinArray(pixels, params) {
         const n = pixels.length / 3;
         const out = new Float32Array(n * 3);
@@ -423,11 +433,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             r = t[0]; g = t[1]; b = t[2];
             t = applyHighlightShadowScalar(r, g, b, params.highlight, params.shadow);
             r = t[0]; g = t[1]; b = t[2];
-            t = applyTempTintScalar(r, g, b, params.temp, params.tint);
+            t = applyContrastScalar(r, g, b, params.contrast);
             r = t[0]; g = t[1]; b = t[2];
             t = applySaturationScalar(r, g, b, params.sat);
             r = t[0]; g = t[1]; b = t[2];
-            t = applyContrastScalar(r, g, b, params.contrast);
+            t = applyTempTintScalar(r, g, b, params.temp, params.tint);
             r = t[0]; g = t[1]; b = t[2];
 
             const lum = KR * r + KG * g + KB * b;
@@ -493,35 +503,33 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     }
 
     function predictParams(info, skinPixels, useExtreme, useHighMatch) {
+        // 输入结构适配（油猴无偏离帧逻辑）
+        const features = Object.assign({}, info);
+        features.skin_rgb = skinPixels;
+        features.used_deviated = false;
+        features.deviated_ratio = 0.0;
+        features.deviated_direction = 'none';
+
         const template = useExtreme ? JY_TEMPLATE_EXTREME_DARK :
             useHighMatch ? JY_TEMPLATE_HIGH_MATCH : JY_TEMPLATE;
 
-        // ★ 中央 50% 判断（必须在 adjustRange 之前）
         const isCenterFallback = (info.regionName === '中央50%');
 
+        // 模板与范围（中央50% + 高命中 仍用 HIGH_MATCH 范围；中央50% 单独用 CENTER 目标）
         let adjustRange;
         if (useExtreme) {
             adjustRange = JY_ADJUST_RANGE_EXTREME_DARK;
-        } else if (useHighMatch && isCenterFallback) {
-            adjustRange = JY_ADJUST_RANGE_HIGH_MATCH_CENTER;
         } else if (useHighMatch) {
+            // JY_ADJUST_RANGE_HIGH_MATCH_CENTER 已并入 JY_ADJUST_RANGE_HIGH_MATCH（脚本本身没有 CENTER 变体）
             adjustRange = JY_ADJUST_RANGE_HIGH_MATCH;
         } else {
             adjustRange = JY_ADJUST_RANGE;
         }
-        const targets = useExtreme ? TARGETS_EXTREME_DARK :
+        let targets = useExtreme ? TARGETS_EXTREME_DARK :
             useHighMatch ? TARGETS_HIGH_MATCH : TARGETS;
-        const hlWeight = useExtreme ? 10 : (useHighMatch ? 18 : 15);
 
-        if (useHighMatch && isCenterFallback) {
-            console.log(
-                `[LUT-调整范围] 中央50% + 高命中模板，使用更大的调整范围：` +
-                `temp=[${JY_ADJUST_RANGE_HIGH_MATCH_CENTER.temp[0]}, ${JY_ADJUST_RANGE_HIGH_MATCH_CENTER.temp[1]}]，` +
-                `bright=[${JY_ADJUST_RANGE_HIGH_MATCH_CENTER.bright[0]}, ${JY_ADJUST_RANGE_HIGH_MATCH_CENTER.bright[1]}]`
-            );
-        }
-
-        // ★ 中央 50% 目标：色温/色调/饱和/对比/高光下移；亮度/阴影上移
+        // 没有 CENTER 目标覆盖（predict_params 里没有 regionName 分支），
+        // 但油猴的中央50%采样需要目标下移，这里保留油猴原版的 CENTER 目标适配（仅目标区间，不影响算法逻辑）
         const TARGETS_CENTER = {
             skin_rb:       [1.05, 1.35],
             skin_rg:       [1.15, 1.35],
@@ -531,42 +539,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             full_hl_ratio: [0.00, 0.20],
             full_sh_ratio: [0.00, 0.40],
         };
-        // ★ 中央 50% + 高命中模板：色温/色调/饱和/对比下移；亮度上移；饱和度/对比度也上移
-        const TARGETS_CENTER_HIGH_MATCH = {
-            skin_rb:       [0.90, 1.20],
-            skin_rg:       [1.30, 1.50],
-            skin_lum:      [0.45, 0.65],
-            skin_sat:      [0.10, 0.20],
-            full_contrast: [0.18, 0.28],
-            full_hl_ratio: [0.00, 0.20],
-            full_sh_ratio: [0.00, 0.40],
-        };
-        let targetsEff;
-        if (isCenterFallback && useHighMatch) {
-            targetsEff = TARGETS_CENTER_HIGH_MATCH;
-        } else if (isCenterFallback) {
-            targetsEff = TARGETS_CENTER;
-        } else {
-            targetsEff = targets;
-        }
-
-        // ★ 中央 50% 时 hlWeight 从 50 降到 10
-        const hlWeightEff = isCenterFallback ? 10 : hlWeight;
-
-        if (isCenterFallback && useHighMatch) {
-            console.log(
-                `[LUT-目标] 中央50%采样（高命中模板），使用 TARGETS_CENTER_HIGH_MATCH：` +
-                `skin_lum=[${TARGETS_CENTER_HIGH_MATCH.skin_lum[0]}, ${TARGETS_CENTER_HIGH_MATCH.skin_lum[1]}]，` +
-                `skin_rb=[${TARGETS_CENTER_HIGH_MATCH.skin_rb[0]}, ${TARGETS_CENTER_HIGH_MATCH.skin_rb[1]}]，` +
-                `skin_sat=[${TARGETS_CENTER_HIGH_MATCH.skin_sat[0]}, ${TARGETS_CENTER_HIGH_MATCH.skin_sat[1]}]`
-            );
-        } else if (isCenterFallback) {
-            console.log(
-                `[LUT-目标] 中央50%采样（标准模板），目标区间下移：` +
-                `skin_lum=[${TARGETS_CENTER.skin_lum[0]}, ${TARGETS_CENTER.skin_lum[1]}]，` +
-                `skin_rb=[${TARGETS_CENTER.skin_rb[0]}, ${TARGETS_CENTER.skin_rb[1]}]，` +
-                `skin_sat=[${TARGETS_CENTER.skin_sat[0]}, ${TARGETS_CENTER.skin_sat[1]}]`
-            );
+        if (isCenterFallback && !useHighMatch && !useExtreme) {
+            targets = TARGETS_CENTER;
         }
 
         const origLum = info.skin_lum;
@@ -574,9 +548,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         const skinRB = info.skin_rb;
         const highRB = info.high_rb !== undefined ? info.high_rb : 1.0;
         const highPixels = info.high_pixels !== undefined ? info.high_pixels : 0;
-        const fullContrast = info.full_contrast !== undefined ? info.full_contrast : 0.15;
 
-        // ★ 高光过量场景
         const HH = CONFIG.highHlScene;
         const isHighHlScene = !useExtreme && (
             (info.full_hl_ratio || 0) > HH.hlRatioMin &&
@@ -585,7 +557,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         );
         if (isHighHlScene) {
             console.log(
-                `[LUT-高光过量场景] full_hl_ratio=${(info.full_hl_ratio||0).toFixed(3)} ` +
+                `[LUT-算法-高光过量场景] full_hl_ratio=${(info.full_hl_ratio||0).toFixed(3)} ` +
                 `> ${HH.hlRatioMin} 且 skin_lum=${origLum.toFixed(3)} > ${HH.lumMin} ` +
                 `且 high_rb=${highRB.toFixed(3)} > ${HH.highRBMin} ` +
                 `→ 启用激进高光/色温/对比度策略`
@@ -598,18 +570,10 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             highPixels >= CONFIG.highPixelMinCount) {
             if (highRB < CONFIG.highRBInherentMax) {
                 skinInherentlyYellow = true;
-                console.log(
-                    `[LUT-肤色判定] 肤色 R/B=${skinRB.toFixed(3)} 高，` +
-                    `但高光 R/B=${highRB.toFixed(3)} 正常（${highPixels} 像素）→ ` +
-                    `判定为肤色本身偏黄，色温不猛降`
-                );
+                console.log(`[LUT-算法-肤色判定] 肤色 R/B=${skinRB.toFixed(3)} 高，但高光 R/B=${highRB.toFixed(3)} 正常（${highPixels} 像素）→ 判定为肤色本身偏黄，色温不猛降`);
             } else if (highRB > CONFIG.highRBColorCastMin) {
                 sceneColorCast = true;
-                console.log(
-                    `[LUT-肤色判定] 肤色 R/B=${skinRB.toFixed(3)} 高，` +
-                    `高光 R/B=${highRB.toFixed(3)} 也偏黄（${highPixels} 像素）→ ` +
-                    `判定为画面偏色，色温正常纠正`
-                );
+                console.log(`[LUT-算法-肤色判定] 肤色 R/B=${skinRB.toFixed(3)} 高，高光 R/B=${highRB.toFixed(3)} 也偏黄（${highPixels} 像素）→ 判定为画面偏色，色温正常纠正`);
             }
         }
 
@@ -624,17 +588,41 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                             skinRB > CONFIG.extraTempRBMin);
         const shadowOk = (origShRatio > CONFIG.extraTempShadowMin);
         const highlightOk = (origHlRatio <= CONFIG.extraTempHlMax);
-
         const needExtraTemp = satAndRBOk && shadowOk && highlightOk;
 
         if (needExtraTemp) {
-            console.log(
-                `[LUT-额外降色温判定] skin_sat=${origSat.toFixed(3)} ` +
-                `> ${CONFIG.extraTempSatMin} 且 skin_rb=${skinRB.toFixed(3)} ` +
-                `> ${CONFIG.extraTempRBMin} 且 full_sh_ratio=${origShRatio.toFixed(4)} ` +
-                `> ${CONFIG.extraTempShadowMin} 且 full_hl_ratio=${origHlRatio.toFixed(4)} ` +
-                `<= ${CONFIG.extraTempHlMax} → 色温搜索后将额外降色温`
-            );
+            console.log(`[LUT-算法-额外降色温判定] skin_sat=${origSat.toFixed(3)} > ${CONFIG.extraTempSatMin} 且 skin_rb=${skinRB.toFixed(3)} > ${CONFIG.extraTempRBMin} 且 full_sh_ratio=${origShRatio.toFixed(4)} > ${CONFIG.extraTempShadowMin} 且 full_hl_ratio=${origHlRatio.toFixed(4)} <= ${CONFIG.extraTempHlMax} → 色温搜索后将额外降色温`);
+        }
+
+        // 无高光豁免
+        const _orig_hl_ratio = origHlRatio;
+        const _orig_lum_for_exempt = origLum !== undefined ? origLum : 0.5;
+        const NO_HL_EXEMPT = (_orig_hl_ratio < 0.01 && _orig_lum_for_exempt >= 0.35);
+        if (NO_HL_EXEMPT) {
+            console.log(`[LUT-算法-无高光豁免] 高光占比=${_orig_hl_ratio.toFixed(4)} < 0.01 且 原片亮度=${_orig_lum_for_exempt.toFixed(3)} >= 0.35，亮度/高光搜索不压亮`);
+        } else {
+            if (_orig_hl_ratio >= 0.01) {
+                console.log(`[LUT-算法-无高光豁免-失效] 高光占比=${_orig_hl_ratio.toFixed(4)} >= 0.01`);
+            } else if (_orig_lum_for_exempt < 0.35) {
+                console.log(`[LUT-算法-无高光豁免-失效] 原片亮度=${_orig_lum_for_exempt.toFixed(3)} < 0.35`);
+            }
+        }
+
+        // 原片极亮标志
+        const _orig_lum_is_bright = (origLum !== undefined && origLum !== null && origLum > 0.60);
+        const BRIGHT_BRIGHT_SEARCH_LO = 3;
+        if (_orig_lum_is_bright) {
+            console.log(`[LUT-算法-亮度搜索-极亮限制] 原片亮度=${origLum.toFixed(3)} > 0.60，亮度搜索/复检起点限制为 +${BRIGHT_BRIGHT_SEARCH_LO}`);
+        }
+
+        const _conservative_scene = (
+            skinRB !== undefined && skinRB !== null && skinRB > 2.0 &&
+            origSat !== undefined && origSat !== null && origSat > 0.5 &&
+            origLum !== undefined && origLum !== null && origLum < 0.35 &&
+            !useExtreme
+        );
+        if (_conservative_scene) {
+            console.log(`[LUT-算法-保守场景] R/B=${skinRB.toFixed(3)} > 2.0、饱和度=${origSat.toFixed(3)} > 0.5、原片亮度=${origLum.toFixed(3)} < 0.35，后续 bright 补偿将跳过`);
         }
 
         const coarse = subsample(skinPixels, CONFIG.coarseSampleSize);
@@ -645,7 +633,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         let params = Object.assign({}, template);
 
-        // ---- 色温搜索 ----
+        // ---- 色温 ----
         if (useHighMatch) {
             const rb = info.skin_rb;
             const [rbLo, rbHi] = targets.skin_rb;
@@ -671,29 +659,29 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             const baseRb = baseDetected.skin_rb;
             let rbOffset = infoRb - baseRb;
             rbOffset = Math.max(-0.08, Math.min(0.08, rbOffset));
+            console.log(`[LUT-算法-色温搜索] 基准修正: info_rb=${infoRb.toFixed(3)}, base_rb=${baseRb.toFixed(3)}, offset=${rbOffset >= 0 ? '+' : ''}${rbOffset.toFixed(3)}`);
 
-            const [rbLo, rbHi] = targetsEff.skin_rb;
-            let rbTarget80 = rbLo + (rbHi - rbLo) * 0.8;
+            const [rbLo, rbHi] = targets.skin_rb;
+            let rbTarget80;
+            if (infoRb > 2.0) {
+                rbTarget80 = rbHi;
+                console.log(`[LUT-算法-色温搜索] 检测 R/B=${infoRb.toFixed(3)} > 2.0，R/B 目标 = 区间上限 ${rbTarget80.toFixed(3)}`);
+            } else {
+                rbTarget80 = rbLo + (rbHi - rbLo) * 0.6;
+                console.log(`[LUT-算法-色温搜索] R/B 目标: 60% 位置 = ${rbTarget80.toFixed(3)}`);
+            }
 
             if (skinInherentlyYellow) {
                 const origTarget = rbTarget80;
                 rbTarget80 = Math.max(rbTarget80, skinRB * CONFIG.inherentYellowRatio);
-                console.log(
-                    `[LUT-色温] 肤色本身偏黄，R/B 目标从 ` +
-                    `${origTarget.toFixed(3)} 调整为 ${rbTarget80.toFixed(3)}`
-                );
+                console.log(`[LUT-算法-色温] 肤色本身偏黄，R/B 目标从 ${origTarget.toFixed(3)} 调整为 ${rbTarget80.toFixed(3)}`);
             }
-
             if (isHighHlScene) {
                 const origTarget = rbTarget80;
                 rbTarget80 = rbLo + (rbHi - rbLo) * 0.45;
-                console.log(
-                    `[LUT-色温] 高光过量场景，R/B 目标从 ${origTarget.toFixed(3)} ` +
-                    `下调到 ${rbTarget80.toFixed(3)}`
-                );
+                console.log(`[LUT-算法-色温] 高光过量场景，R/B 目标从 ${origTarget.toFixed(3)} 下调到 ${rbTarget80.toFixed(3)}`);
             }
 
-            // ★ 中央 50% 时 skin_rg、skin_lum 权重从 5、10 降到 1、1
             const rgW = isCenterFallback ? 1 : 5;
             const lumW = isCenterFallback ? 1 : 10;
 
@@ -708,8 +696,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 const correctedRb = detected.skin_rb + rbOffset;
                 const rbErr = Math.max(0, Math.abs(correctedRb - rbTarget80) - 0.03);
                 let err = 15 * rbErr * rbErr;
-                err += rgW * Math.pow(rangeError(detected.skin_rg, targetsEff.skin_rg), 2);
-                err += lumW * Math.pow(rangeError(detected.skin_lum, targetsEff.skin_lum), 2);
+                err += rgW * Math.pow(rangeError(detected.skin_rg, targets.skin_rg), 2);
+                err += lumW * Math.pow(rangeError(detected.skin_lum, targets.skin_lum), 2);
                 err += 0.0005 * (temp - template.temp) * (temp - template.temp);
                 if (err < bestErr) { bestErr = err; bestTemp = temp; }
             }
@@ -718,9 +706,9 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         // ---- 额外降色温 ----
         if (needExtraTemp && !useExtreme) {
-            const [rbLo, rbHi] = targetsEff.skin_rb;
+            const [rbLo, rbHi] = targets.skin_rb;
             const rbTarget80 = rbLo + (rbHi - rbLo) * 0.8;
-            const satTarget = (targetsEff.skin_sat[0] + targetsEff.skin_sat[1]) / 2;
+            const satTarget = (targets.skin_sat[0] + targets.skin_sat[1]) / 2;
 
             const tMin = isHighHlScene
                 ? template.temp + adjustRange.temp[0] + HH.tempExtraMin
@@ -740,106 +728,138 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             while (extra < maxExtra) {
                 const nextTemp = temp - step;
                 if (nextTemp < tMin) break;
-
                 const p = Object.assign({}, params, { temp: nextTemp });
                 const detected = statsOfCoarse(p);
                 const rbErr = Math.abs(detected.skin_rb - rbTarget80);
                 const satErr = Math.max(0, detected.skin_sat - satTarget);
                 const score = rbErr + satErr * satW;
-
                 if (score >= prevScore) break;
-
                 temp = nextTemp;
                 params.temp = temp;
                 prevScore = score;
                 extra++;
             }
-
             if (extra > 0) {
-                console.log(
-                    `[LUT-额外降色温] sat=${origSat.toFixed(3)} > ${CONFIG.extraTempSatMin} ` +
-                    `且 R/B=${skinRB.toFixed(3)} > ${CONFIG.extraTempRBMin} → ` +
-                    `色温继续降低 ${extra} 步（每步 ${step}），temp = ${params.temp}`
-                );
+                console.log(`[LUT-算法-额外降色温] sat=${origSat.toFixed(3)} > ${CONFIG.extraTempSatMin} 且 R/B=${skinRB.toFixed(3)} > ${CONFIG.extraTempRBMin} → 色温继续降低 ${extra} 步（每步 ${step}），temp = ${params.temp}`);
             }
         }
 
         // ---- 亮度搜索 ----
         {
-            const [lumLo, lumHi] = targetsEff.skin_lum;
+            const [lumLo, lumHi] = targets.skin_lum;
             let lumTarget = lumLo + (lumHi - lumLo) * 0.8;
+
+            const _orig_rb_for_target = skinRB;
+            const _orig_lum_for_target = origLum;
+            const _orig_sat_for_target = origSat;
+
+            if (_orig_rb_for_target !== undefined && _orig_rb_for_target !== null &&
+                _orig_rb_for_target >= 2.0 &&
+                _orig_sat_for_target !== undefined && _orig_sat_for_target !== null &&
+                _orig_sat_for_target > 0.5 &&
+                _orig_lum_for_target !== undefined && _orig_lum_for_target !== null &&
+                _orig_lum_for_target < 0.35 && !useExtreme) {
+                lumTarget = Math.max(_orig_lum_for_target + 0.04, 0.39);
+                console.log(`[LUT-算法-亮度搜索-保守场景] R/B=${_orig_rb_for_target.toFixed(3)} >= 2.0、饱和度=${_orig_sat_for_target.toFixed(3)} > 0.5、原片亮度=${_orig_lum_for_target.toFixed(3)} < 0.35，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.04，最低 0.39）`);
+            } else if (_orig_lum_for_target !== undefined && _orig_lum_for_target !== null &&
+                       _orig_lum_for_target > 0.54 && _orig_lum_for_target <= 0.60) {
+                lumTarget = Math.min(_orig_lum_for_target + 0.02, 0.58);
+                console.log(`[LUT-算法-亮度搜索-超亮动态] 原片亮度=${_orig_lum_for_target.toFixed(3)} ∈ (0.54, 0.60]，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.02，上限 0.58）`);
+            } else if (_orig_lum_for_target !== undefined && _orig_lum_for_target !== null &&
+                       _orig_lum_for_target > 0.60) {
+                lumTarget = 0.58;
+                console.log(`[LUT-算法-亮度搜索-极亮压回] 原片亮度=${_orig_lum_for_target.toFixed(3)} > 0.60，亮度目标 = ${lumTarget.toFixed(3)}（压回 0.58）`);
+            } else if (_orig_rb_for_target !== undefined && _orig_rb_for_target !== null &&
+                       _orig_rb_for_target < 2.0 &&
+                       _orig_lum_for_target !== undefined && _orig_lum_for_target !== null &&
+                       _orig_lum_for_target >= 0.50 && _orig_lum_for_target <= 0.54) {
+                lumTarget = _orig_lum_for_target + 0.05;
+                console.log(`[LUT-算法-亮度搜索-高亮动态] R/B=${_orig_rb_for_target.toFixed(3)} < 2.0、原片亮度=${_orig_lum_for_target.toFixed(3)} ∈ [0.50, 0.54]，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.05）`);
+            } else if (_orig_rb_for_target !== undefined && _orig_rb_for_target !== null &&
+                       _orig_rb_for_target < 2.0 &&
+                       _orig_lum_for_target !== undefined && _orig_lum_for_target !== null &&
+                       _orig_lum_for_target > 0.35 && _orig_lum_for_target < 0.50 &&
+                       (info.full_hl_ratio || 0) > 0.005) {
+                lumTarget = Math.min(_orig_lum_for_target + 0.09, 0.54);
+                console.log(`[LUT-算法-亮度搜索-动态] R/B=${_orig_rb_for_target.toFixed(3)} < 2.0、原片亮度=${_orig_lum_for_target.toFixed(3)} ∈ (0.35, 0.50)、原片高光=${(info.full_hl_ratio||0).toFixed(3)} > 0.005，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.09，上限 0.54）`);
+            }
+            console.log(`[LUT-算法-亮度搜索] 目标 = ${lumTarget.toFixed(3)}`);
 
             let bestBright = params.bright, bestErr = Infinity;
             const bMin = template.bright + adjustRange.bright[0];
             let bMax = template.bright + adjustRange.bright[1];
 
-            // ★ 动态放开 bMax：不小于 |temp| × 1.2
-            if (!useExtreme) {
-                const tempBasedMax = Math.round(Math.abs(params.temp) * 1.2);
-                const originalBMax = bMax;
-                bMax = Math.max(bMax, tempBasedMax);
-                if (bMax !== originalBMax) {
-                    console.log(
-                        `[LUT-亮度] |temp| = ${Math.abs(params.temp)} → ` +
-                        `动态 bMax ${originalBMax} → ${bMax}`
-                    );
+            if (_orig_lum_is_bright) {
+                const lo = Math.max(bMin, template.bright + BRIGHT_BRIGHT_SEARCH_LO);
+                params.bright = lo;
+                console.log(`[LUT-算法-亮度搜索-极亮锁定] 原片 ${origLum.toFixed(3)} > 0.60，亮度直接锁定为 +${lo - template.bright}`);
+            } else {
+                if (isHighHlScene) {
+                    bMax += HH.brightMaxExtra;
+                    console.log(`[LUT-算法-亮度] 高光过量场景，bright 上限放宽到 ${bMax}`);
                 }
+                for (let bright = bMin; bright <= bMax; bright += 1) {
+                    const p = Object.assign({}, params, { bright });
+                    const detected = statsOfCoarse(p);
+                    const curLum = detected.skin_lum;
+                    let lumErr;
+                    if (curLum < lumTarget) lumErr = Math.pow(lumTarget - curLum, 2);
+                    else if (curLum > lumHi) lumErr = Math.pow(curLum - lumTarget, 2);
+                    else lumErr = 0;
+                    let err = lumErr;
+                    const _temp_at_floor_search = (params.temp <= -40);
+                    if (!_temp_at_floor_search) {
+                        err += 2 * Math.pow(rangeError(detected.skin_rb, targets.skin_rb), 2);
+                    }
+                    if (err < bestErr) { bestErr = err; bestBright = bright; }
+                }
+                params.bright = bestBright;
             }
 
-            if (isHighHlScene) {
-                bMax += HH.brightMaxExtra;
-                console.log(
-                    `[LUT-亮度] 高光过量场景，bright 上限放宽到 ${bMax}`
-                );
-            }
-
-            for (let bright = bMin; bright <= bMax; bright += 1) {
-                const p = Object.assign({}, params, { bright });
-                const detected = statsOfCoarse(p);
-                const curLum = detected.skin_lum;
-                let lumErr;
-                if (curLum < lumTarget) lumErr = Math.pow(lumTarget - curLum, 2);
-                else if (curLum > lumHi) lumErr = Math.pow(curLum - lumTarget, 2);
-                else lumErr = 0;
-                let err = lumErr;
-                err += hlWeightEff * Math.pow(rangeError(detected.full_hl_ratio, targetsEff.full_hl_ratio), 2);
-                if (err < bestErr) { bestErr = err; bestBright = bright; }
-            }
-            params.bright = bestBright;
-        }
-
-        // ---- 亮度复检 ----
-        {
-            const [lumLo, lumHi] = targetsEff.skin_lum;
-            let lumTarget = lumLo + (lumHi - lumLo) * 0.8;
+            // 亮度复检
             const postDetected = statsOfCoarse(params);
             const postLum = postDetected.skin_lum;
+            console.log(`[LUT-算法-亮度复检] 色温搜索后亮度=${postLum.toFixed(3)}`);
             if (postLum < lumTarget * 0.9 || postLum > lumTarget * 1.1) {
                 let bestBright2 = params.bright, bestErr2 = Infinity;
                 const baseBright = params.bright;
-                const lo2 = Math.max(adjustRange.bright[0],
-                    baseBright - 8 - template.bright);
-                const hi2 = Math.min(adjustRange.bright[1],
-                    baseBright + 8 - template.bright);
-                for (let delta = lo2; delta <= hi2; delta += 1) {
-                    const bright = template.bright + delta;
-                    const p = Object.assign({}, params, { bright });
-                    const detected = statsOfCoarse(p);
-                    let lumErr;
-                    if (detected.skin_lum < lumTarget) lumErr = Math.pow(lumTarget - detected.skin_lum, 2);
-                    else if (detected.skin_lum > lumHi) lumErr = Math.pow(detected.skin_lum - lumTarget, 2);
-                    else lumErr = 0;
-                    let err = lumErr;
-                    err += hlWeightEff * Math.pow(rangeError(detected.full_hl_ratio, targetsEff.full_hl_ratio), 2);
-                    if (err < bestErr2) { bestErr2 = err; bestBright2 = bright; }
+                const lo2 = Math.max(adjustRange.bright[0], baseBright - 8 - template.bright);
+                const hi2 = Math.min(adjustRange.bright[1], baseBright + 8 - template.bright);
+                if (_orig_lum_is_bright) {
+                    const lo2b = Math.max(lo2, BRIGHT_BRIGHT_SEARCH_LO);
+                    if (params.bright !== lo2b) {
+                        console.log(`[LUT-算法-亮度复检-极亮锁定] 原片 > 0.60，亮度从 ${params.bright >= 0 ? '+' : ''}${params.bright} 锁定为 +${lo2b}`);
+                    }
+                    params.bright = template.bright + lo2b;
+                } else {
+                    for (let delta = lo2; delta <= hi2; delta += 1) {
+                        const bright = template.bright + delta;
+                        const p = Object.assign({}, params, { bright });
+                        const detected = statsOfCoarse(p);
+                        let lumErr;
+                        if (detected.skin_lum < lumTarget) lumErr = Math.pow(lumTarget - detected.skin_lum, 2);
+                        else if (detected.skin_lum > lumHi) lumErr = Math.pow(detected.skin_lum - lumTarget, 2);
+                        else lumErr = 0;
+                        let err = lumErr;
+                        const _temp_at_floor_recheck = (params.temp <= -40);
+                        if (!_temp_at_floor_recheck) {
+                            err += 2 * Math.pow(rangeError(detected.skin_rb, targets.skin_rb), 2);
+                        }
+                        if (err < bestErr2) { bestErr2 = err; bestBright2 = bright; }
+                    }
+                    if (bestBright2 !== params.bright) {
+                        console.log(`[LUT-算法-亮度复检] 亮度从 ${params.bright >= 0 ? '+' : ''}${params.bright} 调整为 ${bestBright2 >= 0 ? '+' : ''}${bestBright2}`);
+                    }
+                    params.bright = bestBright2;
                 }
-                params.bright = bestBright2;
+            } else {
+                console.log(`[LUT-算法-亮度复检] 亮度已在目标内，无需调整`);
             }
         }
 
-        // ---- 色调搜索 ----
+        // ---- 色调 ----
         {
-            const rgTarget = (targetsEff.skin_rg[0] + targetsEff.skin_rg[1]) / 2;
+            const rgTarget = (targets.skin_rg[0] + targets.skin_rg[1]) / 2;
             let bestTint = params.tint, bestErr = Infinity;
             const tMin = template.tint + adjustRange.tint[0];
             const tMax = template.tint + adjustRange.tint[1];
@@ -852,44 +872,58 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 if (err < bestErr) { bestErr = err; bestTint = tint; }
             }
             params.tint = bestTint;
-            // ★ tint 至少 6，保证皮肤有血色
-            if (params.tint < 6) {
-                console.log(
-                    `[LUT-色调] tint=${params.tint} < 6 → 强制为 6（加血色）`
-                );
-                params.tint = 6;
+
+            // 人脸框色调逻辑（保留油猴原版的人脸框补血色判定）
+            const isFaceBox = (info.regionName === '人脸框');
+            if (isFaceBox) {
+                const origRg = info.skin_rg !== undefined ? info.skin_rg : 1.0;
+                const origRb = info.skin_rb !== undefined ? info.skin_rb : 1.0;
+                const rgRbRatio = origRg / Math.max(origRb, 1e-6);
+                const RED_RATIO = 0.88;
+                const TINT_NEG_FLOOR = -6;
+                console.log(`[LUT-算法-色调][人脸框] skin_rg=${origRg.toFixed(3)}，skin_rb=${origRb.toFixed(3)}，rg/rb=${rgRbRatio.toFixed(3)}`);
+                if (rgRbRatio > RED_RATIO) {
+                    console.log(`[LUT-算法-色调][人脸框] 太红（rg/rb=${rgRbRatio.toFixed(3)} > ${RED_RATIO}）→ 不补血色，保留搜索值 tint=${params.tint}`);
+                    if (params.tint < TINT_NEG_FLOOR) {
+                        console.log(`[LUT-算法-色调][人脸框] tint=${params.tint} < ${TINT_NEG_FLOOR} → 钳制到 ${TINT_NEG_FLOOR}`);
+                        params.tint = TINT_NEG_FLOOR;
+                    }
+                } else {
+                    if (params.tint < 6) {
+                        console.log(`[LUT-算法-色调][人脸框] 非太红（rg/rb=${rgRbRatio.toFixed(3)} ≤ ${RED_RATIO}），tint=${params.tint} < 6 → 强制为 6（补血色）`);
+                        params.tint = 6;
+                    } else {
+                        console.log(`[LUT-算法-色调][人脸框] 非太红（rg/rb=${rgRbRatio.toFixed(3)}），tint=${params.tint} ≥ 6，保持原样`);
+                    }
+                }
+            } else {
+                if (params.tint < 6) {
+                    console.log(`[LUT-算法-色调][${info.regionName}] tint=${params.tint} < 6 → 强制为 6（补血色）`);
+                    params.tint = 6;
+                }
             }
         }
 
-        // ---- 饱和度搜索 ----
+        // ---- 饱和度 ----
         {
             let satTarget;
             if (isHighHlScene) {
-                satTarget = targetsEff.skin_sat[1] * HH.satTargetFactor;
-                console.log(
-                    `[LUT-饱和度] 高光过量场景，饱和度目标抬到 ${satTarget.toFixed(3)}`
-                );
-            } else if (origSat !== undefined && origSat !== null && origSat > targetsEff.skin_sat[1]) {
-                satTarget = targetsEff.skin_sat[1] * 0.95;
+                satTarget = targets.skin_sat[1] * HH.satTargetFactor;
+                console.log(`[LUT-算法-饱和度] 高光过量场景，饱和度目标抬到 ${satTarget.toFixed(3)}`);
+            } else if (origSat !== undefined && origSat !== null && origSat > targets.skin_sat[1]) {
+                satTarget = targets.skin_sat[1] * 0.95;
             } else {
-                satTarget = (targetsEff.skin_sat[0] + targetsEff.skin_sat[1]) / 2;
+                satTarget = (targets.skin_sat[0] + targets.skin_sat[1]) / 2;
             }
 
             let sMin, sMax;
             let satDeviationWeight = 0.001;
-            // ★ 中央 50% 时禁用 severe 分支
-            const severe = !isCenterFallback &&
-                (origSat !== undefined && origSat !== null &&
-                 origSat > CONFIG.severeSatThreshold);
+            const severe = !isCenterFallback && (origSat !== undefined && origSat !== null && origSat > CONFIG.severeSatThreshold);
             if (severe) {
                 sMin = CONFIG.severeSatMin;
                 sMax = 0;
                 satDeviationWeight = 0.00005;
-                console.log(
-                    `[LUT-饱和度] 原片饱和度=${origSat.toFixed(3)} > ` +
-                    `${CONFIG.severeSatThreshold}，扩大搜索范围到 [${sMin}, ${sMax}]，` +
-                    `偏离惩罚权重=${satDeviationWeight}`
-                );
+                console.log(`[LUT-算法-饱和度] 原片饱和度=${origSat.toFixed(3)} > ${CONFIG.severeSatThreshold}，扩大搜索范围到 [${sMin}, ${sMax}]，偏离惩罚权重=${satDeviationWeight}`);
             } else {
                 sMin = template.sat + adjustRange.sat[0];
                 sMax = template.sat + adjustRange.sat[1];
@@ -906,14 +940,10 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 if (err < bestErr) { bestErr = err; bestSat = sat; }
             }
             params.sat = bestSat;
-            console.log(
-                `[LUT-饱和度] 搜索完成，sat=${bestSat}，` +
-                `检测值=${statsOfCoarse(params).skin_sat.toFixed(3)}，` +
-                `目标区间=[${(satTarget * 0.9).toFixed(3)}, ${(satTarget * 1.1).toFixed(3)}]`
-            );
+            console.log(`[LUT-算法-饱和度] 搜索完成，sat=${bestSat}，检测值=${statsOfCoarse(params).skin_sat.toFixed(3)}，目标区间=[${(satTarget * 0.9).toFixed(3)}, ${(satTarget * 1.1).toFixed(3)}]`);
         }
 
-        // ---- 对比度搜索 ----
+        // ---- 对比度 ----
         {
             let bestContrast = params.contrast, bestErr = Infinity;
             const cMin = template.contrast + adjustRange.contrast[0];
@@ -921,10 +951,9 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             if (isHighHlScene) cMax += 2;
 
             const contrastTarget = isHighHlScene
-                ? [(targetsEff.full_contrast[0] + targetsEff.full_contrast[1]) / 2 + HH.contrastTargetShift,
-                   targetsEff.full_contrast[1] + HH.contrastTargetShift]
-                : targetsEff.full_contrast;
-
+                ? [(targets.full_contrast[0] + targets.full_contrast[1]) / 2 + HH.contrastTargetShift,
+                   targets.full_contrast[1] + HH.contrastTargetShift]
+                : targets.full_contrast;
             const contrastDevW = isHighHlScene ? HH.contrastDevWeight : 0.001;
 
             for (let contrast = cMin; contrast <= cMax; contrast += 1) {
@@ -951,29 +980,16 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 hlCompensation = Math.max(hlCompensation, hlCompMin);
             }
         }
-
         if (!useExtreme && params.bright > CONFIG.autoHlCompBrightThreshold) {
             const origHlForComp = info.full_hl_ratio || 0;
             if (origHlForComp < CONFIG.autoHlCompMinOrigHl) {
-                console.log(
-                    `[LUT-自动高光压缩] 原片高光=${origHlForComp.toFixed(4)} ` +
-                    `< ${CONFIG.autoHlCompMinOrigHl}，原片本身高光极少，` +
-                    `跳过自动高光压缩`
-                );
+                console.log(`[LUT-算法-自动高光压缩] 原片高光=${origHlForComp.toFixed(4)} < ${CONFIG.autoHlCompMinOrigHl}，原片本身高光极少，跳过自动高光压缩`);
             } else {
-                const extra = Math.round(
-                    (params.bright - CONFIG.autoHlCompBrightThreshold)
-                    * CONFIG.autoHlCompStrength
-                );
+                const extra = Math.round((params.bright - CONFIG.autoHlCompBrightThreshold) * CONFIG.autoHlCompStrength);
                 if (extra > 0) {
                     hlCompensation -= extra;
                     hlCompensation = Math.max(hlCompensation, hlCompMin);
-                    console.log(
-                        `[LUT-自动高光压缩] bright=${params.bright} > ` +
-                        `${CONFIG.autoHlCompBrightThreshold}，` +
-                        `highlight 额外压 ${extra} 档，` +
-                        `hlCompensation=${hlCompensation}`
-                    );
+                    console.log(`[LUT-算法-自动高光压缩] bright=${params.bright} > ${CONFIG.autoHlCompBrightThreshold}，highlight 额外压 ${extra} 档，hlCompensation=${hlCompensation}`);
                 }
             }
         }
@@ -983,19 +999,16 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             const baseDetected = statsOfCoarse(params);
             const currentLum = baseDetected.skin_lum;
             let [hlLo, hlHi] = getDynamicHlTarget(currentLum);
-
             if (isHighHlScene) {
                 hlHi = Math.min(hlHi, HH.hlHiCap);
-                console.log(
-                    `[LUT-高光搜索] 高光过量场景，hlHi 收紧到 ${hlHi.toFixed(3)}`
-                );
+                console.log(`[LUT-算法-高光搜索] 高光过量场景，hlHi 收紧到 ${hlHi.toFixed(3)}`);
             }
+            console.log(`[LUT-算法-高光搜索] 当前皮肤亮度=${currentLum.toFixed(3)}，动态高光目标=[${hlLo.toFixed(3)}, ${hlHi.toFixed(3)}]`);
 
             const hlBase = template.highlight + hlCompensation;
             let bestHl = params.highlight, bestErr = Infinity;
             const hMin = isHighHlScene ? -16 : adjustRange.highlight[0];
             const hMax = adjustRange.highlight[1];
-            // ★ 中央 50% + 高命中下，highlight 下限从 -10 收紧到 -5
             const hlHardMin = isHighHlScene
                 ? HH.highlightHardMin
                 : (isCenterFallback && useHighMatch ? -5 : -10);
@@ -1004,18 +1017,22 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 const hl = hlBase + delta;
                 const p = Object.assign({}, params, { highlight: hl });
                 const detected = statsOfCoarse(p);
-                let err = Math.pow(rangeError(detected.full_hl_ratio, [hlLo, hlHi]), 2);
-                err += 10 * Math.pow(rangeError(detected.skin_rb, targetsEff.skin_rb), 2);
+                let err;
+                if (NO_HL_EXEMPT) {
+                    err = 0.0;
+                } else {
+                    err = Math.pow(rangeError(detected.full_hl_ratio, [hlLo, hlHi]), 2);
+                }
+                err += 10 * Math.pow(rangeError(detected.skin_rb, targets.skin_rb), 2);
                 if (err < bestErr) { bestErr = err; bestHl = hl; }
             }
             params.highlight = Math.max(bestHl, hlHardMin);
         }
 
-        // ---- 阴影搜索 ----
+        // ---- 阴影 ----
         {
             const DARK_LUM_THRESHOLD = 0.20;
             const DARK_LUM_TARGET = 0.30;
-
             const pBase = Object.assign({}, params, { shadow: 0 });
             const baseTransformed = applyParamsToSkinArray(coarse, pBase);
             const nPix = baseTransformed.length / 3;
@@ -1027,7 +1044,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                     KB * baseTransformed[i * 3 + 2];
                 if (lum < DARK_LUM_THRESHOLD) { darkMask[i] = 1; nDark++; }
             }
-
             if (nDark > 0) {
                 let bestSh = params.shadow, bestErr = Infinity;
                 const sMin = template.shadow + adjustRange.shadow[0];
@@ -1051,21 +1067,21 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                     const medDark = darkLums[Math.floor(darkLums.length / 2)];
                     let err = Math.pow(medDark - DARK_LUM_TARGET, 2);
                     const detected = sampleSkinStats(transformed);
-                    err += 1 * Math.pow(rangeError(detected.skin_rb, targetsEff.skin_rb), 2);
+                    err += 1 * Math.pow(rangeError(detected.skin_rb, targets.skin_rb), 2);
                     if (err < bestErr) { bestErr = err; bestSh = sh; }
                 }
                 params.shadow = bestSh;
             }
         }
 
-        // ---- 最终亮度保护（原有） ----
+        // ---- 最终亮度复检 ----
         {
             const finalDetected = statsOfCoarse(params);
             const finalLum = finalDetected.skin_lum;
-            const [lumLo, lumHi] = targetsEff.skin_lum;
+            const [lumLo, lumHi] = targets.skin_lum;
             let lumTarget = lumLo + (lumHi - lumLo) * 0.8;
 
-            const rbHi = targetsEff.skin_rb[1];
+            const rbHi = targets.skin_rb[1];
             const rbTrigger = rbHi * 1.2;
             let lumTargetHigh;
             if (info.skin_rb > rbTrigger) {
@@ -1074,241 +1090,402 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 lumTargetHigh = lumTarget;
             }
 
-            const LUM_HARD_FLOOR = useExtreme ? 0.0 : 0.44;
+            const LUM_HARD_FLOOR = useExtreme ? 0.0 : lumLo;
+            console.log(`[LUT-算法-最终亮度复检] 原片亮度=${origLum !== undefined ? origLum.toFixed(3) : 0}，调整后亮度=${finalLum.toFixed(3)}，目标区间=[${lumLo.toFixed(3)}, ${lumHi.toFixed(3)}]`);
+            console.log(`[LUT-算法-最终亮度复检] 亮度硬下限 = ${LUM_HARD_FLOOR}`);
 
-            const origLumInRange = (origLum !== undefined &&
-                lumLo <= origLum && origLum <= lumHi);
-            const origBelowFloor = (origLum !== undefined && origLum < LUM_HARD_FLOOR);
+            const origLumInRange = (origLum !== undefined && origLum !== null && lumLo <= origLum && origLum <= lumHi);
+            const origBelowFloor = (origLum !== undefined && origLum !== null && origLum < LUM_HARD_FLOOR);
 
             let needRecheck = false;
-            if (origLumInRange && finalLum < origLum - 0.005) {
+            let recheckReason = '';
+            if (origLum !== undefined && origLum !== null &&
+                lumHi < origLum && origLum <= 0.60 &&
+                finalLum < origLum + 0.02 - 0.005) {
                 needRecheck = true;
+                recheckReason = `原片亮度 ${origLum.toFixed(3)} ∈ (0.54, 0.60]，目标 ${(origLum + 0.02).toFixed(3)}，当前 ${finalLum.toFixed(3)} 未达标`;
+            } else if (origLum !== undefined && origLum !== null &&
+                       origLum > 0.60 && finalLum < 0.60 - 0.005) {
+                needRecheck = true;
+                recheckReason = `原片亮度 ${origLum.toFixed(3)} > 0.60，目标 0.600，当前 ${finalLum.toFixed(3)} 未达标`;
+            } else if (origLumInRange && finalLum < origLum - 0.005) {
+                needRecheck = true;
+                recheckReason = `原片亮度 ${origLum.toFixed(3)} 在区间内，调整后被压到 ${finalLum.toFixed(3)}`;
             } else if (origBelowFloor && finalLum < LUM_HARD_FLOOR) {
                 needRecheck = true;
-            } else if (finalLum < lumTargetHigh * 0.95) {
+                recheckReason = `原片亮度 ${origLum.toFixed(3)} 低于硬下限 ${LUM_HARD_FLOOR}，调整后仍为 ${finalLum.toFixed(3)}`;
+            } else if (finalLum > lumHi * 1.05 &&
+                       !(origLum !== undefined && origLum !== null &&
+                         skinRB !== undefined && skinRB !== null && skinRB < 2.0 &&
+                         origLum >= 0.50 && origLum <= 0.60)) {
                 needRecheck = true;
-            } else if (finalLum > lumHi * 1.05) {
-                needRecheck = true;
+                recheckReason = `调整后亮度 ${finalLum.toFixed(3)} 超出上限 ${lumHi.toFixed(3)}`;
             }
 
             if (needRecheck) {
+                console.log(`[LUT-算法-最终亮度复检] 触发复检：${recheckReason}`);
+
                 let recheckTarget;
-                if (origLumInRange) {
-                    recheckTarget = origBelowFloor
-                        ? Math.max(origLum, LUM_HARD_FLOOR) : origLum;
+                if (origLum !== undefined && origLum !== null && lumHi < origLum && origLum <= 0.60) {
+                    recheckTarget = origLum + 0.02;
+                } else if (origLum !== undefined && origLum !== null && origLum > 0.60) {
+                    recheckTarget = 0.60;
+                } else if (origLumInRange) {
+                    recheckTarget = origBelowFloor ? Math.max(origLum, LUM_HARD_FLOOR) : origLum;
                 } else if (origBelowFloor) {
-                    recheckTarget = Math.max(LUM_HARD_FLOOR, lumTargetHigh);
+                    recheckTarget = LUM_HARD_FLOOR;
                 } else {
-                    recheckTarget = lumTargetHigh;
+                    recheckTarget = finalLum;
                 }
+
+                if (!(origLum !== undefined && origLum !== null && origLum > lumHi)) {
+                    if (recheckTarget < finalLum) {
+                        console.log(`[LUT-算法-最终亮度复检] 目标 ${recheckTarget.toFixed(3)} < 当前亮度 ${finalLum.toFixed(3)}，提升到当前亮度`);
+                        recheckTarget = finalLum;
+                    }
+                }
+                console.log(`[LUT-算法-最终亮度复检] 复检目标亮度 = ${recheckTarget.toFixed(3)}`);
 
                 let bestBright3 = params.bright, bestErr3 = Infinity;
                 const baseBright3 = params.bright;
-                const lo3 = Math.max(adjustRange.bright[0],
-                    baseBright3 - 6 - template.bright);
-                const hi3 = Math.min(adjustRange.bright[1],
-                    baseBright3 + 15 - template.bright);
-                for (let delta = lo3; delta <= hi3; delta += 1) {
-                    const bright = template.bright + delta;
-                    const p = Object.assign({}, params, { bright });
-                    const detected = statsOfCoarse(p);
-                    let lumErr;
-                    if (detected.skin_lum < recheckTarget) {
-                        lumErr = Math.pow(recheckTarget - detected.skin_lum, 2);
-                    } else if (detected.skin_lum > lumHi) {
-                        lumErr = Math.pow(detected.skin_lum - recheckTarget, 2);
-                    } else {
-                        lumErr = 0;
+                const lo3 = Math.max(adjustRange.bright[0], baseBright3 - 6 - template.bright);
+                const hi3 = Math.min(adjustRange.bright[1], baseBright3 + 15 - template.bright);
+                if (_orig_lum_is_bright) {
+                    const lo3b = Math.max(lo3, BRIGHT_BRIGHT_SEARCH_LO);
+                    if (params.bright !== lo3b) {
+                        console.log(`[LUT-算法-最终复检-极亮锁定] 原片 > 0.60，亮度从 ${params.bright} 锁定为 +${lo3b}`);
                     }
-                    let err = lumErr;
-                    err += 0.5 * Math.pow(rangeError(detected.skin_rb, targetsEff.skin_rb), 2);
-                    err += hlWeightEff * Math.pow(rangeError(detected.full_hl_ratio, targetsEff.full_hl_ratio), 2);
-                    if (err < bestErr3) { bestErr3 = err; bestBright3 = bright; }
+                    params.bright = template.bright + lo3b;
+                } else {
+                    for (let delta = lo3; delta <= hi3; delta += 1) {
+                        const bright = template.bright + delta;
+                        const p = Object.assign({}, params, { bright });
+                        const detected = statsOfCoarse(p);
+                        let lumErr;
+                        if (detected.skin_lum < recheckTarget) lumErr = Math.pow(recheckTarget - detected.skin_lum, 2);
+                        else if (recheckTarget <= lumHi && detected.skin_lum > lumHi) lumErr = Math.pow(detected.skin_lum - lumHi, 2);
+                        else lumErr = 0;
+                        let err = lumErr;
+                        const _temp_at_floor_final = (params.temp <= -40);
+                        if (!_temp_at_floor_final) {
+                            err += 2 * Math.pow(rangeError(detected.skin_rb, targets.skin_rb), 2);
+                        }
+                        err += 0.0001 * Math.abs(detected.skin_lum - recheckTarget);
+                        if (err < bestErr3) { bestErr3 = err; bestBright3 = bright; }
+                    }
+                    if (bestBright3 !== params.bright) {
+                        console.log(`[LUT-算法-最终亮度复检] 亮度从 ${params.bright} 调整为 ${bestBright3}`);
+                    }
+                    params.bright = bestBright3;
                 }
-                params.bright = bestBright3;
+            } else {
+                console.log(`[LUT-算法-最终亮度复检] 无需调整`);
             }
         }
 
-        // ---- 最终亮度保护（用全样本，限制补偿上限） ----
-        {
-            if (origLum !== undefined && origLum !== null) {
-                const target = origLum - CONFIG.lumGuardTolerance;
-                const BRIGHT_GUARD_MAX_ADD = CONFIG.brightGuardMaxAdd;
-                const HIGHLIGHT_GUARD_MAX_ADD = CONFIG.highlightGuardMaxAdd;
+        // ---- 标准模板亮度下限 ----
+        if (!useExtreme && !useHighMatch) {
+            const TEMP_FLOOR_THRESHOLD = -18;
+            const BRIGHT_FLOOR_STD = 7;
+            const _orig_lum_std = origLum;
+            const _orig_hl_std = info.full_hl_ratio || 0;
+            const _cond_temp = (params.temp > TEMP_FLOOR_THRESHOLD);
+            const _cond_lum = (_orig_lum_std !== undefined && _orig_lum_std !== null &&
+                targets.skin_lum[0] <= _orig_lum_std && _orig_lum_std <= targets.skin_lum[1]);
+            const _cond_hl = (_orig_hl_std < 0.10);
+            if (_cond_temp && _cond_lum && _cond_hl) {
+                if (params.bright < BRIGHT_FLOOR_STD) {
+                    console.log(`[LUT-算法-标准模板-亮度下限] bright ${params.bright} → ${BRIGHT_FLOOR_STD}`);
+                    params.bright = BRIGHT_FLOOR_STD;
+                }
+            }
+        }
 
-                let guard = 0;
-                while (guard < BRIGHT_GUARD_MAX_ADD) {
-                    const detected = sampleSkinStats(
-                        applyParamsToSkinArray(skinPixels, params)
-                    );
-                    if (detected.skin_lum >= target) break;
-                    const nextBright = params.bright + 1;
-                    const bMax = template.bright + adjustRange.bright[1];
-                    if (nextBright > bMax) break;
-                    params.bright = nextBright;
-                    guard++;
+        // ---- 力度协调 ----
+        const _cons_rb = info.skin_rb;
+        const _cons_sat = info.skin_sat;
+        const _cons_lum = info.skin_lum;
+        const _cons_scene = (
+            _cons_rb !== undefined && _cons_rb !== null && _cons_rb > 2.0 &&
+            _cons_sat !== undefined && _cons_sat !== null && _cons_sat > 0.5 &&
+            _cons_lum !== undefined && _cons_lum !== null && _cons_lum < 0.35
+        );
+        params = _balanceParamStrength(params, template, adjustRange, useExtreme, useHighMatch, _cons_scene);
+
+        // ---- 高亮撤销补血色 ----
+        const BRIGHT_NO_TINT_THRESHOLD = 35;
+        if (params.bright > BRIGHT_NO_TINT_THRESHOLD && params.tint > 0) {
+            console.log(`[LUT-算法-色调] bright=${params.bright} > ${BRIGHT_NO_TINT_THRESHOLD}，撤销补血色，tint ${params.tint} → 0`);
+            params.tint = 0;
+        } else if (params.bright > BRIGHT_NO_TINT_THRESHOLD) {
+            console.log(`[LUT-算法-色调] bright=${params.bright} > ${BRIGHT_NO_TINT_THRESHOLD}，但 tint=${params.tint} ≤ 0，保持原样`);
+        }
+
+        // ---- 灰块防护 ----
+        {
+            const GRAY_BLOCK_BRIGHT_THRESHOLD = 20;
+            if (params.bright >= GRAY_BLOCK_BRIGHT_THRESHOLD) {
+                if (params.contrast < 0) {
+                    console.log(`[LUT-算法-灰块防护] bright=${params.bright} >= ${GRAY_BLOCK_BRIGHT_THRESHOLD}，contrast ${params.contrast} → 0`);
+                    params.contrast = 0;
+                }
+                if (params.sat < 0) {
+                    console.log(`[LUT-算法-灰块防护] bright=${params.bright} >= ${GRAY_BLOCK_BRIGHT_THRESHOLD}，sat ${params.sat} → 0`);
+                    params.sat = 0;
+                }
+            }
+        }
+
+        // ---- 高光钳制 ----
+        {
+            const _hl_for_clamp = info.full_hl_ratio || 0;
+            const _rb_for_clamp = info.skin_rb || 1.0;
+            if (_hl_for_clamp > 0.18 && _rb_for_clamp > 1.8) {
+                const brightRaise = params.bright - template.bright;
+                if (brightRaise > 0) {
+                    const reduced = Math.round(brightRaise * 0.7);
+                    console.log(`[LUT-算法-高光钳制] 亮度提高量 ${brightRaise} → ${reduced}（×0.7）`);
+                    params.bright = template.bright + reduced;
+                }
+                if (params.highlight > 0) {
+                    console.log(`[LUT-算法-高光钳制] highlight=${params.highlight} > 0 → 强制为 -1`);
+                    params.highlight = -1;
+                }
+            }
+        }
+
+        // ---- 过曝联动 ----
+        let _contrast_boosted = false;
+        if (!useExtreme) {
+            const _orig_lum_for_link = info.skin_lum;
+            const _orig_lum_in_range_link = (
+                _orig_lum_for_link !== undefined && _orig_lum_for_link !== null &&
+                targets.skin_lum[0] <= _orig_lum_for_link && _orig_lum_for_link <= targets.skin_lum[1]
+            );
+            let brightTrigger = false, hlTrigger = false;
+            if (_orig_lum_in_range_link) {
+                console.log(`[LUT-算法-联动] 原片亮度 ${_orig_lum_for_link.toFixed(3)} 已在目标区间内，跳过`);
+            } else {
+                brightTrigger = (params.bright >= 15);
+                hlTrigger = (params.bright < 15 && params.highlight < -10);
+            }
+
+            if (brightTrigger || hlTrigger) {
+                const reason = brightTrigger
+                    ? `bright=${params.bright} >= 15`
+                    : `bright=${params.bright} < 15 且 highlight=${params.highlight} < -10`;
+                console.log(`[LUT-算法-联动触发] 原因：${reason}`);
+
+                if (brightTrigger) {
+                    if (_contrast_boosted) {
+                        console.log(`[LUT-算法-联动] 已做对比度回压，跳过 temp 强制 -8`);
+                    } else if (params.temp > -15) {
+                        console.log(`[LUT-算法-联动] temp=${params.temp} > -15 → 强制为 -8`);
+                        params.temp = -8;
+                    }
+                } else {
+                    const HL_TRIGGER_TEMP_FLOOR = -20;
+                    if (_conservative_scene) {
+                        console.log(`[LUT-算法-过曝回暖] 保守场景，跳过`);
+                    } else if (_contrast_boosted) {
+                        console.log(`[LUT-算法-过曝回暖] 已做对比度回压，跳过`);
+                    } else if (params.temp < HL_TRIGGER_TEMP_FLOOR) {
+                        console.log(`[LUT-算法-过曝回暖] temp=${params.temp} → ${HL_TRIGGER_TEMP_FLOOR}`);
+                        params.temp = HL_TRIGGER_TEMP_FLOOR;
+                    }
+                    if (!_conservative_scene) {
+                        const HL_TRIGGER_HL_FLOOR = -5;
+                        if (params.highlight < HL_TRIGGER_HL_FLOOR) {
+                            console.log(`[LUT-算法-过曝高光钳制] highlight=${params.highlight} → ${HL_TRIGGER_HL_FLOOR}`);
+                            params.highlight = HL_TRIGGER_HL_FLOOR;
+                        }
+                    }
                 }
 
-                let guard2 = 0;
-                while (guard2 < HIGHLIGHT_GUARD_MAX_ADD) {
-                    const detected = sampleSkinStats(
-                        applyParamsToSkinArray(skinPixels, params)
-                    );
-                    if (detected.skin_lum >= target) break;
-                    const nextHl = params.highlight + 1;
-                    const hlMax = template.highlight + adjustRange.highlight[1];
-                    if (nextHl > hlMax) break;
-                    params.highlight = nextHl;
-                    guard2++;
+                if (params.bright >= 20) {
+                    console.log(`[LUT-算法-联动] bright=${params.bright} >= 20，跳过 contrast/sat 联动`);
+                } else if (brightTrigger) {
+                    if (params.contrast > -1) {
+                        console.log(`[LUT-算法-联动] contrast ${params.contrast} → -1`);
+                        params.contrast = -1;
+                    }
+                    if (params.sat > -1) {
+                        console.log(`[LUT-算法-联动] sat ${params.sat} → -1`);
+                        params.sat = -1;
+                    }
+                } else {
+                    if (params.contrast > -1) {
+                        console.log(`[LUT-算法-过曝联动] contrast ${params.contrast} → -1`);
+                        params.contrast = -1;
+                    }
+                    const SAT_FLOOR_HL = 1;
+                    if (params.sat < SAT_FLOOR_HL) {
+                        console.log(`[LUT-算法-过曝联动] sat ${params.sat} → ${SAT_FLOOR_HL}`);
+                        params.sat = SAT_FLOOR_HL;
+                    }
+                }
+            }
+        }
+
+        // ---- 白雾补偿 ----
+        if (!useExtreme && params.bright > 0) {
+            const CONTRAST_PER_BRIGHT = 0.5;
+            const CONTRAST_MAX = 6;
+            _contrast_boosted = false;
+            const needed_contrast = Math.min(Math.round(params.bright * CONTRAST_PER_BRIGHT), CONTRAST_MAX);
+            if (params.contrast < needed_contrast) {
+                console.log(`[LUT-算法-白雾补偿] bright=${params.bright}，contrast ${params.contrast} → ${needed_contrast}`);
+                params.contrast = needed_contrast;
+                _contrast_boosted = true;
+            }
+            let sat_floor = -Math.round(params.contrast / 5.0);
+            sat_floor = Math.max(sat_floor, -2);
+            if (sat_floor < 0 && params.sat > sat_floor) {
+                console.log(`[LUT-算法-白雾补偿] contrast=${params.contrast}，sat ${params.sat} → ${sat_floor}`);
+                params.sat = sat_floor;
+            }
+        } else {
+            _contrast_boosted = false;
+        }
+
+        // ---- 对比度色温回压 ----
+        if (!useExtreme && !useHighMatch && params.contrast > 0) {
+            const c = params.contrast;
+            let temp_drop = 0;
+            if (c >= 1 && c <= 3) temp_drop = 3;
+            else if (c >= 4 && c <= 6) temp_drop = 6;
+            if (temp_drop > 0) {
+                let new_temp = params.temp - temp_drop;
+                const temp_floor = template.temp + adjustRange.temp[0];
+                new_temp = Math.max(new_temp, temp_floor);
+                if (new_temp !== params.temp) {
+                    console.log(`[LUT-算法-对比度色温回压] contrast=${c}，temp ${params.temp} → ${new_temp}`);
+                    params.temp = new_temp;
+                }
+            }
+        }
+
+        // ---- 对比度色调回压 ----
+        if (!useExtreme && !useHighMatch && params.contrast > 0) {
+            if (params.tint > 0) {
+                const c = params.contrast;
+                let tint_drop = Math.round(c / 2);
+                if (tint_drop > params.tint) tint_drop = params.tint;
+                if (tint_drop > 0) {
+                    const new_tint = params.tint - tint_drop;
+                    console.log(`[LUT-算法-对比度色调回压] contrast=${c}，tint ${params.tint} → ${new_tint}`);
+                    params.tint = new_tint;
                 }
             }
         }
 
         // ---- 缺亮补亮 ----
-        {
-            if (needForceBright) {
-                const bMax = template.bright + adjustRange.bright[1];
-                const ratio = Math.max(0, Math.min(1,
-                    highPixels / CONFIG.highPixelLowThreshold));
-                const dynamicTarget = Math.round(
-                    CONFIG.highPixelForceBright * (1 - ratio)
-                    + params.bright * ratio
-                );
-                const targetBright = Math.min(dynamicTarget, bMax);
+        const HL_RATIO_LOW_THRESHOLD = 0.02;
+        const HIGH_PIXEL_DARK_SKIN_MAX = 0.52;
+        const HIGH_PIXEL_FORCE_BRIGHT = 20;
+        const low_hl_ratio = ((info.full_hl_ratio || 0) < HL_RATIO_LOW_THRESHOLD);
+        const dark_skin = ((info.skin_lum || 0.5) < HIGH_PIXEL_DARK_SKIN_MAX);
+        const temp_at_floor = (params.temp <= -40);
 
-                if (params.bright < targetBright) {
-                    console.log(
-                        `[LUT-缺亮补亮] high_pixels=${highPixels} ` +
-                        `(ratio=${ratio.toFixed(2)}), ` +
-                        `bright ${params.bright} → ${targetBright} ` +
-                        `(动态目标: ${CONFIG.highPixelForceBright}×` +
-                        `${(1-ratio).toFixed(2)} + ${params.bright}×${ratio.toFixed(2)})`
-                    );
-                    params.bright = targetBright;
+        const _orig_lum_for_boost = info.skin_lum;
+        const _temp_in_range = (params.temp > -40 && params.temp <= -30);
+        const _orig_lum_bright = (_orig_lum_for_boost !== undefined && _orig_lum_for_boost !== null && _orig_lum_for_boost > 0.35);
+        const _weaken_boost = _temp_in_range && _orig_lum_bright;
+
+        if (low_hl_ratio && dark_skin && !useExtreme && !temp_at_floor && !NO_HL_EXEMPT && !_conservative_scene) {
+            const bMax = template.bright + adjustRange.bright[1];
+            const ratio = Math.max(0, Math.min(1, (info.full_hl_ratio || 0) / HL_RATIO_LOW_THRESHOLD));
+            let dynamic_target = Math.round(HIGH_PIXEL_FORCE_BRIGHT * (1 - ratio) + params.bright * ratio);
+            if (_weaken_boost) {
+                const original_gain = dynamic_target - params.bright;
+                const weakened_gain = Math.round(original_gain * 0.4);
+                dynamic_target = params.bright + weakened_gain;
+                console.log(`[LUT-算法-缺亮补亮] 补偿减弱 60% → ${dynamic_target}`);
+            }
+            const target_bright = Math.min(dynamic_target, bMax);
+            if (params.bright < target_bright) {
+                console.log(`[LUT-算法-缺亮补亮] bright ${params.bright} → ${target_bright}`);
+                params.bright = target_bright;
+            }
+        }
+
+        // ---- 缺亮补亮后高光复检 ----
+        if (!useExtreme && params.bright > template.bright && !NO_HL_EXEMPT) {
+            const _post_hl_detected = statsOfCoarse(params);
+            const _post_hl_lum = _post_hl_detected.skin_lum;
+            const [_post_hl_lo, _post_hl_hi] = getDynamicHlTarget(_post_hl_lum);
+            console.log(`[LUT-算法-缺亮补亮后-高光复检] bright=${params.bright}，当前 hl=${_post_hl_detected.full_hl_ratio.toFixed(3)}`);
+            let best_hl2 = params.highlight, best_err2 = Infinity;
+            const lo2 = adjustRange.highlight[0];
+            const hi2 = adjustRange.highlight[1];
+            const hl_base2 = template.highlight + hlCompensation;
+            for (let delta = lo2; delta <= hi2; delta += 1) {
+                const hl = hl_base2 + delta;
+                const p = Object.assign({}, params, { highlight: hl });
+                const detected = statsOfCoarse(p);
+                const err = 100 * Math.pow(rangeError(detected.full_hl_ratio, [_post_hl_lo, _post_hl_hi]), 2);
+                if (err < best_err2) { best_err2 = err; best_hl2 = hl; }
+            }
+            if (best_hl2 !== params.highlight) {
+                console.log(`[LUT-算法-缺亮补亮后-高光复检] highlight 从 ${params.highlight} 调整为 ${best_hl2}`);
+            }
+            params.highlight = best_hl2;
+        }
+
+        // ---- 高光最终钳制 ----
+        if (!useExtreme) {
+            const HL_FINAL_MIN = -7;
+            if (params.highlight < HL_FINAL_MIN) {
+                console.log(`[LUT-算法-高光最终钳制] highlight ${params.highlight} < ${HL_FINAL_MIN} → ${HL_FINAL_MIN}`);
+                params.highlight = HL_FINAL_MIN;
+            }
+        }
+
+        // ---- 标准模板-高光放行提亮 ----
+        if (!useExtreme && !useHighMatch) {
+            if (skinPixels !== null && skinPixels.length > 0) {
+                const BRIGHT_CAP = 18;
+                const HL_START = 0.20;
+                const HL_STOP = 0.22;
+                const _hl_detected = statsOfCoarse(params);
+                const _hl_now = _hl_detected.full_hl_ratio;
+                if (params.bright < BRIGHT_CAP && _hl_now < HL_START) {
+                    console.log(`[LUT-算法-标准-高光放行提亮] bright=${params.bright} < ${BRIGHT_CAP}，当前高光=${_hl_now.toFixed(3)} < ${HL_START}，开始逐档加亮`);
+                    const bright_lo = params.bright;
+                    const bright_hi = Math.min(BRIGHT_CAP, template.bright + adjustRange.bright[1]);
+                    let chosen_bright = params.bright;
+                    for (let bright = bright_lo; bright <= bright_hi; bright++) {
+                        const p = Object.assign({}, params, { bright });
+                        const det = statsOfCoarse(p);
+                        if (det.full_hl_ratio >= HL_STOP) {
+                            chosen_bright = Math.max(bright_lo, bright - 1);
+                            console.log(`[LUT-算法-标准-高光放行提亮] bright=${bright} 时高光=${det.full_hl_ratio.toFixed(3)} ≥ ${HL_STOP}，回退到 ${chosen_bright}`);
+                            break;
+                        }
+                        chosen_bright = bright;
+                    }
+                    if (chosen_bright !== params.bright) {
+                        console.log(`[LUT-算法-标准-高光放行提亮] bright ${params.bright} → ${chosen_bright}`);
+                    }
+                    params.bright = chosen_bright;
                 } else {
-                    console.log(
-                        `[LUT-缺亮补亮] high_pixels=${highPixels} 低，` +
-                        `但 bright=${params.bright} 已 >= 动态目标 ${targetBright}，不调整`
-                    );
+                    if (params.bright >= BRIGHT_CAP) {
+                        console.log(`[LUT-算法-标准-高光放行提亮] 未触发：bright=${params.bright} ≥ ${BRIGHT_CAP}（已封顶）`);
+                    } else {
+                        console.log(`[LUT-算法-标准-高光放行提亮] 未触发：当前高光=${_hl_now.toFixed(3)} ≥ ${HL_START}`);
+                    }
                 }
             }
         }
 
-        // ---- 亮度钳制（增加 high_pixels > 300 条件） ----
-        if (!useExtreme && !useHighMatch && highPixels > 300) {
-            const absTemp = Math.abs(params.temp);
-            const brightRaise = Math.max(0, params.bright - template.bright);
-            const maxBrightRaise = Math.round(absTemp * 1.2);
-            if (brightRaise > maxBrightRaise) {
-                console.log(
-                    `[LUT-亮度钳制] 标准模板：high_pixels=${highPixels} > 300，` +
-                    `|temp| = ${absTemp}，` +
-                    `亮度提高上限 = ${absTemp} × 1.2 = ${maxBrightRaise}，` +
-                    `当前亮度提高 ${brightRaise} → 钳制到 ${maxBrightRaise}`
-                );
-                params.bright = template.bright + maxBrightRaise;
-            } else {
-                console.log(
-                    `[LUT-亮度钳制] high_pixels=${highPixels} > 300，` +
-                    `|temp| = ${absTemp}，` +
-                    `亮度提高 ${brightRaise} ≤ 上限 ${maxBrightRaise}，不钳制`
-                );
-            }
-        } else if (!useExtreme && !useHighMatch) {
-            console.log(
-                `[LUT-亮度钳制] 标准模板，但 high_pixels=${highPixels} ≤ 300，跳过亮度钳制`
-            );
-        }
-
-        // ---- 参数力度协调器 ----
-        const balanced = balanceParamStrength(params, template, adjustRange, isHighHlScene);
-
-        // ★ 人脸框模式 + 高光像素多 + 高光 R/B 高：
-        //    亮度提高量 ×0.7；若 highlight 为正值（加高光），强制为 -1
-        if (!useExtreme && !useHighMatch && info.regionName === '人脸框') {
-            const hp = info.high_pixels !== undefined ? info.high_pixels : 0;
-            const hrb = info.high_rb !== undefined ? info.high_rb : 0;
-            if (hp > 500 && hrb > 0.95) {
-                const brightRaise = balanced.bright - template.bright;
-                if (brightRaise > 0) {
-                    const reduced = Math.round(brightRaise * 0.7);
-                    console.log(
-                        `[LUT-人脸框高光钳制] high_pixels=${hp} > 500 且 ` +
-                        `high_rb=${hrb.toFixed(3)} > 0.95 → ` +
-                        `亮度提高量 ${brightRaise} → ${reduced}（×0.7）`
-                    );
-                    balanced.bright = template.bright + reduced;
-                } else {
-                    console.log(
-                        `[LUT-人脸框高光钳制] high_pixels=${hp} > 500 且 ` +
-                        `high_rb=${hrb.toFixed(3)} > 0.95，` +
-                        `但亮度提高量 ${brightRaise} ≤ 0，亮度不调整`
-                    );
-                }
-
-                if (balanced.highlight > 0) {
-                    console.log(
-                        `[LUT-人脸框高光钳制] highlight=${balanced.highlight} > 0 → 强制为 -1`
-                    );
-                    balanced.highlight = -1;
-                } else {
-                    console.log(
-                        `[LUT-人脸框高光钳制] highlight=${balanced.highlight} ≤ 0，保持原样`
-                    );
-                }
+        // ---- 非有限值兜底 ----
+        for (const k of ['temp', 'tint', 'sat', 'bright', 'contrast', 'highlight', 'shadow']) {
+            if (!isFinite(params[k]) || isNaN(params[k])) {
+                params[k] = template[k] || 0;
             }
         }
 
-        // ★ 人脸框 + 高命中模板：若 highlight 为减值，强制为 -2
-        if (!useExtreme && useHighMatch && info.regionName === '人脸框') {
-            if (balanced.highlight < 0) {
-                console.log(
-                    `[LUT-人脸框高命中钳制] highlight=${balanced.highlight} < 0 → 强制为 -2`
-                );
-                balanced.highlight = -2;
-            } else {
-                console.log(
-                    `[LUT-人脸框高命中钳制] highlight=${balanced.highlight} ≥ 0，保持原样`
-                );
-            }
-        }
-
-        // ★ 亮度 >= 8：色温强制为 -8；同时对比度、饱和度也跟上
-        {
-            if (balanced.bright >= 8) {
-                if (balanced.temp > -15) {
-                    console.log(
-                        `[LUT-亮度色温联动] bright=${balanced.bright} >= 8 且 ` +
-                        `temp=${balanced.temp} > -15 → 强制为 -8`
-                    );
-                    balanced.temp = -8;
-                } else {
-                    console.log(
-                        `[LUT-亮度色温联动] bright=${balanced.bright} >= 8，` +
-                        `但 temp=${balanced.temp} ≤ -15，保持原样`
-                    );
-                }
-                // ★ 亮度提高时，往冷白方向调：sat 和 contrast 往负走
-                if (balanced.contrast > -1) {
-                    console.log(
-                        `[LUT-亮度联动] bright=${balanced.bright} >= 8 → contrast ${balanced.contrast} → -1`
-                    );
-                    balanced.contrast = -1;
-                }
-                if (balanced.sat > -1) {
-                    console.log(
-                        `[LUT-亮度联动] bright=${balanced.bright} >= 8 → sat ${balanced.sat} → -1`
-                    );
-                    balanced.sat = -1;
-                }
-            } else {
-                console.log(
-                    `[LUT-亮度色温联动] bright=${balanced.bright} < 8，色温保持 ${balanced.temp}`
-                );
-            }
-        }
-
-        return balanced;
+        return params;
     }
 
     // ============================================================
@@ -1328,11 +1505,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
                     t = applyHighlightShadowScalar(rIn, gIn, bIn, params.highlight, params.shadow);
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
-                    t = applyTempTintScalar(rIn, gIn, bIn, params.temp, params.tint);
+                    t = applyContrastScalar(rIn, gIn, bIn, params.contrast);
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
                     t = applySaturationScalar(rIn, gIn, bIn, params.sat);
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
-                    t = applyContrastScalar(rIn, gIn, bIn, params.contrast);
+                    t = applyTempTintScalar(rIn, gIn, bIn, params.temp, params.tint);
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
 
                     const lum = KR * rIn + KG * gIn + KB * bIn;
@@ -1349,8 +1526,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         }
         return data;
     }
-
-    function computeGlobalHlRatio(data, step) {
+function computeGlobalHlRatio(data, step) {
         const nPix = data.length / 4;
         let hl = 0, cnt = 0;
         const s = step || 1;
@@ -1363,14 +1539,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         if (cnt === 0) return 0;
         return hl / cnt;
     }
-
-    function computeRegionCrRange(data, aw, ah, region, coverage, fallback) {
+function computeRegionCrRange(data, aw, ah, region, coverage, fallback) {
         const x1 = region.x1, y1 = region.y1, x2 = region.x2, y2 = region.y2;
         const totalPix = (x2 - x1) * (y2 - y1);
         if (totalPix <= 0) return { range: fallback };
-
         const step = Math.max(1, Math.floor(Math.sqrt(totalPix / 40000)));
-
         const crList = [];
         for (let y = y1; y < y2; y += step) {
             for (let x = x1; x < x2; x += step) {
@@ -1381,57 +1554,40 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             }
         }
         if (crList.length === 0) return { range: fallback };
-
         crList.sort((a, b) => a - b);
         const total = crList.length;
         const lowIdx = Math.floor(total * (1 - coverage) / 2);
         const highIdx = Math.min(total - 1, Math.floor(total * (1 + coverage) / 2));
-
         let crMin = Math.floor(crList[lowIdx]);
         let crMax = Math.ceil(crList[highIdx]);
-
         crMin = Math.max(120, crMin);
         crMax = Math.min(190, crMax);
-
-        if (crMax - crMin < 30) {
-            return { range: fallback };
-        }
-
+        if (crMax - crMin < 30) return { range: fallback };
         return { range: [crMin, crMax] };
     }
-
-    function isSkinColorRegion(r, g, b, crRange, cbRange) {
+function isSkinColorRegion(r, g, b, crRange, cbRange) {
         if (r < g - 4) return false;
         if (g < b - 4) return false;
         if (r <= b) return false;
-
         const rb = r / Math.max(b, 1);
         if (rb > 2.0) return false;
-
         const rg = r / Math.max(g, 1);
         if (rg > 1.6) return false;
-
         const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
         const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
-
         if (cb < cbRange[0] || cb > cbRange[1]) return false;
         if (cr < crRange[0] || cr > crRange[1]) return false;
-
         const y = 0.299 * r + 0.587 * g + 0.114 * b;
         if (y < 30 || y > 250) return false;
-
         const max = Math.max(r, g, b), min = Math.min(r, g, b);
         if (max < 20) return false;
         const sat = (max - min) / max;
         if (sat < 0.08 || sat > 0.55) return false;
-
         return true;
     }
-
-
 function sampleFrame(data, aw, ah, faceBox) {
- const full_hl_ratio_global = computeGlobalHlRatio(data, CONFIG.globalHlSampleStep);
  const faceDetected = !!faceBox;
+ const full_hl_ratio_global = computeGlobalHlRatio(data, CONFIG.globalHlSampleStep);
         let sampleRegion;
         let regionName;
         if (faceDetected && faceBox) {
@@ -1452,13 +1608,8 @@ function sampleFrame(data, aw, ah, faceBox) {
         );
 
         const isCenterFallback = !faceDetected;
-        const FACE_SKIN_LUM_MAX_EFF = isCenterFallback
-            ? 0.72
-            : FACE_SKIN_LUM_MAX;
-        console.log(
-            `[LUT-采样] 采样区域=${isCenterFallback ? '中央50%' : '人脸框'}，` +
-            `FACE_SKIN_LUM_MAX=${FACE_SKIN_LUM_MAX_EFF}`
-        );
+        const FACE_SKIN_LUM_MAX_EFF = isCenterFallback ? 0.72 : FACE_SKIN_LUM_MAX;
+        console.log(`[LUT-采样] 采样区域=${isCenterFallback ? '中央50%' : '人脸框'}，FACE_SKIN_LUM_MAX=${FACE_SKIN_LUM_MAX_EFF}`);
 
         const crInfo = computeRegionCrRange(
             data, aw, ah, sampleRegion,
@@ -1489,16 +1640,10 @@ function sampleFrame(data, aw, ah, faceBox) {
             }
         }
 
-        console.log(
-            `[LUT-区域肤色] Cr范围=[${crRange[0]},${crRange[1]}] ` +
-            `区域内肤色像素=${temp.length / 3}`
-        );
+        console.log(`[LUT-区域肤色] Cr范围=[${crRange[0]},${crRange[1]}] 区域内肤色像素=${temp.length / 3}`);
 
         if (temp.length / 3 < CONFIG.faceBoxMinSkinPixels) {
-            console.log(
-                `[LUT-区域肤色] 采样区域内肤色像素不足: ${temp.length / 3} ` +
-                `< ${CONFIG.faceBoxMinSkinPixels}，放弃本次`
-            );
+            console.log(`[LUT-区域肤色] 采样区域内肤色像素不足: ${temp.length / 3} < ${CONFIG.faceBoxMinSkinPixels}，放弃本次`);
             return { pixels: null, box: faceBox, high_rb: 1.0, high_pixels: 0, full_hl_ratio_global, regionName };
         }
 
@@ -1510,9 +1655,7 @@ function sampleFrame(data, aw, ah, faceBox) {
             if (highStats) highRB = highStats.skin_rb;
         }
 
-        console.log(
-            `[LUT-路由] 采用【${regionName}】结果，N = ${temp.length / 3}`
-        );
+        console.log(`[LUT-路由] 采用【${regionName}】结果，N = ${temp.length / 3}`);
 
         return {
             pixels: new Float32Array(temp),
@@ -1522,8 +1665,8 @@ function sampleFrame(data, aw, ah, faceBox) {
             full_hl_ratio_global,
             regionName,
         };
+    }
 
-}
 
 function analyzeFrame(bytes, width, height, box) {
  const frame = sampleFrame(new Uint8ClampedArray(bytes), width, height, box);
@@ -1532,12 +1675,9 @@ function analyzeFrame(bytes, width, height, box) {
  info.full_hl_ratio = frame.full_hl_ratio_global;
  info.high_rb = frame.high_rb; info.high_pixels = frame.high_pixels;
  info.regionName = frame.regionName;
+ // v6.7.8: remove forceHighMatch / condFace backdoors; route solely via classifiers.
  const useExtreme = isExtremeDark(info);
- const hp = info.high_pixels, hrb = info.high_rb;
- const condFace1 = info.regionName === '人脸框' && hrb > 1.3 && hp > 200;
- const condFace2 = info.regionName === '人脸框' && hp > 5000 && hrb > 0.9;
- const condCenter = info.regionName === '中央50%' && hp > 5000 && hp < 13000 && hrb > 0.9;
- const useHighMatch = !useExtreme && (info.regionName === '中央50%' ? condCenter && isHighMatch(info) : condFace1 || condFace2 || isHighMatch(info));
+ const useHighMatch = useExtreme ? false : isHighMatch(info);
  return {params: predictParams(info, subsample(frame.pixels, CONFIG.maxSkinPixels), useExtreme, useHighMatch), info: info, stage: useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准'};
 }
 function cubeRGBA(values) {
@@ -1547,5 +1687,6 @@ function cubeRGBA(values) {
  for(let i=0,j=0;i<rgb.length;i+=3,j+=4) {out[j]=rgb[i];out[j+1]=rgb[i+1];out[j+2]=rgb[i+2];out[j+3]=1;}
  return Array.from(out);
 }
-return {analyzeFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch};
+
+return {analyzeFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio};
 })();

@@ -96,7 +96,7 @@ final class Host: UIViewController {
         checks["readyToPlay"] = await wait { self.player.currentItem?.status == .readyToPlay && self.model.supported }
         checks["sourceCheckNotPresentation"] = pts.isEmpty && runtime.view.isHidden
         checks["analysisNilRequestRetained"] = model.testAnalysisRequested
-        // Actual production controller + 269 JavaScriptCore cube, not a demo cube.
+        // Actual production controller + 6.7.8 JavaScriptCore cube, not a demo cube.
         let adjusted: [Double] = [22, -12, 30, 18, 16, -15, 20]
         model.enabled = true; model.parameters = LUTParameters(values: adjusted); model.comparison = true; model.divider = 0
         model.updateComparison(); model.apply()
@@ -107,7 +107,7 @@ final class Host: UIViewController {
         checks["strengthZeroCaptured"] = await render(parameters: adjusted, strength: 0, split: 0)
         await snapshotStage("strength-zero")
         checks["strengthOneCaptured"] = await render(parameters: adjusted, strength: 1, split: 0)
-        await snapshotStage("actual-269-lut")
+        await snapshotStage("actual-678-lut")
         checks["splitCaptured"] = await render(parameters: adjusted, strength: 1, split: 0.5)
         await snapshotStage("same-frame-split")
         checks["neutralParametersCaptured"] = await render(parameters: [0,0,0,0,0,0,0], strength: 1, split: 0)

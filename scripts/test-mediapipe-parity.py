@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess,tempfile,sys
 r=Path(__file__).resolve().parents[1]
-s=(r/'THIRD_PARTY/lut-v6.7.5.txt').read_text()
+s=(r/'THIRD_PARTY/lut-v6.7.8.txt').read_text()
 a=s.index('    const CONFIG = {');b=s.index('    function getOrCreateOverlayRoot')
 c=s.index('    const KR =');d=s.index('    // ============================================================\n    // 四、MediaPipe 加载')
 e=s.index('    function computeGlobalHlRatio');f=s.index('    function captureFaceSkinPixels')

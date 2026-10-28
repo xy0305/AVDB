@@ -53,8 +53,11 @@ final class NativeHLSLUTSurface: NSObject {
         view.autoResizeDrawable = true; view.isOpaque = true
         view.clearColor = MTLClearColorMake(0, 0, 0, 1)
         view.isHidden = true
-        // Callers with controls in container should explicitly reorder below them.
-        container.insertSubview(view, at: 0)
+        // Overlay host is noninteractive and sits under chrome/subtitles in PlayerView.
+        // Within the host, keep the Metal view on top of any stray siblings; never above controls.
+        if view.superview !== container { container.addSubview(view) }
+        container.bringSubviewToFront(view)
+        view.frame = container.bounds
         for name in [UIApplication.didEnterBackgroundNotification, UIApplication.willResignActiveNotification,
                      UIApplication.didBecomeActiveNotification, AVPlayerItem.timeJumpedNotification] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
@@ -77,18 +80,31 @@ final class NativeHLSLUTSurface: NSObject {
 
     /// User-triggered single-frame analysis may downsample this buffer separately.
     /// It shares the output, never creates a second player or CPU frame readback here.
-    func copyDecodedFrameForAnalysis() -> CVPixelBuffer? {
+    /// Prefer the last presented SDR frame so analysis matches what the user saw.
+    /// `force` bypasses the 1.2s throttle (开启/重新分析); still shares the output — no second player.
+    func copyDecodedFrameForAnalysis(force: Bool = false) -> CVPixelBuffer? {
         guard sourceSafe, let player, let output else { return nil }
         let now = CACurrentMediaTime()
-        guard now - lastAnalysisHost >= 1.2 else { return nil }
+        if !force && now - lastAnalysisHost < 1.2 { return nil }
         var pts = CMTime.invalid
+        // Prefer a fresh decode at the playhead; fall back to last presented SDR frame.
         if let buffer = output.copyPixelBuffer(forItemTime: player.currentTime(), itemTimeForDisplay: &pts) {
             guard isKnownSDR(buffer) else { lastBuffer = nil; return nil }
             lastBuffer = buffer; lastPTS = pts; dirty = true; lastAnalysisHost = now
             return buffer
         }
-        if lastBuffer != nil { lastAnalysisHost = now }
-        return lastBuffer
+        if let previous = lastBuffer, isKnownSDR(previous) {
+            lastAnalysisHost = now
+            return previous
+        }
+        return nil
+    }
+
+    /// Next analysis may reuse the latest presented buffer immediately after 开启/重新分析.
+    func prepareForcedAnalysisFrame() {
+        lastAnalysisHost = -.infinity
+        forceCopy = true
+        dirty = true
     }
 
     /// Set nil to show the original layer immediately. No AVVideoComposition on HLS.
@@ -257,7 +273,7 @@ final class NativeHLSLUTSurface: NSObject {
                 guard completed.status == .completed else { self.hide("GPU 提交失败，回原画"); return }
                 guard UIApplication.shared.applicationState == .active, self.bypassReason == nil, self.player?.isExternalPlaybackActive == false else { self.hide("原画旁路"); return }
                 self.view.isHidden = false
-                if self.lastStatus != "在线 SDR LUT：Metal" { self.lastStatus = "在线 SDR LUT：Metal"; self.onStatus?(self.lastStatus) }
+                if self.lastStatus != "在线 SDR LUT：Metal（原版 6.7.8）" { self.lastStatus = "在线 SDR LUT：Metal（原版 6.7.8）"; self.onStatus?(self.lastStatus) }
                 self.onPresented?(pts)
             }
         }

@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess, tempfile, json, sys
 root=Path(__file__).resolve().parents[1]
-original=(root/'THIRD_PARTY/lut-v6.7.5.txt').read_text()
+original=(root/'THIRD_PARTY/lut-v6.7.8.txt').read_text()
 # Independent oracle: evaluate original lexical numeric section, not shipped extraction.
 a=original.index('    const CONFIG = {'); b=original.index('    function getOrCreateOverlayRoot')
 c=original.index('    const KR ='); d=original.index('    // ============================================================\n    // 四、MediaPipe 加载')
@@ -21,16 +21,25 @@ for(const [name,base] of [['dark',[.16,.13,.12]],['bright',[.85,.76,.64]],['high
  for(const mode of [0,1,2]){
  const info={...stats,high_rb:mode===2?1.4:1,high_pixels:mode===2?6000:0,regionName:mode===2?'中央50%':'人脸框'};
  if(name==='bright')info.full_hl_ratio=.7;
+ // mode1 forces extreme flag into predictParams; classifiers may still disagree on isExtremeDark(info)
  const p=ref.predictParams(info,new Float32Array(pixels),mode===1,mode===2);
  const q=port.predictParams(info,new Float32Array(pixels),mode===1,mode===2);
- assert.deepStrictEqual(JSON.parse(JSON.stringify(q)),JSON.parse(JSON.stringify(p)));
+ assert.deepStrictEqual(JSON.parse(JSON.stringify(q)),JSON.parse(JSON.stringify(p)), name+' mode '+mode);
  const rgb=Array.from(ref.generateLutData(33,p)); const rgba=port.cubeRGBA(['temp','tint','sat','bright','contrast','highlight','shadow'].map(k=>p[k]));
  for(let i=0;i<rgb.length;i++) assert.strictEqual(rgb[i],rgba[Math.floor(i/3)*4+i%3]);
  cases.push({name:name+mode,pixels,info,extreme:mode===1,high:mode===2,params:p,rgb:rgb.slice(0,120)});
  }
 }
 assert.strictEqual(port.sampleSkinStats([]),null);
-fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: 21 staged searches, stats, 21 complete 33³ RGB cubes: exact Node equality');
+// Cold-scene high-match protection (v6.7.8): low R/B+R/G+sat with moderate luma → high-match
+const cold={skin_rb:1.1,skin_rg:1.1,skin_sat:0.2,skin_lum:0.4,full_hl_ratio:0.05,full_sh_ratio:0.1,no_skin_data:false,high_pixels:0};
+assert.strictEqual(ref.isHighMatch(cold), true);
+assert.strictEqual(port.isHighMatch(cold), true);
+// Extreme-dark threshold change (v6.7.8): luma<0.28, hl<0.01, sh>0.24 (no R/B gate)
+const dark={skin_rb:1.8,skin_lum:0.25,full_hl_ratio:0.005,full_sh_ratio:0.30,no_skin_data:false};
+assert.strictEqual(ref.isExtremeDark(dark), true);
+assert.strictEqual(port.isExtremeDark(dark), true);
+fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: 21 staged searches, stats, 21 complete 33³ RGB cubes + v6.7.8 classifiers: exact Node equality');
 '''
 with tempfile.TemporaryDirectory() as tmp:
  t=Path(tmp);(t/'oracle.js').write_text(oracle);(t/'test.js').write_text(js)
