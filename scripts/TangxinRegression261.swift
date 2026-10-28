@@ -36,6 +36,8 @@ import Foundation
         precondition(!TangxinPolicy.next(URL(string:"https://tangxinvlog.app/a/Other/2")!,from:first.videos[0].author!.url))
         precondition(!TangxinPolicy.next(root,from:root))
         precondition(!TangxinPolicy.next(URL(string:"https://tangxinvlog.app/featured/3")!,from:root))
+        precondition(TangxinPolicy.documentURL(URL(string:"https://tangxinvlog.app/featured/2")!)?.absoluteString == "https://tangxinvlog.app/featured/2/")
+        precondition(TangxinPolicy.documentURL(URL(string:"https://tangxinvlog.app/featured/2/")!)?.path == "/featured/2/")
         let evilNext = TangxinFixtures261.first.replacingOccurrences(of:"/featured/2",with:"https://elsewhere.org/featured/2")
         let safeNext = try TangxinParser.list(evilNext,at:root)
         precondition(safeNext.next == nil)

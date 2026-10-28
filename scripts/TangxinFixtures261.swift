@@ -28,9 +28,9 @@ enum TangxinFixtures261 {
                 let html: String
                 if path == "/featured" || path == "/featured/" {
                     html = "<div class='grid'>" + card("blocked",title:"未成年") + "</div>" + next(2)
-                } else if path == "/featured/2" {
+                } else if path == "/featured/2" || path == "/featured/2/" {
                     html = "<div class='grid'></div>" + next(3)
-                } else if path == "/featured/3" {
+                } else if path == "/featured/3" || path == "/featured/3/" {
                     html = "<article class='card'></article>" + next(4)
                 } else {
                     html = "<div class='grid'>" + card("neutral1") + card("blocked",title:"偷拍") + "</div>"
@@ -39,7 +39,7 @@ enum TangxinFixtures261 {
             }
             guard let url = request.url, request.value(forHTTPHeaderField:"Referer") == TangxinPolicy.origin.absoluteString, request.value(forHTTPHeaderField:"Cookie") == nil else { throw TangxinError.unsafe }
             if url.path == "/featured" || url.path == "/featured/" { return Data(first.utf8) }
-            if url.path == "/featured/2" {
+            if url.path == "/featured/2" || url.path == "/featured/2/" {
                 if ProcessInfo.processInfo.arguments.contains("--failure264"), await attempts.failFirst() { throw TangxinError.structure }
                 return Data(second.utf8)
             }

@@ -60,7 +60,8 @@ enum TangxinError: LocalizedError {
 }
 enum TangxinPolicy {
     static let origin = URL(string: "https://tangxinvlog.app/")!
-    static let featured = origin.appendingPathComponent("featured/")
+    // Directory form: site 307s `/featured` → `/featured/` (and same for /featured/N, /a/…, /v/…).
+    static let featured = URL(string: "https://tangxinvlog.app/featured/")!
     static let cdn = "t.5gcdn.xyz"
     static let headers = ["User-Agent": OnlinePolicy.ua, "Referer": origin.absoluteString]
     // Nicknames are deliberately NOT inspected. Generic 黑料 alone is not a verdict.
@@ -99,6 +100,18 @@ enum TangxinPolicy {
         }
         let a = parts(current), b = parts(candidate)
         return a.0 == b.0 && b.1 == a.1 + 1
+    }
+    /// Canonical directory URL for GET. Does not follow Location headers or change host/query.
+    /// Live site returns HTTP 307 from `/featured/2` → `/featured/2/`; OnlineTransport refuses redirects.
+    static func documentURL(_ url: URL) -> URL? {
+        guard page(url) || video(url) else { return nil }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        let encoded = components.percentEncodedPath
+        if !encoded.hasSuffix("/") { components.percentEncodedPath = encoded + "/" }
+        components.query = nil
+        components.fragment = nil
+        guard let out = components.url, page(out) || video(out), out.host == origin.host else { return nil }
+        return out
     }
 }
 
@@ -213,13 +226,14 @@ enum TangxinParser {
 }
 
 struct TangxinClient: Sendable {
-    // Own transport: ephemeral, no cookies/cache/credentials, no redirects or TLS exceptions.
+    // Own transport: ephemeral, no cookies/cache/credentials, no TLS exceptions.
+    // Redirects stay blocked in OnlineTransport; TangxinPolicy.documentURL only adds a trailing slash on-host.
     let transport: OnlineTransport
     init(transport: OnlineTransport = OnlineTransport()) { self.transport = transport }
     func withDNSMode(_ mode: OnlineDNSMode) -> TangxinClient { TangxinClient(transport: transport.withDNSMode(mode)) }
     func document(_ url: URL) async throws -> String {
-        guard TangxinPolicy.page(url) || TangxinPolicy.video(url) else { throw TangxinError.unsafe }
-        let bytes = try await transport.fetch(url,cap:2*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:TangxinPolicy.origin),context:TangxinPolicy.video(url) ? .document : .discovery)
+        guard let target = TangxinPolicy.documentURL(url) else { throw TangxinError.unsafe }
+        let bytes = try await transport.fetch(target,cap:2*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:TangxinPolicy.origin),context:TangxinPolicy.video(url) ? .document : .discovery)
         guard let html = String(data:bytes,encoding:.utf8) else { throw TangxinError.structure }
         return html
     }

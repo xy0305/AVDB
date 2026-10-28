@@ -55,9 +55,9 @@ actor TangxinModelFixture261 {
             let html: String
             if path == "/featured" || path == "/featured/" {
                 html = "<div class='grid'>" + TangxinFixtures261.card("blocked",title:"未成年") + "</div><a rel='next' href='/featured/2'>Next</a>"
-            } else if path == "/featured/2" {
+            } else if path == "/featured/2" || path == "/featured/2/" {
                 html = "<div class='grid'></div><a rel='next' href='/featured/3'>Next</a>"
-            } else if path == "/featured/3" {
+            } else if path == "/featured/3" || path == "/featured/3/" {
                 html = "<article class='card'></article><a rel='next' href='/featured/4'>Next</a>"
             } else { html = "<div class='grid'>" + TangxinFixtures261.card("visible") + "</div>" }
             return Data(html.utf8)

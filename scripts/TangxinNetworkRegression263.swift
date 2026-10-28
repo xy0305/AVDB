@@ -61,6 +61,29 @@ enum TangxinNetworkRegression263 {
         _ = try await client.playback(detail)
         let paths = await log.all()
         precondition(paths.contains { $0.hasSuffix(".m3u8") } && paths.contains { $0.hasSuffix("key.bin") } && paths.contains { $0.hasSuffix(".jpg") } && paths.contains { $0.hasPrefix("/v/") })
+        // Build 274: site 307s `/featured/2` → `/featured/2/`. Canonicalize before GET; never follow Location.
+        precondition(TangxinPolicy.featured.path.hasSuffix("/"))
+        let barePage = URL(string: "https://tangxinvlog.app/featured/2")!
+        let bareVideo = URL(string: "https://tangxinvlog.app/v/neutral1")!
+        precondition(TangxinPolicy.documentURL(barePage)?.path == "/featured/2/")
+        precondition(TangxinPolicy.documentURL(bareVideo)?.path == "/v/neutral1/")
+        precondition(TangxinPolicy.documentURL(TangxinPolicy.featured)?.path == "/featured/")
+        precondition(TangxinPolicy.documentURL(URL(string: "https://elsewhere.org/featured/2")!) == nil)
+        precondition(TangxinPolicy.documentURL(URL(string: "https://tangxinvlog.app/featured/2?x=1")!) == nil)
+        let slashLog = Calls()
+        let slashClient = TangxinClient(transport:OnlineTransport(resolver:{ _ in ["198.18.0.1"] },loader:{ r in
+            await slashLog.add(r.url!.path)
+            precondition(r.url!.path.hasSuffix("/"), "client must GET directory form, not bare path that 307s")
+            if r.url!.path.hasPrefix("/v/") { return Data(TangxinFixtures261.detail.utf8) }
+            if r.url!.path == "/featured/2/" { return Data(TangxinFixtures261.second.utf8) }
+            return Data(TangxinFixtures261.first.utf8)
+        })).withDNSMode(.systemProxy)
+        let page2 = try await slashClient.list(barePage)
+        precondition(page2.videos.count == 1)
+        _ = try await slashClient.detail(bareVideo)
+        let slashPaths = await slashLog.all()
+        precondition(slashPaths.contains("/featured/2/") && slashPaths.contains("/v/neutral1/"))
+        precondition(!slashPaths.contains("/featured/2") && !slashPaths.contains("/v/neutral1"))
         // HLS parser validates each segment/key URL, not just root playlist.
         for child in ["https://other.example.org/segment.ts","https://127.0.0.1/segment.ts","http://t.5gcdn.xyz/segment.ts"] {
             let text = "#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXTINF:5,\n" + child + "\n#EXT-X-ENDLIST\n"
@@ -71,6 +94,6 @@ enum TangxinNetworkRegression263 {
             do { _ = try await errorClient.list(root); fatalError("error expected") }
             catch { let d = OnlineFailure.classify(error).presentation(at:.discovery); precondition(d.category == (code == -999 ? .cancelled : .tls) && d.systemCode == code && d.stage == .discovery) }
         }
-        print("PASS263 production diagnostic legacy/typed/NSError roundtrip, DNS strict/approved-proxy/private/empty/getaddrinfo/TLS/cancel, client list/image/detail/HLS/key propagation; native player segment IO NOT covered")
+        print("PASS263+274 production diagnostic legacy/typed/NSError roundtrip, DNS strict/approved-proxy/private/empty/getaddrinfo/TLS/cancel, client list/image/detail/HLS/key propagation, trailing-slash documentURL (no Location follow); native player segment IO NOT covered")
     }
 }
