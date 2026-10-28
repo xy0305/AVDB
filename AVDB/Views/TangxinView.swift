@@ -274,56 +274,129 @@ struct TangxinDetailView: View {
     let client: TangxinClient
     @State private var detail: TangxinDetail?
     @State private var error: String?
-    @State private var loading = false
+    /// Detail document fetch — must not share state with playback resolve (that disabled the only play control).
+    @State private var loadingDetail = false
+    @State private var resolvingPlay = false
     @State private var playback: TangxinPlayback?
     @State private var request = UUID()
     @State private var playTask: Task<Void,Never>?
     var body: some View {
         ScrollView {
-            VStack(alignment:.leading,spacing:18) {
+            VStack(alignment:.leading,spacing:16) {
                 if let detail {
-                    TangxinImage(url:detail.video.poster,client:client).aspectRatio(16/9,contentMode:.fit).clipShape(RoundedRectangle(cornerRadius:16))
+                    coverPlayHero(detail)
                     Text(detail.video.title).font(.title2.bold())
                     if let author = detail.video.author {
                         NavigationLink(value:author) { Label(author.name,systemImage:"person.crop.circle").frame(minHeight:44) }
                             .accessibilityIdentifier("tangxin.detail.author")
                     }
-                    if !detail.summary.isEmpty { Text(detail.summary).font(.body) }
-                    VStack(alignment:.leading,spacing:8) {
-                        ForEach(detail.tagLinks) { tag in
-                            NavigationLink(value:tag) { Text(tag.name).font(.caption).frame(minHeight:44) }
-                                .accessibilityIdentifier("tangxin.tag.\(tag.url.lastPathComponent)")
-                        }
-                        ForEach(detail.tags.filter { name in !detail.tagLinks.contains { $0.name == name } },id:\.self) { name in
-                            Text(name).font(.caption).foregroundStyle(.secondary)
-                        }
+                    // Play bar sits above tags so it stays above the fold (old layout buried it under 5×44pt links).
+                    Button { startPlayback(detail) } label: {
+                        Label(resolvingPlay ? "解析中…" : "播放", systemImage: "play.fill")
+                            .frame(maxWidth:.infinity,minHeight:44)
                     }
-                    Button {
-                        guard !loading else { return }; loading = true; error = nil
-                        playTask = Task {
-                            do { let plan = try await client.playback(detail); try Task.checkCancellation(); playback = plan }
-                            catch { if !Task.isCancelled { self.error = error.localizedDescription } }
-                            loading = false
-                        }
-                    } label: { Label("播放",systemImage:"play.fill").frame(maxWidth:.infinity,minHeight:44) }
-                    .buttonStyle(.borderedProminent).disabled(loading).accessibilityIdentifier("tangxin.play")
+                    .buttonStyle(.borderedProminent)
+                    .disabled(resolvingPlay || loadingDetail)
+                    .accessibilityIdentifier("tangxin.play")
+
+                    if !detail.summary.isEmpty { Text(detail.summary).font(.body) }
+                    tagChips(detail)
                 }
-                if loading { ProgressView() }
-                if let error { Text(error).font(.footnote); Button("重试") { request = UUID() }.frame(minWidth:44,minHeight:44) }
+                if loadingDetail { ProgressView().frame(maxWidth:.infinity).padding(.vertical,24) }
+                if resolvingPlay { ProgressView("正在解析播放地址…").frame(maxWidth:.infinity) }
+                if let error {
+                    Text(error).font(.footnote)
+                    Button("重试") { request = UUID() }.frame(minWidth:44,minHeight:44)
+                }
             }.padding()
         }
         .navigationTitle("视频详情").navigationBarTitleDisplayMode(.inline)
         .task(id:request) {
-            loading = true; error = nil; detail = nil
+            loadingDetail = true; error = nil; detail = nil
             do { let value = try await client.detail(video.url); try Task.checkCancellation(); detail = value }
             catch { if !Task.isCancelled { self.error = error.localizedDescription } }
-            loading = false
+            loadingDetail = false
         }
         .onDisappear { playTask?.cancel() }
         .fullScreenCover(item:$playback) { plan in
             // The existing player owns subtitle/gesture/audio/LUT/orientation behavior.
             // No Movie/JavDB query, 115 operation, cookies or global header mutation.
             KSChromePlayer(url:plan.url,title:detail?.video.title ?? video.title,subtitle:"糖心 · HLS",headers:plan.headers,progressID:"tangxin:"+video.url.lastPathComponent,publicSubtitleQuery:"")
+        }
+    }
+
+    /// Entire cover is the hit target; TangxinImage itself disables hit testing, so the Button must own the gesture.
+    private func coverPlayHero(_ detail: TangxinDetail) -> some View {
+        Button { startPlayback(detail) } label: {
+            TangxinImage(url:detail.video.poster,client:client)
+                .aspectRatio(16/9,contentMode:.fit)
+                .overlay {
+                    ZStack {
+                        LinearGradient(colors:[.clear,.black.opacity(0.35)],startPoint:.center,endPoint:.bottom)
+                        Image(systemName: resolvingPlay ? "hourglass" : "play.fill")
+                            .font(.system(size:22,weight:.semibold))
+                            .foregroundStyle(.white.opacity(0.96))
+                            .frame(width:64,height:64)
+                            .contentShape(Circle())
+                            .liquidGlassCircle()
+                    }
+                    .allowsHitTesting(false)
+                }
+                .clipShape(RoundedRectangle(cornerRadius:16,style:.continuous))
+                .contentShape(RoundedRectangle(cornerRadius:16,style:.continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(resolvingPlay || loadingDetail)
+        .accessibilityLabel("播放")
+        .accessibilityIdentifier("tangxin.play.cover")
+    }
+
+    /// Compact horizontal pills (FlowLayout wrap) instead of sparse vertical NavigationLink rows.
+    private func tagChips(_ detail: TangxinDetail) -> some View {
+        let orphans = detail.tags.filter { name in !detail.tagLinks.contains { $0.name == name } }
+        return Group {
+            if !detail.tagLinks.isEmpty || !orphans.isEmpty {
+                FlowLayout(spacing:8) {
+                    ForEach(detail.tagLinks) { tag in
+                        NavigationLink(value:tag) {
+                            Text(tag.name)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal,12)
+                                .padding(.vertical,7)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                                .frame(minHeight:32)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("tangxin.tag.\(tag.url.lastPathComponent)")
+                    }
+                    ForEach(orphans,id:\.self) { name in
+                        Text(name)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal,12)
+                            .padding(.vertical,7)
+                            .background(Color(.systemGray5), in: Capsule())
+                    }
+                }
+                .accessibilityIdentifier("tangxin.tags")
+            }
+        }
+    }
+
+    private func startPlayback(_ detail: TangxinDetail) {
+        guard !resolvingPlay, !loadingDetail else { return }
+        resolvingPlay = true; error = nil
+        playTask?.cancel()
+        playTask = Task {
+            do {
+                let plan = try await client.playback(detail)
+                try Task.checkCancellation()
+                playback = plan
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
+            }
+            resolvingPlay = false
         }
     }
 }
