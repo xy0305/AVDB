@@ -30,7 +30,9 @@ final class NativeHLSLUTSurface: NSObject {
     private var inFlight = false
     private var lastBuffer: CVPixelBuffer?
     private var lastPTS = CMTime.invalid
+    private var lastAnalysisHost: CFTimeInterval = -.infinity
     private var dirty = false
+    private var forceCopy = false
     private var lastFrameHost = CACurrentMediaTime()
     private var bypassReason: String?
     private var sourceSafe = false
@@ -62,7 +64,7 @@ final class NativeHLSLUTSurface: NSObject {
                         guard let changed = note.object as? AVPlayerItem, changed === self.item else { return }
                     }
                     self.generation += 1
-                    self.lastBuffer = nil; self.dirty = false
+                    self.lastBuffer = nil; self.dirty = true; self.forceCopy = true
                     self.hide("等待新解码帧；后台/AirPlay/PiP 使用原画")
                     self.lastFrameHost = CACurrentMediaTime()
                 }
@@ -77,18 +79,22 @@ final class NativeHLSLUTSurface: NSObject {
     /// It shares the output, never creates a second player or CPU frame readback here.
     func copyDecodedFrameForAnalysis() -> CVPixelBuffer? {
         guard sourceSafe, let player, let output else { return nil }
+        let now = CACurrentMediaTime()
+        guard now - lastAnalysisHost >= 1.2 else { return nil }
         var pts = CMTime.invalid
         if let buffer = output.copyPixelBuffer(forItemTime: player.currentTime(), itemTimeForDisplay: &pts) {
             guard isKnownSDR(buffer) else { lastBuffer = nil; return nil }
-            lastBuffer = buffer; lastPTS = pts; dirty = true
+            lastBuffer = buffer; lastPTS = pts; dirty = true; lastAnalysisHost = now
             return buffer
         }
+        if lastBuffer != nil { lastAnalysisHost = now }
         return lastBuffer
     }
 
     /// Set nil to show the original layer immediately. No AVVideoComposition on HLS.
     func setFilter(_ value: ((CIImage) -> CIImage)?) {
         generation += 1; filter = value; dirty = true
+        if lastBuffer == nil { forceCopy = true }
         hide(value == nil ? "原画（在线 LUT 关闭）" : "等待 SDR 解码帧及 GPU 完成")
         lastFrameHost = CACurrentMediaTime()
     }
@@ -104,7 +110,7 @@ final class NativeHLSLUTSurface: NSObject {
         generation += 1; link?.invalidate(); link = nil
         formatTask?.cancel(); formatTask = nil
         if let item, let output { item.remove(output) }
-        output = nil; item = nil; filter = nil
+        output = nil; item = nil; filter = nil; lastBuffer = nil
         observers.forEach(NotificationCenter.default.removeObserver); observers.removeAll()
         view.removeFromSuperview()
     }
@@ -116,7 +122,7 @@ final class NativeHLSLUTSurface: NSObject {
 
     private func bind(_ next: AVPlayerItem?) {
         generation += 1; formatTask?.cancel(); sourceSafe = false
-        lastBuffer = nil; dirty = false
+        lastBuffer = nil; dirty = false; forceCopy = true; lastAnalysisHost = -.infinity
         hide("切换视频：原画等待格式检查")
         if let item, let output { item.remove(output) }
         item = next; output = nil; transform = .identity
@@ -190,14 +196,14 @@ final class NativeHLSLUTSurface: NSObject {
             return
         }
         let hostTime = displayLink.targetTimestamp > 0 ? displayLink.targetTimestamp : CACurrentMediaTime()
-        let time = output.itemTime(forHostTime: hostTime)
+        let time = player.rate == 0 ? player.currentTime() : output.itemTime(forHostTime: hostTime)
         var pts = CMTime.invalid
         let buffer: CVPixelBuffer
-        if output.hasNewPixelBuffer(forItemTime: time) {
+        if output.hasNewPixelBuffer(forItemTime: time) || (forceCopy && player.rate == 0) {
             guard let fresh = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: &pts), isKnownSDR(fresh) else {
                 lastBuffer = nil; hide("解码色彩元数据未知或非 SDR，原画旁路"); return
             }
-            buffer = fresh; lastBuffer = fresh; lastPTS = pts
+            buffer = fresh; lastBuffer = fresh; lastPTS = pts; forceCopy = false
             lastFrameHost = CACurrentMediaTime()
         } else if dirty, player.rate == 0, let previous = lastBuffer {
             buffer = previous; pts = lastPTS

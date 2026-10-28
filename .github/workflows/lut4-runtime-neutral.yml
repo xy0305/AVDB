@@ -14,6 +14,10 @@ jobs:
         run: xcodebuild -version
       - name: Install project generator
         run: gem install xcodeproj --no-document
+      - name: Compile production arm64 iOS17 runtime without DEBUG hooks
+        run: |
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun --sdk iphoneos swiftc -sdk "$SDK" -target arm64-apple-ios17.0 -O -parse-as-library -emit-module -module-name NativeHLSRuntime AVDB/Views/Player/NativeHLSLUTSurface.swift -o /tmp/NativeHLSRuntime.swiftmodule
       - name: Run real HLS with production Metal surface
         run: python3 scripts/test-hls-runtime.py
       - uses: actions/upload-artifact@v4
