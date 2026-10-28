@@ -266,7 +266,7 @@ final class NativeLUTController: ObservableObject {
             let cg = await Task.detached(priority:.userInitiated) { () -> CGImage? in
                 guard let archive = imported ?? NativeLUT.bake(params,faithful:mode).map({ LUTArchive(size:33,rgba:$0) }) else { return nil }
                 let cs = CGColorSpace(name:CGColorSpace.sRGB)!, context = CIContext(options:[.workingColorSpace:CGColorSpace(name:CGColorSpace.sRGB)!])
-                let source = CIImage(cgImage:frame.image,options:[.colorSpace:cs])
+                let source = CIImage(cgImage:frame.image) // Honor the decoded frame's ICC/Rec.709 tag; do not reinterpret its bytes as sRGB.
                 var normalized = source
                 if archive.domainMin != [0,0,0] || archive.domainMax != [1,1,1] {
                     let lo = archive.domainMin, scale = (0..<3).map { 1/(archive.domainMax[$0]-lo[$0]) }
