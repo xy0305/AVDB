@@ -34,7 +34,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
             }
             checks.append("production NativeLUT JSContext cube, invalid guard and CoreImage identity/RGB boundary rendering")
             // Actual production interchange, parser denial paths and dedicated-thread inference.
-            let archive = LUTArchive(size:33,rgba:cube,domainMin:[-.1,0,0],domainMax:[1.1,1,1])
+            let archive = LUTArchive(size:33,rgba:cube,domainMin:[-0.1,0,0],domainMax:[1.1,1,1])
             let roundtrip = try LUTArchive.parse(archive.text())
             try require(roundtrip == archive,"cube roundtrip with real domain")
             for bad in ["LUT_3D_SIZE 66", "LUT_3D_SIZE 2\nNaN 0 0", "LUT_3D_SIZE 2\nDOMAIN_MIN 1 1 1\nDOMAIN_MAX 0 0 0", "LUT_1D_SIZE 2"] {
@@ -120,7 +120,18 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
             for _ in 0..<100 { if controller.exportedURL != nil { break }; try await Task.sleep(nanoseconds:100_000_000) }
             try require(controller.exportedURL != nil,"file export")
             controller.importCube(controller.exportedURL!)
-            try require(controller.enabled,"file import")
+            for _ in 0..<100 { if controller.status.hasPrefix("已导入") { break }; try await Task.sleep(nanoseconds:100_000_000) }
+            try require(controller.status.hasPrefix("已导入"),"file import: \(controller.status)")
+            try require(controller.parameters == full!.parameters,"CUBE recipe reimport")
+            try require(controller.previewCount>0,"bounded preview frames")
+            controller.addVideos([movie,movie])
+            try require(controller.videoQueue.count==1,"queue dedup")
+            controller.generateBatch()
+            for _ in 0..<400 { if !controller.batchRunning { break }; try await Task.sleep(nanoseconds:100_000_000) }
+            try require(controller.batchOutputs.count==1,"batch generation: \(controller.batchLog)")
+            controller.changePreview(1)
+            controller.clearVideoQueue();try require(controller.videoQueue.isEmpty,"queue clear")
+            checks.append("actual 24-time local sample completion; preview memory bounds/flip; batch queue dedup/generate/file output/clear; CUBE recipe comments roundtrip")
             controller.clearAllPresets();controller.reset()
             checks.append("production local finite sampling cancellation; associated/universal preset; manual/restore; actual CUBE file export/import; production NativeLUTPanel rendered")
             let data = try JSONSerialization.data(withJSONObject:["inferenceSummary":inferenceSummary,"passed":true,"checks":checks,"boundaries":"Production controller/panel/model use compiled and run; only KSPlayer transport stub and bake counter instrumentation. Neutral non-face fixture attempts real GPU VIDEO inference: inspect inferenceSummary for delegate failure vs no-face. Real face accuracy/physical device FPS NOT RUN. Local synthetic media only."],options:[.prettyPrinted,.sortedKeys])

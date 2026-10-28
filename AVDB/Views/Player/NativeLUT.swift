@@ -54,11 +54,24 @@ struct LUTArchive: Codable, Equatable {
     var rgba: Data
     var domainMin: [Double] = [0,0,0]
     var domainMax: [Double] = [1,1,1]
+    var recipe: [Double]? = nil
+    var recipeFaithful: Bool? = nil
     static func parse(_ text: String) throws -> LUTArchive {
         guard text.utf8.count <= 24*1024*1024 else { throw LUTError.invalid("CUBE 超过 24 MiB") }
         var n = 0, lo = [0.0,0,0], hi = [1.0,1,1], data = [Float]()
+        var metadata = [Int:Double](), recipeMode: Bool? = nil
         var seenSize = false, seenMin = false, seenMax = false
         for raw in text.components(separatedBy: .newlines) {
+            let comment = raw.trimmingCharacters(in:.whitespaces)
+            if comment.hasPrefix("#") {
+                let body = String(comment.dropFirst()).trimmingCharacters(in:.whitespaces).replacingOccurrences(of:"：",with:":")
+                let parts = body.components(separatedBy:":")
+                if parts.count == 2 {
+                    let name = parts[0].trimmingCharacters(in:.whitespaces), value = parts[1].trimmingCharacters(in:.whitespaces)
+                    if let i = LUTParameters.names.firstIndex(of:name), let v = Double(value), v.isFinite, abs(v)<=100 { metadata[i] = v }
+                    if name == "AVDB_MODE" { recipeMode = value == "desktop83" }
+                }
+            }
             let line = raw.components(separatedBy: "#")[0].trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("TITLE ") { continue }
             let v = line.split(whereSeparator: { $0.isWhitespace }).map(String.init)
@@ -78,10 +91,15 @@ struct LUTArchive: Codable, Equatable {
             data.append(contentsOf: a); data.append(1)
         }
         guard seenSize, data.count == n*n*n*4, (0..<3).allSatisfy({ hi[$0] > lo[$0] }) else { throw LUTError.invalid("CUBE 维数/条目/DOMAIN 不匹配") }
-        return LUTArchive(size: n, rgba: data.withUnsafeBytes { Data($0) }, domainMin: lo, domainMax: hi)
+        return LUTArchive(size: n, rgba: data.withUnsafeBytes { Data($0) }, domainMin: lo, domainMax: hi, recipe: metadata.count == 7 ? (0..<7).map { metadata[$0]! } : nil, recipeFaithful: recipeMode)
     }
     func text() -> String {
-        var out = "TITLE \"AVDB SDR v8.3\"\n# Red fastest; nonlinear sRGB; strength/enhancements not baked\nLUT_3D_SIZE \(size)\nDOMAIN_MIN \(domainMin.map(String.init(describing:)).joined(separator: " "))\nDOMAIN_MAX \(domainMax.map(String.init(describing:)).joined(separator: " "))\n"
+        var out = "LUT_3D_SIZE \(size)\n# AVDB SDR nonlinear sRGB; red fastest; enhancements/strength not baked\n"
+        if let recipe, recipe.count == 7 {
+            out += "# AVDB_MODE: \(recipeFaithful == false ? "protection267" : "desktop83")\n"
+            for i in 0..<7 { out += "#   \(LUTParameters.names[i]): \(Int(recipe[i]))\n" }
+        }
+        out += "TITLE \"AVDB SDR v8.3\"\nDOMAIN_MIN \(domainMin.map { String($0) }.joined(separator: " "))\nDOMAIN_MAX \(domainMax.map { String($0) }.joined(separator: " "))\n"
         rgba.withUnsafeBytes { raw in
             let f = raw.bindMemory(to: Float.self)
             for i in stride(from: 0, to: f.count, by: 4) { out += String(format: "%.8f %.8f %.8f\n", locale: Locale(identifier: "en_US_POSIX"), f[i], f[i+1], f[i+2]) }
@@ -214,6 +232,134 @@ final class LUTRevealState: @unchecked Sendable {
 
 @MainActor
 final class NativeLUTController: ObservableObject {
+    @Published var previewOriginal: UIImage?
+    @Published var previewProcessed: UIImage?
+    @Published var previewIndex = 0
+    @Published var previewCount = 0
+    private var previewFrames = [LUTFrame]()
+    private var previewTask: Task<Void, Never>?
+    private var previewRevision = 0
+    @Published var videoQueue: [URL] = []
+    @Published var batchOutputs: [URL] = []
+    @Published var batchRunning = false
+    @Published var batchCurrent = 0
+    @Published var batchLog = ""
+    @Published var batchAssociate = false
+    private var queueScopes = [URL]()
+    private var skipRevision = 0
+    func changePreview(_ delta: Int) {
+        guard !previewFrames.isEmpty else { return }
+        previewIndex = (previewIndex + delta + previewFrames.count) % previewFrames.count
+        refreshPreview()
+    }
+    private func rememberPreview(_ frames: [LUTFrame]) {
+        previewFrames = Array(frames.prefix(10)); previewCount = previewFrames.count; previewIndex = 0
+    }
+    private func refreshPreview() {
+        previewRevision += 1; let revision = previewRevision
+        previewTask?.cancel()
+        guard previewFrames.indices.contains(previewIndex) else { return }
+        let frame = previewFrames[previewIndex], params = parameters, mode = faithful, imported = importedCube
+        previewOriginal = UIImage(cgImage:frame.image)
+        previewTask = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds:200_000_000) } catch { return }
+            let cg = await Task.detached(priority:.userInitiated) { () -> CGImage? in
+                guard let archive = imported ?? NativeLUT.bake(params,faithful:mode).map({ LUTArchive(size:33,rgba:$0) }) else { return nil }
+                let cs = CGColorSpace(name:CGColorSpace.sRGB)!, context = CIContext(options:[.workingColorSpace:CGColorSpace(name:CGColorSpace.sRGB)!])
+                let source = CIImage(cgImage:frame.image,options:[.colorSpace:cs])
+                var normalized = source
+                if archive.domainMin != [0,0,0] || archive.domainMax != [1,1,1] {
+                    let lo = archive.domainMin, scale = (0..<3).map { 1/(archive.domainMax[$0]-lo[$0]) }
+                    normalized = (source.matchedFromWorkingSpace(to:cs) ?? source).applyingFilter("CIColorMatrix",parameters:["inputRVector":CIVector(x:scale[0],y:0,z:0,w:0),"inputGVector":CIVector(x:0,y:scale[1],z:0,w:0),"inputBVector":CIVector(x:0,y:0,z:scale[2],w:0),"inputBiasVector":CIVector(x:-lo[0]*scale[0],y:-lo[1]*scale[1],z:-lo[2]*scale[2],w:0)]).matchedToWorkingSpace(from:cs) ?? source
+                }
+                guard let image = CIFilter(name:"CIColorCubeWithColorSpace",parameters:["inputCubeDimension":archive.size,"inputCubeData":archive.rgba,"inputColorSpace":cs,kCIInputImageKey:normalized])?.outputImage else { return nil }
+                return context.createCGImage(image,from:source.extent,format:.RGBA8,colorSpace:cs)
+            }.value
+            guard !Task.isCancelled, let self, self.previewRevision == revision else { return }
+            self.previewProcessed = cg.map { UIImage(cgImage:$0) }
+        }
+    }
+    func addVideos(_ selected: [URL]) {
+        guard !batchRunning else { return }
+        for url in selected {
+            if url.startAccessingSecurityScopedResource() { queueScopes.append(url) }
+            if (try? url.resourceValues(forKeys:[.isDirectoryKey]).isDirectory) == true {
+                if let files = FileManager.default.enumerator(at:url,includingPropertiesForKeys:[.isRegularFileKey],options:[.skipsHiddenFiles,.skipsPackageDescendants]) {
+                    var visited = 0
+                    while let file = files.nextObject() as? URL, visited < 2000, videoQueue.count < 50 {
+                        visited += 1
+                        if UTType(filenameExtension:file.pathExtension)?.conforms(to:.movie) == true, !videoQueue.contains(file) { videoQueue.append(file) }
+                    }
+                }
+            } else if UTType(filenameExtension:url.pathExtension)?.conforms(to:.movie) == true, !videoQueue.contains(url), videoQueue.count < 50 { videoQueue.append(url) }
+        }
+        batchLog = "已选择 \(videoQueue.count) 个本地视频（仅用户授权文件夹，最多50个）"
+    }
+    func removeVideo(_ index: Int) { guard !batchRunning, videoQueue.indices.contains(index) else { return }; videoQueue.remove(at:index) }
+    func clearVideoQueue() {
+        cancelSampling(); videoQueue = []; batchOutputs = []
+        for url in queueScopes { url.stopAccessingSecurityScopedResource() }; queueScopes = []
+    }
+    func skipBatchFile() { guard batchRunning else { return }; skipRevision += 1; imageGenerator?.cancelAllCGImageGeneration(); sampleWorker?.cancel() }
+    func generateBatch() {
+        cancelSampling(); guard !videoQueue.isEmpty else { return }
+        let revision = workRevision, mode = faithful, size = exportSize, urls = videoQueue, associate = batchAssociate
+        batchRunning = true; sampling = true; batchOutputs = []; batchCurrent = 0; batchLog = "本地批量开始；逐文件有限采样，不修改当前播放"
+        sampleTask = Task { [weak self] in
+            guard let self else { return }
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AVDB-LUT-Batch-\(UUID().uuidString)",isDirectory:true)
+            try? FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+            for (index,url) in urls.enumerated() {
+                guard revision == workRevision, !Task.isCancelled else { return }
+                batchCurrent = index+1; let skip = skipRevision
+                do {
+                    let asset = AVURLAsset(url:url), generator = AVAssetImageGenerator(asset:asset)
+                    generator.appliesPreferredTrackTransform = true; generator.maximumSize = CGSize(width:640,height:640)
+                    generator.requestedTimeToleranceBefore = CMTime(seconds:0.3,preferredTimescale:600);generator.requestedTimeToleranceAfter = generator.requestedTimeToleranceBefore
+                    imageGenerator = generator
+                    let deadline = Task {
+                        try? await Task.sleep(nanoseconds:20_000_000_000)
+                        guard !Task.isCancelled else { return }; generator.cancelAllCGImageGeneration(); asset.cancelLoading()
+                    }
+                    defer { deadline.cancel() }
+                    let duration = try await asset.load(.duration).seconds
+                    guard duration.isFinite, duration>0 else { throw LUTError.invalid("无有效时长") }
+                    var frames = [LUTFrame]()
+                    let start = ProcessInfo.processInfo.systemUptime
+                    for frame in 0..<24 {
+                        guard revision == workRevision, !Task.isCancelled else { return }
+                        guard skip == skipRevision, ProcessInfo.processInfo.systemUptime-start < 20 else { break }
+                        if let (cg,_) = try? await generator.image(at:CMTime(seconds:duration*(0.05+0.9*(Double(frame)+0.5)/24),preferredTimescale:600)) { frames.append(LUTFrame(image:cg)) }
+                        sampleProgress = (Double(index)+Double(frame+1)/24)/Double(urls.count)
+                    }
+                    guard skip == skipRevision else { batchLog += "\n\(index+1): 已跳过"; continue }
+                    let worker = Task.detached(priority:.userInitiated) { NativeLUT.fullAnalyze(frames,faithful:mode) }; sampleWorker = worker
+                    guard let result = await worker.value else { batchLog += "\n\(index+1): 无有效肤色/采样失败"; continue }
+                    guard revision == workRevision, !Task.isCancelled else { return }
+                    guard skip == skipRevision else { batchLog += "\n\(index+1): 已跳过"; continue }
+                    let archive = await Task.detached { () -> LUTArchive? in
+                        guard let data = NativeLUT.bake(result.parameters,faithful:mode,size:size) else { return nil }
+                        return LUTArchive(size:size,rgba:data,recipe:result.parameters.values,recipeFaithful:mode)
+                    }.value
+                    guard revision == workRevision, !Task.isCancelled, let archive else { return }
+                    guard skip == skipRevision else { batchLog += "\n\(index+1): 已跳过"; continue }
+                    let text = await Task.detached { archive.text() }.value
+                    guard revision == workRevision, !Task.isCancelled else { return }
+                    let output = directory.appendingPathComponent(String(format:"%03d-",index+1)+url.deletingPathExtension().lastPathComponent+".cube")
+                    try text.write(to:output,atomically:true,encoding:.utf8); batchOutputs.append(output)
+                    if associate, let p = presetFile(for:url) {
+                        try FileManager.default.createDirectory(at:p.deletingLastPathComponent(),withIntermediateDirectories:true)
+                        try JSONEncoder().encode(LUTPreset(values:result.parameters.values,faithful:mode,cube:nil)).write(to:p,options:.atomic)
+                    }
+                    batchLog += "\n\(index+1): 成功 \(result.summary)"
+                } catch { batchLog += "\n\(index+1): \(error.localizedDescription)" }
+            }
+            guard revision == workRevision, !Task.isCancelled else { return }
+            batchRunning = false; sampling = false; sampleProgress = 1; imageGenerator = nil
+            batchLog += "\n完成：\(batchOutputs.count)/\(urls.count)，可分享所有 CUBE"
+        }
+    }
+
     @Published var faithful = false
     @Published var sampleProgress = 0.0
     @Published var sampling = false
@@ -238,10 +384,13 @@ final class NativeLUTController: ObservableObject {
     private var exportTask: Task<Void, Never>?
     private var exportRevision = 0
     private var presetURL: URL? {
-        guard let url = (item?.asset as? AVURLAsset)?.url,
-              let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
-        let hash = SHA256.hash(data: Data(url.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
-        return base.appendingPathComponent("LUTPresets", isDirectory: true).appendingPathComponent(hash+".json")
+        guard let url = (item?.asset as? AVURLAsset)?.url else { return nil }
+        return presetFile(for:url)
+    }
+    private func presetFile(for url: URL) -> URL? {
+        guard let base = FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask).first else { return nil }
+        let hash = SHA256.hash(data:Data(url.absoluteString.utf8)).map { String(format:"%02x",$0) }.joined()
+        return base.appendingPathComponent("LUTPresets",isDirectory:true).appendingPathComponent(hash+".json")
     }
     func switchMode(_ next: Bool) {
         cancelSampling(); buildGeneration += 1; buildTask?.cancel(); faithful = next; importedCube = nil; cachedCube = nil; cachedParameters = nil
@@ -250,6 +399,7 @@ final class NativeLUTController: ObservableObject {
         status = next ? "v8.3 原版数值：使用桌面模板/0.67亮度/0.57对比度/0.92过曝阈值；不等同267保护模式" : "267 保护模式：保留中性肤色、近白及有界安全搜索"
     }
     func cancelSampling() {
+        batchRunning = false
         workRevision += 1; analysisGeneration += 1; sampleTask?.cancel(); sampleWorker?.cancel(); sampleTimeout?.cancel()
         imageGenerator?.cancelAllCGImageGeneration(); imageGenerator = nil
         sampling = false; busy = false; requested = false; decodedFrames = []; sampleProgress = 0
@@ -264,6 +414,7 @@ final class NativeLUTController: ObservableObject {
         enabled = true; sampleProgress = 1; apply(); refreshStatistics(); status = result.summary
     }
     private func finishFrames(_ frames: [LUTFrame], revision: Int, source: Int) {
+        rememberPreview(frames)
         let mode = faithful
         sampleWorker?.cancel()
         let worker = Task.detached(priority: .userInitiated) { NativeLUT.fullAnalyze(frames, faithful: mode) }
@@ -345,14 +496,28 @@ final class NativeLUTController: ObservableObject {
     func manualChange(_ i: Int, _ value: Double) { cancelSampling(); importedCube = nil; parameters.values[i] = value; enabled = true; apply(); refreshStatistics() }
     func restorePrediction() { cancelSampling(); importedCube = nil; parameters = predicted; enabled = true; apply(); refreshStatistics() }
     func importCube(_ url: URL) {
-        let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
-            guard size <= 24*1024*1024 else { throw LUTError.invalid("CUBE 超过 24 MiB") }
-            let archive = try LUTArchive.parse(String(contentsOf: url,encoding: .utf8))
-            cancelSampling(); importedCube = archive; enabled = true; apply(); statisticsAfter = []
-            status = "已导入 \(archive.size)³ CUBE（真实 DOMAIN）；手动调参会改回参数 LUT"
-        } catch { status = "CUBE 导入失败：\(error.localizedDescription)" }
+        cancelSampling(); let revision = workRevision
+        status = "校验 CUBE 文件…"
+        Task { [weak self] in
+            let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
+            let result = await Task.detached { () -> Result<LUTArchive,Error> in
+                Result {
+                    let size = try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? Int.max
+                    guard size<=24*1024*1024 else { throw LUTError.invalid("CUBE 超过24MiB") }
+                    return try LUTArchive.parse(String(contentsOf:url,encoding:.utf8))
+                }
+            }.value
+            guard let self, self.workRevision == revision else { return }
+            switch result {
+            case .success(let archive):
+                self.importedCube = archive
+                if let recipe = archive.recipe { self.parameters = LUTParameters(values:recipe); self.predicted = self.parameters; self.faithful = archive.recipeFaithful ?? true }
+                else { self.parameters = LUTParameters(); self.predicted = self.parameters }
+                self.enabled = true; self.apply(); self.statisticsAfter = []
+                self.status = "已导入 \(archive.size)³ CUBE（真实DOMAIN）。" + (archive.recipe == nil ? "无参数注释：手动调参会新建参数LUT，不会假装反解任意CUBE。" : "已恢复原文件7参数；手动调参将按此配方重建LUT。")
+            case .failure(let error): self.status = "CUBE 导入失败：\(error.localizedDescription)"
+            }
+        }
     }
     func exportCube() {
         exportRevision += 1; let revision = exportRevision
@@ -362,7 +527,7 @@ final class NativeLUTController: ObservableObject {
             let archive = await Task.detached(priority: .userInitiated) { () -> LUTArchive? in
                 if let imported { return imported }
                 guard let data = NativeLUT.bake(params,faithful:mode,size:size) else { return nil }
-                return LUTArchive(size:size,rgba:data)
+                return LUTArchive(size:size,rgba:data,recipe:params.values,recipeFaithful:mode)
             }.value
             guard !Task.isCancelled, let self, self.exportRevision == revision, let archive else { return }
             do {
@@ -389,7 +554,12 @@ final class NativeLUTController: ObservableObject {
         guard let url, let data = try? Data(contentsOf:url), data.count <= 8*1024*1024,
               let preset = try? JSONDecoder().decode(LUTPreset.self,from:data), preset.values.count == 7,
               preset.values.allSatisfy({ $0.isFinite && abs($0) <= 100 }) else { return }
-        if let c = preset.cube { guard (2...65).contains(c.size), c.rgba.count == c.size*c.size*c.size*16, c.domainMin.count == 3, c.domainMax.count == 3 else { return } }
+        if let c = preset.cube {
+            guard (2...65).contains(c.size), c.rgba.count == c.size*c.size*c.size*16, c.domainMin.count == 3, c.domainMax.count == 3,
+                  c.domainMin.allSatisfy({ $0.isFinite && abs($0)<=16 }),c.domainMax.allSatisfy({ $0.isFinite && abs($0)<=16 }),
+                  (0..<3).allSatisfy({ c.domainMax[$0]>c.domainMin[$0] }),
+                  c.rgba.withUnsafeBytes({ $0.bindMemory(to:Float.self).allSatisfy({ $0.isFinite && $0>=0 && $0<=1 }) }) else { return }
+        }
         cancelSampling(); faithful = preset.faithful; parameters = LUTParameters(values:preset.values)
         importedCube = preset.cube; enabled = true; cachedCube = nil; cachedParameters = nil; apply()
     }
@@ -398,7 +568,9 @@ final class NativeLUTController: ObservableObject {
         status = universal ? "已删除通用 LUT" : "已删除当前素材关联"
     }
     func clearAllPresets() {
+        cancelSampling(); statsRevision += 1; statsTask?.cancel(); previewRevision += 1; previewTask?.cancel()
         if let url = universalPresetURL?.deletingLastPathComponent() { try? FileManager.default.removeItem(at:url) }
+        previewFrames = []; previewOriginal = nil; previewProcessed = nil; previewCount = 0
         exportedURL = nil; samplePixels = []; statisticsBefore = []; statisticsAfter = []; status = "已清除全部本地预设与分析统计；源图从未保存"
     }
 
@@ -518,6 +690,8 @@ final class NativeLUTController: ObservableObject {
     func detach() {
         cancelSampling(); statsRevision += 1; statsTask?.cancel(); exportRevision += 1; exportTask?.cancel()
         importedCube = nil; statisticsBefore = []; statisticsAfter = []; samplePixels = []; exportedURL = nil
+        previewRevision += 1; previewTask?.cancel(); previewFrames = []; previewCount = 0; previewOriginal = nil; previewProcessed = nil
+        for url in queueScopes { url.stopAccessingSecurityScopedResource() }; queueScopes = []; videoQueue = []; batchOutputs = []
         generation += 1
         buildGeneration += 1; buildTask?.cancel(); cachedCube = nil; cachedParameters = nil
         sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
@@ -552,6 +726,7 @@ final class NativeLUTController: ObservableObject {
         requested = true; status = "等待原始解码帧…"
     }
     func reset() {
+        previewRevision += 1; previewTask?.cancel(); previewFrames = []; previewCount = 0; previewOriginal = nil; previewProcessed = nil
         cancelSampling(); importedCube = nil; statsRevision += 1; statsTask?.cancel()
         statisticsBefore = []; statisticsAfter = []; samplePixels = []
         exportRevision += 1; exportTask?.cancel(); exportedURL = nil
@@ -563,6 +738,7 @@ final class NativeLUTController: ObservableObject {
         item?.videoComposition = original; requested = true; status = "已重置"
     }
     func apply() {
+        refreshPreview()
         guard supported, let item else { return }
         buildGeneration += 1
         let revision = buildGeneration, sourceGeneration = generation
@@ -733,7 +909,34 @@ struct NativeLUTPanel: View {
     @Environment(\.dismiss) private var dismiss
     @State private var pickCube = false
     @State private var pickImages = false
+    @State private var pickVideos = false
+    @State private var shareBatch = false
     @ViewBuilder private var fullSections: some View {
+            Section("本地视频批量生成") {
+                Button("添加本地视频 / 文件夹") { pickVideos = true }
+                ForEach(Array(model.videoQueue.enumerated()), id: \.offset) { index,url in
+                    HStack { Text(url.lastPathComponent).lineLimit(1); Spacer(); Button("移除",role:.destructive) { model.removeVideo(index) }.disabled(model.batchRunning) }
+                }
+                Button("清空列表") { model.clearVideoQueue() }
+                Toggle("同时保存每个素材的App关联预设",isOn:$model.batchAssociate)
+                Button("开始批量生成 CUBE") { model.generateBatch() }.disabled(model.batchRunning || model.videoQueue.isEmpty)
+                Button("跳过当前文件") { model.skipBatchFile() }.disabled(!model.batchRunning)
+                Button("取消全部") { model.cancelSampling() }
+                Text("当前 \(model.batchCurrent)/\(model.videoQueue.count) · 导出 \(model.batchOutputs.count)")
+                Text(model.batchLog).font(.caption)
+                if !model.batchOutputs.isEmpty { Button("分享所有生成的 CUBE") { shareBatch = true } }
+            }
+            Section("离线同帧预览 · 仅 LUT，不含增强/强度混合") {
+                HStack {
+                    if let image = model.previewOriginal { VStack { Text("原图"); Image(uiImage:image).resizable().scaledToFit() } }
+                    if let image = model.previewProcessed { VStack { Text("处理后"); Image(uiImage:image).resizable().scaledToFit() } }
+                }
+                if model.previewCount > 0 {
+                    Text("\(model.previewIndex+1)/\(model.previewCount)")
+                    HStack { Button("上一帧") { model.changePreview(-1) }; Spacer(); Button("下一帧") { model.changePreview(1) } }
+                }
+                Text("最多保留10个640像素级预览帧在内存；重置/离开素材后清除，不上传。") .font(.caption)
+            }
             Section("v8.3 完整数值与分析") {
                 Picker("数值模式", selection: Binding(get: { model.faithful }, set: { model.switchMode($0) })) {
                     Text("267 保护模式").tag(false)
@@ -808,7 +1011,8 @@ struct NativeLUTPanel: View {
             }
             ForEach(0..<7,id:\.self) { i in
                 VStack(alignment:.leading) {
-                    Text("\(LUTParameters.names[i]) \(Int(model.parameters.values[i]))")
+                    Text("\(LUTParameters.names[i]) \(Int(model.parameters.values[i])) · 预测 \(Int(model.predicted.values[i])) · Δ \(Int(model.parameters.values[i]-model.predicted.values[i]))")
+                    Stepper("逐级微调",value:Binding(get:{ Int(model.parameters.values[i]) },set:{ model.manualChange(i,Double($0)) }),in:-100...100)
                     Slider(value:Binding(get:{ model.parameters.values[i] },set:{ model.manualChange(i, $0) }),in:-100...100,step:1)
                 }
             }
@@ -836,6 +1040,10 @@ struct NativeLUTPanel: View {
         }.presentationDetents([.medium,.large])
         .fileImporter(isPresented: $pickCube, allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data]) { result in
             if case let .success(url) = result { model.importCube(url) }
+        }
+        .sheet(isPresented:$shareBatch) { LUTBatchShare(items:model.batchOutputs) }
+        .fileImporter(isPresented:$pickVideos,allowedContentTypes:[.movie,.folder],allowsMultipleSelection:true) { result in
+            if case let .success(urls) = result { model.addVideos(urls) }
         }
         .fileImporter(isPresented: $pickImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             if case let .success(urls) = result { model.importMedia(urls) }
@@ -866,4 +1074,10 @@ private final class LUTInferenceThread: @unchecked Sendable {
         condition.lock(); jobs.append { value = operation(); signal.signal() }; condition.signal(); condition.unlock()
         signal.wait(); return value!
     }
+}
+
+struct LUTBatchShare: UIViewControllerRepresentable {
+    var items: [URL]
+    func makeUIViewController(context:Context) -> UIActivityViewController { UIActivityViewController(activityItems:items,applicationActivities:nil) }
+    func updateUIViewController(_ uiViewController:UIActivityViewController,context:Context) { }
 }
