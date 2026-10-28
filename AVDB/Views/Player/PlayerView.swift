@@ -728,50 +728,59 @@ struct KSChromePlayer: View {
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                 .frame(width: 48, alignment: .leading)
-            Slider(
-                value: Binding(
-                    get: { isSeeking ? seekValue : currentTime },
-                    set: { newValue in
+            GeometryReader { geo in
+                Slider(
+                    value: Binding(
+                        get: { isSeeking ? seekValue : currentTime },
+                        set: { newValue in
+                            guard !seekPending, duration.isFinite, duration > 0 else { return }
+                            isSeeking = true
+                            seekValue = min(duration, max(0, newValue))
+                            seekPreview.request(time: seekValue, duration: duration)
+                        }
+                    ),
+                    in: 0...max(duration, 0.1)
+                ) { editing in
+                    if editing {
                         guard !seekPending, duration.isFinite, duration > 0 else { return }
+                        hideTask?.cancel()
+                        if !isSeeking { seekValue = min(duration, max(0, currentTime)) }
                         isSeeking = true
-                        seekValue = min(duration, max(0, newValue))
                         seekPreview.request(time: seekValue, duration: duration)
+                    } else if isSeeking && !horizontalDrag {
+                        seek(to: seekValue)
+                        currentTime = seekValue
+                        isSeeking = false
+                        seekPreview.cancel()
+                        scheduleHide()
                     }
-                ),
-                in: 0...max(duration, 0.1)
-            ) { editing in
-                if editing {
-                    guard !seekPending, duration.isFinite, duration > 0 else { return }
-                    hideTask?.cancel()
-                    if !isSeeking { seekValue = min(duration, max(0, currentTime)) }
-                    isSeeking = true
-                    seekPreview.request(time: seekValue, duration: duration)
-                } else if isSeeking && !horizontalDrag {
-                    seek(to: seekValue)
-                    currentTime = seekValue
-                    isSeeking = false
-                    seekPreview.cancel()
-                    scheduleHide()
+                }
+                .disabled(seekPending || duration <= 0)
+                .contentShape(Rectangle())
+                .tint(.white)
+                .controlSize(.small)
+                .accessibilityIdentifier("player.progress")
+                // SwiftUI Slider only seeks via thumb drag; tap the track to jump (UISlider-style).
+                .simultaneousGesture(
+                    SpatialTapGesture().onEnded { event in
+                        tapSeekProgress(atX: event.location.x, width: geo.size.width)
+                    }
+                )
+                .overlay {
+                    GeometryReader { geometry in
+                        if isSeeking && !horizontalDrag {
+                            let cardWidth = min(192.0, max(0, geometry.size.width - 16))
+                            let fraction = min(1, max(0, seekValue / max(duration, 0.1)))
+                            let half = cardWidth / 2 + 8
+                            seekPreviewCard
+                                .frame(width: cardWidth)
+                                .position(x: min(max(half, geometry.size.width * fraction), geometry.size.width - half), y: -82)
+                        }
+                    }
+                    .allowsHitTesting(false)
                 }
             }
             .frame(height: 34)
-            .overlay {
-                GeometryReader { geometry in
-                    if isSeeking && !horizontalDrag {
-                        let cardWidth = min(192.0, max(0, geometry.size.width - 16))
-                        let fraction = min(1, max(0, seekValue / max(duration, 0.1)))
-                        let half = cardWidth / 2 + 8
-                        seekPreviewCard
-                            .frame(width: cardWidth)
-                            .position(x: min(max(half, geometry.size.width * fraction), geometry.size.width - half), y: -82)
-                    }
-                }
-                .allowsHitTesting(false)
-            }
-            .disabled(seekPending || duration <= 0)
-            .contentShape(Rectangle())
-            .tint(.white)
-            .controlSize(.small)
             Text(formatTime(duration))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white)
@@ -786,6 +795,20 @@ struct KSChromePlayer: View {
             tintStrength: 0.18,
             elevation: 0.4
         )
+    }
+
+    /// Map a tap on the progress track to an absolute seek. Drag continues to use Slider editing.
+    private func tapSeekProgress(atX x: CGFloat, width: CGFloat) {
+        guard !seekPending, !horizontalDrag, duration.isFinite, duration > 0, width > 0 else { return }
+        let fraction = min(1, max(0, Double(x / width)))
+        let target = duration * fraction
+        hideTask?.cancel()
+        seekValue = target
+        seek(to: target)
+        currentTime = target
+        isSeeking = false
+        seekPreview.cancel()
+        scheduleHide()
     }
 
     private func glassButton(_ system: String, action: @escaping () -> Void) -> some View {
