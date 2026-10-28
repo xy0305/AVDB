@@ -1,0 +1,27 @@
+name: Neutral production HLS runtime
+on:
+  push:
+    branches: [feat/lut4-online-runtime-neutral-from269]
+permissions:
+  contents: read
+jobs:
+  hls-production-runtime:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Install project generator
+        run: gem install xcodeproj --no-document
+      - name: Run real HLS with production Metal surface
+        run: python3 scripts/test-hls-runtime.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lut4-production-hls-runtime
+          path: |
+            evidence-hls-runtime/*.json
+            evidence-hls-runtime/*.log
+            evidence-hls-runtime/*.png
+          if-no-files-found: warn
