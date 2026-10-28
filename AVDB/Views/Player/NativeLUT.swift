@@ -352,7 +352,7 @@ final class NativeLUTController: ObservableObject {
                 let extent = source.extent
                 var result = source
                 // LUT domain intentionally unchanged; intensity is a true image dissolve.
-                if let cube, let mapped = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":cube,"inputColorSpace":cs,kCIInputImageKey:source])?.outputImage {
+                if amount > 0, let cube, let mapped = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":cube,"inputColorSpace":cs,kCIInputImageKey:source])?.outputImage {
                     if amount == 1 { result = mapped }
                     else { result = mapped.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": source, "inputTime": 1-amount]) }
                 }

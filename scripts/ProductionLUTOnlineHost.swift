@@ -92,7 +92,7 @@ final class Host: UIViewController {
     }
     private func delta(_ a: [UInt8], _ b: [UInt8]) -> Int { zip(a,b).reduce(0) { $0 + abs(Int($1.0)-Int($1.1)) } }
     private func run(overlay: UIView) async {
-        player.play()
+        backend.play()
         checks["readyToPlay"] = await wait { self.player.currentItem?.status == .readyToPlay && self.model.supported }
         checks["sourceCheckNotPresentation"] = pts.isEmpty && runtime.view.isHidden
         checks["analysisNilRequestRetained"] = model.testAnalysisRequested
@@ -101,7 +101,7 @@ final class Host: UIViewController {
         model.enabled = true; model.parameters = LUTParameters(values: adjusted); model.comparison = true; model.divider = 0
         model.updateComparison(); model.apply()
         checks["decodedAndPresented"] = await wait { self.pts.count >= 20 && self.player.currentTime().seconds > 1 }
-        player.pause()
+        backend.pause()
         player.seek(to: CMTime(seconds: 4, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { done in Task { @MainActor in self.seekCompleted = done } }
         checks["pausedSeekNewPTS"] = await wait { self.seekCompleted && self.pts.last.map { abs($0-4) < 0.2 } == true }
         checks["strengthZeroCaptured"] = await render(parameters: adjusted, strength: 0, split: 0)
@@ -126,14 +126,17 @@ final class Host: UIViewController {
         let first = runtime.copyDecodedFrameForAnalysis()
         let throttled = runtime.copyDecodedFrameForAnalysis()
         checks["sharedAnalysisOutputAndThrottle"] = first != nil && throttled == nil && runtime.output === originalOutput
+        model.setLayoutCompatible(false)
+        checks["fillModeOriginalBypass"] = runtime.view.isHidden
+        model.setLayoutCompatible(true)
         // Explicit PiP owner bypass; real external PiP remains a device-only test.
         model.setNativeBypass("PiP：原画")
         checks["pipOwnerBypass"] = runtime.view.isHidden
         model.setNativeBypass(nil)
-        let before = pts.count; player.play()
+        let before = pts.count; backend.play()
         checks["resumeAfterSeek"] = await wait { self.pts.count > before + 20 && self.player.currentTime().seconds > 6 }
         checks["toEnd"] = await wait { self.player.currentTime().seconds > 11.5 }
-        player.pause()
+        backend.pause()
         model.enabled = false; model.sharpen = false; model.deband = false; model.apply()
         checks["disableOriginalFallback"] = runtime.view.isHidden && player.currentItem?.videoComposition == nil
         model.enabled = true; model.apply(); model.reset()
