@@ -202,8 +202,15 @@ enum AvbaseMetadata {
               let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#&=+%"))) else { return nil }
         return "/talents/" + encoded
     }
+    /// NFKC + casefold + collapsed whitespace (same contract as ActorNameNormalizer.key).
+    static func foldName(_ value: String) -> String {
+        value.precomposedStringWithCompatibilityMapping
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
     static func parseTalent(html: String, names: [String]) -> String? {
-        let wanted = Set(names.map(ActorNameNormalizer.key).filter { !$0.isEmpty })
+        let wanted = Set(names.map(foldName).filter { !$0.isEmpty })
         guard !wanted.isEmpty, let data = props(html) else { return nil }
         let talents: [[String: Any]]
         if let one = data["talent"] as? [String: Any] { talents = [one] }
@@ -219,35 +226,10 @@ enum AvbaseMetadata {
                 candidates.append((name, image))
             }
         }
-        let hits = candidates.filter { wanted.contains(ActorNameNormalizer.key($0.0)) }
+        let hits = candidates.filter { wanted.contains(foldName($0.0)) }
         // Exact name match only; conflicting distinct headshots for the same query are rejected.
         let urls = Set(hits.map { $0.1 })
         return urls.count == 1 ? urls.first : nil
-    }
-}
-
-/// Cookie-free avbase talent headshots. Declared host: www.avbase.net → pics.dmm.co.jp/mono/actjpgs.
-actor AvbasePortraitService {
-    static let shared = AvbasePortraitService()
-    private let cache = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300, capacity: 128)
-    func lookup(names: [String]) async -> String? {
-        let ordered = ActorNameNormalizer.orderedUnique(names).prefix(3)
-        guard !ordered.isEmpty, !Task.isCancelled else { return nil }
-        let key = ordered.map(ActorNameNormalizer.key).joined(separator: "|")
-        return await cache.value(key: key) {
-            await Self.fetch(names: Array(ordered))
-        }
-    }
-    private static func fetch(names: [String]) async -> String? {
-        for name in names {
-            guard !Task.isCancelled, let path = AvbaseMetadata.talentPath(name) else { continue }
-            guard let url = URL(string: AvbaseMetadata.origin + path),
-                  let data = await CatalogueMetadataService.requestPublic(url, timeout: 3),
-                  let html = String(data: data, encoding: .utf8),
-                  let image = AvbaseMetadata.parseTalent(html: html, names: names) else { continue }
-            return image
-        }
-        return nil
     }
 }
 
@@ -394,5 +376,30 @@ actor CatalogueMetadataService {
             for try await byte in bytes { try Task.checkCancellation(); guard data.count < 2 * 1024 * 1024 else { return nil }; data.append(byte) }
             return data
         } catch { return nil }
+    }
+}
+
+/// Cookie-free avbase talent headshots. Declared host: www.avbase.net → pics.dmm.co.jp/mono/actjpgs.
+actor AvbasePortraitService {
+    static let shared = AvbasePortraitService()
+    private let cache = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300, capacity: 128)
+    func lookup(names: [String]) async -> String? {
+        let ordered = ActorNameNormalizer.orderedUnique(names).prefix(3)
+        guard !ordered.isEmpty, !Task.isCancelled else { return nil }
+        let key = ordered.map(ActorNameNormalizer.key).joined(separator: "|")
+        return await cache.value(key: key) {
+            await Self.fetch(names: Array(ordered))
+        }
+    }
+    private static func fetch(names: [String]) async -> String? {
+        for name in names {
+            guard !Task.isCancelled, let path = AvbaseMetadata.talentPath(name) else { continue }
+            guard let url = URL(string: AvbaseMetadata.origin + path),
+                  let data = await CatalogueMetadataService.requestPublic(url, timeout: 3),
+                  let html = String(data: data, encoding: .utf8),
+                  let image = AvbaseMetadata.parseTalent(html: html, names: names) else { continue }
+            return image
+        }
+        return nil
     }
 }

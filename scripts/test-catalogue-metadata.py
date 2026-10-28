@@ -107,8 +107,9 @@ source=core+metadata+stub+models+r'''
    return "<script id='__NEXT_DATA__' type='application/json'>"+String(data:data,encoding:.utf8)!+"</script>"
   }
   let talent:[String:Any]=["primary":["name":"蒼井すず","image_url":head],"actors":[["name":"蒼井すず","image_url":head]]]
-  assert(AvbaseMetadata.parseTalent(html:try talentPage(talent),names:["蒼井すず"]) == head)
-  assert(AvbaseMetadata.parseTalent(html:try talentPage(talent),names:["別人"]) == nil)
+  let talentHTML=try talentPage(talent)
+  assert(AvbaseMetadata.parseTalent(html:talentHTML,names:["蒼井すず"]) == head)
+  assert(AvbaseMetadata.parseTalent(html:talentHTML,names:["別人"]) == nil)
   assert(AvbaseMetadata.actorImage(head) == head)
   assert(AvbaseMetadata.actorImage(pl) == nil)
   assert(AvbaseMetadata.talentPath("蒼井すず")?.hasPrefix("/talents/") == true)
