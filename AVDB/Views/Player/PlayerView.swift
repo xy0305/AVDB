@@ -291,6 +291,7 @@ struct KSChromePlayer: View {
         .onChange(of: progressID) { _, _ in onlineSubtitles.clear() }
         .onChange(of: publicSubtitleQuery) { _, _ in onlineSubtitles.clear() }
         .onChange(of: url) { _, _ in
+            lut.detach()
             qualityGeneration += 1
             appliedQuality = nil
             observedResolution = .zero
@@ -347,6 +348,8 @@ struct KSChromePlayer: View {
             Color.black
             AudioOwnedKSVideoPlayer(player: coordinator, audio: audio, url: url, options: playerOptions, onStop: stopPlayback)
                 .onAppear { applyFillMode() }
+            NativeLUTOverlay(model: lut)
+                .allowsHitTesting(false)
             TimelineView(.periodic(from: .now, by: 0.1)) { _ in
                 let clock = coordinator.playerLayer?.player.currentPlaybackTime ?? 0
                 let text = OnlineSubtitleParser.display(onlineSubtitles.cues, at: clock, offset: onlineSubtitles.offset)
@@ -845,6 +848,7 @@ struct KSChromePlayer: View {
     }
 
     private func applyFillMode() {
+        lut.setLayoutCompatible(fillMode == .fit)
         guard let player = coordinator.playerLayer?.player else { return }
         switch fillMode {
         case .fit:

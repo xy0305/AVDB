@@ -2,6 +2,7 @@
 // Source metadata retained in THIRD_PARTY/lut-v6.7.5.txt; no license inferred.
 import SwiftUI
 import AVFoundation
+import AVKit
 import CoreImage
 import MediaPipeTasksVision
 import UIKit
@@ -102,7 +103,68 @@ final class NativeLUTController: ObservableObject {
     private var buildGeneration = 0
     private var cachedCube: Data?
     private weak var avPlayer: AVPlayer?
-    func updateComparison() { reveal.setSplit(comparison ? divider : nil) }
+    private weak var onlineContainer: UIView?
+    private var surface: NativeHLSLUTSurface?
+    private var onlineMode = false
+    private var onlineFilter: ((CIImage) -> CIImage)?
+    private var pipObservation: NSKeyValueObservation?
+    private var nativeBypass: String?
+    private var layoutCompatible = true
+    private var effectiveBypass: String? { nativeBypass ?? (layoutCompatible ? nil : "填充/拉伸模式保留原画；在线 LUT 使用适应模式") }
+    func setLayoutCompatible(_ compatible: Bool) {
+        guard layoutCompatible != compatible else { return }
+        layoutCompatible = compatible; surface?.setNativeBypass(effectiveBypass)
+    }
+    #if DEBUG
+    var testSurface: NativeHLSLUTSurface? { surface }
+    var testAnalysisRequested: Bool { requested }
+    private(set) var testAppliedBuild = 0
+    #endif
+
+    func setContainer(_ container: UIView) {
+        guard onlineContainer !== container else { return }
+        surface?.stop(); surface = nil; onlineContainer = container
+        // Container replacement invalidates pending analysis and cube publication.
+        generation += 1; analysisGeneration += 1; busy = false
+        buildGeneration += 1; buildTask?.cancel()
+        if onlineMode { startOnlineSurface() }
+    }
+    func removeContainer(_ container: UIView) {
+        guard onlineContainer === container else { return }
+        detach(); onlineContainer = nil
+    }
+    func setNativeBypass(_ reason: String?) {
+        nativeBypass = reason
+        surface?.setNativeBypass(effectiveBypass)
+    }
+    private func startOnlineSurface() {
+        guard onlineMode, surface == nil, let player = avPlayer, let container = onlineContainer else { return }
+        guard let runtime = NativeHLSLUTSurface(player: player, container: container) else {
+            supported = false; status = "Metal 不可用；在线原画旁路"; return
+        }
+        surface = runtime
+        let token = generation
+        runtime.onSourceCheck = { [weak self, weak runtime] safe, message in
+            guard let self, self.generation == token, self.surface === runtime else { return }
+            self.supported = safe
+            self.status = safe ? "在线 SDR 等待：源检查通过，尚未呈现 LUT" : message
+            if safe && self.enabled { self.apply() }
+        }
+        runtime.onStatus = { [weak self, weak runtime] message in
+            guard let self, self.generation == token, self.surface === runtime else { return }
+            self.status = message
+        }
+        runtime.onPresented = { [weak self, weak runtime] _ in
+            guard let self, self.generation == token, self.surface === runtime else { return }
+            self.status = "在线 SDR LUT：Metal（原版 269 引擎）"
+        }
+        runtime.setNativeBypass(effectiveBypass)
+        if let onlineFilter { runtime.setFilter(onlineFilter) }
+    }
+    func updateComparison() {
+        reveal.setSplit(comparison ? divider : nil)
+        if onlineMode, let onlineFilter { surface?.setFilter(onlineFilter) }
+    }
     func pauseComparison() { avPlayer?.pause(); comparison = true; updateComparison() }
     private var constrained: Bool {
         safePerformance && (ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState == .serious || ProcessInfo.processInfo.thermalState == .critical)
@@ -140,16 +202,24 @@ final class NativeLUTController: ObservableObject {
 
     func tick(_ player: KSAVPlayer?) {
         // A transient backend/layer gap is not an item change; do not destroy format state.
-        guard let next = player?.player.currentItem else { return }
-        avPlayer = player?.player
-        if lastConstrained != constrained { lastConstrained = constrained; apply() }
-        if item !== next {
-            detach(); item = next; original = next.videoComposition
+        guard let next = player?.player.currentItem else {
+            if item != nil { detach() }
+            return
+        }
+        if item !== next || avPlayer !== player?.player {
+            detach(); item = next; avPlayer = player?.player; original = next.videoComposition
+            // Keep KSPlayer's PiP delegate and route behavior untouched. Observe the
+            // native PiP transition; every transition first hides the Metal surface.
+            if let pip = player?.pipController {
+                pipObservation = pip.observe(\.isPictureInPictureActive, options: [.initial, .new, .prior]) { [weak self] pip, change in
+                    let bypass = change.isPrior || pip.isPictureInPictureActive
+                    Task { @MainActor in self?.setNativeBypass(bypass ? "PiP：原画" : nil) }
+                }
+            }
             status = "检查视频格式…"
             let token = generation
-            // Reject known HLS before any remote AVAsset property loading.
             if (next.asset as? AVURLAsset)?.url.pathExtension.lowercased() == "m3u8" {
-                finishFormatCheck(token, next, message: "HLS 不支持原生 composition LUT")
+                onlineMode = true; startOnlineSurface()
                 return
             }
             formatTimeout = Task { [weak self, weak next] in
@@ -184,6 +254,11 @@ final class NativeLUTController: ObservableObject {
                     guard generation == token, item === next else { return }
                     try Task.checkCancellation()
                     guard generation == token, item === next else { return }
+                    if !playable && !hdr {
+                        formatTimeout?.cancel(); formatTimeout = nil
+                        onlineMode = true; startOnlineSurface()
+                        return
+                    }
                     guard playable && !hdr else {
                         finishFormatCheck(token, next, message: hdr ? "HDR 不支持 LUT" : "此视频不支持原生 composition LUT（HLS/非可合成流）")
                         return
@@ -195,9 +270,15 @@ final class NativeLUTController: ObservableObject {
                 }
             }
         }
+        if onlineMode { startOnlineSurface() }
+        if lastConstrained != constrained { lastConstrained = constrained; apply() }
         if supported && enabled && requested && !busy { analyze() }
     }
     func detach() {
+        let wasOnline = onlineMode
+        surface?.stop(); surface = nil; onlineMode = false; onlineFilter = nil
+        pipObservation?.invalidate(); pipObservation = nil; nativeBypass = nil
+        avPlayer = nil
         generation += 1
         buildGeneration += 1; buildTask?.cancel(); cachedCube = nil
         sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
@@ -207,9 +288,13 @@ final class NativeLUTController: ObservableObject {
         formatTimeout?.cancel(); formatTimeout = nil
         enabled = false
         status = "等待播放器视频轨道；LUT 未启用"
-        if let item { item.videoComposition = original; if let output { item.remove(output) } }
+        if let item { if !wasOnline { item.videoComposition = original }; if let output { item.remove(output) } }
         item = nil; output = nil; original = nil; composition = nil
         supported = false; busy = false; requested = true
+    }
+    private func restoreOriginalRendering() {
+        if onlineMode { onlineFilter = nil; surface?.setFilter(nil) }
+        else { item?.videoComposition = original }
     }
     func toggle() {
         guard supported else { return }
@@ -217,7 +302,7 @@ final class NativeLUTController: ObservableObject {
         if enabled && cachedCube == nil {
             requested = true
             buildGeneration += 1; buildTask?.cancel()
-            item?.videoComposition = original
+            restoreOriginalRendering()
             return
         }
         if !enabled { analysisGeneration += 1; busy = false }
@@ -227,26 +312,26 @@ final class NativeLUTController: ObservableObject {
         guard supported else { return }
         analysisGeneration += 1; busy = false; reveal.cancel()
         buildGeneration += 1; buildTask?.cancel()
-        item?.videoComposition = original
+        restoreOriginalRendering()
         requested = true; status = "等待原始解码帧…"
     }
     func reset() {
         analysisGeneration += 1; busy = false; reveal.cancel()
         enabled = false; sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
         buildGeneration += 1; buildTask?.cancel()
-        parameters = LUTParameters(); composition = nil
-        item?.videoComposition = original; requested = true; status = "已重置"
+        parameters = LUTParameters(); composition = nil; cachedCube = nil
+        restoreOriginalRendering(); requested = true; status = "已重置"
     }
     func apply() {
         guard supported, let item else { return }
         buildGeneration += 1
         let revision = buildGeneration, sourceGeneration = generation
         buildTask?.cancel()
-        let useLUT = enabled && strength > 0
+        let useLUT = enabled && (onlineMode || strength > 0)
         let useSharpen = sharpen && !constrained
         let useDeband = deband && !constrained
         guard useLUT || useSharpen || useDeband else {
-            reveal.cancel(); composition = nil; item.videoComposition = original
+            reveal.cancel(); composition = nil; restoreOriginalRendering()
             status = constrained && (sharpen || deband) ? "节能/高温保护：增强已旁路" : "原始画面（全部增强已旁路）"
             return
         }
@@ -263,8 +348,8 @@ final class NativeLUTController: ObservableObject {
             if useDeband && kernel == nil { self.status = "Metal 去色带不可用；未伪装为模糊" }
             self.cachedCube = cube ?? self.cachedCube
             let cs = CGColorSpace(name: CGColorSpace.sRGB)!
-            let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
-                let source = request.sourceImage, extent = source.extent
+            let render: (CIImage) -> CIImage = { source in
+                let extent = source.extent
                 var result = source
                 // LUT domain intentionally unchanged; intensity is a true image dissolve.
                 if let cube, let mapped = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":cube,"inputColorSpace":cs,kCIInputImageKey:source])?.outputImage {
@@ -278,18 +363,40 @@ final class NativeLUTController: ObservableObject {
                     }
                 }
                 if useSharpen && sharp > 0 { result = result.clampedToExtent().applyingFilter("CISharpenLuminance", parameters: [kCIInputSharpnessKey: sharp]).cropped(to: extent) }
-                request.finish(with: LUTRevealState.composite(original: source, filtered: result, originalFraction: reveal.originalFraction()).cropped(to: extent), context: ci)
-            })
-            self.composition = comp
+                return LUTRevealState.composite(original: source, filtered: result, originalFraction: reveal.originalFraction()).cropped(to: extent)
+            }
             reveal.begin(reduceMotion: UIAccessibility.isReduceMotionEnabled)
-            item.videoComposition = comp
-            if !useDeband || kernel != nil { self.status = self.constrained ? "节能/高温：锐化与去色带旁路；LUT 保留" : "SDR 增强已应用；去色带为实验功能" }
+            if self.onlineMode {
+                self.onlineFilter = render
+                self.surface?.setFilter(render)
+                #if DEBUG
+                self.testAppliedBuild += 1
+                #endif
+                // onPresented, not source-check/build completion, announces online success.
+                self.status = "在线 SDR 等待：参数已提交，等待 GPU 呈现"
+            } else {
+                let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
+                    request.finish(with: render(request.sourceImage), context: ci)
+                })
+                self.composition = comp
+                item.videoComposition = comp
+                if !useDeband || kernel != nil { self.status = self.constrained ? "节能/高温：锐化与去色带旁路；LUT 保留" : "SDR 增强已应用；去色带为实验功能" }
+            }
         }
     }
     private func analyze() {
-        guard let item, let output, item.videoComposition == nil else { return }
-        let time = item.currentTime()
-        guard output.hasNewPixelBuffer(forItemTime: time), let buffer = output.copyPixelBuffer(forItemTime:time,itemTimeForDisplay:nil) else { return }
+        guard let item else { return }
+        let buffer: CVPixelBuffer
+        if onlineMode {
+            // A nil/throttled frame must not consume the user's analysis request.
+            guard let frame = surface?.copyDecodedFrameForAnalysis() else { return }
+            buffer = frame
+        } else {
+            guard let output, item.videoComposition == nil else { return }
+            let time = item.currentTime()
+            guard output.hasNewPixelBuffer(forItemTime: time), let frame = output.copyPixelBuffer(forItemTime:time,itemTimeForDisplay:nil) else { return }
+            buffer = frame
+        }
         // Conservative transfer-function check on the actual decoded frame too.
         if let transfer = CVBufferCopyAttachment(buffer,kCVImageBufferTransferFunctionKey,nil) as? String,
            transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
@@ -389,6 +496,21 @@ private final class OriginalFaceLandmarker: @unchecked Sendable {
             return (nil, "中央50%（MediaPipe 错误：\(error.localizedDescription)）")
         }
     }
+}
+
+/// Dedicated noninteractive sibling: above the native player, below subtitles,
+/// chrome and the original gesture receiver. Never owns a second AVPlayer.
+struct NativeLUTOverlay: UIViewRepresentable {
+    let model: NativeLUTController
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(); view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        model.setContainer(view)
+        return view
+    }
+    func updateUIView(_ uiView: UIView, context: Context) { model.setContainer(uiView) }
+    func makeCoordinator() -> NativeLUTController { model }
+    static func dismantleUIView(_ uiView: UIView, coordinator: NativeLUTController) { coordinator.removeContainer(uiView) }
 }
 
 struct NativeLUTPanel: View {
