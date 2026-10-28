@@ -17,3 +17,9 @@
 `python3 scripts/test-mediapipe-parity.py`：从独立原文本提取采样 oracle，而不是拿移植版自比；16组完整 sampleFrame 返回（全部 pixels/high_rb/high_pixels/global ratio/regionName），覆盖奇数尺寸、横竖图、无脸、全框、局部框、空框，确定性RGBA随机输入。macOS还执行实际Swift ROI函数与JS独立oracle的5组差分：first-face/minmax/小数 floor ceil/越界/空脸/退化。
 
 原生Metal GPU和浏览器WebGL GPU浮点实现、VIDEO追踪历史/毫秒时间戳、AVFoundation解码/色彩管理、CI缩放与Canvas2D插值可能不同；同版本模型不意味着跨后端landmarks逐浮点相等。这里只能验证相同landmarks输入的ROI规则及相同RGBA+ROI的sampleFrame精确一致。原生模型推理尚需要实体iOS运行验证；Linux iSH不能运行Xcode或Metal，不以Node采样测试冒充原生推理成功。未测量设备延迟/功耗。
+
+## 与桌面 MPV 参考的诚实差异
+
+- 油猴 / 原生：Tasks Vision **VIDEO** 模式 + `faceBoxExpand=1.0` 中心/半径公式（全部关键点 min/max）。
+- 桌面 `mpv_realtime_lut.py`：同模型但 **IMAGE** 模式，直接 `int(min/max*size)`，无 expand 步（expand 1.0 时与中心公式外接矩形等价）。
+- 因此：相同 landmarks 输入时原生 ROI 与油猴一致；与 MPV 在边界像素上可能差 1px（floor/ceil vs int）。不宣称跨后端 landmarks 逐浮点相等。

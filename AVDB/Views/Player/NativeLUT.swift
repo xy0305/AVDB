@@ -310,7 +310,7 @@ final class NativeLUTController: ObservableObject {
         if !enabled {
             analysisGeneration += 1; busy = false
             restoreOriginalRendering()
-            status = "原画（LUT 已关闭）"
+            status = onlineMode ? "原画（在线 LUT 已关闭）" : "原画（LUT 已关闭）"
             return
         }
         apply()
@@ -444,8 +444,12 @@ final class NativeLUTController: ObservableObject {
 
 // Foundation-only geometry shared by native inference and independent oracle tests.
 enum OriginalLandmarkGeometry {
+    /// Matches userscript CONFIG.faceBoxExpand (1.0). Desktop MPV uses IMAGE-mode raw
+    /// min/max without the center/radius step; expand 1.0 keeps the same box extents.
+    static let faceBoxExpand = 1.0
     static func region(faces: [[[Double]]], width: Int, height: Int) -> [String: Int]? {
         guard let landmarks = faces.first, !landmarks.isEmpty else { return nil }
+        // First-face ALL landmark extrema (not a cheek/jaw subset).
         var x1 = Double.infinity, y1 = Double.infinity
         var x2 = -Double.infinity, y2 = -Double.infinity
         for lm in landmarks {
@@ -454,7 +458,7 @@ enum OriginalLandmarkGeometry {
             x2 = max(x2, x); y2 = max(y2, y)
         }
         let cx = (x1+x2)/2, cy = (y1+y2)/2
-        let hw = (x2-x1)/2 * 1.0, hh = (y2-y1)/2 * 1.0
+        let hw = (x2-x1)/2 * faceBoxExpand, hh = (y2-y1)/2 * faceBoxExpand
         let w = Double(width), h = Double(height)
         return ["x1": max(0, Int(floor((cx-hw)*w))),
                 "y1": max(0, Int(floor((cy-hh)*h))),
@@ -498,7 +502,7 @@ private final class OriginalFaceLandmarker: @unchecked Sendable {
                 return (nil, "中央50%（MediaPipe 未检测到人脸）")
             }
             let box = OriginalLandmarkGeometry.region(faces: [landmarks.map { [Double($0.x), Double($0.y)] }], width: image.width, height: image.height)
-            return (box, "MediaPipe 第一人脸关键点 ROI")
+            return (box, "MediaPipe 第一人脸全部关键点 min/max 极值 · expand \(OriginalLandmarkGeometry.faceBoxExpand)")
         } catch {
             // Original catches inference exceptions and only then uses the center fallback.
             return (nil, "中央50%（MediaPipe 错误：\(error.localizedDescription)）")
@@ -530,8 +534,11 @@ struct NativeLUTPanel: View {
             Text(model.status).font(.footnote)
             Group {
             Button(model.enabled ? "关闭 LUT（恢复原画）" : "开启 LUT（自动分析）") { model.toggle() }
+                .accessibilityHint("对应桌面参考 R 自动分析 / F 关闭")
             Button("重新分析当前帧") { model.reanalyze() }
+                .accessibilityHint("强制抓取当前解码帧并重新跑 6.7.8 搜索")
             Button("重置并恢复原画") { model.reset() }
+                .accessibilityHint("清空参数、关闭 LUT，回到未调色原画")
             Section("画质增强 · SDR") {
                 Text("LUT 强度 \(model.strength, specifier: "%.2f")")
                 Slider(value: Binding(get: { model.strength }, set: { model.strength = $0; model.apply() }), in: 0...1)
@@ -549,7 +556,7 @@ struct NativeLUTPanel: View {
                 Button("暂停并比较同一帧") { model.pauseComparison() }
                 Text("原始分支直接使用解码请求 sourceImage；原始按钮关闭所有增强。")
             }
-            Section("手动微调（调节后立即应用）") {
+            Section("手动微调（松手即应用 · 与开启后的自动结果叠加编辑）") {
             ForEach(0..<7,id:\.self) { i in
                 VStack(alignment:.leading) {
                     Text("\(LUTParameters.names[i]) \(Int(model.parameters.values[i]))")
@@ -559,7 +566,7 @@ struct NativeLUTPanel: View {
             }
             }.disabled(!model.supported)
             Section {
-                Text("对齐参考：开启≈自动分析当前帧；关闭/重置≈恢复原画；下方滑杆为手动微调并立即应用。仅 SDR（文件 composition 或在线 Metal）。HDR/受保护内容走原画。分析无需停在此面板。")
+                Text("对齐参考（油猴 v6.7.8 / MPV 托盘）：开启≈自动分析当前帧；重新分析≈R；关闭/重置≈F 恢复原画；下方滑杆为手动微调并立即应用。115 / 在线 HLS 与本地文件共用此面板。仅 SDR（文件 composition 或在线 Metal）。HDR/受保护内容走原画。分析无需停在此面板。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

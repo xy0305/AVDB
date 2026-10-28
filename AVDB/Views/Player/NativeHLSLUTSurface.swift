@@ -110,7 +110,8 @@ final class NativeHLSLUTSurface: NSObject {
     /// Set nil to show the original layer immediately. No AVVideoComposition on HLS.
     func setFilter(_ value: ((CIImage) -> CIImage)?) {
         generation += 1; filter = value; dirty = true
-        if lastBuffer == nil { forceCopy = true }
+        // Always force one fresh pull so 开启 / 手动应用 / 参数变更不依赖 hasNew 边沿。
+        forceCopy = true
         hide(value == nil ? "原画（在线 LUT 关闭）" : "等待 SDR 解码帧及 GPU 完成")
         lastFrameHost = CACurrentMediaTime()
     }
@@ -118,7 +119,16 @@ final class NativeHLSLUTSurface: NSObject {
     /// The owner MUST call this on PiP start/stop. PiP uses the original AV layer.
     func setNativeBypass(_ reason: String?) {
         generation += 1; bypassReason = reason
-        hide(reason.map { "原画旁路：\($0)" } ?? "等待前台新帧")
+        // Clearing PiP/layout bypass must force a fresh pull so resume after seek
+        // does not wait on a stale hasNewPixelBuffer edge.
+        forceCopy = true
+        dirty = true
+        if reason != nil { lastBuffer = nil }
+        if let reason {
+            hide("原画旁路：\(reason)")
+        } else {
+            hide("等待前台新帧")
+        }
         lastFrameHost = CACurrentMediaTime()
     }
 
@@ -207,24 +217,48 @@ final class NativeHLSLUTSurface: NSObject {
             hide("后台/AirPlay/PiP 原画旁路"); return
         }
         guard let item, item.status == .readyToPlay, sourceSafe, let output, let filter else { return }
+        // Keep the last Metal frame up during brief GPU/back-pressure gaps.
+        // Hard-fallback to AVPlayerLayer only after a long stall (HLS segment gaps).
+        let stallLimit: CFTimeInterval = 2.0
         guard !inFlight else {
-            if player.rate != 0 && CACurrentMediaTime() - lastFrameHost > 0.5 { hide("GPU 等待超时，回原画") }
+            if player.rate != 0 && view.isHidden && CACurrentMediaTime() - lastFrameHost > stallLimit {
+                hide("GPU 等待超时，回原画")
+            }
             return
         }
         let hostTime = displayLink.targetTimestamp > 0 ? displayLink.targetTimestamp : CACurrentMediaTime()
         let time = player.rate == 0 ? player.currentTime() : output.itemTime(forHostTime: hostTime)
         var pts = CMTime.invalid
         let buffer: CVPixelBuffer
-        if output.hasNewPixelBuffer(forItemTime: time) || (forceCopy && player.rate == 0) {
+        // forceCopy works while playing too (seek / bypass clear / filter publish).
+        if output.hasNewPixelBuffer(forItemTime: time) || forceCopy {
             guard let fresh = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: &pts), isKnownSDR(fresh) else {
+                if forceCopy {
+                    // One forced miss must not permanently kill the overlay; retry next tick.
+                    forceCopy = false
+                    if player.rate != 0 && view.isHidden && CACurrentMediaTime() - lastFrameHost > stallLimit {
+                        lastBuffer = nil; hide("解码色彩元数据未知或非 SDR，原画旁路")
+                    }
+                    return
+                }
                 lastBuffer = nil; hide("解码色彩元数据未知或非 SDR，原画旁路"); return
             }
             buffer = fresh; lastBuffer = fresh; lastPTS = pts; forceCopy = false
             lastFrameHost = CACurrentMediaTime()
-        } else if dirty, player.rate == 0, let previous = lastBuffer {
+        } else if dirty, let previous = lastBuffer {
+            // Re-present last SDR frame while paused OR while playing across brief gaps.
             buffer = previous; pts = lastPTS
         } else {
-            if player.rate != 0 && CACurrentMediaTime() - lastFrameHost > 0.5 { hide("无新解码帧，已回原画") }
+            if player.rate != 0 {
+                if view.isHidden {
+                    // Overlay already down — pull hard next tick and only hard-fallback after stallLimit.
+                    forceCopy = true
+                    if CACurrentMediaTime() - lastFrameHost > stallLimit {
+                        hide("无新解码帧，已回原画")
+                    }
+                }
+                // If still visible, keep last drawable; do not flicker back to AVPlayerLayer.
+            }
             return
         }
         dirty = false
