@@ -487,6 +487,12 @@ import SwiftUI
                 guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
                 portrait = image; return
             }
+            // avbase talent page → declared FANZA actjpgs headshot (after curated HQ Gfriends).
+            if let url = await AvbasePortraitService.shared.lookup(names: JavBusActorService.names(actor)),
+               let image = await ImageLoader.shared.load(url, maxPixelSize: 512) {
+                guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
+                portrait = image; return
+            }
             guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
             let tmdb = await ActorAvatarFallback.resolveMissing(actor: actor, names: JavBusActorService.names(actor), existingFailed: true)
             guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }

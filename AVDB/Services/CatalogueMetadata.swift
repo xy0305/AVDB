@@ -52,7 +52,8 @@ struct ScrapedMetadata: Sendable, Hashable {
     var poster: String?
     var cover: String?
     var digitalCID: String?
-    var images: [String] { var seen = Set<String>(); return [poster, cover].compactMap { $0 }.filter { seen.insert($0).inserted } }
+    // HQ-first: large cover (pl / package large) before package thumb (ps).
+    var images: [String] { var seen = Set<String>(); return [cover, poster].compactMap { $0 }.filter { seen.insert($0).inserted } }
 }
 
 enum AvbaseMetadata {
@@ -107,6 +108,7 @@ enum AvbaseMetadata {
         let actors = casts.isEmpty ? (work["actors"] as? [[String: Any]] ?? []) : casts
         result.actorNames = Array(Set(actors.filter { string($0["note"]) != "男優" }.compactMap { string($0["name"]) })).sorted()
         let products = work["products"] as? [[String: Any]] ?? []
+        var bestRank = -1
         for product in products {
             result.maker = result.maker ?? name(product["maker"])
             result.publisher = result.publisher ?? name(product["label"])
@@ -125,12 +127,24 @@ enum AvbaseMetadata {
             guard dmm?.cid == pid || (dmm == nil && CatalogueIdentity.matches(pid, wanted: number)) else { continue }
             let poster = image(string(product["thumbnail_url"]), productID: pid, dmm: dmm?.cid == pid, namespace: dmm?.imageRoot)
             let cover = image(string(product["image_url"]), productID: pid, dmm: dmm?.cid == pid, namespace: dmm?.imageRoot)
-            // Keep paired artwork from ONE exact-record product; do not merge photographs.
-            if result.poster == nil && result.cover == nil, poster != nil || cover != nil {
-                result.poster = poster ?? cover; result.cover = cover ?? poster
+            guard poster != nil || cover != nil else { continue }
+            // Score: prefer pl (large) over ps/jp; prefer digital video package over mono DVD.
+            let coverURL = cover ?? poster!
+            let rank = coverRank(coverURL) * 10 + (dmm?.imageRoot == "/digital/video/" || dmm?.imageRoot == "/digital/amateur/" ? 1 : 0)
+            if rank > bestRank {
+                bestRank = rank
+                result.poster = poster ?? cover
+                result.cover = cover ?? poster
             }
         }
         return result
+    }
+    /// Higher is better: pl large jacket > jp amateur package > ps thumb.
+    static func coverRank(_ url: String) -> Int {
+        if url.hasSuffix("pl.jpg") { return 3 }
+        if url.hasSuffix("jp.jpg") { return 2 }
+        if url.hasSuffix("ps.jpg") { return 1 }
+        return 0
     }
     static func name(_ value: Any?) -> String? { (value as? [String: Any]).flatMap { string($0["name"]) } }
     static func date(_ raw: String?) -> String? {
@@ -171,6 +185,69 @@ enum AvbaseMetadata {
     static func cleanImageURL(_ url: URL) -> Bool {
         url.scheme == "https" && url.user == nil && url.password == nil && url.port == nil
             && url.query == nil && url.fragment == nil && !url.absoluteString.contains("%")
+    }
+    /// Public FANZA actor headshot mirrored by avbase talent pages. Exact actjpgs path only.
+    static func actorImage(_ raw: String?) -> String? {
+        guard let raw, let url = URL(string: raw), cleanImageURL(url),
+              url.host == "pics.dmm.co.jp",
+              url.path.range(of: #"^/mono/actjpgs/[a-z0-9_]{1,80}\.jpg$"#, options: .regularExpression) != nil else { return nil }
+        return raw
+    }
+    /// Exact talent page under /talents/{name}. Reject path separators / query / empty names.
+    static func talentPath(_ name: String) -> String? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 80,
+              !trimmed.contains("/"), !trimmed.contains("\\"), !trimmed.contains("?"),
+              !trimmed.contains("#"), !trimmed.contains("&"),
+              let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/?#&=+%"))) else { return nil }
+        return "/talents/" + encoded
+    }
+    static func parseTalent(html: String, names: [String]) -> String? {
+        let wanted = Set(names.map(ActorNameNormalizer.key).filter { !$0.isEmpty })
+        guard !wanted.isEmpty, let data = props(html) else { return nil }
+        let talents: [[String: Any]]
+        if let one = data["talent"] as? [String: Any] { talents = [one] }
+        else { talents = data["talents"] as? [[String: Any]] ?? [] }
+        guard talents.count == 1, let talent = talents.first else { return nil }
+        var candidates: [(String, String)] = []
+        if let primary = talent["primary"] as? [String: Any],
+           let name = string(primary["name"]), let image = actorImage(string(primary["image_url"])) {
+            candidates.append((name, image))
+        }
+        for actor in (talent["actors"] as? [[String: Any]] ?? []) {
+            if let name = string(actor["name"]), let image = actorImage(string(actor["image_url"])) {
+                candidates.append((name, image))
+            }
+        }
+        let hits = candidates.filter { wanted.contains(ActorNameNormalizer.key($0.0)) }
+        // Exact name match only; conflicting distinct headshots for the same query are rejected.
+        let urls = Set(hits.map { $0.1 })
+        return urls.count == 1 ? urls.first : nil
+    }
+}
+
+/// Cookie-free avbase talent headshots. Declared host: www.avbase.net → pics.dmm.co.jp/mono/actjpgs.
+actor AvbasePortraitService {
+    static let shared = AvbasePortraitService()
+    private let cache = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300, capacity: 128)
+    func lookup(names: [String]) async -> String? {
+        let ordered = ActorNameNormalizer.orderedUnique(names).prefix(3)
+        guard !ordered.isEmpty, !Task.isCancelled else { return nil }
+        let key = ordered.map(ActorNameNormalizer.key).joined(separator: "|")
+        return await cache.value(key: key) {
+            await Self.fetch(names: Array(ordered))
+        }
+    }
+    private static func fetch(names: [String]) async -> String? {
+        for name in names {
+            guard !Task.isCancelled, let path = AvbaseMetadata.talentPath(name) else { continue }
+            guard let url = URL(string: AvbaseMetadata.origin + path),
+                  let data = await CatalogueMetadataService.requestPublic(url, timeout: 3),
+                  let html = String(data: data, encoding: .utf8),
+                  let image = AvbaseMetadata.parseTalent(html: html, names: names) else { continue }
+            return image
+        }
+        return nil
     }
 }
 
@@ -291,6 +368,12 @@ actor CatalogueMetadataService {
         }
         guard !Task.isCancelled else { return nil }
         return found
+    }
+    static func requestPublic(_ url: URL, timeout: TimeInterval) async -> Data? {
+        // Avbase HTML only: www.avbase.net exact origin, no body/credentials.
+        guard url.scheme == "https", url.host == "www.avbase.net", url.user == nil, url.password == nil,
+              url.port == nil, url.fragment == nil else { return nil }
+        return await request(url, timeout: timeout)
     }
     private static func request(_ url: URL, timeout: TimeInterval, body: Data? = nil) async -> Data? {
         guard timeout > 0, !Task.isCancelled else { return nil }

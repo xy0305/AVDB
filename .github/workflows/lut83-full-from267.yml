@@ -3,14 +3,12 @@ on:
   push:
     branches: [feat/lut83-full-from267]
     paths:
-      - AVDB/Resources/OriginalLUT.js
-      - AVDB/Views/Player/NativeLUT.swift
-      - AVDB/Resources/Info.plist
-      - AVDB.xcodeproj/project.pbxproj
-      - scripts/*lut83*
-      - scripts/LUT83NeutralHost.swift
-      - scripts/test-native-lut.py
+      - AVDB/**
+      - AVDB.xcodeproj/**
+      - scripts/**
+      - Build278-AvbaseHQImages.md
       - .github/workflows/lut83-full-from267.yml
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -45,6 +43,11 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Avbase HQ cover and portrait contracts
+        run: |
+          python3 scripts/test-catalogue-metadata.py
+          python3 scripts/test-avbase-portraits278.py
+          python3 scripts/test-list-hq-covers275.py
       - name: Install existing pinned dependency only
         run: |
           gem install cocoapods -v 1.16.2 --no-document

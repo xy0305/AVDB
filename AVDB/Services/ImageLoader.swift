@@ -654,7 +654,7 @@ enum ListHQCoverCache {
     #endif
 }
 
-/// List thumbnails: HQ first (resolved Amazon/DMM/MGS / catalogue), then JavDB.
+/// List thumbnails: HQ first (resolved Amazon/DMM/MGS/avbase catalogue pl), then JavDB.
 /// No per-row Tenhow scrape; ImageLoader rejects DMM NOW thumbs and falls back.
 public enum ListCoverPolicy {
     public static func sources(movie: Movie) -> [String] {
@@ -669,9 +669,11 @@ public enum ListCoverPolicy {
         }
         if !original {
             append(ListHQCoverCache.url(for: movie.number))
+            // Catalogue-bound avbase / DMM / MGS packages: HQ (pl) already first in images.
             for image in movie.catalogueMetadata?.images ?? [] {
                 guard let url = URL(string: image) else { continue }
                 if DetailPosterPolicy.allowedPublicImage(url)
+                    || AvbaseMetadata.allowedDiscoveredImage(url)
                     || AmazonPoster.allowedImage(url)
                     || TenhowPoster.allowedImage(url) {
                     append(image)

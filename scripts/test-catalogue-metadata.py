@@ -93,6 +93,26 @@ source=core+metadata+stub+models+r'''
   assert(Movie(id:"id",type:"0",number:"723GGH-010").withCatalogueMetadata(result).catalogueMetadata == nil)
   assert(Movie(id:"id",number:"R18-292").codePrefix == "R18")
   assert(Movie(id:"id",number:"723GGH-009").codePrefix == "723GGH")
+  let ps="https://pics.dmm.co.jp/digital/video/ssis00001/ssis00001ps.jpg"
+  let pl="https://pics.dmm.co.jp/digital/video/ssis00001/ssis00001pl.jpg"
+  let linkedVideo="https://video.dmm.co.jp/av/content/?id=ssis00001"
+  let hqProduct:[String:Any]=["product_id":"ssis00001","url":linkedVideo,"thumbnail_url":ps,"image_url":pl]
+  let hqWork:[String:Any]=["work_id":"SSIS-001","prefix":"","title":"HQ fixture","products":[hqProduct],"actors":[]]
+  let hq=AvbaseMetadata.parse(html:try page([hqWork]),number:"SSIS-001")!
+  assert(hq.cover == pl && hq.poster == ps && hq.images == [pl,ps])
+  assert(AvbaseMetadata.coverRank(pl) > AvbaseMetadata.coverRank(ps))
+  let head="https://pics.dmm.co.jp/mono/actjpgs/aoi_suzu.jpg"
+  func talentPage(_ talent:[String:Any]) throws -> String {
+   let data=try JSONSerialization.data(withJSONObject:["props":["pageProps":["talent":talent]]])
+   return "<script id='__NEXT_DATA__' type='application/json'>"+String(data:data,encoding:.utf8)!+"</script>"
+  }
+  let talent:[String:Any]=["primary":["name":"蒼井すず","image_url":head],"actors":[["name":"蒼井すず","image_url":head]]]
+  assert(AvbaseMetadata.parseTalent(html:try talentPage(talent),names:["蒼井すず"]) == head)
+  assert(AvbaseMetadata.parseTalent(html:try talentPage(talent),names:["別人"]) == nil)
+  assert(AvbaseMetadata.actorImage(head) == head)
+  assert(AvbaseMetadata.actorImage(pl) == nil)
+  assert(AvbaseMetadata.talentPath("蒼井すず")?.hasPrefix("/talents/") == true)
+  assert(AvbaseMetadata.talentPath("../evil") == nil)
   print("PASS native production numeric-prefix identity, avbase namespaces/record binding, nullable amateur package images, unchanged JavDB IDs and metadata merge")
  }
 }

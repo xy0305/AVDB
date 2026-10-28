@@ -12,6 +12,7 @@ assert "secondFallbackURL: sources.dropFirst(2).first" in loader
 assert "DetailPosterPolicy.candidates(number: movie.number).first" in loader
 assert "ListHQCoverCache.url(for: movie.number)" in loader
 assert "AmazonPoster.allowedImage(url)" in loader
+assert "AvbaseMetadata.allowedDiscoveredImage(url)" in loader
 assert "awsimgsrc.dmm.co.jp" in loader
 assert "ListHQCoverCache.store(number: movie.number, source: winner.source)" in resolver
 # Keep legacy FrontPosterPolicy source order contracts intact.
