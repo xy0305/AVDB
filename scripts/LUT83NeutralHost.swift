@@ -148,7 +148,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
                 return values
             }
             let srcPixel = sample(controller.previewOriginal!), dstPixel = sample(controller.previewProcessed!)
-            for channel in 0..<3 { try require(abs(dstPixel[channel]-srcPixel[channel]/2)<0.02,"actual non-unit CUBE domain render") }
+            for channel in 0..<3 { try require(abs(dstPixel[channel]-srcPixel[channel]/2)<0.02,"actual non-unit CUBE domain render src=\(srcPixel) dst=\(dstPixel)") }
             let picture = movie.deletingLastPathComponent().appendingPathComponent("neutral.png")
             try UIImage(cgImage:skinCG).pngData()!.write(to:picture)
             controller.importMedia([picture,picture])
@@ -170,7 +170,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
             let data = try JSONSerialization.data(withJSONObject:["inferenceSummary":inferenceSummary,"passed":true,"checks":checks,"boundaries":"Production controller/panel/model use compiled and run; only KSPlayer transport stub and bake counter instrumentation. Neutral non-face fixture runs real VIDEO model on simulator CPU; physical-device production uses GPU on its dedicated thread. Inspect inferenceSummary for inference failure vs no-face. Real face accuracy/physical device FPS NOT RUN. Local synthetic media only."],options:[.prettyPrinted,.sortedKeys])
             try data.write(to:output)
         } catch {
-            let data = try! JSONSerialization.data(withJSONObject:["passed":false,"error":String(describing:error),"checks":checks],options:.prettyPrinted)
+            let data = try! JSONSerialization.data(withJSONObject:["inferenceSummary":inferenceSummary,"passed":false,"error":String(describing:error),"checks":checks],options:.prettyPrinted)
             try! data.write(to:output)
         }
     }
