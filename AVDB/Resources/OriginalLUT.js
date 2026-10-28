@@ -1572,3 +1572,91 @@ function cubeRGBA(values) {
 }
 return {analyzeFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch};
 })();
+
+// Independent implementation of user-supplied v8.3 numerical specification.
+// No Python/Lua/Tk/installer code is executed or embedded. SDR nonlinear sRGB.
+var Desktop83 = (function(){
+const keys=['temp','tint','sat','bright','contrast','highlight','shadow'];
+const sk=['skin_rb','skin_rg','skin_lum','skin_sat','full_contrast','full_hl_ratio','full_sh_ratio'];
+const targets=[[[1.24,1.50],[1.20,1.35],[.35,.54],[.22,.34],[.10,.20],[0,.05],[0,.40]],[[1.03,1.36],[1.10,1.30],[.38,.62],[.12,.42],[.12,.24],[0,.10],[0,.24]],[[1.05,1.32],[1.12,1.28],[.42,.60],[.14,.25],[.13,.23],[0,.10],[.14,.35]]];
+const templates=[[-20,6,0,0,0,-2,2],[-3,6,0,5,0,-2,2],[-18,3,-1,25,-2,-1,20]];
+const ranges=[[[-20,5],[-5,5],[-5,3],[-5,10],[-3,2],[-5,3],[-5,10]],[[-3,-8],[-5,5],[-5,3],[-5,5],[-3,2],[-2,2],[-5,5]],[[-8,4],[-3,5],[-5,1],[-15,10],[-3,2],[-3,2],[-15,10]]];
+const lum=x=>.2126*x[0]+.7152*x[1]+.0722*x[2];
+const clip=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const err=(x,r)=>Math.max(r[0]-x,0,x-r[1]);
+function median(a){a=a.slice().sort((a,b)=>a-b);let n=a.length;return n%2?a[n>>1]:(a[n/2-1]+a[n/2])/2;}
+// Python ties-to-even is important for the dynamic high-match temperature.
+function round(x){let f=Math.floor(x),r=x-f;return r===.5?(f%2===0?f:f+1):Math.round(x);}
+function pixel(rgb,p,search){
+ let x=rgb.slice(),before=lum(x),l=before;
+ let factor=1+p[3]/50*.67*Math.max(.3,1-Math.max(0,(l-.7)/.3)*.7);x=x.map(v=>v*factor);
+ l=lum(x);factor=1+p[5]/50*.7*Math.max(0,(l-.5)/.5);x=x.map(v=>v*factor);
+ factor=1+p[6]/50*.7*Math.max(0,(.5-l)/.5);x=x.map(v=>v*factor);
+ let t=p[0]/50,ti=p[1]/50,g=[(1+t*.23)*(1+ti*.045),(1+t*.058)*(1-ti*.09),(1-t*.23)*(1+ti*.045)];
+ let norm=lum(g);if(norm>.001)g=g.map(v=>v/norm);
+ let damp=1-clip((lum(x)-.7)/.3)*.95;x=x.map((v,i)=>v*(1+(g[i]-1)*damp));
+ l=lum(x);x=x.map(v=>l+(1+p[2]/50*.82)*(v-l));
+ l=lum(x);factor=1+p[4]/50*.57*Math.max(.5,1-Math.max(0,(l-.7)/.3)*.5);x=x.map(v=>.5+factor*(v-.5));
+ l=lum(x);if(l>.92 && (search || (before<=.92 && p.some(v=>v!==0))))x=x.map(v=>v*.92/Math.max(l,1e-6));
+ return x.map(v=>clip(v));
+}
+function stats(a){
+ if(!a.length)return null;
+ let mean=[0,0,0],ls=[],sat=0,hl=0,sh=0;
+ for(let x of a){for(let i=0;i<3;i++)mean[i]+=x[i]/a.length;let l=lum(x);ls.push(l);hl+=l>.8?1:0;sh+=l<.2?1:0;sat+=(Math.max(...x)-Math.min(...x))/Math.max(1e-6,...x);}
+ let avg=ls.reduce((s,x)=>s+x,0)/ls.length;
+ return [mean[2]>1e-6?mean[0]/mean[2]:1,mean[1]>1e-6?mean[0]/mean[1]:1,lum(mean),sat/a.length,Math.sqrt(ls.reduce((s,x)=>s+(x-avg)**2,0)/ls.length),hl/a.length,sh/a.length];
+}
+function thin(a,n){if(a.length<=n)return a.slice();return Array.from({length:n},(_,i)=>a[Math.floor(i*a.length/n)]);}
+function select(bytes,w,h,box){
+ let all=[],face=[],fallback=[];
+ for(let y=0;y<h;y+=2)for(let x=0;x<w;x+=2){let i=(y*w+x)*4,r=bytes[i],g=bytes[i+1],b=bytes[i+2],v=[r/255,g/255,b/255];all.push(v);
+ if(lum(v)>=.8)continue;
+ if(box && x>=box.x1 && x<box.x2 && y>=box.y1 && y<box.y2)face.push(v);
+ let Y=.299*r+.587*g+.114*b,cr=(r-Y)*.713+128,cb=(b-Y)*.564+128;
+ if(cr>=120&&cr<=180&&cb>=70&&cb<=135)fallback.push(v);
+ }
+ let l=all.length?lum(all.reduce((s,x)=>s.map((v,i)=>v+x[i]/all.length),[0,0,0])):0;
+ if(l<.05||l>.95)return [];
+ // Desktop does not threshold a detected face crop. Explicit mobile fallback if absent.
+ return thin(face.length>=50?face:fallback,2000);
+}
+function choose(frames){
+ let a=frames.filter(a=>a.length>=50).map(a=>({a,s:stats(a)}));if(!a.length)return null;
+ let yellow=a.filter(x=>x.s[0]>=1.45),over=[],under=[];
+ for(let x of a)if(err(x.s[0],targets[0][0])*10+err(x.s[2],targets[0][2])*5>.02){if(x.s[0]>1.5)over.push(x);if(x.s[0]<1.24)under.push(x);}
+ let chosen=a,direction='全部';
+ if(yellow.length>=20){chosen=yellow.length>a.length*.7?yellow.slice(0,Math.floor(a.length*.7)).concat(a.filter(x=>x.s[0]<1.45).slice(0,a.length-Math.floor(a.length*.7))):yellow;direction='偏黄优先';}
+ else if((over.length+under.length)/a.length>.5){chosen=over.length>=under.length?over:under;direction=over.length>=under.length?'偏黄':'偏蓝';}
+ return {pixels:thin(chosen.flatMap(x=>x.a),3000),info:sk.map((_,i)=>median(chosen.map(x=>x.s[i]))),frames:a.length,direction};
+}
+function predict(a,info){
+ let extreme=info[0]<=1.6&&info[2]<.22&&info[6]>.35&&info[5]<.10;
+ let high=!extreme&&[0,1,2,3].every(i=>err(info[i],targets[1][i])===0);
+ let mode=extreme?2:high?1:0,T=targets[mode],base=templates[mode],range=ranges[mode],p=base.slice();
+ const cache=new Map();
+ function st(q=p){let k=q.join(',');if(!cache.has(k))cache.set(k,stats(a.map(x=>pixel(x,q,true))));return cache.get(k);}
+ function search(index,lo,hi,origin,cost){let best=p[index],error=Infinity;for(let d=lo;d<=hi;d++){let q=p.slice();q[index]=origin+d;let s=st(q),e=cost(s,d,q);if(e<error){error=e;best=q[index];}}p[index]=best;}
+ let lumTarget=T[2][0]+.8*(T[2][1]-T[2][0]),weight=extreme?10:50;
+ const lumError=s=>(s[2]<lumTarget||s[2]>T[2][1]?(s[2]-lumTarget)**2:0)+2*err(s[0],T[0])**2+weight*err(s[5],T[5])**2;
+ if(high){let origin=round(-3+clip((info[0]-T[0][0])/(T[0][1]-T[0][0]))*-5);search(0,-2,2,origin,(s,d)=>err(s[0],T[0])**2+.001*d*d);}
+ else{let offset=clip(info[0]-st()[0],-.08,.08),target=T[0][0]+.8*(T[0][1]-T[0][0]);search(0,...range[0],base[0],(s,d)=>15*Math.max(0,Math.abs(s[0]+offset-target)-.03)**2+5*err(s[1],T[1])**2+10*err(s[2],T[2])**2+.0005*d*d);}
+ search(3,...range[3],base[3],lumError);
+ if(st()[2]<lumTarget*.9||st()[2]>lumTarget*1.1)search(3,Math.max(range[3][0],p[3]-8-base[3]),Math.min(range[3][1],p[3]+8-base[3]),base[3],lumError);
+ let mid=i=>(T[i][0]+T[i][1])/2;
+ search(1,...range[1],base[1],(s,d)=>err(s[1],[mid(1)*.95,mid(1)*1.05])**2+.001*d*d);
+ search(2,...range[2],base[2],(s,d)=>err(s[3],[mid(3)*.9,mid(3)*1.1])**2+.001*d*d);
+ search(4,...range[4],base[4],(s,d)=>err(s[4],T[4])**2+100*err(s[0],T[0])**2+.001*d*d);
+ let comp=extreme?0:round(-(Math.max(0,p[3]-5)+Math.max(0,p[6]-2)*.5));
+ search(5,...range[5],base[5]+comp,s=>err(s[5],T[5])**2+10*err(s[0],T[0])**2);
+ let q=p.slice();q[6]=0;let dark=a.map(x=>lum(pixel(x,q,true))<.2);
+ if(dark.some(Boolean))search(6,...range[6],base[6],(s,d,q)=>{let ls=a.map((x,i)=>dark[i]?lum(pixel(x,q,true)):null).filter(x=>x!==null);return (median(ls)-.3)**2+err(s[0],T[0])**2;});
+ let origIn=err(info[2],T[2])===0;
+ // Final recheck follows the finite desktop search limits; no 267 neutral bypass here.
+ if((origIn&&st()[2]<info[2]-.005)||st()[2]<lumTarget*.95||st()[2]>T[2][1]*1.05){let target=origIn?info[2]:lumTarget;let origin=p[3];search(3,Math.max(range[3][0],origin-6-base[3]),Math.min(range[3][1],origin+15-base[3]),base[3],s=>((s[2]<target||s[2]>T[2][1])?(s[2]-target)**2:0)+2*err(s[0],T[0])**2+weight*err(s[5],T[5])**2);}
+ return {values:p,stage:['标准','高命中','极暗'][mode],after:st()};
+}
+function analyze(frames){let c=choose(frames);if(!c)return null;let p=predict(c.pixels,c.info);return {values:p.values,stage:p.stage,info:c.info,after:p.after,frames:c.frames,direction:c.direction,pixels:c.pixels};}
+function cubeRGBA(values,size){size=size||33;if(![33,65].includes(size)||values.length!==7||!values.every(Number.isFinite))return null;let out=[];for(let b=0;b<size;b++)for(let g=0;g<size;g++)for(let r=0;r<size;r++)out.push(...pixel([r/(size-1),g/(size-1),b/(size-1)],values,false),1);return out;}
+return {pixel,stats,select,choose,predict,analyze,cubeRGBA,targets,keys};
+})();
