@@ -83,6 +83,7 @@ jobs:
           python3 scripts/test-detail-back.py
           python3 scripts/test-catalog-lifecycle.py
           python3 scripts/test-front-posters.py
+          python3 scripts/test-list-hq-covers275.py
           python3 scripts/test-detail-posters.py
           python3 scripts/test-tenhow-posters.py
           python3 scripts/test-catalogue-metadata.py

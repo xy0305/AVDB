@@ -171,6 +171,8 @@ enum DetailPosterResolver {
             guard !Task.isCancelled,
                   let winner = DetailPosterQuality.winner(decoded.map(\.quality)),
                   let selected = decoded.first(where: { $0.quality.source == winner.source }) else { return nil }
+            // Tip list grids with the verified HQ URL (Amazon/DMM/MGS/Tenhow).
+            ListHQCoverCache.store(number: movie.number, source: winner.source)
             // No intermediate publication. The winner cache, not ImageLoader's
             // independently downsampled source cache, is the only warm fast path.
             return await artwork(image: selected.image, source: winner.source, derive: false)

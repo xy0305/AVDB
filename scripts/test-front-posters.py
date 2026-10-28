@@ -78,6 +78,10 @@ assert 'kCGImageSourceCreateThumbnailWithTransform: true' in source
 assert 'posterCache.totalCostLimit = 48 * 1024 * 1024' in source
 assert 'posterInFlight[key]' in source
 assert 'contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original' in source
+assert 'ListCoverPolicy.sources(movie: movie)' in source
+assert 'secondFallbackURL: sources.dropFirst(2).first' in source
+assert 'ListHQCoverCache.store(number: movie.number, source: winner.source)' in (root/'AVDB/Services/DetailPosterResolver.swift').read_text()
+assert 'awsimgsrc.dmm.co.jp' in source  # list HQ NOW-thumb reject on AWS CDN too
 assert 'FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)' in source
 assert 'landscapeFallback = landscapeFallback ?? (img, candidate)' in source
 assert 'publish(landscapeFallback.image, identity: identity, source: landscapeFallback.source)' in source

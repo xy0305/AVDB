@@ -366,7 +366,10 @@ public actor ImageLoader {
     }
 
     private static func isExternalCover(_ urlString: String) -> Bool {
-        urlString.contains("pics.dmm.co.jp") || urlString.contains("image.mgstage.com")
+        // Include AWS DMM CDN so NOW placeholders (147×200) fail fast on list HQ tries.
+        urlString.contains("pics.dmm.co.jp")
+            || urlString.contains("awsimgsrc.dmm.co.jp")
+            || urlString.contains("image.mgstage.com")
     }
 
     /// 判断是否为 App 专用加密 CDN（tp.spfcas.com）
@@ -604,6 +607,84 @@ public struct JavDBImage: View {
     }
 }
 
+/// Memory-only HQ URL tips learned from detail poster wins.
+/// List reads synchronously; never triggers Tenhow/Amazon discovery itself.
+enum ListHQCoverCache {
+    private static let lock = NSLock()
+    private static var urls: [String: String] = [:]
+    private static let capacity = 256
+
+    static func key(_ number: String) -> String? {
+        let trimmed = number.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    static func url(for number: String?) -> String? {
+        guard let number, let key = key(number) else { return nil }
+        lock.lock(); defer { lock.unlock() }
+        return urls[key]
+    }
+
+    static func store(number: String?, source: String) {
+        guard let number, let key = key(number),
+              let parsed = URL(string: source), isHQHost(parsed) else { return }
+        lock.lock(); defer { lock.unlock() }
+        if urls[key] == nil, urls.count >= capacity, let oldest = urls.keys.first {
+            urls[oldest] = nil
+        }
+        urls[key] = source
+    }
+
+    static func isHQHost(_ url: URL) -> Bool {
+        switch url.host?.lowercased() {
+        case "m.media-amazon.com", "images-na.ssl-images-amazon.com",
+             "pics.dmm.co.jp", "awsimgsrc.dmm.co.jp",
+             "image.mgstage.com", "www.tenhow.net":
+            return true
+        default:
+            return false
+        }
+    }
+
+    #if DEBUG
+    static func resetForTests() {
+        lock.lock(); defer { lock.unlock() }
+        urls.removeAll()
+    }
+    #endif
+}
+
+/// List thumbnails: HQ first (resolved Amazon/DMM/MGS / catalogue), then JavDB.
+/// No per-row Tenhow scrape; ImageLoader rejects DMM NOW thumbs and falls back.
+public enum ListCoverPolicy {
+    public static func sources(movie: Movie) -> [String] {
+        let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
+        let javdb = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
+        var result: [String] = []
+        func append(_ value: String?) {
+            guard let value else { return }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !result.contains(trimmed) else { return }
+            result.append(trimmed)
+        }
+        if !original {
+            append(ListHQCoverCache.url(for: movie.number))
+            for image in movie.catalogueMetadata?.images ?? [] {
+                guard let url = URL(string: image) else { continue }
+                if DetailPosterPolicy.allowedPublicImage(url)
+                    || AmazonPoster.allowedImage(url)
+                    || TenhowPoster.allowedImage(url) {
+                    append(image)
+                }
+            }
+            // One guessed public portrait only — keeps list request budget small.
+            append(DetailPosterPolicy.candidates(number: movie.number).first)
+        }
+        for source in javdb { append(source) }
+        return result
+    }
+}
+
 /// Shared by all movie lists; no gestures or detail fetches.
 public struct MoviePosterImage: View {
     let movie: Movie
@@ -611,8 +692,11 @@ public struct MoviePosterImage: View {
 
     public var body: some View {
         let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
-        let sources = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
-        JavDBImage(url: sources.first, fallbackURL: sources.dropFirst().first,
+        // HQ (Amazon MAIN._SCRM_ / DMM / MGS / detail tip) first; JavDB cover/thumb last.
+        let sources = ListCoverPolicy.sources(movie: movie)
+        JavDBImage(url: sources.first,
+                   fallbackURL: sources.dropFirst().first,
+                   secondFallbackURL: sources.dropFirst(2).first,
                    contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original)
     }
 }
