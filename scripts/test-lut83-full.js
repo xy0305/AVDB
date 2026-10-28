@@ -20,3 +20,7 @@ const sample=fixtures[0].a;
 const a=Desktop83.analyze(Array(24).fill(sample));assert.equal(a.frames,24);assert.equal(a.pixels.length,1440);
 assert(Desktop83.select(Array(400).fill(0),10,10,null).length===0);
 console.log(JSON.stringify({passed:true,oracleFixtures:fixtures.length,reports},null,2));
+
+let raster=Array(64*48*4).fill(128);for(let y=12;y<28;y++)for(let x=24;x<40;x++){let i=(y*64+x)*4;raster[i]=153;raster[i+1]=115;raster[i+2]=102;raster[i+3]=255;}
+assert(Desktop83.select(raster,64,48,null,true).length>=50,'actual HSV/morphology/8-connected component fallback');
+console.log('PASS independently implemented HSV, opening/closing and scored connected component selection');

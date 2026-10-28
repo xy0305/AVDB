@@ -90,7 +90,7 @@ struct LUTArchive: Codable, Equatable {
             guard seenSize, a.count == 3, a.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 1 }), data.count < n*n*n*4 else { throw LUTError.invalid("无效或越界的 RGB 数据（不支持 1D/混合 CUBE）") }
             data.append(contentsOf: a); data.append(1)
         }
-        guard seenSize, data.count == n*n*n*4, (0..<3).allSatisfy({ hi[$0] > lo[$0] }) else { throw LUTError.invalid("CUBE 维数/条目/DOMAIN 不匹配") }
+        guard seenSize, data.count == n*n*n*4, (0..<3).allSatisfy({ hi[$0]-lo[$0] >= 0.000001 }) else { throw LUTError.invalid("CUBE 维数/条目/DOMAIN 不匹配") }
         return LUTArchive(size: n, rgba: data.withUnsafeBytes { Data($0) }, domainMin: lo, domainMax: hi, recipe: metadata.count == 7 ? (0..<7).map { metadata[$0]! } : nil, recipeFaithful: recipeMode)
     }
     func text() -> String {
@@ -167,7 +167,7 @@ extension NativeLUT {
             // Same raster sent to model and sampler, not an independently flipped buffer.
             guard let provider = CGDataProvider(data: Data(bytes) as CFData), let raster = CGImage(width: w,height: h,bitsPerComponent: 8,bitsPerPixel: 32,bytesPerRow: w*4,space: CGColorSpace(name: CGColorSpace.sRGB)!,bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),provider: provider,decode: nil,shouldInterpolate: false,intent: .defaultIntent) else { continue }
             let detection = OriginalFaceLandmarker.shared.region(image: raster); detectionText = detection.description
-            let args: [Any] = [bytes,w,h,detection.box as Any? ?? NSNull()]
+            let args: [Any] = [bytes,w,h,detection.box as Any? ?? NSNull(),faithful]
             if let a = ctx.objectForKeyedSubscript("Desktop83")?.objectForKeyedSubscript("select")?.call(withArguments: args)?.toArray() as? [[NSNumber]] { samples.append(a.map { $0.map(\.doubleValue) }) }
             if !faithful, let p = analyze(bytes: bytes,width: w,height: h,box: detection.box) { safe.append(p.0.values) }
         }
@@ -185,7 +185,7 @@ extension NativeLUT {
         guard let ctx = engine(), !pixels.isEmpty else { return nil }
         ctx.setObject(pixels, forKeyedSubscript: "samplePixels" as NSString)
         ctx.setObject(p.values, forKeyedSubscript: "sampleParams" as NSString)
-        let script = faithful ? "Desktop83.stats(samplePixels.map(x=>Desktop83.pixel(x,sampleParams,true)))" : "Object.values(OriginalLUT.sampleSkinStats(OriginalLUT.applyParamsToSkinArray(samplePixels.flat(),{temp:sampleParams[0],tint:sampleParams[1],sat:sampleParams[2],bright:sampleParams[3],contrast:sampleParams[4],highlight:sampleParams[5],shadow:sampleParams[6]})))"
+        let script = faithful ? "Desktop83.stats(samplePixels.map(x=>Desktop83.pixel(x,sampleParams,true)))" : "(()=>{let a=OriginalLUT.applyParamsToSkinArray(samplePixels.flat(),{temp:sampleParams[0],tint:sampleParams[1],sat:sampleParams[2],bright:sampleParams[3],contrast:sampleParams[4],highlight:sampleParams[5],shadow:sampleParams[6]});return Desktop83.stats(Array.from({length:a.length/3},(_,i)=>[a[i*3],a[i*3+1],a[i*3+2]]));})()"
         return ctx.evaluateScript(script)?.toArray() as? [Double]
     }
 }
@@ -260,7 +260,7 @@ final class NativeLUTController: ObservableObject {
         previewTask?.cancel()
         guard previewFrames.indices.contains(previewIndex) else { return }
         let frame = previewFrames[previewIndex], params = parameters, mode = faithful, imported = importedCube
-        previewOriginal = UIImage(cgImage:frame.image)
+        previewOriginal = UIImage(cgImage:frame.image); previewProcessed = nil
         previewTask = Task { [weak self] in
             do { try await Task.sleep(nanoseconds:200_000_000) } catch { return }
             let cg = await Task.detached(priority:.userInitiated) { () -> CGImage? in
@@ -329,22 +329,28 @@ final class NativeLUTController: ObservableObject {
                     for frame in 0..<24 {
                         guard revision == workRevision, !Task.isCancelled else { return }
                         guard skip == skipRevision, ProcessInfo.processInfo.systemUptime-start < 20 else { break }
-                        if let (cg,_) = try? await generator.image(at:CMTime(seconds:duration*(0.05+0.9*(Double(frame)+0.5)/24),preferredTimescale:600)) { frames.append(LUTFrame(image:cg)) }
+                        let decoded = try? await generator.image(at:CMTime(seconds:duration*(0.05+0.9*(Double(frame)+0.5)/24),preferredTimescale:600))
+                        guard revision == workRevision, !Task.isCancelled else { return }
+                        guard skip == skipRevision else { break }
+                        if let (cg,_) = decoded { frames.append(LUTFrame(image:cg)) }
                         sampleProgress = (Double(index)+Double(frame+1)/24)/Double(urls.count)
                     }
                     guard skip == skipRevision else { batchLog += "\n\(index+1): 已跳过"; continue }
                     let worker = Task.detached(priority:.userInitiated) { NativeLUT.fullAnalyze(frames,faithful:mode) }; sampleWorker = worker
-                    guard let result = await worker.value else { batchLog += "\n\(index+1): 无有效肤色/采样失败"; continue }
+                    let candidate = await worker.value
                     guard revision == workRevision, !Task.isCancelled else { return }
+                    guard let result = candidate else { batchLog += "\n\(index+1): 无有效肤色/采样失败"; continue }
                     guard skip == skipRevision else { batchLog += "\n\(index+1): 已跳过"; continue }
                     let archive = await Task.detached { () -> LUTArchive? in
                         guard let data = NativeLUT.bake(result.parameters,faithful:mode,size:size) else { return nil }
                         return LUTArchive(size:size,rgba:data,recipe:result.parameters.values,recipeFaithful:mode)
                     }.value
-                    guard revision == workRevision, !Task.isCancelled, let archive else { return }
+                    guard revision == workRevision, !Task.isCancelled else { return }
+                    guard let archive else { batchLog += "\n\(index+1): 烘焙失败"; continue }
                     guard skip == skipRevision else { batchLog += "\n\(index+1): 已跳过"; continue }
                     let text = await Task.detached { archive.text() }.value
                     guard revision == workRevision, !Task.isCancelled else { return }
+                    guard skip == skipRevision else { batchLog += "\n\(index+1): 已跳过"; continue }
                     let output = directory.appendingPathComponent(String(format:"%03d-",index+1)+url.deletingPathExtension().lastPathComponent+".cube")
                     try text.write(to:output,atomically:true,encoding:.utf8); batchOutputs.append(output)
                     if associate, let p = presetFile(for:url) {
@@ -352,7 +358,7 @@ final class NativeLUTController: ObservableObject {
                         try JSONEncoder().encode(LUTPreset(values:result.parameters.values,faithful:mode,cube:nil)).write(to:p,options:.atomic)
                     }
                     batchLog += "\n\(index+1): 成功 \(result.summary)"
-                } catch { batchLog += "\n\(index+1): \(error.localizedDescription)" }
+                } catch { guard revision == workRevision, !Task.isCancelled else { return }; batchLog += "\n\(index+1): \(error.localizedDescription)" }
             }
             guard revision == workRevision, !Task.isCancelled else { return }
             batchRunning = false; sampling = false; sampleProgress = 1; imageGenerator = nil
@@ -395,7 +401,7 @@ final class NativeLUTController: ObservableObject {
     func switchMode(_ next: Bool) {
         cancelSampling(); buildGeneration += 1; buildTask?.cancel(); faithful = next; importedCube = nil; cachedCube = nil; cachedParameters = nil
         parameters = LUTParameters(); predicted = parameters; statisticsBefore = []; statisticsAfter = []
-        samplePixels = []; enabled = false; item?.videoComposition = original
+        samplePixels = []; enabled = false; item?.videoComposition = original; refreshPreview()
         status = next ? "v8.3 原版数值：使用桌面模板/0.67亮度/0.57对比度/0.92过曝阈值；不等同267保护模式" : "267 保护模式：保留中性肤色、近白及有界安全搜索"
     }
     func cancelSampling() {
@@ -410,7 +416,7 @@ final class NativeLUTController: ObservableObject {
         sampling = false; busy = false; sampleTimeout?.cancel(); imageGenerator = nil; decodedFrames = []
         guard let result else { status = "没有足够有效肤色数据；未自动套用默认模板，可手动调参或导入 CUBE"; return }
         parameters = result.parameters; predicted = parameters; importedCube = nil
-        statisticsBefore = result.info; samplePixels = result.pixels; statisticsAfter = result.after
+        statisticsBefore = result.info; samplePixels = result.pixels; statisticsAfter = faithful ? result.after : []
         enabled = true; sampleProgress = 1; apply(); refreshStatistics(); status = result.summary
     }
     private func finishFrames(_ frames: [LUTFrame], revision: Int, source: Int) {
@@ -452,7 +458,9 @@ final class NativeLUTController: ObservableObject {
                     try Task.checkCancellation()
                     guard revision == workRevision, source == generation else { return }
                     let time = duration * (0.05 + 0.9*(Double(i)+0.5)/24)
-                    if let (cg, _) = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600)) { frames.append(LUTFrame(image: cg)) }
+                    let decoded = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600))
+                    guard revision == workRevision, source == generation, !Task.isCancelled else { return }
+                    if let (cg,_) = decoded { frames.append(LUTFrame(image:cg)) }
                     sampleProgress = Double(i+1)/24
                 }
                 guard revision == workRevision, source == generation, !Task.isCancelled else { return }
@@ -474,8 +482,12 @@ final class NativeLUTController: ObservableObject {
                 guard revision == workRevision, !Task.isCancelled else { return }
                 let access = url.startAccessingSecurityScopedResource()
                 defer { if access { url.stopAccessingSecurityScopedResource() } }
-                if let src = CGImageSourceCreateWithURL(url as CFURL, nil),
-                   let cg = CGImageSourceCreateThumbnailAtIndex(src,0,[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:640,kCGImageSourceCreateThumbnailWithTransform:true] as CFDictionary) { frames.append(LUTFrame(image:cg)) }
+                let cg = await Task.detached(priority:.userInitiated) { () -> CGImage? in
+                    guard let src = CGImageSourceCreateWithURL(url as CFURL,nil) else { return nil }
+                    return CGImageSourceCreateThumbnailAtIndex(src,0,[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:640,kCGImageSourceCreateThumbnailWithTransform:true] as CFDictionary)
+                }.value
+                guard revision == workRevision, !Task.isCancelled else { return }
+                if let cg { frames.append(LUTFrame(image:cg)) }
                 sampleProgress = Double(index+1)/Double(min(24,urls.count))
             }
             guard revision == workRevision, !Task.isCancelled else { return }
@@ -557,7 +569,7 @@ final class NativeLUTController: ObservableObject {
         if let c = preset.cube {
             guard (2...65).contains(c.size), c.rgba.count == c.size*c.size*c.size*16, c.domainMin.count == 3, c.domainMax.count == 3,
                   c.domainMin.allSatisfy({ $0.isFinite && abs($0)<=16 }),c.domainMax.allSatisfy({ $0.isFinite && abs($0)<=16 }),
-                  (0..<3).allSatisfy({ c.domainMax[$0]>c.domainMin[$0] }),
+                  (0..<3).allSatisfy({ c.domainMax[$0]-c.domainMin[$0]>=0.000001 }),
                   c.rgba.withUnsafeBytes({ $0.bindMemory(to:Float.self).allSatisfy({ $0.isFinite && $0>=0 && $0<=1 }) }) else { return }
         }
         cancelSampling(); faithful = preset.faithful; parameters = LUTParameters(values:preset.values)
@@ -568,7 +580,7 @@ final class NativeLUTController: ObservableObject {
         status = universal ? "已删除通用 LUT" : "已删除当前素材关联"
     }
     func clearAllPresets() {
-        cancelSampling(); statsRevision += 1; statsTask?.cancel(); previewRevision += 1; previewTask?.cancel()
+        cancelSampling(); statsRevision += 1; statsTask?.cancel(); previewRevision += 1; previewTask?.cancel(); exportRevision += 1; exportTask?.cancel()
         if let url = universalPresetURL?.deletingLastPathComponent() { try? FileManager.default.removeItem(at:url) }
         previewFrames = []; previewOriginal = nil; previewProcessed = nil; previewCount = 0
         exportedURL = nil; samplePixels = []; statisticsBefore = []; statisticsAfter = []; status = "已清除全部本地预设与分析统计；源图从未保存"
@@ -878,7 +890,13 @@ private final class OriginalFaceLandmarker: @unchecked Sendable {
                 }
                 let options = FaceLandmarkerOptions()
                 options.baseOptions.modelAssetPath = path
+                #if targetEnvironment(simulator)
+                // Tasks 0.10.14 Metal delegate is not a reliable simulator target.
+                // Run the real bundled model on CPU, never a fake landmark stub.
+                options.baseOptions.delegate = .CPU
+                #else
                 options.baseOptions.delegate = .GPU
+                #endif
                 options.runningMode = .video
                 options.numFaces = 1
                 options.minFaceDetectionConfidence = 0.3
@@ -893,7 +911,7 @@ private final class OriginalFaceLandmarker: @unchecked Sendable {
             let input = try MPImage(uiImage: UIImage(cgImage: image, scale: 1, orientation: .up))
             let result = try task!.detect(videoFrame: input, timestampInMilliseconds: timestamp)
             guard let landmarks = result.faceLandmarks.first, !landmarks.isEmpty else {
-                return (nil, "全画面回退（MediaPipe 未检测到人脸）")
+                return (nil, "全画面回退（MediaPipe VIDEO 真模型未检测到人脸；模拟器CPU/真机GPU）")
             }
             let box = OriginalLandmarkGeometry.region(faces: [landmarks.map { [Double($0.x), Double($0.y)] }], width: image.width, height: image.height)
             return (box, "MediaPipe 第一人脸关键点 ROI")
@@ -912,6 +930,13 @@ struct NativeLUTPanel: View {
     @State private var pickVideos = false
     @State private var shareBatch = false
     @ViewBuilder private var fullSections: some View {
+        queueSection
+        previewSection
+        analysisSection
+        cubeSection
+        statisticsSection
+    }
+    private var queueSection: some View {
             Section("本地视频批量生成") {
                 Button("添加本地视频 / 文件夹") { pickVideos = true }
                 ForEach(Array(model.videoQueue.enumerated()), id: \.offset) { index,url in
@@ -926,6 +951,8 @@ struct NativeLUTPanel: View {
                 Text(model.batchLog).font(.caption)
                 if !model.batchOutputs.isEmpty { Button("分享所有生成的 CUBE") { shareBatch = true } }
             }
+    }
+    private var previewSection: some View {
             Section("离线同帧预览 · 仅 LUT，不含增强/强度混合") {
                 HStack {
                     if let image = model.previewOriginal { VStack { Text("原图"); Image(uiImage:image).resizable().scaledToFit() } }
@@ -937,6 +964,8 @@ struct NativeLUTPanel: View {
                 }
                 Text("最多保留10个640像素级预览帧在内存；重置/离开素材后清除，不上传。") .font(.caption)
             }
+    }
+    private var analysisSection: some View {
             Section("v8.3 完整数值与分析") {
                 Picker("数值模式", selection: Binding(get: { model.faithful }, set: { model.switchMode($0) })) {
                     Text("267 保护模式").tag(false)
@@ -952,6 +981,8 @@ struct NativeLUTPanel: View {
                 Text("仅处理显式选择的图片或当前本地素材。图片不保存、不上传；统计只在内存。原版的“四图校准”是内置目标区间来源，不是原版可导入四图按钮；此处多图是新增离线分析入口。网络流不随机抓帧、不新增流下载；HLS composition 与 HDR 仍禁用。")
                     .font(.caption).foregroundStyle(.secondary)
             }
+    }
+    private var cubeSection: some View {
             Section("CUBE / 本地自动关联") {
                 Button("导入已有 .cube") { pickCube = true }
                 Picker("新导出维数", selection: $model.exportSize) { Text("33³（推荐）").tag(33); Text("65³（更大）").tag(65) }
@@ -970,8 +1001,10 @@ struct NativeLUTPanel: View {
                 Text("等效桌面Lua自动加载与 / 键切换：App本地关联优先于通用预设；开启/关闭LUT按钮切换。不安装MPV、不改播放器下载参数。保存预设只含参数/CUBE及素材URL的SHA256键，不含源图。")
                     .font(.caption).foregroundStyle(.secondary)
             }
+    }
+    private var statisticsSection: some View {
             Section("分析前后数值 / delta") {
-                Text("肤色/ROI样本的统计预览，不等同全画面像素统计。外部CUBE不伪造参数统计。")
+                Text("肤色/ROI样本统计（高光>0.8、阴影<0.2），不等同全画面像素统计。外部CUBE不伪造参数统计。")
                     .font(.caption)
                 ForEach(0..<min(model.statisticsBefore.count, model.statisticsAfter.count), id: \.self) { i in
                     let names = ["R/B", "R/G", "亮度", "饱和度", "对比度 σ", "高光占比", "阴影占比"]

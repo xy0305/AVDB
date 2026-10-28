@@ -1608,18 +1608,51 @@ function stats(a){
  return [mean[2]>1e-6?mean[0]/mean[2]:1,mean[1]>1e-6?mean[0]/mean[1]:1,lum(mean),sat/a.length,Math.sqrt(ls.reduce((s,x)=>s+(x-avg)**2,0)/ls.length),hl/a.length,sh/a.length];
 }
 function thin(a,n){if(a.length<=n)return a.slice();return Array.from({length:n},(_,i)=>a[Math.floor(i*a.length/n)]);}
-function select(bytes,w,h,box){
+function skinComponent(bytes,w,h){
+ const gw=Math.ceil(w/2),gh=Math.ceil(h/2),n=gw*gh;let mask=new Uint8Array(n),offsets=[];
+ // Independent binary opening/closing with a 5x5 ellipse, on bounded half-resolution grid.
+ for(let y=-2;y<=2;y++)for(let x=-2;x<=2;x++)if(Math.abs(y)!==2||x===0)offsets.push([x,y]);
+ for(let y=0;y<gh;y++)for(let x=0;x<gw;x++){
+  let i=((y*2)*w+x*2)*4,r=bytes[i],g=bytes[i+1],b=bytes[i+2],Y=.299*r+.587*g+.114*b,cr=(r-Y)*.713+128,cb=(b-Y)*.564+128,max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+  let H=d===0?0:max===r?((g-b)/d+6)%6:max===g?(b-r)/d+2:(r-g)/d+4;
+  H*=30; // OpenCV's byte HSV hue uses 0..179, not degrees 0..359.
+  let S=max?d/max*255:0;
+  mask[y*gw+x]=cr>=120&&cr<=180&&cb>=70&&cb<=135&&H<=25&&S>=30&&S<=200&&max>=50?1:0;
+ }
+ function morph(a,dilate){let out=new Uint8Array(n);for(let y=0;y<gh;y++)for(let x=0;x<gw;x++){
+  let value=dilate?0:1;
+  for(let [dx,dy] of offsets){let xx=x+dx,yy=y+dy;if(xx<0||xx>=gw||yy<0||yy>=gh)continue;let v=a[yy*gw+xx];if(dilate?v:!v){value=dilate?1:0;break;}}
+  out[y*gw+x]=value;
+ }return out;}
+ mask=morph(morph(morph(morph(mask,false),true),true),false);
+ let visited=new Uint8Array(n),best=[],score=-Infinity;
+ for(let start=0;start<n;start++)if(mask[start]&&!visited[start]){
+  let list=[start],head=0,xlo=gw,xhi=0,ylo=gh,yhi=0,sumY=0;visited[start]=1;
+  while(head<list.length){let i=list[head++],x=i%gw,y=Math.floor(i/gw);xlo=Math.min(xlo,x);xhi=Math.max(xhi,x);ylo=Math.min(ylo,y);yhi=Math.max(yhi,y);sumY+=y;
+   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){let xx=x+dx,yy=y+dy;if(xx<0||xx>=gw||yy<0||yy>=gh)continue;let q=yy*gw+xx;if(mask[q]&&!visited[q]){visited[q]=1;list.push(q);}}
+  }
+  let area=list.length,ratio=area/n,aspect=(xhi-xlo+1)/(yhi-ylo+1);
+  if(area*4<50||ratio>.30||aspect<.4||aspect>2.5)continue;
+  let value=1-Math.abs(sumY/area/gh-.4)-Math.abs(ratio-.08)*5;
+  if(value>score){score=value;best=list;}
+ }
+ return new Set(best);
+}
+
+function select(bytes,w,h,box,strict){
  let all=[],face=[],fallback=[];
  for(let y=0;y<h;y+=2)for(let x=0;x<w;x+=2){let i=(y*w+x)*4,r=bytes[i],g=bytes[i+1],b=bytes[i+2],v=[r/255,g/255,b/255];all.push(v);
  if(lum(v)>=.8)continue;
  if(box && x>=box.x1 && x<box.x2 && y>=box.y1 && y<box.y2)face.push(v);
  let Y=.299*r+.587*g+.114*b,cr=(r-Y)*.713+128,cb=(b-Y)*.564+128;
- if(cr>=120&&cr<=180&&cb>=70&&cb<=135)fallback.push(v);
+ if(cr>=120&&cr<=180&&cb>=70&&cb<=135)fallback.push({v,index:Math.floor(y/2)*Math.ceil(w/2)+Math.floor(x/2)});
  }
  let l=all.length?lum(all.reduce((s,x)=>s.map((v,i)=>v+x[i]/all.length),[0,0,0])):0;
  if(l<.05||l>.95)return [];
  // Desktop does not threshold a detected face crop. Explicit mobile fallback if absent.
- return thin(face.length>=50?face:fallback,2000);
+ if(face.length>=50)return thin(face,2000);
+ const region=strict?skinComponent(bytes,w,h):null;
+ return thin(fallback.filter(x=>!region||region.has(x.index)).map(x=>x.v),2000);
 }
 function choose(frames){
  let a=frames.filter(a=>a.length>=50).map(a=>({a,s:stats(a)}));if(!a.length)return null;

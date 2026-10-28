@@ -36,13 +36,24 @@ subprocess.run(['xcrun','simctl','bootstatus',device['udid'],'-b'],check=True)
 subprocess.run(['xcodebuild','build','-workspace',str(d/'LUT83.xcworkspace'),'-scheme','LUT83','-destination','platform=iOS Simulator,id='+device['udid'],'-derivedDataPath',str(d/'Derived'),'CODE_SIGNING_ALLOWED=NO'],check=True)
 app=d/'Derived/Build/Products/Debug-iphonesimulator/LUT83.app'
 subprocess.run(['xcrun','simctl','install',device['udid'],str(app)],check=True)
-subprocess.run(['xcrun','simctl','launch',device['udid'],'org.avdb.lut83neutral'],check=True)
+console=open(d/'app-console.log','w');launcher=subprocess.Popen(['xcrun','simctl','launch','--console-pty',device['udid'],'org.avdb.lut83neutral'],stdout=console,stderr=subprocess.STDOUT)
 container=Path(subprocess.check_output(['xcrun','simctl','get_app_container',device['udid'],'org.avdb.lut83neutral','data'],text=True).strip())
 result=container/'Documents/result.json'
-for _ in range(120):
+for _ in range(240):
  if result.exists():break
  time.sleep(1)
-assert result.exists(),'No completion file; app crash or timeout'
+progress=container/'Documents/progress.txt'
+if progress.exists():print('Last fixture stage:',progress.read_text())
+subprocess.run(["xcrun","simctl","io",device["udid"],"screenshot",str(d/"native-panel.png")])
+if not result.exists():
+ try:
+  with open(d/'simulator-runtime.log','w') as log:
+   subprocess.run(['xcrun','simctl','spawn',device['udid'],'log','show','--last','5m','--style','compact','--predicate','process == "LUT83"'],stdout=log,stderr=subprocess.STDOUT,timeout=30)
+ except subprocess.TimeoutExpired:pass
+ for report in (Path.home()/'Library/Logs/DiagnosticReports').glob('LUT83*'):
+  if report.is_file():(d/'crash.log').write_text(report.read_text(errors='replace')[:200000])
+assert result.exists(),'No completion file; app crash or timeout; see app-console/runtime/crash logs'
+
 o=json.loads(result.read_text());o['device']=device
 (d/'result.json').write_text(json.dumps(o,indent=2));print(json.dumps(o,indent=2));assert o['passed']
 

@@ -2,6 +2,7 @@ import SwiftUI
 import AVFoundation
 import CoreImage
 import JavaScriptCore
+import UIKit
 
 // Only KSPlayer transport is stubbed. Production MediaPipe GPU/VIDEO is invoked on its dedicated thread.
 final class KSAVPlayer { let player: AVPlayer; init(_ player: AVPlayer) { self.player = player } }
@@ -16,7 +17,9 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
         var checks = [String]()
         var inferenceSummary = "NOT RUN"
         let output = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("result.json")
+        func mark(_ stage:String) { try? stage.write(to:output.deletingLastPathComponent().appendingPathComponent("progress.txt"),atomically:true,encoding:.utf8) }
         do {
+            mark("basic cube")
             let zero = LUTParameters()
             let cube = NativeLUT.cube(zero)!
             try require(cube.count == 33*33*33*4*4, "cube size")
@@ -41,17 +44,21 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
                 do { _ = try LUTArchive.parse(bad); throw FixtureFailure(message:"accepted invalid cube") }
                 catch is LUTError { }
             }
-            let skin = CIImage(color:CIColor(red:0.6,green:0.45,blue:0.4)).cropped(to:CGRect(x:0,y:0,width:64,height:48))
+            let backdrop = CIImage(color:CIColor(red:0.5,green:0.5,blue:0.5)).cropped(to:CGRect(x:0,y:0,width:64,height:48))
+            let skin = CIImage(color:CIColor(red:0.6,green:0.45,blue:0.4)).cropped(to:CGRect(x:24,y:12,width:16,height:16)).composited(over:backdrop)
             let skinCG = ci.createCGImage(skin,from:skin.extent,format:.RGBA8,colorSpace:cs)!
+            mark("real MediaPipe VIDEO model")
             let full = await Task.detached { NativeLUT.fullAnalyze([LUTFrame(image:skinCG)],faithful:true) }.value
             try require(full != nil,"full numeric pipeline with real MediaPipe attempt")
             inferenceSummary = full!.summary
+            mark("faithful cube")
             let faithfulCube = NativeLUT.bake(full!.parameters,faithful:true)!
             try require(faithfulCube.count == cube.count,"faithful cube")
             let zero65 = NativeLUT.bake(zero,faithful:true,size:65)!
             try require(zero65.count == 65*65*65*16,"65 cube")
             checks.append("CUBE roundtrip/domain; malformed/NaN/unsupported rejection; real production GPU VIDEO model attempt; full prediction; 65 cube")
             // Generate a tiny local neutral SDR file. No URLSession, network or source adapter.
+            mark("local movie")
             let movie = output.deletingLastPathComponent().appendingPathComponent("neutral.mov")
             try? FileManager.default.removeItem(at:movie)
             let writer = try AVAssetWriter(outputURL:movie,fileType:.mov)
@@ -64,12 +71,13 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
                 CVPixelBufferPoolCreatePixelBuffer(nil,adaptor.pixelBufferPool!,&buffer)
                 CVPixelBufferLockBaseAddress(buffer!,[])
                 let raw = CVPixelBufferGetBaseAddress(buffer!)!.assumingMemoryBound(to:UInt8.self)
-                for y in 0..<48 { for x in 0..<64 { let i=y*CVPixelBufferGetBytesPerRow(buffer!)+x*4;raw[i]=102;raw[i+1]=115;raw[i+2]=153;raw[i+3]=255 } }
+                for y in 0..<48 { for x in 0..<64 { let i=y*CVPixelBufferGetBytesPerRow(buffer!)+x*4;let patch = (24..<40).contains(x) && (12..<28).contains(y);raw[i]=patch ? 102:128;raw[i+1]=patch ? 115:128;raw[i+2]=patch ? 153:128;raw[i+3]=255 } }
                 CVPixelBufferUnlockBaseAddress(buffer!,[])
                 try require(adaptor.append(buffer!,withPresentationTime:CMTime(value:Int64(frame),timescale:6)),"append local frame")
             }
             input.markAsFinished();await writer.finishWriting()
             try require(writer.status == .completed,"local asset writer")
+            mark("controller format/cache")
             let bridge = KSAVPlayer(AVPlayer(url:movie))
             let controller = NativeLUTController()
             controller.tick(bridge)
@@ -99,6 +107,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
             controller.tick(bridge)
             for _ in 0..<100 { if controller.supported { break }; try await Task.sleep(nanoseconds:100_000_000) }
             controller.faithful = true
+            mark("local bounded sampler")
             controller.sampleLocalAsset()
             try await Task.sleep(nanoseconds:50_000_000)
             controller.cancelSampling()
@@ -116,6 +125,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
             controller.manualChange(0,7);try require(controller.parameters.values[0]==7,"manual parameter")
             controller.predicted=full!.parameters;controller.restorePrediction()
             try require(controller.parameters==full!.parameters,"restore prediction")
+            mark("export import")
             controller.exportCube()
             for _ in 0..<100 { if controller.exportedURL != nil { break }; try await Task.sleep(nanoseconds:100_000_000) }
             try require(controller.exportedURL != nil,"file export")
@@ -124,17 +134,40 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) throws {
             try require(controller.status.hasPrefix("已导入"),"file import: \(controller.status)")
             try require(controller.parameters == full!.parameters,"CUBE recipe reimport")
             try require(controller.previewCount>0,"bounded preview frames")
+            mark("domain and image preview")
+            let domainURL = movie.deletingLastPathComponent().appendingPathComponent("domain.cube")
+            try LUTArchive(size:33,rgba:cube,domainMin:[0,0,0],domainMax:[2,2,2]).text().write(to:domainURL,atomically:true,encoding:.utf8)
+            controller.importCube(domainURL)
+            for _ in 0..<100 { if controller.status.hasPrefix("已导入") { break }; try await Task.sleep(nanoseconds:100_000_000) }
+            try await Task.sleep(nanoseconds:2_000_000_000)
+            try require(controller.previewOriginal != nil && controller.previewProcessed != nil,"actual preview rendering")
+            func sample(_ image:UIImage) -> [Float] {
+                let cg = image.cgImage!, frame = CIImage(cgImage:cg), rect = CGRect(x:0,y:0,width:1,height:1)
+                var values=[Float](repeating:0,count:4)
+                values.withUnsafeMutableBytes { ci.render(frame,toBitmap:$0.baseAddress!,rowBytes:16,bounds:rect,format:.RGBAf,colorSpace:cs) }
+                return values
+            }
+            let srcPixel = sample(controller.previewOriginal!), dstPixel = sample(controller.previewProcessed!)
+            for channel in 0..<3 { try require(abs(dstPixel[channel]-srcPixel[channel]/2)<0.02,"actual non-unit CUBE domain render") }
+            let picture = movie.deletingLastPathComponent().appendingPathComponent("neutral.png")
+            try UIImage(cgImage:skinCG).pngData()!.write(to:picture)
+            controller.importMedia([picture,picture])
+            for _ in 0..<100 { if !controller.sampling { break }; try await Task.sleep(nanoseconds:100_000_000) }
+            try require(controller.previewCount==2 && controller.sampleProgress==1,"actual file-picker image pipeline")
+            checks.append("actual nonlinear non-unit CUBE DOMAIN rendered against expected pixel; explicit neutral PNG multi-image analysis")
             controller.addVideos([movie,movie])
             try require(controller.videoQueue.count==1,"queue dedup")
+            mark("batch")
             controller.generateBatch()
             for _ in 0..<400 { if !controller.batchRunning { break }; try await Task.sleep(nanoseconds:100_000_000) }
             try require(controller.batchOutputs.count==1,"batch generation: \(controller.batchLog)")
             controller.changePreview(1)
             controller.clearVideoQueue();try require(controller.videoQueue.isEmpty,"queue clear")
             checks.append("actual 24-time local sample completion; preview memory bounds/flip; batch queue dedup/generate/file output/clear; CUBE recipe comments roundtrip")
+            mark("complete")
             controller.clearAllPresets();controller.reset()
             checks.append("production local finite sampling cancellation; associated/universal preset; manual/restore; actual CUBE file export/import; production NativeLUTPanel rendered")
-            let data = try JSONSerialization.data(withJSONObject:["inferenceSummary":inferenceSummary,"passed":true,"checks":checks,"boundaries":"Production controller/panel/model use compiled and run; only KSPlayer transport stub and bake counter instrumentation. Neutral non-face fixture attempts real GPU VIDEO inference: inspect inferenceSummary for delegate failure vs no-face. Real face accuracy/physical device FPS NOT RUN. Local synthetic media only."],options:[.prettyPrinted,.sortedKeys])
+            let data = try JSONSerialization.data(withJSONObject:["inferenceSummary":inferenceSummary,"passed":true,"checks":checks,"boundaries":"Production controller/panel/model use compiled and run; only KSPlayer transport stub and bake counter instrumentation. Neutral non-face fixture runs real VIDEO model on simulator CPU; physical-device production uses GPU on its dedicated thread. Inspect inferenceSummary for inference failure vs no-face. Real face accuracy/physical device FPS NOT RUN. Local synthetic media only."],options:[.prettyPrinted,.sortedKeys])
             try data.write(to:output)
         } catch {
             let data = try! JSONSerialization.data(withJSONObject:["passed":false,"error":String(describing:error),"checks":checks],options:.prettyPrinted)
