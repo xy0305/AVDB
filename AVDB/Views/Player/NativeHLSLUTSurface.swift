@@ -10,10 +10,13 @@ final class NativeHLSLUTSurface: NSObject {
     let view: MTKView
     private(set) var output: AVPlayerItemVideoOutput?
     var onStatus: ((String) -> Void)?
+    var onSourceCheck: ((Bool, String) -> Void)?
+    var readyForDecodedFrames: Bool { sourceSafe && output != nil }
     var onPresented: ((CMTime) -> Void)?
 #if DEBUG
     // Instrumentation only: the host can append a GPU blit before commit.
     var testEncode: ((MTLTexture, MTLCommandBuffer, CMTime) -> Void)?
+    var testGeometry: (([String: Double]) -> Void)?
 #endif
     private weak var player: AVPlayer?
     private weak var item: AVPlayerItem?
@@ -70,6 +73,19 @@ final class NativeHLSLUTSurface: NSObject {
         link.add(to: .main, forMode: .common); self.link = link
     }
 
+    /// User-triggered single-frame analysis may downsample this buffer separately.
+    /// It shares the output, never creates a second player or CPU frame readback here.
+    func copyDecodedFrameForAnalysis() -> CVPixelBuffer? {
+        guard sourceSafe, let player, let output else { return nil }
+        var pts = CMTime.invalid
+        if let buffer = output.copyPixelBuffer(forItemTime: player.currentTime(), itemTimeForDisplay: &pts) {
+            guard isKnownSDR(buffer) else { lastBuffer = nil; return nil }
+            lastBuffer = buffer; lastPTS = pts; dirty = true
+            return buffer
+        }
+        return lastBuffer
+    }
+
     /// Set nil to show the original layer immediately. No AVVideoComposition on HLS.
     func setFilter(_ value: ((CIImage) -> CIImage)?) {
         generation += 1; filter = value; dirty = true
@@ -115,12 +131,16 @@ final class NativeHLSLUTSurface: NSObject {
             guard let self, let next else { return }
             do {
                 let protected = try await next.asset.load(.hasProtectedContent)
+                try Task.checkCancellation()
+                guard self.item === next else { return }
                 guard !protected else { self.hide("受保护内容使用原画；不绕过 DRM"); return }
                 let tracks = try await next.asset.loadTracks(withMediaType: .video)
                 var preferred = CGAffineTransform.identity
                 if let track = tracks.first {
                     preferred = try await track.load(.preferredTransform)
                     let descriptions = try await track.load(.formatDescriptions)
+                    try Task.checkCancellation()
+                    guard self.item === next else { return }
                     for description in descriptions {
                         let ext = CMFormatDescriptionGetExtensions(description) as NSDictionary?
                         let transfer = ext?[kCMFormatDescriptionExtension_TransferFunction] as? String
@@ -136,6 +156,7 @@ final class NativeHLSLUTSurface: NSObject {
                 self.transform = preferred
                 // Every decoded buffer must still pass the explicit SDR metadata gate.
                 self.sourceSafe = true
+                self.onSourceCheck?(true, "源检查通过；等待明确 SDR 解码帧")
             } catch {
                 guard !Task.isCancelled, self.item === next else { return }
                 self.hide("无法验证源格式/保护状态，使用原画")
@@ -164,7 +185,10 @@ final class NativeHLSLUTSurface: NSObject {
             hide("后台/AirPlay/PiP 原画旁路"); return
         }
         guard let item, item.status == .readyToPlay, sourceSafe, let output, let filter else { return }
-        guard !inFlight else { return }
+        guard !inFlight else {
+            if player.rate != 0 && CACurrentMediaTime() - lastFrameHost > 0.5 { hide("GPU 等待超时，回原画") }
+            return
+        }
         let hostTime = displayLink.targetTimestamp > 0 ? displayLink.targetTimestamp : CACurrentMediaTime()
         let time = output.itemTime(forHostTime: hostTime)
         var pts = CMTime.invalid
@@ -203,7 +227,14 @@ final class NativeHLSLUTSurface: NSObject {
             .concatenating(CGAffineTransform(translationX: x, y: y))
         let bounds = CGRect(origin: .zero, size: size)
         let black = CIImage(color: .black).cropped(to: bounds)
-        let image = filtered.transformed(by: fit).composited(over: black).cropped(to: bounds)
+        let contentRect = CGRect(x: x, y: y, width: extent.width * scale, height: extent.height * scale)
+        let foreground = filtered.transformed(by: fit).cropped(to: contentRect)
+        // Explicit opaque mask: cube filters may map transparent black to opaque RGB.
+        let mask = CIImage(color: .white).cropped(to: contentRect).composited(over: black)
+        let image = foreground.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: black, kCIInputMaskImageKey: mask]).cropped(to: bounds)
+#if DEBUG
+        testGeometry?(["bufferWidth": Double(CVPixelBufferGetWidth(buffer)), "bufferHeight": Double(CVPixelBufferGetHeight(buffer)), "sourceWidth": extent.width, "sourceHeight": extent.height, "drawableWidth": size.width, "drawableHeight": size.height, "fitX": x, "fitY": y, "fitWidth": contentRect.width, "fitHeight": contentRect.height])
+#endif
         context.render(image, to: drawable.texture, commandBuffer: command, bounds: bounds, colorSpace: colorSpace)
 #if DEBUG
         testEncode?(drawable.texture, command, pts)

@@ -22,6 +22,7 @@ final class Host: UIViewController {
     private var pixels: [[UInt8]] = []
     private var pixelPTS: [Double] = []
     private var capture = false
+    private var geometry: [String: Double] = [:]
     private var seekCompleted = false
     private let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
@@ -36,6 +37,7 @@ final class Host: UIViewController {
         guard let runtime = NativeHLSLUTSurface(player: player, container: overlay) else { finish(["passed": false, "error": "No Metal device"]); return }
         self.runtime = runtime
         runtime.onStatus = { [weak self] value in self?.statuses.append(value) }
+        runtime.testGeometry = { [weak self] in self?.geometry = $0 }
         runtime.onPresented = { [weak self] time in self?.pts.append(time.seconds) }
         runtime.testEncode = { [weak self] texture, command, time in
             guard let self, self.capture else { return }
@@ -82,19 +84,18 @@ final class Host: UIViewController {
         let seekOK = await wait { self.seekCompleted && self.pts.last.map { abs($0 - 4) < 0.2 } == true }
         capture = true; runtime.setFilter { $0 }
         let offOK = await wait { self.pixels.count == 1 }
-        try? "off".write(to: documents.appendingPathComponent("stage.txt"), atomically: true, encoding: .utf8)
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        await snapshotStage("off")
         let cube = Self.cube()
         capture = true
         runtime.setFilter { image in
             CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension": 33, "inputCubeData": cube, "inputColorSpace": CGColorSpace(name: CGColorSpace.sRGB)!, kCIInputImageKey: image])!.outputImage!
         }
         let onOK = await wait { self.pixels.count == 2 }
-        try? "on".write(to: documents.appendingPathComponent("stage.txt"), atomically: true, encoding: .utf8)
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        await snapshotStage("on")
         let visible = !runtime.view.isHidden
         let delta = pixels.count == 2 ? zip(pixels[0], pixels[1]).map { abs(Int($0.0)-Int($0.1)) }.reduce(0,+) : 0
         let samePTS = pixelPTS.count == 2 && abs(pixelPTS[0] - pixelPTS[1]) < 0.001
+        let letterboxBlack = pixels.count == 2 && pixels.allSatisfy { $0.prefix(30).allSatisfy { $0 == 0 } }
         let seekFrameCount = pts.count
         player.play()
         let resumes = await wait { self.pts.count > seekFrameCount + 20 && self.player.currentTime().seconds > 6 }
@@ -103,13 +104,19 @@ final class Host: UIViewController {
         runtime.setFilter(nil)
         let fallback = runtime.view.isHidden
         let unique = Set(pts.map { Int(($0*1000).rounded()) }).count
-        finish(["passed": ready && frames && seekOK && offOK && onOK && delta > 1000 && samePTS && visible && resumes && toEnd && fallback,
+        finish(["passed": ready && frames && seekOK && offOK && onOK && delta > 1000 && samePTS && letterboxBlack && visible && resumes && toEnd && fallback,
                 "readyToPlay": ready, "timeAdvancedBeforeSeek": timeBefore, "frameCount": pts.count, "uniquePTS": unique,
                 "pts": pts, "pausedSeekNewPTS": seekOK, "pausedSeekTarget": 4, "samePTSOnOff": samePTS,
                 "pixelPTS": pixelPTS, "gpuDrawablePixelAbsoluteDelta": delta, "offSamples": pixels.first ?? [], "onSamples": pixels.last ?? [],
+                "geometry": geometry, "letterboxBlack": letterboxBlack,
                 "surfaceVisibleAfterGPUCompletion": visible, "resumeAfterSeek": resumes, "toEnd": toEnd,
                 "finalCurrentTime": player.currentTime().seconds, "filterOffOriginalFallback": fallback,
                 "sameAVPlayer": true, "statuses": statuses, "testOnlyCPUReadback": true])
+    }
+
+    private func snapshotStage(_ name: String) async {
+        try? name.write(to: documents.appendingPathComponent("stage.txt"), atomically: true, encoding: .utf8)
+        _ = await wait({ (try? String(contentsOf: self.documents.appendingPathComponent("ack.txt"), encoding: .utf8)) == name }, seconds: 15)
     }
 
     private static func cube() -> Data {

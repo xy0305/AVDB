@@ -47,6 +47,7 @@ for _ in range(720):
   value=stage.read_text().strip()
   if value not in seen:
    seen.add(value);subprocess.run(['xcrun','simctl','io',device['udid'],'screenshot',str(d/(value+'.png'))],check=True)
+   (container/'Documents/ack.txt').write_text(value)
  if result.exists():break
  time.sleep(.25)
 subprocess.run(['xcrun','simctl','io',device['udid'],'screenshot',str(d/'final.png')])
