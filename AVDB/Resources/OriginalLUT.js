@@ -1,4 +1,6 @@
-// Direct numeric reuse: 网页视频实时 LUT, @author You, @version 6.7.5. No license inferred.
+// Numeric base: 网页视频实时 LUT 6.7.5. No license inferred.
+// v8.3 review: independently implemented bounded safety, full-frame fallback and validation.
+// SDR nonlinear RGB [0,1]; red-fastest cube indexing. Not a full Python/MPV port.
 var OriginalLUT = (function(){
 const console = {log:function(){},warn:function(){},error:function(){}};
     const CONFIG = {
@@ -112,12 +114,12 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         highlight: [-6, 4], shadow: [-6, 6],
     };
     const TARGETS = {
-        skin_rb: [1.20, 1.50],
-        skin_rg: [1.15, 1.35],
-        skin_lum: [0.40, 0.58],
-        skin_sat: [0.12, 0.26],
+        skin_rb: [1.24, 1.50],
+        skin_rg: [1.20, 1.35],
+        skin_lum: [0.35, 0.54],
+        skin_sat: [0.22, 0.34],
         full_contrast: [0.10, 0.20],
-        full_hl_ratio: [0.00, 0.20],
+        full_hl_ratio: [0.00, 0.05],
         full_sh_ratio: [0.00, 0.40],
     };
 
@@ -140,8 +142,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         shadow: [-7, 7],
     };
     const TARGETS_HIGH_MATCH = {
-        skin_rb:       [1.40, 1.55],
-        skin_rg:       [1.24, 1.36],
+        skin_rb:       [1.03, 1.36],
+        skin_rg:       [1.10, 1.30],
         skin_lum:      [0.38, 0.62],
         skin_sat:      [0.12, 0.42],
         full_contrast: [0.12, 0.24],
@@ -204,7 +206,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         return (
             info.skin_lum < 0.22 &&
             info.full_sh_ratio > 0.35 &&
-            info.full_hl_ratio < 0.15
+            info.full_hl_ratio < 0.10
         );
     }
 
@@ -212,9 +214,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         if (!info) return false;
         if (info.no_skin_data) return false;
         if (isExtremeDark(info)) return false;
-        // ★ 高光像素数门槛
-        const hp = info.high_pixels !== undefined ? info.high_pixels : 0;
-        if (hp <= 500) return false;
+        // A highlight-count gate incorrectly rejects already-natural dark scenes.
         return (
             info.skin_rb >= TARGETS_HIGH_MATCH.skin_rb[0] &&
             info.skin_rb <= TARGETS_HIGH_MATCH.skin_rb[1] &&
@@ -360,8 +360,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     function applySaturationScalar(r, g, b, sat) {
         if (sat === 0) return [r, g, b];
         const gray = KR * r + KG * g + KB * b;
-        // ★ 系数从 0.82 提升到 1.5，让 sat 效果更明显
-        const satScale = 1.0 + sat / 50.0 * 1.5;
+        // v8.3 calibrated response; avoid the previous 1.5 oversaturation.
+        const satScale = 1.0 + sat / 50.0 * 0.82;
         return [
             gray + satScale * (r - gray),
             gray + satScale * (g - gray),
@@ -412,6 +412,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     }
 
     function applyParamsToSkinArray(pixels, params) {
+        const identity = Object.keys(params).every(k => params[k] === 0);
         const n = pixels.length / 3;
         const out = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) {
@@ -431,7 +432,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             r = t[0]; g = t[1]; b = t[2];
 
             const lum = KR * r + KG * g + KB * b;
-            if (lum > OVEREXPOSE_LIMIT && !isNearWhite(r, g, b)) {
+            if (!identity && lum > OVEREXPOSE_LIMIT && !isNearWhite(r, g, b)) {
                 const s = OVEREXPOSE_LIMIT / lum;
                 r *= s; g *= s; b *= s;
             }
@@ -1308,6 +1309,23 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             }
         }
 
+        // Search and later balancing can disagree. Recheck the final parameters,
+        // not an intermediate candidate. These bounds deliberately avoid copying
+        // desktop template biases or amplifying noise with a +50 exposure boost.
+        Object.keys(balanced).forEach(k => balanced[k] = Math.max(-50, Math.min(50, balanced[k])));
+        balanced.bright = Math.min(useExtreme ? 35 : 10, Math.max(-10, balanced.bright));
+        const originalInRange = origLum >= TARGETS.skin_lum[0] && origLum <= TARGETS.skin_lum[1];
+        if (originalInRange) {
+            const reference = sampleSkinStats(skinPixels).skin_lum;
+            // Bounded attenuation, including color/contrast: raising brightness
+            // alone cannot reliably undo a later contrast or temperature change.
+            for (let attempt = 0; attempt < 12; attempt++) {
+                const final = sampleSkinStats(applyParamsToSkinArray(skinPixels, balanced));
+                if (final && final.skin_lum >= reference - CONFIG.lumGuardTolerance) break;
+                Object.keys(balanced).forEach(k => balanced[k] *= 0.5);
+                if (attempt === 11) Object.keys(balanced).forEach(k => balanced[k] = 0);
+            }
+        }
         return balanced;
     }
 
@@ -1315,6 +1333,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     // 三、LUT 烘焙
     // ============================================================
     function generateLutData(size, params) {
+        if (!Number.isInteger(size) || size < 2 || size > 65) return null;
+        const identity = Object.keys(params).every(k => params[k] === 0);
         const data = new Float32Array(size * size * size * 3);
         let idx = 0;
         for (let b = 0; b < size; b++) {
@@ -1336,7 +1356,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
 
                     const lum = KR * rIn + KG * gIn + KB * bIn;
-                    if (lum > OVEREXPOSE_LIMIT && !isNearWhite(rIn, gIn, bIn)) {
+                    if (!identity && lum > OVEREXPOSE_LIMIT && !isNearWhite(rIn, gIn, bIn)) {
                         const s = OVEREXPOSE_LIMIT / lum;
                         rIn *= s; gIn *= s; bIn *= s;
                     }
@@ -1438,12 +1458,9 @@ function sampleFrame(data, aw, ah, faceBox) {
             sampleRegion = faceBox;
             regionName = '人脸框';
         } else {
-            const cw = Math.floor(aw * 0.5);
-            const ch = Math.floor(ah * 0.5);
-            const cx0 = Math.floor((aw - cw) / 2);
-            const cy0 = Math.floor((ah - ch) / 2);
-            sampleRegion = { x1: cx0, y1: cy0, x2: cx0 + cw, y2: cy0 + ch };
-            regionName = '中央50%';
+            // Landscape/portrait/4:3: do not silently discard edge faces.
+            sampleRegion = { x1: 0, y1: 0, x2: aw, y2: ah };
+            regionName = '全画面回退';
         }
 
         console.log(
@@ -1526,6 +1543,12 @@ function sampleFrame(data, aw, ah, faceBox) {
 }
 
 function analyzeFrame(bytes, width, height, box) {
+ if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 4096 * 4096 || !bytes || bytes.length !== width * height * 4) return null;
+ if (box) {
+   if (![box.x1, box.y1, box.x2, box.y2].every(Number.isFinite)) return null;
+   box = {x1: Math.max(0, Math.min(width, Math.floor(box.x1))), y1: Math.max(0, Math.min(height, Math.floor(box.y1))), x2: Math.max(0, Math.min(width, Math.ceil(box.x2))), y2: Math.max(0, Math.min(height, Math.ceil(box.y2)))};
+   if (box.x1 >= box.x2 || box.y1 >= box.y2) box = null;
+ }
  const frame = sampleFrame(new Uint8ClampedArray(bytes), width, height, box);
  if (!frame.pixels) return null;
  const info = sampleSkinStats(frame.pixels);
@@ -1533,14 +1556,14 @@ function analyzeFrame(bytes, width, height, box) {
  info.high_rb = frame.high_rb; info.high_pixels = frame.high_pixels;
  info.regionName = frame.regionName;
  const useExtreme = isExtremeDark(info);
- const hp = info.high_pixels, hrb = info.high_rb;
- const condFace1 = info.regionName === '人脸框' && hrb > 1.3 && hp > 200;
- const condFace2 = info.regionName === '人脸框' && hp > 5000 && hrb > 0.9;
- const condCenter = info.regionName === '中央50%' && hp > 5000 && hp < 13000 && hrb > 0.9;
- const useHighMatch = !useExtreme && (info.regionName === '中央50%' ? condCenter && isHighMatch(info) : condFace1 || condFace2 || isHighMatch(info));
+ const useHighMatch = !useExtreme && isHighMatch(info);
+ // Preserve naturally matching skin rather than imposing a fixed cool template.
+ if (useHighMatch) return {params: {temp:0,tint:0,sat:0,bright:0,contrast:0,highlight:0,shadow:0}, info:info, stage:'肤色保护'};
  return {params: predictParams(info, subsample(frame.pixels, CONFIG.maxSkinPixels), useExtreme, useHighMatch), info: info, stage: useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准'};
 }
 function cubeRGBA(values) {
+ if (!Array.isArray(values) || values.length !== 7 || !values.every(v => typeof v === 'number' && Number.isFinite(v))) return null;
+ values = values.map(v => Math.max(-50, Math.min(50, v)));
  const keys = ['temp','tint','sat','bright','contrast','highlight','shadow'];
  const params = {}; keys.forEach((k,i)=>params[k]=values[i]);
  const rgb = generateLutData(33,params); const out = new Float32Array(33*33*33*4);

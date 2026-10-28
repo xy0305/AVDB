@@ -36,10 +36,11 @@ enum NativeLUT {
         return (LUTParameters(values: values), dict["stage"] as? String ?? "标准")
     }
     static func cube(_ p: LUTParameters) -> Data? {
-        guard let context = engine(),
+        guard p.values.count == 7, p.values.allSatisfy({ $0.isFinite }), let context = engine(),
               let result = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("cubeRGBA")?.call(withArguments: [p.values]),
               context.exception == nil, let numbers = result.toArray() as? [NSNumber], numbers.count == 33*33*33*4 else { return nil }
         let floats = numbers.map { $0.floatValue }
+        guard floats.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 1 }) else { return nil }
         return floats.withUnsafeBytes { Data($0) }
     }
 }
@@ -101,6 +102,7 @@ final class NativeLUTController: ObservableObject {
     private var buildTask: Task<Void, Never>?
     private var buildGeneration = 0
     private var cachedCube: Data?
+    private var cachedParameters: LUTParameters?
     private weak var avPlayer: AVPlayer?
     func updateComparison() { reveal.setSplit(comparison ? divider : nil) }
     func pauseComparison() { avPlayer?.pause(); comparison = true; updateComparison() }
@@ -199,7 +201,7 @@ final class NativeLUTController: ObservableObject {
     }
     func detach() {
         generation += 1
-        buildGeneration += 1; buildTask?.cancel(); cachedCube = nil
+        buildGeneration += 1; buildTask?.cancel(); cachedCube = nil; cachedParameters = nil
         sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
         analysisGeneration += 1
         reveal.cancel()
@@ -235,6 +237,7 @@ final class NativeLUTController: ObservableObject {
         enabled = false; sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
         buildGeneration += 1; buildTask?.cancel()
         parameters = LUTParameters(); composition = nil
+        cachedCube = nil; cachedParameters = nil
         item?.videoComposition = original; requested = true; status = "已重置"
     }
     func apply() {
@@ -255,13 +258,19 @@ final class NativeLUTController: ObservableObject {
         let limit = min(0.003, max(0.001, threshold)), sampleRadius = min(16, max(4, radius))
         let kernel = Self.debandKernel
         let ci = context, reveal = self.reveal
+        // Strength/comparison/enhancement changes do not change LUT-domain data.
+        let reusableCube = cachedParameters == params ? cachedCube : nil
         buildTask = Task { [weak self, weak item] in
             do { try await Task.sleep(nanoseconds: 100_000_000) } catch { return }
-            let cube = useLUT ? await Task.detached(priority: .userInitiated) { NativeLUT.cube(params) }.value : nil
+            let cube: Data?
+            if useLUT {
+                if let reusableCube { cube = reusableCube }
+                else { cube = await Task.detached(priority: .userInitiated) { NativeLUT.cube(params) }.value }
+            } else { cube = nil }
             guard let self, let item, !Task.isCancelled, self.generation == sourceGeneration, self.buildGeneration == revision, self.item === item else { return }
             if useLUT && cube == nil { self.status = "原版 LUT 引擎失败"; return }
             if useDeband && kernel == nil { self.status = "Metal 去色带不可用；未伪装为模糊" }
-            self.cachedCube = cube ?? self.cachedCube
+            if let cube { self.cachedCube = cube; self.cachedParameters = params }
             let cs = CGColorSpace(name: CGColorSpace.sRGB)!
             let comp = AVVideoComposition(asset: item.asset, applyingCIFiltersWithHandler: { request in
                 let source = request.sourceImage, extent = source.extent
@@ -295,7 +304,7 @@ final class NativeLUTController: ObservableObject {
            transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
             enabled = false; supported = false; status = "HDR 解码帧已禁用 LUT"; return
         }
-        busy = true; requested = false; status = "获取 MediaPipe 关键点 → 原版动态 Cr / 分阶段搜索…"
+        busy = true; requested = false; status = "获取 MediaPipe 关键点 → 全画面回退 / 安全搜索…"
         let token = generation
         let analysisToken = analysisGeneration
         let ciImage = CIImage(cvPixelBuffer:buffer)
@@ -317,11 +326,11 @@ final class NativeLUTController: ObservableObject {
                 let detection = OriginalFaceLandmarker.shared.region(image: rgbaImage)
                 let roi = detection.box
                 guard let analysis = NativeLUT.analyze(bytes: bytes, width: w, height: h, box: roi) else { return nil }
-                return (analysis.0, "原版6.7.5 · \(analysis.1) · \(detection.description)")
+                return (analysis.0, "v8.3 安全调色 · \(analysis.1) · \(detection.description)")
             }.value
             guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
             busy = false
-            guard let result else { status = "原版肤色采样不足（<150）或引擎失败；保留旧 LUT"; return }
+            guard let result else { status = "肤色采样不足（<150）或引擎失败；可手动调参，未套用默认偏色模板"; return }
             parameters = result.0; apply(); status = "33³ LUT · \(result.1) · SDR"
         }
     }
@@ -361,7 +370,7 @@ private final class OriginalFaceLandmarker: @unchecked Sendable {
         do {
             if task == nil {
                 guard let path = Bundle.main.path(forResource: "face_landmarker", ofType: "task") else {
-                    return (nil, "中央50%（MediaPipe 模型缺失）")
+                    return (nil, "全画面回退（MediaPipe 模型缺失）")
                 }
                 let options = FaceLandmarkerOptions()
                 options.baseOptions.modelAssetPath = path
@@ -380,13 +389,13 @@ private final class OriginalFaceLandmarker: @unchecked Sendable {
             let input = try MPImage(uiImage: UIImage(cgImage: image, scale: 1, orientation: .up))
             let result = try task!.detect(videoFrame: input, timestampInMilliseconds: timestamp)
             guard let landmarks = result.faceLandmarks.first, !landmarks.isEmpty else {
-                return (nil, "中央50%（MediaPipe 未检测到人脸）")
+                return (nil, "全画面回退（MediaPipe 未检测到人脸）")
             }
             let box = OriginalLandmarkGeometry.region(faces: [landmarks.map { [Double($0.x), Double($0.y)] }], width: image.width, height: image.height)
             return (box, "MediaPipe 第一人脸关键点 ROI")
         } catch {
             // Original catches inference exceptions and only then uses the center fallback.
-            return (nil, "中央50%（MediaPipe 错误：\(error.localizedDescription)）")
+            return (nil, "全画面回退（MediaPipe 错误：\(error.localizedDescription)）")
         }
     }
 }
