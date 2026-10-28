@@ -1,0 +1,72 @@
+name: Restore previous 266 LUT - neutral gates and unsigned IPA
+on:
+  push:
+    branches: [fix/restore-previous-lut-from-3f30575]
+permissions:
+  contents: read
+jobs:
+  neutral-native:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Original 266 oracle and inherited neutral regressions
+        run: |
+          set -euo pipefail
+          mkdir -p evidence-restore-lut
+          { python3 scripts/test-native-lut.py; python3 scripts/test-enhancement-pixels.py; python3 scripts/test-seek-preview.py; python3 scripts/test-progress-tap277.py; } 2>&1 | tee evidence-restore-lut/macos.log
+      - name: Old production controller and panel in neutral iOS simulator
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          gem install cocoapods -v 1.16.2 --no-document
+          python3 scripts/test-restore-lut-simulator.py > evidence-restore-lut/simulator.log 2>&1 || { tail -120 evidence-restore-lut/simulator.log; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: restore-lut-neutral-evidence
+          path: |
+            evidence-restore-lut/*.log
+            evidence-restore-lut/result.json
+            evidence-restore-lut/native-panel.png
+  release:
+    needs: neutral-native
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install unchanged pinned dependency
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod install --repo-update
+      - name: Build unchanged SDR kernel and unsigned arm64 Release
+        run: |
+          set -euo pipefail
+          xcrun -sdk iphoneos metal -fcikernel -c AVDB/Resources/Enhancement.metal -o /tmp/Enhancement.air
+          xcrun -sdk iphoneos metallib -cikernel /tmp/Enhancement.air -o AVDB/Resources/Enhancement.metallib
+          xcodebuild -workspace AVDB.xcworkspace -scheme AVDB -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/restore-lut-release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' CODE_SIGN_ENTITLEMENTS='' build > /tmp/restore-lut-release.log 2>&1 || { tail -120 /tmp/restore-lut-release.log; exit 1; }
+          APP=/tmp/restore-lut-release/Build/Products/Release-iphoneos/AVDB.app
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceCommit string $GITHUB_SHA" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :AVDBBuildLabel string restore-lut" "$APP/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")" = 269
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")" = 1.0.2
+          lipo -info "$APP/AVDB"
+          xcrun vtool -show-build "$APP/AVDB"
+          if codesign -dv "$APP" 2>/dev/null; then exit 1; fi
+          mkdir -p /tmp/restore-lut-package/Payload
+          ditto "$APP" /tmp/restore-lut-package/Payload/AVDB.app
+          cd /tmp/restore-lut-package
+          zip -qry "$GITHUB_WORKSPACE/AVDB-unsigned-1.0.2-269-restore-lut.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AVDB-unsigned-1.0.2-269-restore-lut
+          path: '*.ipa'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: restore-lut-release-build-log
+          path: /tmp/restore-lut-release.log

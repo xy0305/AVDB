@@ -1,6 +1,4 @@
-// Numeric base: 网页视频实时 LUT 6.7.5. No license inferred.
-// v8.3 review: independently implemented bounded safety, full-frame fallback and validation.
-// SDR nonlinear RGB [0,1]; red-fastest cube indexing. Not a full Python/MPV port.
+// Direct numeric reuse: 网页视频实时 LUT, @author You, @version 6.7.5. No license inferred.
 var OriginalLUT = (function(){
 const console = {log:function(){},warn:function(){},error:function(){}};
     const CONFIG = {
@@ -114,12 +112,12 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         highlight: [-6, 4], shadow: [-6, 6],
     };
     const TARGETS = {
-        skin_rb: [1.24, 1.50],
-        skin_rg: [1.20, 1.35],
-        skin_lum: [0.35, 0.54],
-        skin_sat: [0.22, 0.34],
+        skin_rb: [1.20, 1.50],
+        skin_rg: [1.15, 1.35],
+        skin_lum: [0.40, 0.58],
+        skin_sat: [0.12, 0.26],
         full_contrast: [0.10, 0.20],
-        full_hl_ratio: [0.00, 0.05],
+        full_hl_ratio: [0.00, 0.20],
         full_sh_ratio: [0.00, 0.40],
     };
 
@@ -142,8 +140,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         shadow: [-7, 7],
     };
     const TARGETS_HIGH_MATCH = {
-        skin_rb:       [1.03, 1.36],
-        skin_rg:       [1.10, 1.30],
+        skin_rb:       [1.40, 1.55],
+        skin_rg:       [1.24, 1.36],
         skin_lum:      [0.38, 0.62],
         skin_sat:      [0.12, 0.42],
         full_contrast: [0.12, 0.24],
@@ -206,7 +204,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         return (
             info.skin_lum < 0.22 &&
             info.full_sh_ratio > 0.35 &&
-            info.full_hl_ratio < 0.10
+            info.full_hl_ratio < 0.15
         );
     }
 
@@ -214,7 +212,9 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         if (!info) return false;
         if (info.no_skin_data) return false;
         if (isExtremeDark(info)) return false;
-        // A highlight-count gate incorrectly rejects already-natural dark scenes.
+        // ★ 高光像素数门槛
+        const hp = info.high_pixels !== undefined ? info.high_pixels : 0;
+        if (hp <= 500) return false;
         return (
             info.skin_rb >= TARGETS_HIGH_MATCH.skin_rb[0] &&
             info.skin_rb <= TARGETS_HIGH_MATCH.skin_rb[1] &&
@@ -360,8 +360,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     function applySaturationScalar(r, g, b, sat) {
         if (sat === 0) return [r, g, b];
         const gray = KR * r + KG * g + KB * b;
-        // v8.3 calibrated response; avoid the previous 1.5 oversaturation.
-        const satScale = 1.0 + sat / 50.0 * 0.82;
+        // ★ 系数从 0.82 提升到 1.5，让 sat 效果更明显
+        const satScale = 1.0 + sat / 50.0 * 1.5;
         return [
             gray + satScale * (r - gray),
             gray + satScale * (g - gray),
@@ -412,7 +412,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     }
 
     function applyParamsToSkinArray(pixels, params) {
-        const identity = Object.keys(params).every(k => params[k] === 0);
         const n = pixels.length / 3;
         const out = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) {
@@ -432,7 +431,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             r = t[0]; g = t[1]; b = t[2];
 
             const lum = KR * r + KG * g + KB * b;
-            if (!identity && lum > OVEREXPOSE_LIMIT && !isNearWhite(r, g, b)) {
+            if (lum > OVEREXPOSE_LIMIT && !isNearWhite(r, g, b)) {
                 const s = OVEREXPOSE_LIMIT / lum;
                 r *= s; g *= s; b *= s;
             }
@@ -1309,23 +1308,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             }
         }
 
-        // Search and later balancing can disagree. Recheck the final parameters,
-        // not an intermediate candidate. These bounds deliberately avoid copying
-        // desktop template biases or amplifying noise with a +50 exposure boost.
-        Object.keys(balanced).forEach(k => balanced[k] = Math.max(-50, Math.min(50, balanced[k])));
-        balanced.bright = Math.min(useExtreme ? 35 : 10, Math.max(-10, balanced.bright));
-        const originalInRange = origLum >= TARGETS.skin_lum[0] && origLum <= TARGETS.skin_lum[1];
-        if (originalInRange) {
-            const reference = sampleSkinStats(skinPixels).skin_lum;
-            // Bounded attenuation, including color/contrast: raising brightness
-            // alone cannot reliably undo a later contrast or temperature change.
-            for (let attempt = 0; attempt < 12; attempt++) {
-                const final = sampleSkinStats(applyParamsToSkinArray(skinPixels, balanced));
-                if (final && final.skin_lum >= reference - CONFIG.lumGuardTolerance) break;
-                Object.keys(balanced).forEach(k => balanced[k] *= 0.5);
-                if (attempt === 11) Object.keys(balanced).forEach(k => balanced[k] = 0);
-            }
-        }
         return balanced;
     }
 
@@ -1333,8 +1315,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     // 三、LUT 烘焙
     // ============================================================
     function generateLutData(size, params) {
-        if (!Number.isInteger(size) || size < 2 || size > 65) return null;
-        const identity = Object.keys(params).every(k => params[k] === 0);
         const data = new Float32Array(size * size * size * 3);
         let idx = 0;
         for (let b = 0; b < size; b++) {
@@ -1356,7 +1336,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
 
                     const lum = KR * rIn + KG * gIn + KB * bIn;
-                    if (!identity && lum > OVEREXPOSE_LIMIT && !isNearWhite(rIn, gIn, bIn)) {
+                    if (lum > OVEREXPOSE_LIMIT && !isNearWhite(rIn, gIn, bIn)) {
                         const s = OVEREXPOSE_LIMIT / lum;
                         rIn *= s; gIn *= s; bIn *= s;
                     }
@@ -1458,9 +1438,12 @@ function sampleFrame(data, aw, ah, faceBox) {
             sampleRegion = faceBox;
             regionName = '人脸框';
         } else {
-            // Landscape/portrait/4:3: do not silently discard edge faces.
-            sampleRegion = { x1: 0, y1: 0, x2: aw, y2: ah };
-            regionName = '全画面回退';
+            const cw = Math.floor(aw * 0.5);
+            const ch = Math.floor(ah * 0.5);
+            const cx0 = Math.floor((aw - cw) / 2);
+            const cy0 = Math.floor((ah - ch) / 2);
+            sampleRegion = { x1: cx0, y1: cy0, x2: cx0 + cw, y2: cy0 + ch };
+            regionName = '中央50%';
         }
 
         console.log(
@@ -1543,12 +1526,6 @@ function sampleFrame(data, aw, ah, faceBox) {
 }
 
 function analyzeFrame(bytes, width, height, box) {
- if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width * height > 4096 * 4096 || !bytes || bytes.length !== width * height * 4) return null;
- if (box) {
-   if (![box.x1, box.y1, box.x2, box.y2].every(Number.isFinite)) return null;
-   box = {x1: Math.max(0, Math.min(width, Math.floor(box.x1))), y1: Math.max(0, Math.min(height, Math.floor(box.y1))), x2: Math.max(0, Math.min(width, Math.ceil(box.x2))), y2: Math.max(0, Math.min(height, Math.ceil(box.y2)))};
-   if (box.x1 >= box.x2 || box.y1 >= box.y2) box = null;
- }
  const frame = sampleFrame(new Uint8ClampedArray(bytes), width, height, box);
  if (!frame.pixels) return null;
  const info = sampleSkinStats(frame.pixels);
@@ -1556,14 +1533,14 @@ function analyzeFrame(bytes, width, height, box) {
  info.high_rb = frame.high_rb; info.high_pixels = frame.high_pixels;
  info.regionName = frame.regionName;
  const useExtreme = isExtremeDark(info);
- const useHighMatch = !useExtreme && isHighMatch(info);
- // Preserve naturally matching skin rather than imposing a fixed cool template.
- if (useHighMatch) return {params: {temp:0,tint:0,sat:0,bright:0,contrast:0,highlight:0,shadow:0}, info:info, stage:'肤色保护'};
+ const hp = info.high_pixels, hrb = info.high_rb;
+ const condFace1 = info.regionName === '人脸框' && hrb > 1.3 && hp > 200;
+ const condFace2 = info.regionName === '人脸框' && hp > 5000 && hrb > 0.9;
+ const condCenter = info.regionName === '中央50%' && hp > 5000 && hp < 13000 && hrb > 0.9;
+ const useHighMatch = !useExtreme && (info.regionName === '中央50%' ? condCenter && isHighMatch(info) : condFace1 || condFace2 || isHighMatch(info));
  return {params: predictParams(info, subsample(frame.pixels, CONFIG.maxSkinPixels), useExtreme, useHighMatch), info: info, stage: useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准'};
 }
 function cubeRGBA(values) {
- if (!Array.isArray(values) || values.length !== 7 || !values.every(v => typeof v === 'number' && Number.isFinite(v))) return null;
- values = values.map(v => Math.max(-50, Math.min(50, v)));
  const keys = ['temp','tint','sat','bright','contrast','highlight','shadow'];
  const params = {}; keys.forEach((k,i)=>params[k]=values[i]);
  const rgb = generateLutData(33,params); const out = new Float32Array(33*33*33*4);
@@ -1571,125 +1548,4 @@ function cubeRGBA(values) {
  return Array.from(out);
 }
 return {analyzeFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch};
-})();
-
-// Independent implementation of user-supplied v8.3 numerical specification.
-// No Python/Lua/Tk/installer code is executed or embedded. SDR nonlinear sRGB.
-var Desktop83 = (function(){
-const keys=['temp','tint','sat','bright','contrast','highlight','shadow'];
-const sk=['skin_rb','skin_rg','skin_lum','skin_sat','full_contrast','full_hl_ratio','full_sh_ratio'];
-const targets=[[[1.24,1.50],[1.20,1.35],[.35,.54],[.22,.34],[.10,.20],[0,.05],[0,.40]],[[1.03,1.36],[1.10,1.30],[.38,.62],[.12,.42],[.12,.24],[0,.10],[0,.24]],[[1.05,1.32],[1.12,1.28],[.42,.60],[.14,.25],[.13,.23],[0,.10],[.14,.35]]];
-const templates=[[-20,6,0,0,0,-2,2],[-3,6,0,5,0,-2,2],[-18,3,-1,25,-2,-1,20]];
-const ranges=[[[-20,5],[-5,5],[-5,3],[-5,10],[-3,2],[-5,3],[-5,10]],[[-3,-8],[-5,5],[-5,3],[-5,5],[-3,2],[-2,2],[-5,5]],[[-8,4],[-3,5],[-5,1],[-15,10],[-3,2],[-3,2],[-15,10]]];
-const lum=x=>.2126*x[0]+.7152*x[1]+.0722*x[2];
-const clip=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
-const err=(x,r)=>Math.max(r[0]-x,0,x-r[1]);
-function median(a){a=a.slice().sort((a,b)=>a-b);let n=a.length;return n%2?a[n>>1]:(a[n/2-1]+a[n/2])/2;}
-// Python ties-to-even is important for the dynamic high-match temperature.
-function round(x){let f=Math.floor(x),r=x-f;return r===.5?(f%2===0?f:f+1):Math.round(x);}
-function pixel(rgb,p,search){
- let x=rgb.slice(),before=lum(x),l=before;
- let factor=1+p[3]/50*.67*Math.max(.3,1-Math.max(0,(l-.7)/.3)*.7);x=x.map(v=>v*factor);
- l=lum(x);factor=1+p[5]/50*.7*Math.max(0,(l-.5)/.5);x=x.map(v=>v*factor);
- factor=1+p[6]/50*.7*Math.max(0,(.5-l)/.5);x=x.map(v=>v*factor);
- let t=p[0]/50,ti=p[1]/50,g=[(1+t*.23)*(1+ti*.045),(1+t*.058)*(1-ti*.09),(1-t*.23)*(1+ti*.045)];
- let norm=lum(g);if(norm>.001)g=g.map(v=>v/norm);
- let damp=1-clip((lum(x)-.7)/.3)*.95;x=x.map((v,i)=>v*(1+(g[i]-1)*damp));
- l=lum(x);x=x.map(v=>l+(1+p[2]/50*.82)*(v-l));
- l=lum(x);factor=1+p[4]/50*.57*Math.max(.5,1-Math.max(0,(l-.7)/.3)*.5);x=x.map(v=>.5+factor*(v-.5));
- l=lum(x);if(l>.92 && (search || (before<=.92 && p.some(v=>v!==0))))x=x.map(v=>v*.92/Math.max(l,1e-6));
- return x.map(v=>clip(v));
-}
-function stats(a){
- if(!a.length)return null;
- let mean=[0,0,0],ls=[],sat=0,hl=0,sh=0;
- for(let x of a){for(let i=0;i<3;i++)mean[i]+=x[i]/a.length;let l=lum(x);ls.push(l);hl+=l>.8?1:0;sh+=l<.2?1:0;sat+=(Math.max(...x)-Math.min(...x))/Math.max(1e-6,...x);}
- let avg=ls.reduce((s,x)=>s+x,0)/ls.length;
- return [mean[2]>1e-6?mean[0]/mean[2]:1,mean[1]>1e-6?mean[0]/mean[1]:1,lum(mean),sat/a.length,Math.sqrt(ls.reduce((s,x)=>s+(x-avg)**2,0)/ls.length),hl/a.length,sh/a.length];
-}
-function thin(a,n){if(a.length<=n)return a.slice();return Array.from({length:n},(_,i)=>a[Math.floor(i*a.length/n)]);}
-function skinComponent(bytes,w,h){
- const gw=Math.ceil(w/2),gh=Math.ceil(h/2),n=gw*gh;let mask=new Uint8Array(n),offsets=[];
- // Independent binary opening/closing with a 5x5 ellipse, on bounded half-resolution grid.
- for(let y=-2;y<=2;y++)for(let x=-2;x<=2;x++)if(Math.abs(y)!==2||x===0)offsets.push([x,y]);
- for(let y=0;y<gh;y++)for(let x=0;x<gw;x++){
-  let i=((y*2)*w+x*2)*4,r=bytes[i],g=bytes[i+1],b=bytes[i+2],Y=.299*r+.587*g+.114*b,cr=(r-Y)*.713+128,cb=(b-Y)*.564+128,max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
-  let H=d===0?0:max===r?((g-b)/d+6)%6:max===g?(b-r)/d+2:(r-g)/d+4;
-  H*=30; // OpenCV's byte HSV hue uses 0..179, not degrees 0..359.
-  let S=max?d/max*255:0;
-  mask[y*gw+x]=cr>=120&&cr<=180&&cb>=70&&cb<=135&&H<=25&&S>=30&&S<=200&&max>=50?1:0;
- }
- function morph(a,dilate){let out=new Uint8Array(n);for(let y=0;y<gh;y++)for(let x=0;x<gw;x++){
-  let value=dilate?0:1;
-  for(let [dx,dy] of offsets){let xx=x+dx,yy=y+dy;if(xx<0||xx>=gw||yy<0||yy>=gh)continue;let v=a[yy*gw+xx];if(dilate?v:!v){value=dilate?1:0;break;}}
-  out[y*gw+x]=value;
- }return out;}
- mask=morph(morph(morph(morph(mask,false),true),true),false);
- let visited=new Uint8Array(n),best=[],score=-Infinity;
- for(let start=0;start<n;start++)if(mask[start]&&!visited[start]){
-  let list=[start],head=0,xlo=gw,xhi=0,ylo=gh,yhi=0,sumY=0;visited[start]=1;
-  while(head<list.length){let i=list[head++],x=i%gw,y=Math.floor(i/gw);xlo=Math.min(xlo,x);xhi=Math.max(xhi,x);ylo=Math.min(ylo,y);yhi=Math.max(yhi,y);sumY+=y;
-   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){let xx=x+dx,yy=y+dy;if(xx<0||xx>=gw||yy<0||yy>=gh)continue;let q=yy*gw+xx;if(mask[q]&&!visited[q]){visited[q]=1;list.push(q);}}
-  }
-  let area=list.length,ratio=area/n,aspect=(xhi-xlo+1)/(yhi-ylo+1);
-  if(area*4<50||ratio>.30||aspect<.4||aspect>2.5)continue;
-  let value=1-Math.abs(sumY/area/gh-.4)-Math.abs(ratio-.08)*5;
-  if(value>score){score=value;best=list;}
- }
- return new Set(best);
-}
-
-function select(bytes,w,h,box,strict){
- let all=[],face=[],fallback=[];
- for(let y=0;y<h;y+=2)for(let x=0;x<w;x+=2){let i=(y*w+x)*4,r=bytes[i],g=bytes[i+1],b=bytes[i+2],v=[r/255,g/255,b/255];all.push(v);
- if(lum(v)>=.8)continue;
- if(box && x>=box.x1 && x<box.x2 && y>=box.y1 && y<box.y2)face.push(v);
- let Y=.299*r+.587*g+.114*b,cr=(r-Y)*.713+128,cb=(b-Y)*.564+128;
- if(cr>=120&&cr<=180&&cb>=70&&cb<=135)fallback.push({v,index:Math.floor(y/2)*Math.ceil(w/2)+Math.floor(x/2)});
- }
- let l=all.length?lum(all.reduce((s,x)=>s.map((v,i)=>v+x[i]/all.length),[0,0,0])):0;
- if(l<.05||l>.95)return [];
- // Desktop does not threshold a detected face crop. Explicit mobile fallback if absent.
- if(face.length>=50)return thin(face,2000);
- const region=strict?skinComponent(bytes,w,h):null;
- return thin(fallback.filter(x=>!region||region.has(x.index)).map(x=>x.v),2000);
-}
-function choose(frames){
- let a=frames.filter(a=>a.length>=50).map(a=>({a,s:stats(a)}));if(!a.length)return null;
- let yellow=a.filter(x=>x.s[0]>=1.45),over=[],under=[];
- for(let x of a)if(err(x.s[0],targets[0][0])*10+err(x.s[2],targets[0][2])*5>.02){if(x.s[0]>1.5)over.push(x);if(x.s[0]<1.24)under.push(x);}
- let chosen=a,direction='全部';
- if(yellow.length>=20){chosen=yellow.length>a.length*.7?yellow.slice(0,Math.floor(a.length*.7)).concat(a.filter(x=>x.s[0]<1.45).slice(0,a.length-Math.floor(a.length*.7))):yellow;direction='偏黄优先';}
- else if((over.length+under.length)/a.length>.5){chosen=over.length>=under.length?over:under;direction=over.length>=under.length?'偏黄':'偏蓝';}
- return {pixels:thin(chosen.flatMap(x=>x.a),3000),info:sk.map((_,i)=>median(chosen.map(x=>x.s[i]))),frames:a.length,direction};
-}
-function predict(a,info){
- let extreme=info[0]<=1.6&&info[2]<.22&&info[6]>.35&&info[5]<.10;
- let high=!extreme&&[0,1,2,3].every(i=>err(info[i],targets[1][i])===0);
- let mode=extreme?2:high?1:0,T=targets[mode],base=templates[mode],range=ranges[mode],p=base.slice();
- const cache=new Map();
- function st(q=p){let k=q.join(',');if(!cache.has(k))cache.set(k,stats(a.map(x=>pixel(x,q,true))));return cache.get(k);}
- function search(index,lo,hi,origin,cost){let best=p[index],error=Infinity;for(let d=lo;d<=hi;d++){let q=p.slice();q[index]=origin+d;let s=st(q),e=cost(s,d,q);if(e<error){error=e;best=q[index];}}p[index]=best;}
- let lumTarget=T[2][0]+.8*(T[2][1]-T[2][0]),weight=extreme?10:50;
- const lumError=s=>(s[2]<lumTarget||s[2]>T[2][1]?(s[2]-lumTarget)**2:0)+2*err(s[0],T[0])**2+weight*err(s[5],T[5])**2;
- if(high){let origin=round(-3+clip((info[0]-T[0][0])/(T[0][1]-T[0][0]))*-5);search(0,-2,2,origin,(s,d)=>err(s[0],T[0])**2+.001*d*d);}
- else{let offset=clip(info[0]-st()[0],-.08,.08),target=T[0][0]+.8*(T[0][1]-T[0][0]);search(0,...range[0],base[0],(s,d)=>15*Math.max(0,Math.abs(s[0]+offset-target)-.03)**2+5*err(s[1],T[1])**2+10*err(s[2],T[2])**2+.0005*d*d);}
- search(3,...range[3],base[3],lumError);
- if(st()[2]<lumTarget*.9||st()[2]>lumTarget*1.1)search(3,Math.max(range[3][0],p[3]-8-base[3]),Math.min(range[3][1],p[3]+8-base[3]),base[3],lumError);
- let mid=i=>(T[i][0]+T[i][1])/2;
- search(1,...range[1],base[1],(s,d)=>err(s[1],[mid(1)*.95,mid(1)*1.05])**2+.001*d*d);
- search(2,...range[2],base[2],(s,d)=>err(s[3],[mid(3)*.9,mid(3)*1.1])**2+.001*d*d);
- search(4,...range[4],base[4],(s,d)=>err(s[4],T[4])**2+100*err(s[0],T[0])**2+.001*d*d);
- let comp=extreme?0:round(-(Math.max(0,p[3]-5)+Math.max(0,p[6]-2)*.5));
- search(5,...range[5],base[5]+comp,s=>err(s[5],T[5])**2+10*err(s[0],T[0])**2);
- let q=p.slice();q[6]=0;let dark=a.map(x=>lum(pixel(x,q,true))<.2);
- if(dark.some(Boolean))search(6,...range[6],base[6],(s,d,q)=>{let ls=a.map((x,i)=>dark[i]?lum(pixel(x,q,true)):null).filter(x=>x!==null);return (median(ls)-.3)**2+err(s[0],T[0])**2;});
- let origIn=err(info[2],T[2])===0;
- // Final recheck follows the finite desktop search limits; no 267 neutral bypass here.
- if((origIn&&st()[2]<info[2]-.005)||st()[2]<lumTarget*.95||st()[2]>T[2][1]*1.05){let target=origIn?info[2]:lumTarget;let origin=p[3];search(3,Math.max(range[3][0],origin-6-base[3]),Math.min(range[3][1],origin+15-base[3]),base[3],s=>((s[2]<target||s[2]>T[2][1])?(s[2]-target)**2:0)+2*err(s[0],T[0])**2+weight*err(s[5],T[5])**2);}
- return {values:p,stage:['标准','高命中','极暗'][mode],after:st()};
-}
-function analyze(frames){let c=choose(frames);if(!c)return null;let p=predict(c.pixels,c.info);return {values:p.values,stage:p.stage,info:c.info,after:p.after,frames:c.frames,direction:c.direction,pixels:c.pixels};}
-function cubeRGBA(values,size){size=size||33;if(![33,65].includes(size)||values.length!==7||!values.every(Number.isFinite))return null;let out=[];for(let b=0;b<size;b++)for(let g=0;g<size;g++)for(let r=0;r<size;r++)out.push(...pixel([r/(size-1),g/(size-1),b/(size-1)],values,false),1);return out;}
-return {pixel,stats,select,choose,predict,analyze,cubeRGBA,targets,keys};
 })();
