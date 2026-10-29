@@ -104,7 +104,41 @@ const faceMulti=port.analyzeMultiFrame([
 assert.ok(faceMulti && faceMulti.usedFace===true);
 assert.strictEqual(faceMulti.info.regionName,'人脸框');
 assert.strictEqual(faceMulti.frameCount,1);
-fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: 21 staged searches, stats, 21 complete 33³ RGB cubes + v6.7.8 classifiers + multi-frame median: exact Node equality');
+assert.strictEqual(multi.sceneGuard, false);
+// Scene-change guard: divergent skin_lum/rb must NOT median mixed scenes.
+const skinDark=makeSkinRGBA(W,H,[0.28,0.20,0.18],0.02);
+const skinBright=makeSkinRGBA(W,H,[0.78,0.62,0.55],0.02);
+const mixed=port.analyzeMultiFrame([
+ {bytes:Array.from(skinA),width:W,height:H,box:null},
+ {bytes:Array.from(skinDark),width:W,height:H,box:null},
+ {bytes:Array.from(skinBright),width:W,height:H,box:null}
+]);
+assert.ok(mixed && mixed.params);
+assert.strictEqual(mixed.sceneGuard, true);
+assert.ok(mixed.frameCount >= 1 && mixed.frameCount < 3, 'scene guard should drop mixed frames, got '+mixed.frameCount);
+// Coherent pair + one outlier → keep the coherent cluster (size 2).
+const skinA2=makeSkinRGBA(W,H,[0.61,0.44,0.37],0.03);
+const outlier=makeSkinRGBA(W,H,[0.22,0.16,0.14],0.02);
+const cluster=port.analyzeMultiFrame([
+ {bytes:Array.from(skinA),width:W,height:H,box:null},
+ {bytes:Array.from(skinA2),width:W,height:H,box:null},
+ {bytes:Array.from(outlier),width:W,height:H,box:null}
+]);
+assert.ok(cluster && cluster.sceneGuard===true);
+assert.strictEqual(cluster.frameCount, 2);
+// Face-preferred + scene guard: divergent face frames → best coherent face cluster / single.
+const faceDarkBox={x1:8,y1:8,x2:56,y2:56};
+const faceMix=port.analyzeMultiFrame([
+ {bytes:Array.from(skinA),width:W,height:H,box:faceBox},
+ {bytes:Array.from(skinDark),width:W,height:H,box:faceDarkBox},
+ {bytes:Array.from(skinC),width:W,height:H,box:null}
+]);
+assert.ok(faceMix && faceMix.usedFace===true);
+assert.ok(faceMix.frameCount<=2);
+assert.strictEqual(typeof port.selectCoherentPairs, 'function');
+assert.strictEqual(port.SCENE_GUARD_LUM_SPAN, 0.08);
+assert.strictEqual(port.SCENE_GUARD_RB_SPAN, 0.18);
+fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: 21 staged searches, stats, 21 complete 33³ RGB cubes + v6.7.8 classifiers + multi-frame median + scene-guard: exact Node equality');
 '''
 with tempfile.TemporaryDirectory() as tmp:
  t=Path(tmp);(t/'oracle.js').write_text(oracle);(t/'test.js').write_text(js)

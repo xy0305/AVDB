@@ -126,6 +126,15 @@ final class NativeLUTController: ObservableObject {
     private var buildTask: Task<Void, Never>?
     private var buildGeneration = 0
     private var cachedCube: Data?
+    /// After analysis/reanalyze, dissolve previous cube → new cube (~200ms). Bypass/关闭 clears immediately.
+    private var pendingCubeCrossfade = false
+    private var crossfadeFromCube: Data?
+    private var crossfadeStartUptime: TimeInterval?
+    private static let filterCrossfadeSeconds: TimeInterval = 0.2
+    /// First 开启 auto-analyze waits ~400ms (userscript initialDelayMs spirit) before grab.
+    private var needsEnableDelay = false
+    private static let enableDelayNanoseconds: UInt64 = 400_000_000
+    private static let sampleIntervalNanoseconds: UInt64 = 120_000_000
     private weak var avPlayer: AVPlayer?
     private weak var onlineContainer: UIView?
     private var surface: NativeHLSLUTSurface?
@@ -305,6 +314,7 @@ final class NativeLUTController: ObservableObject {
         avPlayer = nil
         generation += 1
         buildGeneration += 1; buildTask?.cancel(); cachedCube = nil
+        pendingCubeCrossfade = false; crossfadeFromCube = nil; crossfadeStartUptime = nil; needsEnableDelay = false
         sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
         analysisGeneration += 1
         reveal.cancel()
@@ -317,6 +327,8 @@ final class NativeLUTController: ObservableObject {
         supported = false; busy = false; requested = true
     }
     private func restoreOriginalRendering() {
+        // Bypass / 关闭: clear filter immediately (no crossfade).
+        pendingCubeCrossfade = false; crossfadeFromCube = nil; crossfadeStartUptime = nil
         if onlineMode { onlineFilter = nil; surface?.setFilter(nil) }
         else { item?.videoComposition = original }
     }
@@ -325,10 +337,11 @@ final class NativeLUTController: ObservableObject {
         enabled.toggle()
         if enabled && cachedCube == nil {
             requested = true
+            needsEnableDelay = true
             buildGeneration += 1; buildTask?.cancel()
             restoreOriginalRendering()
             surface?.prepareForcedAnalysisFrame()
-            status = onlineMode ? "在线：等待解码帧以便自动分析…" : "等待原始解码帧以便自动分析…"
+            status = onlineMode ? "在线：稍候抓帧自动分析…" : "稍候抓帧自动分析…"
             return
         }
         if !enabled {
@@ -342,8 +355,11 @@ final class NativeLUTController: ObservableObject {
     func reanalyze() {
         guard supported else { return }
         analysisGeneration += 1; busy = false; reveal.cancel()
+        needsEnableDelay = false
         buildGeneration += 1; buildTask?.cancel()
-        restoreOriginalRendering()
+        // Online: keep current Metal filter on screen; new cube crossfades in.
+        // File composition: must clear videoComposition so AVPlayerItemVideoOutput can copy.
+        if !onlineMode { restoreOriginalRendering() }
         surface?.prepareForcedAnalysisFrame()
         requested = true; status = "等待原始解码帧（一键自动分析）…"
     }
@@ -352,6 +368,7 @@ final class NativeLUTController: ObservableObject {
         enabled = false; sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
         buildGeneration += 1; buildTask?.cancel()
         parameters = LUTParameters(); composition = nil; cachedCube = nil
+        needsEnableDelay = false
         restoreOriginalRendering(); requested = true; status = "已恢复原画（LUT 关闭）"
     }
     func apply() {
@@ -378,15 +395,43 @@ final class NativeLUTController: ObservableObject {
             guard let self, let item, !Task.isCancelled, self.generation == sourceGeneration, self.buildGeneration == revision, self.item === item else { return }
             if useLUT && cube == nil { self.status = "原版 6.7.8 LUT 引擎失败"; return }
             if useDeband && kernel == nil { self.status = "Metal 去色带不可用；未伪装为模糊" }
+            // Crossfade only when analysis/reanalyze published a new cube; strength-only apply skips it.
+            if useLUT, cube != nil, self.pendingCubeCrossfade {
+                // Crossfade from previous cube only if it is still presented; else fade original→new.
+                let stillShowing = self.onlineMode ? (self.onlineFilter != nil) : (self.item?.videoComposition != nil)
+                self.crossfadeFromCube = stillShowing ? self.cachedCube : nil
+                self.crossfadeStartUptime = ProcessInfo.processInfo.systemUptime
+                self.pendingCubeCrossfade = false
+            } else if !useLUT {
+                self.crossfadeFromCube = nil
+                self.crossfadeStartUptime = nil
+                self.pendingCubeCrossfade = false
+            }
             self.cachedCube = cube ?? self.cachedCube
             let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+            let fadeFrom = self.crossfadeFromCube
+            let fadeStart = self.crossfadeStartUptime
+            let fadeDur = Self.filterCrossfadeSeconds
             let render: (CIImage) -> CIImage = { source in
                 let extent = source.extent
                 var result = source
                 // LUT domain intentionally unchanged; intensity is a true image dissolve.
+                // After analysis: ~200ms cube crossfade (old→new, or original→new on first enable).
                 if amount > 0, let cube, let mapped = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":cube,"inputColorSpace":cs,kCIInputImageKey:source])?.outputImage {
-                    if amount == 1 { result = mapped }
-                    else { result = mapped.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": source, "inputTime": 1-amount]) }
+                    var lutImage = mapped
+                    if let start = fadeStart {
+                        let t = max(0, min(1, (ProcessInfo.processInfo.systemUptime - start) / fadeDur))
+                        if t < 1 {
+                            if let fadeFrom,
+                               let oldMapped = CIFilter(name: "CIColorCubeWithColorSpace", parameters: ["inputCubeDimension":33,"inputCubeData":fadeFrom,"inputColorSpace":cs,kCIInputImageKey:source])?.outputImage {
+                                lutImage = oldMapped.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": mapped, "inputTime": t])
+                            } else {
+                                lutImage = source.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": mapped, "inputTime": t])
+                            }
+                        }
+                    }
+                    if amount == 1 { result = lutImage }
+                    else { result = lutImage.applyingFilter("CIDissolveTransition", parameters: ["inputTargetImage": source, "inputTime": 1-amount]) }
                 }
                 if useDeband, let kernel {
                     // Threshold measured in nonlinear SDR sRGB, not linear working RGB.
@@ -418,17 +463,24 @@ final class NativeLUTController: ObservableObject {
     }
     private func analyze() {
         guard let item else { return }
-        // Mobile-bounded multi-frame grab (userscript: ≤3 @ ~80ms; early-stop on face).
+        // Mobile-bounded multi-frame grab (userscript: ≤3 @ ~120ms; early-stop on face).
         // Paused / single available frame falls back to one-shot analyzeFrame.
         let paused = (avPlayer?.rate ?? 0) == 0
         let maxGrabs = paused ? 1 : 3
+        let delayFirstGrab = needsEnableDelay
+        needsEnableDelay = false
         busy = true; requested = false
         status = maxGrabs > 1
-            ? "一键分析：最多3帧 · MediaPipe → 6.7.8 多帧中位…"
+            ? "一键分析：最多3帧·120ms · MediaPipe → 6.7.8 多帧中位…"
             : "一键分析：MediaPipe 关键点 → 6.7.8 动态 Cr / 分阶段搜索…"
         let token = generation
         let analysisToken = analysisGeneration
         Task { @MainActor in
+            if delayFirstGrab {
+                status = "开启后稍候抓帧（避免黑场/加载）…"
+                try? await Task.sleep(nanoseconds: Self.enableDelayNanoseconds)
+                guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
+            }
             var prepared: [CGImage] = []
             var lastPTS = CMTime.invalid
             var lastBufferID: ObjectIdentifier?
@@ -467,7 +519,7 @@ final class NativeLUTController: ObservableObject {
                 prepared.append(image)
                 if probe.box != nil { break }
                 if grabIndex + 1 < maxGrabs {
-                    try? await Task.sleep(nanoseconds: 80_000_000)
+                    try? await Task.sleep(nanoseconds: Self.sampleIntervalNanoseconds)
                 }
             }
             guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
@@ -498,7 +550,10 @@ final class NativeLUTController: ObservableObject {
             guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
             busy = false
             guard let result else { status = "肤色采样不足（<150）或引擎失败；保留当前画面 / 旧 LUT"; return }
-            parameters = result.0; apply(); status = "33³ LUT · \(result.1) · SDR"
+            parameters = result.0
+            pendingCubeCrossfade = true
+            apply()
+            status = "33³ LUT · \(result.1) · SDR"
         }
     }
 

@@ -1682,6 +1682,39 @@ function analyzeFrame(bytes, width, height, box) {
 }
 // Bounded multi-frame path (userscript v6.7.8): prefer face-box frames, median skin stats, merge pixels.
 // Caller supplies up to CONFIG.sampleFrames (3) RGBA rasters; grab/timing lives in native Swift.
+// Scene-change guard (build 274): if skin_lum / skin_rb span across frames exceeds thresholds,
+// do not median mixed scenes — keep the largest coherent cluster (face-preferred), or best single.
+const SCENE_GUARD_LUM_SPAN = 0.08;
+const SCENE_GUARD_RB_SPAN = 0.18;
+function selectCoherentPairs(pairs) {
+ if (pairs.length <= 1) return { pairs: pairs, sceneGuard: false };
+ let minL = Infinity, maxL = -Infinity, minR = Infinity, maxR = -Infinity;
+ for (const p of pairs) {
+  minL = Math.min(minL, p.stats.skin_lum); maxL = Math.max(maxL, p.stats.skin_lum);
+  minR = Math.min(minR, p.stats.skin_rb); maxR = Math.max(maxR, p.stats.skin_rb);
+ }
+ if ((maxL - minL) <= SCENE_GUARD_LUM_SPAN && (maxR - minR) <= SCENE_GUARD_RB_SPAN) {
+  return { pairs: pairs, sceneGuard: false };
+ }
+ // Largest cluster: each seed keeps frames within thresh on both axes; tie → earliest seed.
+ let bestIdx = [0];
+ for (let seed = 0; seed < pairs.length; seed++) {
+  const s0 = pairs[seed].stats;
+  const cluster = [];
+  for (let i = 0; i < pairs.length; i++) {
+   const s = pairs[i].stats;
+   if (Math.abs(s.skin_lum - s0.skin_lum) <= SCENE_GUARD_LUM_SPAN &&
+       Math.abs(s.skin_rb - s0.skin_rb) <= SCENE_GUARD_RB_SPAN) {
+    cluster.push(i);
+   }
+  }
+  if (cluster.length > bestIdx.length ||
+      (cluster.length === bestIdx.length && cluster[0] < bestIdx[0])) {
+   bestIdx = cluster;
+  }
+ }
+ return { pairs: bestIdx.map(i => pairs[i]), sceneGuard: true };
+}
 function analyzeMultiFrame(frames) {
  if (!frames || !frames.length) return null;
  const sampled = [];
@@ -1695,13 +1728,16 @@ function analyzeMultiFrame(frames) {
  if (!sampled.length) return null;
  const faceFrames = sampled.filter(f => f.regionName === '人脸框');
  const used = faceFrames.length > 0 ? faceFrames : sampled;
- const perFrameStats = [];
+ const pairs = [];
  for (const f of used) {
   const s = sampleSkinStats(f.pixels);
-  if (s) perFrameStats.push(s);
+  if (s) pairs.push({ frame: f, stats: s });
  }
- if (!perFrameStats.length) return null;
- const firstFrame = used[0];
+ if (!pairs.length) return null;
+ const selected = selectCoherentPairs(pairs);
+ const chosen = selected.pairs;
+ const perFrameStats = chosen.map(p => p.stats);
+ const firstFrame = chosen[0].frame;
  const globalHlRatio = firstFrame.full_hl_ratio_global !== undefined
   ? firstFrame.full_hl_ratio_global : 0;
  const info = {
@@ -1717,10 +1753,10 @@ function analyzeMultiFrame(frames) {
   regionName: firstFrame.regionName || '人脸框',
  };
  let totalLen = 0;
- for (const f of used) totalLen += f.pixels.length;
+ for (const p of chosen) totalLen += p.frame.pixels.length;
  const merged = new Float32Array(totalLen);
  let off = 0;
- for (const f of used) { merged.set(f.pixels, off); off += f.pixels.length; }
+ for (const p of chosen) { merged.set(p.frame.pixels, off); off += p.frame.pixels.length; }
  const useExtreme = isExtremeDark(info);
  const useHighMatch = useExtreme ? false : isHighMatch(info);
  const stage = useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准';
@@ -1728,9 +1764,10 @@ function analyzeMultiFrame(frames) {
   params: predictParams(info, subsample(merged, CONFIG.maxSkinPixels), useExtreme, useHighMatch),
   info: info,
   stage: stage,
-  frameCount: used.length,
+  frameCount: chosen.length,
   rawFrameCount: sampled.length,
-  usedFace: faceFrames.length > 0
+  usedFace: faceFrames.length > 0,
+  sceneGuard: selected.sceneGuard
  };
 }
 function cubeRGBA(values) {
@@ -1741,5 +1778,5 @@ function cubeRGBA(values) {
  return Array.from(out);
 }
 
-return {analyzeFrame, analyzeMultiFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median};
+return {analyzeFrame, analyzeMultiFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
 })();
