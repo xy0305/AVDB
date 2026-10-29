@@ -50,6 +50,25 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             highlightFloorHard: -12,
             hlRatioHardFloor: 0.35,
         },
+        // Build 276 mobile shadow toe + skin guard (deliberate divergence from desktop 6.7.8)
+        shadowToe: {
+            toeEnd: 0.20,        // input luma above this: untouched 6.7.8 pipeline
+            toeFull: 0.10,       // input luma below this: fully toe-protected
+            slopeMin: 0.92,      // never crush near-black detail by more than 8%
+            slopeMax: 1.05,      // never lift near-black by more than 5% (black point stays 0)
+            extremeSlopePerShadow: 0.02, // extreme-dark templates (shadow>10) may lift a bit more
+            extremeSlopeMax: 1.25,
+        },
+        skinGuard: {
+            maxHueRotate: 6,     // degrees, mean skin hue (of mean RGB)
+            magentaFloor: 4,     // skin hue must stay >= this (wrap below 0 = magenta/pink)
+            minSatRatio: 0.80,   // skin saturation may drop at most 20%
+            maxSatRatio: 1.15,
+            maxSteps: 40,
+            satMaxDelta: 6,
+            minLum: 0.12,
+            hueRange: [-20, 50],
+        },
         nearWhiteDelta: 0.08,
         nearWhiteMinC: 0.85,
         brightGuardMaxAdd: 2,
@@ -514,6 +533,77 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             key = k;
             return val;
         };
+    }
+
+    // Build 276: hue (deg) / saturation of the mean RGB of a pixel array
+    function meanHueSat(pixels) {
+        const n = pixels.length / 3;
+        if (n === 0) return null;
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < n; i++) { r += pixels[i * 3]; g += pixels[i * 3 + 1]; b += pixels[i * 3 + 2]; }
+        r /= n; g /= n; b /= n;
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+        let h = 0;
+        if (d > 1e-9) {
+            if (mx === r) h = ((g - b) / d) % 6;
+            else if (mx === g) h = (b - r) / d + 2;
+            else h = (r - g) / d + 4;
+            h *= 60;
+        }
+        // signed around red: (-180, 180]; skin lives ~ +5..+35
+        if (h > 180) h -= 360;
+        if (h <= -180) h += 360;
+        return { hue: h, sat: mx > 1e-6 ? d / mx : 0, lum: KR * r + KG * g + KB * b };
+    }
+
+    function skinGuardViolation(before, after, SG) {
+        if (!before || !after) return null;
+        const rot = after.hue - before.hue;
+        const floor = Math.min(SG.magentaFloor, before.hue);
+        if (after.hue < floor || rot < -SG.maxHueRotate) return 'cool';   // toward pink/magenta
+        if (rot > SG.maxHueRotate) return 'warm';                         // toward yellow
+        const ratio = before.sat > 1e-6 ? after.sat / before.sat : 1;
+        if (ratio < SG.minSatRatio) return 'desat';
+        if (ratio > SG.maxSatRatio) return 'oversat';
+        return null;
+    }
+
+    // Build 276: bound skin hue rotation / magenta / saturation change produced by temp/tint/sat.
+    function skinGuardParams(params, skinSample, template) {
+        const SG = CONFIG.skinGuard;
+        const before = meanHueSat(skinSample);
+        // only plausible skin samples (not black/white/saturated-red fallbacks)
+        if (!before || before.sat < 0.03 || before.sat > 0.75 || before.lum < SG.minLum ||
+            before.hue < SG.hueRange[0] || before.hue > SG.hueRange[1]) return params;
+        const evalP = () => meanHueSat(applyParamsToSkinArray(skinSample, params));
+        let v = skinGuardViolation(before, evalP(), SG);
+        let steps = 0;
+        while (v && steps < SG.maxSteps) {
+            steps++;
+            if (v === 'cool') {
+                // magenta/pink: first remove green-cut (tint), then warm temp
+                if (params.tint > 0) params.tint -= 1;
+                else if (params.temp < 0) params.temp += 1;
+                else break;
+            } else if (v === 'warm') {
+                if (params.temp > template.temp) params.temp -= 1;
+                else if (params.tint < 6) params.tint += 1;
+                else break;
+            } else if (v === 'desat') {
+                // cold temp removes skin chroma; warm back first, then lift sat
+                if (params.temp < -12) params.temp += 1;
+                else if (params.sat < template.sat + SG.satMaxDelta) params.sat += 1;
+                else break;
+            } else if (v === 'oversat') {
+                if (params.sat > template.sat - SG.satMaxDelta) params.sat -= 1;
+                else break;
+            }
+            v = skinGuardViolation(before, evalP(), SG);
+        }
+        if (steps > 0) {
+            console.log(`[LUT-算法-肤色保护] ${steps} 步 → temp=${params.temp} tint=${params.tint} sat=${params.sat}`);
+        }
+        return params;
     }
 
     function predictParams(info, skinPixels, useExtreme, useHighMatch) {
@@ -1523,6 +1613,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             }
         }
 
+        // ---- Build 276 肤色保护（限制色相旋转/洋红偏色/饱和度骤降）----
+        if (!useExtreme && skinPixels !== null && skinPixels.length > 0) {
+            skinGuardParams(params, coarse, template);
+        }
+
         // ---- Build 275 过曝风险 bright/highlight 硬顶 ----
         if (isWashoutRisk) {
             const brightCap = template.bright + WR.brightCapDelta;
@@ -1554,6 +1649,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     // ============================================================
     function generateLutData(size, params) {
         const data = new Float32Array(size * size * size * 3);
+        const toeSlope = shadowToeSlope(params);
         let idx = 0;
         for (let b = 0; b < size; b++) {
             for (let g = 0; g < size; g++) {
@@ -1579,6 +1675,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                         rIn *= s; gIn *= s; bIn *= s;
                     }
 
+                    // Build 276 shadow toe: keep black point, keep near-black slope, keep source shadow hue.
+                    const r0 = r / (size - 1), g0 = g / (size - 1), b0 = b / (size - 1);
+                    const t2 = applyShadowToe(r0, g0, b0, rIn, gIn, bIn, toeSlope);
+                    rIn = t2[0]; gIn = t2[1]; bIn = t2[2];
+
                     data[idx++] = Math.min(1, Math.max(0, rIn));
                     data[idx++] = Math.min(1, Math.max(0, gIn));
                     data[idx++] = Math.min(1, Math.max(0, bIn));
@@ -1586,6 +1687,37 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             }
         }
         return data;
+    }
+
+    // Slope of the neutral pipeline at the toe end, clamped (black point preserved by construction).
+    function shadowToeSlope(params) {
+        const ST = CONFIG.shadowToe;
+        const T = ST.toeEnd;
+        let t = applyBrightnessScalar(T, T, T, params.bright);
+        t = applyHighlightShadowScalar(t[0], t[1], t[2], params.highlight, params.shadow);
+        t = applyContrastScalar(t[0], t[1], t[2], params.contrast);
+        t = applySaturationScalar(t[0], t[1], t[2], params.sat);
+        t = applyTempTintScalar(t[0], t[1], t[2], params.temp, params.tint);
+        const outT = KR * t[0] + KG * t[1] + KB * t[2];
+        let hi = ST.slopeMax;
+        if (params.shadow > 10) {
+            hi = Math.min(ST.extremeSlopeMax, ST.slopeMax + (params.shadow - 10) * ST.extremeSlopePerShadow);
+        }
+        return Math.max(ST.slopeMin, Math.min(hi, outT / T));
+    }
+
+    function applyShadowToe(r0, g0, b0, r, g, b, slope) {
+        const ST = CONFIG.shadowToe;
+        const lin = KR * r0 + KG * g0 + KB * b0;
+        if (lin >= ST.toeEnd) return [r, g, b];
+        let w = 1;
+        if (lin > ST.toeFull) {
+            const x = (lin - ST.toeFull) / (ST.toeEnd - ST.toeFull);
+            w = 1 - x * x * (3 - 2 * x);
+        }
+        // toe target: source colour (hue/chroma) scaled by a bounded slope
+        const tr = r0 * slope, tg = g0 * slope, tb = b0 * slope;
+        return [r + (tr - r) * w, g + (tg - g) * w, b + (tb - b) * w];
     }
 function computeGlobalHlRatio(data, step) {
         const nPix = data.length / 4;
@@ -1839,5 +1971,5 @@ function cubeRGBA(values) {
  return Array.from(out);
 }
 
-return {analyzeFrame, analyzeMultiFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
+return {analyzeFrame, analyzeMultiFrame, cubeRGBA, applyShadowToe, shadowToeSlope, meanHueSat, skinGuardParams, CONFIG, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
 })();

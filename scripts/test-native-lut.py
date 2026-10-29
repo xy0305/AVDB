@@ -14,6 +14,53 @@ const original=vm.createContext({});vm.runInContext(fs.readFileSync(process.argv
 const ref=vm.runInContext(process.argv[4],original),port=engine.OriginalLUT;
 let seed=154;function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
 const cases=[];
+// Build 276 dark-fabric / shadow-detail contract on the shipped cube.
+function cubeAt(rgb,ri,gi,bi){const e=(bi*1089+gi*33+ri)*3;return [rgb[e],rgb[e+1],rgb[e+2]];}
+const Yl=c=>.2126*c[0]+.7152*c[1]+.0722*c[2];
+function toeContract(q,rgb,label){
+ const T=port.CONFIG.shadowToe, slope=port.shadowToeSlope(q);
+ const hi=q.shadow>10?T.extremeSlopeMax:T.slopeMax;
+ assert.ok(slope>=T.slopeMin-1e-12 && slope<=hi+1e-12, label+' toe slope '+slope);
+ // black point preserved exactly
+ const k=cubeAt(rgb,0,0,0); assert.ok(Math.max(...k)<=1e-9, label+' black lifted '+k);
+ // neutral ramp: monotonic, no lift > slopeMax and no crush < slopeMin below toeFull (luma ~0.10)
+ let prev=-1;
+ for(let i=0;i<=16;i++){
+  const v=i/32, out=Yl(cubeAt(rgb,i,i,i));
+  assert.ok(out>=prev-1e-9, label+' neutral ramp non-monotonic at '+v);
+  prev=out;
+  if(i>0 && v<=T.toeFull){
+   assert.ok(out/v>=T.slopeMin-1e-6 && out/v<=hi+1e-6, label+' toe ratio '+(out/v)+' at '+v);
+   if(v<=0.08 && q.shadow<=10) assert.ok(out<=v*1.05+1e-6, label+' lift below 0.08: '+out+' vs '+v);
+  }
+ }
+ // dark coloured fabric keeps its source hue/chroma ratios (temp/tint not applied to near-black)
+ for(const [ri,gi,bi] of [[3,2,2],[2,2,3],[1,1,1],[2,1,1]]){
+  const o=cubeAt(rgb,ri,gi,bi), src=[ri/32,gi/32,bi/32];
+  if(Yl(src)>T.toeFull) continue;
+  const s=o[1]/src[1];
+  for(let c=0;c<3;c++) assert.ok(Math.abs(o[c]-src[c]*s)<1e-6, label+' dark fabric chroma shifted');
+ }
+ // shadow detail: 0.02 vs 0.05 step keeps >= 92% of its separation
+ const d0=0.03, d1=Yl(cubeAt(rgb,2,2,2))-Yl(cubeAt(rgb,1,1,1));
+ assert.ok(d1>=T.slopeMin*(2/32-1/32)-1e-6, label+' shadow step crushed '+d1+' '+d0);
+}
+// Build 276 skin hue/sat bound (non-extreme paths).
+function skinBound(info,px,q,extreme,label){
+ if(extreme) return;
+ const SG=port.CONFIG.skinGuard;
+ const coarse=px; // fixture already <= coarse size
+ const a=port.meanHueSat(coarse), b=port.meanHueSat(port.applyParamsToSkinArray(coarse,q));
+ if(!a || a.sat<0.03 || a.sat>0.75 || a.lum<SG.minLum || a.hue<SG.hueRange[0] || a.hue>SG.hueRange[1]) return;
+ const rot=b.hue-a.hue;
+ const ok=Math.abs(rot)<=SG.maxHueRotate+0.5 && b.hue>=Math.min(SG.magentaFloor,a.hue)-0.5 &&
+   b.sat/a.sat>=SG.minSatRatio-0.02 && b.sat/a.sat<=SG.maxSatRatio+0.02;
+ // guard may stop at search bounds (e.g. sat ceiling); then it must at least not rotate into magenta.
+ if(!ok){
+  assert.ok(b.hue>=Math.min(SG.magentaFloor,a.hue)-0.5, label+' skin went magenta '+JSON.stringify([a,b,q]));
+  assert.ok(Math.abs(rot)<=SG.maxHueRotate+0.5, label+' skin hue rotate '+rot+' '+JSON.stringify(q));
+ }
+}
 for(const [name,base] of [['dark',[.16,.13,.12]],['bright',[.85,.76,.64]],['highmatch',[.58,.45,.40]],['yellow',[.7,.43,.24]],['black',[0,0,0]],['white',[1,1,1]],['red',[1,0,0]]]){
  let pixels=[];for(let i=0;i<60;i++)for(const c of base)pixels.push(Math.min(1,Math.max(0,c+(rnd()-.5)*.12)));
  const stats=ref.sampleSkinStats(new Float32Array(pixels));
@@ -48,12 +95,23 @@ for(const [name,base] of [['dark',[.16,.13,.12]],['bright',[.85,.76,.64]],['high
  const rgbPort=Array.from(port.generateLutData(33,q));
  const rgba=port.cubeRGBA(['temp','tint','sat','bright','contrast','highlight','shadow'].map(k=>q[k]));
  for(let i=0;i<rgbPort.length;i++) assert.strictEqual(rgbPort[i],rgba[Math.floor(i/3)*4+i%3]);
- // When params still match 6.7.8, RGB must also match the oracle cube.
+ // When params still match 6.7.8, RGB must also match the oracle cube OUTSIDE the Build 276 shadow toe
+ // (input luma >= toeEnd). Inside the toe the mobile cube deliberately preserves black point / slope / hue.
  const sameParams = JSON.stringify(q)===JSON.stringify(p);
+ const TOE=port.CONFIG.shadowToe;
  if(sameParams){
   const rgb=Array.from(ref.generateLutData(33,p));
-  for(let i=0;i<rgb.length;i++) assert.strictEqual(rgb[i],rgba[Math.floor(i/3)*4+i%3]);
+  let checked=0;
+  for(let e=0;e<rgb.length/3;e++){
+   const r0=(e%33)/32,g0=(Math.floor(e/33)%33)/32,b0=Math.floor(e/1089)/32;
+   if(.2126*r0+.7152*g0+.0722*b0 < TOE.toeEnd) continue;
+   for(let c=0;c<3;c++) assert.strictEqual(rgb[e*3+c],rgba[e*4+c]);
+   checked++;
+  }
+  assert.ok(checked>30000,'oracle cube coverage '+checked);
  }
+ toeContract(q,rgbPort,name+mode);
+ skinBound(info,new Float32Array(pixels),q,mode===1,name+mode);
  cases.push({name:name+mode,pixels,info,extreme:mode===1,high:mode===2,params:q,rgb:rgbPort.slice(0,120)});
  }
 }
@@ -72,6 +130,31 @@ for(const [name,base] of [['dark',[.16,.13,.12]],['bright',[.85,.76,.64]],['high
  assert.ok(wp.highlight <= -9, 'warm washout highlight, got '+wp.highlight);
 }
 
+// Build 276 regression fixtures from user feedback (LUT-on 275: dark sheer fabric lost, skin odd hue).
+{
+ // Desktop-style params that previously crushed toe (contrast 6 pivots at 0.5) and rotated skin.
+ const harsh={temp:-31,tint:5,sat:-1,bright:18,contrast:6,highlight:-7,shadow:2};
+ const rgb=Array.from(port.generateLutData(33,harsh));
+ toeContract(harsh,rgb,'harsh');
+ // 6.7.8 oracle crushes 0.03 luma to ~0 here; mobile cube keeps it.
+ const oracleRgb=Array.from(ref.generateLutData(33,harsh));
+ assert.ok(Yl(cubeAt(oracleRgb,1,1,1))<0.01, 'oracle toe expected crushed');
+ assert.ok(Yl(cubeAt(rgb,1,1,1))>=0.029, 'mobile toe preserved');
+ // Skin fixtures that drifted magenta / desaturated on 275.
+ seed=276;
+ for(const [nm,base,hl,sh] of [['warmskin',[.70,.50,.40],.28,.08],['pinkskin',[.66,.50,.50],.12,.10],['dimskin',[.42,.30,.25],.02,.30],['neutral',[.62,.47,.40],.06,.15]]){
+  const px=[];for(let i=0;i<300;i++)for(const c of base)px.push(Math.min(1,Math.max(0,c+(rnd()-.5)*.1)));
+  const f=new Float32Array(px), st=port.sampleSkinStats(f);
+  const info={...st,full_hl_ratio:hl,full_sh_ratio:sh,high_rb:1.2,high_pixels:300,regionName:'人脸框'};
+  const ex=port.isExtremeDark(info), hm=ex?false:port.isHighMatch(info);
+  const q=port.predictParams(info,f,ex,hm);
+  const a=port.meanHueSat(f), b=port.meanHueSat(port.applyParamsToSkinArray(f,q));
+  assert.ok(Math.abs(b.hue-a.hue)<=port.CONFIG.skinGuard.maxHueRotate+0.5, nm+' hue rotate '+(b.hue-a.hue));
+  assert.ok(b.hue>=Math.min(port.CONFIG.skinGuard.magentaFloor,a.hue)-0.5, nm+' magenta '+b.hue);
+  assert.ok(b.sat/a.sat>=port.CONFIG.skinGuard.minSatRatio-0.02, nm+' desat '+(b.sat/a.sat));
+  toeContract(q,Array.from(port.generateLutData(33,q)),nm);
+ }
+}
 assert.strictEqual(port.sampleSkinStats([]),null);
 // Cold-scene high-match protection (v6.7.8): low R/B+R/G+sat with moderate luma → high-match
 const cold={skin_rb:1.1,skin_rg:1.1,skin_sat:0.2,skin_lum:0.4,full_hl_ratio:0.05,full_sh_ratio:0.1,no_skin_data:false,high_pixels:0};
@@ -180,7 +263,7 @@ assert.ok(faceMix.frameCount<=2);
 assert.strictEqual(typeof port.selectCoherentPairs, 'function');
 assert.strictEqual(port.SCENE_GUARD_LUM_SPAN, 0.08);
 assert.strictEqual(port.SCENE_GUARD_RB_SPAN, 0.18);
-fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: staged searches + Build275 anti-OE + classifiers + multi-frame/scene-guard; cube self-consistency (6.7.8 param equality where unchanged)');
+fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: staged searches + Build276 shadow-toe/skin-guard + Build275 anti-OE + classifiers + multi-frame/scene-guard; cube self-consistency (6.7.8 param equality where unchanged)');
 '''
 with tempfile.TemporaryDirectory() as tmp:
  t=Path(tmp);(t/'oracle.js').write_text(oracle);(t/'test.js').write_text(js)
