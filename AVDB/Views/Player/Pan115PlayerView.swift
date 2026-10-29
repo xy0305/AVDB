@@ -44,7 +44,8 @@ struct Pan115PlayerView: View {
                         vm.receiveMetrics(metrics, settled: settled, url: sourceURL, generation: metricsGeneration)
                     },
                     historyMovie: movie,
-                    historyArtwork: historyArtwork
+                    historyArtwork: historyArtwork,
+                    historySource: "115"
                 )
                 .id(url)
                 .id(metricsGeneration)

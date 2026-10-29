@@ -321,7 +321,9 @@ struct TangxinDetailView: View {
         .fullScreenCover(item:$playback) { plan in
             // The existing player owns subtitle/gesture/audio/LUT/orientation behavior.
             // No Movie/JavDB query, 115 operation, cookies or global header mutation.
-            KSChromePlayer(url:plan.url,title:detail?.video.title ?? video.title,subtitle:"糖心 · HLS",headers:plan.headers,progressID:"tangxin:"+video.url.lastPathComponent,publicSubtitleQuery:"")
+            KSChromePlayer(url:plan.url,title:detail?.video.title ?? video.title,subtitle:"糖心 · HLS",headers:plan.headers,progressID:"tangxin:"+video.url.lastPathComponent,publicSubtitleQuery:"",
+                           historyMovie:Movie(id:PlaybackHistoryList.tangxinPrefix+video.url.absoluteString,number:"糖心",title:detail?.video.title ?? video.title),
+                           historySource:"糖心",historyPage:video.url,historyPoster:detail?.video.poster ?? video.poster)
         }
     }
 

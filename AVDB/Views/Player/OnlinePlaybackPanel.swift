@@ -15,6 +15,11 @@ final class OnlinePlaybackModel: ObservableObject {
     }
     @Published private(set) var states: [OnlineSource:State] = [:]
     @Published var plan: OnlinePlaybackPlan?
+    #if !ONLINE_CORE_TEST
+    /// 观看历史 context only (catalog movie + detail poster); never sent to a provider and not cleared by reset().
+    var historyMovie: Movie?
+    var historyArtwork: UIImage?
+    #endif
     struct Resolution: Equatable {
         enum Status: Equatable { case resolving, validated, failed(OnlineFailure) }
         let line: OnlineLine
@@ -250,7 +255,7 @@ struct OnlinePlaybackPanel: View {
         .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in model.reset() }
         .onDisappear { model.cancelPending() }
         .fullScreenCover(item: $model.plan, onDismiss: { model.cancelPending() }) { plan in
-            OnlineQualityPlayer(plan: plan)
+            OnlineQualityPlayer(plan: plan, historyMovie: model.historyMovie, historyArtwork: model.historyArtwork)
                 .id(plan.id)
         }
     }
@@ -300,6 +305,8 @@ struct OnlinePlaybackPanel: View {
 
 struct OnlineQualityPlayer: View {
     let plan: OnlinePlaybackPlan
+    var historyMovie: Movie? = nil
+    var historyArtwork: UIImage? = nil
     @State private var manual: HLSVariant?
     private var choice: OnlineQualityChoice {
         OnlineQualitySelector.select(plan.ladder, preferHighest: plan.preference.preferHighest, manual: manual)
@@ -308,7 +315,9 @@ struct OnlineQualityPlayer: View {
         KSChromePlayer(url: plan.url, title: plan.number, subtitle: plan.source.label,
                        headers: plan.headers, onlineQuality: choice,
                        progressID: "online:" + plan.id.uuidString,
-                       supportsFramePreview: false, publicSubtitleQuery: plan.number)
+                       supportsFramePreview: false, publicSubtitleQuery: plan.number,
+                       historyMovie: historyMovie, historyArtwork: historyArtwork,
+                       historySource: plan.source.label)
         .overlay(alignment: .topTrailing) {
             if plan.ladder.count > 1 {
                 Menu {

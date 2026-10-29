@@ -30,7 +30,8 @@ struct PlayerView: View {
                     title: vm.title,
                     subtitle: vm.currentQuality,
                     headers: vm.headers,
-                    historyMovie: vm.historyMovie
+                    historyMovie: vm.historyMovie,
+                    historySource: "JavDB"
                 )
             } else if vm.isLoading {
                 ProgressView("加载播放源…")
@@ -162,7 +163,13 @@ struct KSChromePlayer: View {
     var onVideoMetrics: ((URL, PlaybackVideoMetrics?, Bool) -> Void)? = nil
     var historyMovie: Movie? = nil
     var historyArtwork: UIImage? = nil
+    /// Display label for 「观看历史」 (JavDB / 115 / MissAV / 糖心…). Never a URL.
+    var historySource: String? = nil
+    /// Tangxin only: public page + poster so the history entry reopens its own detail.
+    var historyPage: URL? = nil
+    var historyPoster: URL? = nil
     @State private var historyGate = PlaybackHistoryStartGate()
+    @State private var historyRecordedID: String?
     @State private var historyScope = PlaybackHistoryStore.shared.scope
     @State private var historyToken = APIClient.shared.token
     @State private var lastVideoMetrics: PlaybackVideoMetrics?
@@ -312,7 +319,11 @@ struct KSChromePlayer: View {
             cancelPlayerDrag()
             configureSeekPreview()
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            flushHistory(force: true)
+        }
         .onDisappear {
+            flushHistory(force: true)
             seekPreview.close()
             // UIKit full-screen/adaptive sheet presentations may disappear the presenter.
             // They must not tear down playback or force the whole app to portrait.
@@ -892,6 +903,8 @@ struct KSChromePlayer: View {
                     onPlaybackFailure?()
                 }
                 isPlaying = state.isPlaying
+                if state == .paused { flushHistory(force: true) }
+                if state == .playedToTheEnd { flushHistory(force: true, position: max(currentTime, duration)) }
                 isBuffering = state == .buffering || state == .preparing
                 if state.isPlaying || state == .readyToPlay || state == .paused {
                     hasStarted = true
@@ -929,7 +942,9 @@ struct KSChromePlayer: View {
                 if let movie = historyMovie, APIClient.shared.token == historyToken,
                    historyGate.sample(time: currentTime, playing: coordinator.playerLayer?.player.isPlaying == true,
                                       seeking: isSeeking || seekPending, failed: failureReported) {
-                    PlaybackHistoryStore.shared.record(movie, artwork: historyArtwork, scope: historyScope)
+                    PlaybackHistoryStore.shared.record(movie, artwork: historyArtwork, scope: historyScope,
+                                                       source: historySource, page: historyPage, poster: historyPoster)
+                    historyRecordedID = movie.id
                 }
                 applyOnlineQuality()
                 publishVideoMetrics(timedOut: Date().timeIntervalSince(start) > 30)
@@ -990,6 +1005,15 @@ struct KSChromePlayer: View {
         if let progressID {
             PlaybackProgressStore.save(movieID: progressID, time: currentTime, duration: duration)
         }
+        flushHistory(force: false)
+    }
+
+    /// 观看历史 resume point. Only after the start gate recorded this session; ticks write every ≥10 s,
+    /// pause / end / exit / background force a write.
+    private func flushHistory(force: Bool, position: TimeInterval? = nil) {
+        guard let id = historyRecordedID, APIClient.shared.token == historyToken else { return }
+        PlaybackHistoryStore.shared.updateProgress(id, position: position ?? currentTime, duration: duration,
+                                                   scope: historyScope, force: force)
     }
 
     private func seek(to time: TimeInterval) {

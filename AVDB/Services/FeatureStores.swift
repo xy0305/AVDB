@@ -9,22 +9,119 @@ import Foundation
 import UIKit
 
 /// Device-only, account-isolated history. Never stores a stream, cookie or token.
+/// Build 277: optional source/position/duration/Tangxin page fields; old v1 JSON decodes unchanged.
 struct PlaybackHistoryItem: Codable, Identifiable, Hashable {
     let movieID: String
     let number: String
     let title: String
     let type: String?
     let coverURL: String?
-    let playedAt: Date
+    var playedAt: Date
+    /// Display label only (JavDB / 115 / MissAV / 糖心 …). Never a URL.
+    var source: String? = nil
+    /// Last watched media time / duration in seconds (updated on pause, exit and background).
+    var position: Double? = nil
+    var length: Double? = nil
+    /// Public Tangxin video page + poster (https, no query) so the entry can reopen its own detail.
+    var pageURL: String? = nil
+    var posterURL: String? = nil
     var id: String { movieID }
     var movie: Movie { Movie(id: movieID, type: type, number: number, title: title, coverURL: coverURL) }
+    var isTangxin: Bool { movieID.hasPrefix(PlaybackHistoryList.tangxinPrefix) }
+    /// 0…1 when both values are meaningful; nil hides the bar.
+    var fraction: Double? {
+        guard let position, let length, length > 1, position.isFinite, length.isFinite, position > 0 else { return nil }
+        return min(1, max(0, position / length))
+    }
+}
+
+/// Pure ordering/dedupe/cap/progress policy. Foundation-only so CI can execute it with plain swiftc.
+struct PlaybackHistoryList: Equatable {
+    static let capacity = 500
+    static let tangxinPrefix = "tangxin:"
+    private(set) var items: [PlaybackHistoryItem] = []
+
+    init(items: [PlaybackHistoryItem] = []) {
+        self.items = items.sorted { $0.playedAt > $1.playedAt }
+    }
+
+    /// Dedupe by id and move to top; keep the previous resume point until new progress arrives.
+    /// Returns ids evicted by the cap.
+    @discardableResult
+    mutating func record(_ entry: PlaybackHistoryItem) -> [String] {
+        var next = entry
+        if let old = items.first(where: { $0.movieID == entry.movieID }) {
+            if next.position == nil { next.position = old.position; next.length = old.length }
+            if next.source == nil { next.source = old.source }
+            if next.pageURL == nil { next.pageURL = old.pageURL }
+            if next.posterURL == nil { next.posterURL = old.posterURL }
+        }
+        items.removeAll { $0.movieID == entry.movieID }
+        items.insert(next, at: 0)
+        guard items.count > Self.capacity else { return [] }
+        let evicted = items.dropFirst(Self.capacity).map(\.movieID)
+        items = Array(items.prefix(Self.capacity))
+        return evicted
+    }
+
+    /// Returns true when the change is worth persisting (forced, ≥10 s moved, or first value).
+    @discardableResult
+    mutating func updateProgress(_ id: String, position: Double, length: Double, at date: Date, force: Bool) -> Bool {
+        guard position.isFinite, position >= 0, let index = items.firstIndex(where: { $0.movieID == id }) else { return false }
+        var item = items[index]
+        let moved = abs((item.position ?? -100) - position)
+        guard force || moved >= 10 else { return false }
+        item.position = position
+        if length.isFinite, length > 0 { item.length = length }
+        item.playedAt = date
+        items[index] = item
+        return true
+    }
+
+    mutating func remove(_ id: String) { items.removeAll { $0.movieID == id } }
+    mutating func clear() { items = [] }
+}
+
+enum PlaybackHistoryFormat {
+    /// 今天 21:05 / 昨天 08:30 / 10月3日 / 2025年12月1日
+    static func relative(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let time = DateFormatter(); time.calendar = calendar; time.timeZone = calendar.timeZone
+        time.locale = Locale(identifier: "zh_CN"); time.dateFormat = "HH:mm"
+        if calendar.isDate(date, inSameDayAs: now) { return "今天 " + time.string(from: date) }
+        if let y = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: y) {
+            return "昨天 " + time.string(from: date)
+        }
+        let day = DateFormatter(); day.calendar = calendar; day.timeZone = calendar.timeZone
+        day.locale = Locale(identifier: "zh_CN")
+        day.dateFormat = calendar.component(.year, from: date) == calendar.component(.year, from: now) ? "M月d日" : "yyyy年M月d日"
+        return day.string(from: date)
+    }
+
+    static func clock(_ t: Double) -> String {
+        guard t.isFinite, t >= 0 else { return "00:00" }
+        let s = Int(t); let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%02d:%02d", m, sec)
+    }
+
+    /// 看到 12:30 / 共 2:00:00 · 已看完
+    static func progressText(_ item: PlaybackHistoryItem) -> String? {
+        guard let position = item.position, position > 0 else { return nil }
+        if let length = item.length, length > 1 {
+            if position >= length - 15 { return "已看完" }
+            return "看到 " + clock(position) + " / " + clock(length)
+        }
+        return "看到 " + clock(position)
+    }
 }
 
 @MainActor
 final class PlaybackHistoryStore: ObservableObject {
     static let shared = PlaybackHistoryStore()
+    static let guestScope = "guest"
     @Published private(set) var items: [PlaybackHistoryItem] = []
     private(set) var scope: String?
+    private var list = PlaybackHistoryList()
+    private let artworkCache = NSCache<NSString, UIImage>()
     private let defaults: UserDefaults
     private let directory: URL
     init(defaults: UserDefaults = .standard, directory: URL? = nil) {
@@ -34,12 +131,14 @@ final class PlaybackHistoryStore: ObservableObject {
     }
     private var key: String? { scope.map { "avdb.play.history.v1." + $0 } }
 
+    /// Logged-out playback is kept in a separate device-only "guest" scope; accounts never see each other's history.
     func activate(accountID: Int?) {
-        let next = accountID.map { "user-\($0)" }
+        let next = accountID.map { "user-\($0)" } ?? Self.guestScope
         guard scope != next else { return }
         scope = next
-        items = key.flatMap { defaults.data(forKey: $0) }.flatMap { try? JSONDecoder().decode([PlaybackHistoryItem].self, from: $0) } ?? []
-        items.sort { $0.playedAt > $1.playedAt }
+        let stored = key.flatMap { defaults.data(forKey: $0) }.flatMap { try? JSONDecoder().decode([PlaybackHistoryItem].self, from: $0) } ?? []
+        list = PlaybackHistoryList(items: stored)
+        items = list.items
     }
     /// Public unsigned artwork only. Reject rather than strip signed URLs.
     static func safeCoverURL(_ value: String?) -> String? {
@@ -51,6 +150,13 @@ final class PlaybackHistoryStore: ObservableObject {
         guard ["jpg", "jpeg", "png", "webp", "avif"].contains(ext) else { return nil }
         return value
     }
+    /// Public https page/poster without credentials, query or fragment (Tangxin entries only).
+    static func safePublicURL(_ value: URL?) -> String? {
+        guard let value, let u = URLComponents(url: value, resolvingAgainstBaseURL: false), u.scheme == "https",
+              let host = u.host?.lowercased(), !host.isEmpty, !host.contains("localhost"),
+              u.user == nil, u.password == nil, u.query == nil, u.fragment == nil else { return nil }
+        return value.absoluteString
+    }
     private func imageURL(_ movieID: String) -> URL? {
         guard let scope else { return nil }
         // UTF8 hex is reversible identity, not a secret; no path traversal.
@@ -59,36 +165,52 @@ final class PlaybackHistoryStore: ObservableObject {
     }
     func artwork(for movieID: String) -> UIImage? {
         guard let url = imageURL(movieID) else { return nil }
-        return UIImage(contentsOfFile: url.path)
+        if let cached = artworkCache.object(forKey: url.path as NSString) { return cached }
+        guard let image = UIImage(contentsOfFile: url.path) else { return nil }
+        artworkCache.setObject(image, forKey: url.path as NSString)
+        return image
     }
-    func record(_ movie: Movie, artwork: UIImage?, scope expected: String?, at date: Date = Date()) {
+    func record(_ movie: Movie, artwork: UIImage?, scope expected: String?, at date: Date = Date(),
+                source: String? = nil, page: URL? = nil, poster: URL? = nil) {
         guard let expected, scope == expected, !movie.id.isEmpty else { return }
         if let artwork, let url = imageURL(movie.id) {
             let size = artwork.size
             if size.width > 0, size.height > 0 {
-                let ratio = min(1, 480 / max(size.width, size.height))
+                let ratio = min(1, 640 / max(size.width, size.height))
                 let format = UIGraphicsImageRendererFormat(); format.scale = 1
                 let image = UIGraphicsImageRenderer(size: CGSize(width: size.width * ratio, height: size.height * ratio), format: format).image { _ in
                     artwork.draw(in: CGRect(origin: .zero, size: CGSize(width: size.width * ratio, height: size.height * ratio)))
                 }
                 try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try? image.jpegData(compressionQuality: 0.85)?.write(to: url, options: .atomic)
+                artworkCache.removeObject(forKey: url.path as NSString)
             }
         }
-        items.removeAll { $0.movieID == movie.id }
-        items.insert(PlaybackHistoryItem(movieID: movie.id, number: movie.displayNumber, title: movie.displayTitle,
-                                        type: movie.type, coverURL: Self.safeCoverURL(movie.coverURL ?? movie.thumbURL), playedAt: date), at: 0)
-        for item in items.dropFirst(300) { removeImage(item.movieID) }
-        items = Array(items.prefix(300))
+        let entry = PlaybackHistoryItem(movieID: movie.id, number: movie.displayNumber, title: movie.displayTitle,
+                                        type: movie.type, coverURL: Self.safeCoverURL(movie.coverURL ?? movie.thumbURL), playedAt: date,
+                                        source: source, pageURL: Self.safePublicURL(page), posterURL: Self.safePublicURL(poster))
+        for id in list.record(entry) { removeImage(id) }
+        items = list.items
+        persist()
+    }
+    /// Pause / exit / background force a write; periodic ticks write only after ≥10 s of movement.
+    func updateProgress(_ movieID: String, position: Double, duration: Double, scope expected: String?, force: Bool = false, at date: Date = Date()) {
+        guard let expected, scope == expected else { return }
+        guard list.updateProgress(movieID, position: position, length: duration, at: date, force: force) else { return }
+        items = list.items
         persist()
     }
     private func persist() {
-        guard let key, let data = try? JSONEncoder().encode(items) else { return }
+        guard let key, let data = try? JSONEncoder().encode(list.items) else { return }
         defaults.set(data, forKey: key)
     }
-    private func removeImage(_ id: String) { if let url = imageURL(id) { try? FileManager.default.removeItem(at: url) } }
-    func remove(_ id: String) { removeImage(id); items.removeAll { $0.id == id }; persist() }
-    func clear() { for item in items { removeImage(item.id) }; items = []; persist() }
+    private func removeImage(_ id: String) {
+        guard let url = imageURL(id) else { return }
+        artworkCache.removeObject(forKey: url.path as NSString)
+        try? FileManager.default.removeItem(at: url)
+    }
+    func remove(_ id: String) { removeImage(id); list.remove(id); items = list.items; persist() }
+    func clear() { for item in list.items { removeImage(item.id) }; list.clear(); items = []; persist() }
 }
 
 /// A ready event is not playback. Require an active engine and forward media-time movement.

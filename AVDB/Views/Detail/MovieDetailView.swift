@@ -121,6 +121,10 @@ struct MovieDetailView: View {
         .sheet(isPresented: $showOnlinePlayback, onDismiss: { onlinePlaybackModel.cancelPending() }) {
             if let movie = vm.movie {
                 OnlinePlaybackSheet(number: movie.displayNumber, model: onlinePlaybackModel, versions: $onlineVersions)
+                    .onAppear {
+                        onlinePlaybackModel.historyMovie = movie
+                        onlinePlaybackModel.historyArtwork = posterArtwork?.image ?? activeTPDBArtwork?.image
+                    }
             }
         }
         .onChange(of: movieID) { _, _ in
