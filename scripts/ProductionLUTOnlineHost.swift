@@ -91,6 +91,30 @@ final class Host: UIViewController {
         return await wait { self.pixels.count > count }
     }
     private func delta(_ a: [UInt8], _ b: [UInt8]) -> Int { zip(a,b).reduce(0) { $0 + abs(Int($1.0)-Int($1.1)) } }
+    /// (mean |Δ| per channel in 8-bit codes, mean Δ on source pixels darker than 64) for the better of both row orders.
+    private static func sourceFidelity(_ buf: CVPixelBuffer, _ image: CIImage) -> (Double, Double) {
+        let w = CVPixelBufferGetWidth(buf), h = CVPixelBufferGetHeight(buf)
+        var out = [UInt8](repeating: 0, count: w * h * 4)
+        CIContext(options: [.cacheIntermediates: false]).render(image, toBitmap: &out, rowBytes: w * 4, bounds: CGRect(x: 0, y: 0, width: w, height: h), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        CVPixelBufferLockBaseAddress(buf, .readOnly); defer { CVPixelBufferUnlockBaseAddress(buf, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(buf)?.assumingMemoryBound(to: UInt8.self) else { return (999, 999) }
+        let rb = CVPixelBufferGetBytesPerRow(buf)
+        var best = (999.0, 999.0)
+        for flipped in [false, true] {
+            var err = 0.0, n = 0.0, dark = 0.0, dn = 0.0
+            for y in stride(from: 0, to: h, by: 2) { for x in stride(from: 0, to: w, by: 2) {
+                let src = base + y * rb + x * 4                     // BGRA
+                let oy = flipped ? (h - 1 - y) : y, o = oy * w * 4 + x * 4 // RGBA
+                let s = [Double(src[2]), Double(src[1]), Double(src[0])], d = [Double(out[o]), Double(out[o+1]), Double(out[o+2])]
+                for c in 0..<3 { err += abs(d[c] - s[c]); n += 1 }
+                let luma = 0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2]
+                if luma < 64 { dark += (0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2]) - luma; dn += 1 }
+            } }
+            let r = (n > 0 ? err / n : 999, dn > 0 ? dark / dn : 0)
+            if r.0 < best.0 { best = r }
+        }
+        return best
+    }
     private func run(overlay: UIView) async {
         backend.play()
         checks["readyToPlay"] = await wait { self.player.currentItem?.status == .readyToPlay && self.model.supported }
@@ -126,6 +150,16 @@ final class Host: UIViewController {
         let first = runtime.copyDecodedFrameForAnalysis()
         let throttled = runtime.copyDecodedFrameForAnalysis()
         checks["sharedAnalysisOutputAndThrottle"] = first != nil && throttled == nil && runtime.output === originalOutput
+        // Build 279: presentation/analysis source image must keep the decoded SDR values untouched
+        // (no BT.709-OETF→sRGB lift). Compare CoreImage readback of the production source image with the
+        // raw 32BGRA bytes; the legacy untagged CIImage is measured to document the old lift.
+        if let buf = runtime.copyDecodedFrameForAnalysis(force: true) {
+            let fidelity = Self.sourceFidelity(buf, NativeHLSLUTSurface.sourceImage(buf))
+            let legacy = Self.sourceFidelity(buf, CIImage(cvPixelBuffer: buf))
+            measures["sourceIdentityMeanAbs"] = fidelity.0; measures["sourceIdentityDarkLift"] = fidelity.1
+            measures["legacyUntaggedMeanAbs"] = legacy.0; measures["legacyUntaggedDarkLift"] = legacy.1
+            checks["sourceImageIdentityToDecodedBuffer"] = fidelity.0 < 1.5 && abs(fidelity.1) < 2.0
+        } else { checks["sourceImageIdentityToDecodedBuffer"] = false }
         model.setLayoutCompatible(false)
         checks["fillModeOriginalBypass"] = runtime.view.isHidden
         model.setLayoutCompatible(true)

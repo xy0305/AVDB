@@ -1,8 +1,12 @@
 from pathlib import Path
 import subprocess,tempfile,json,re,hashlib,sys
 r=Path(__file__).resolve().parents[1];s=(r/'AVDB/Views/Player/NativeHLSLUTSurface.swift').read_text();c=(r/'AVDB/Views/Player/NativeLUT.swift').read_text();p=(r/'AVDB/Views/Player/PlayerView.swift').read_text()
-assert hashlib.sha256(s.encode()).hexdigest()=='774a5ccfb1ab3bab30cc45c4bc8e6dadd6250b16c8a9ff5edb5a2566bd039218', 'runtime must remain exact verified production file'
+assert hashlib.sha256(s.encode()).hexdigest()=='b20c5571c4da80560ca978c951730ab19434886aebfeb7582cca41a2d238cfcb', 'runtime must remain exact verified production file'
 assert 'guard !protected else' in s and '不绕过 DRM' in s
+# Build 279: decoded SDR buffers are tagged sRGB (no BT.709-OETF→sRGB lift) in presentation AND analysis.
+assert 'CIImage(cvPixelBuffer: buffer, options: [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])' in s
+assert 'var source = Self.sourceImage(buffer)' in s and 'CIImage(cvPixelBuffer: buffer)\n' not in s
+assert 'NativeHLSLUTSurface.sourceImage(buffer)' in c and 'CIImage(cvPixelBuffer: buffer)' not in c
 assert '0x64766831' in s and '0x64766865' in s
 assert 'guard self.generation == revision else { return }' in s
 assert 'generation += 1; link?.invalidate()' in s

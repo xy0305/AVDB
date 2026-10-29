@@ -19,14 +19,16 @@ function cubeAt(rgb,ri,gi,bi){const e=(bi*1089+gi*33+ri)*3;return [rgb[e],rgb[e+
 const Yl=c=>.2126*c[0]+.7152*c[1]+.0722*c[2];
 function toeContract(q,rgb,label){
  const T=port.CONFIG.shadowToe, slope=port.shadowToeSlope(q);
- assert.ok(slope>=T.slopeMin-1e-12 && slope<=T.slopeMax+1e-12, label+' toe slope '+slope);
+ // Build 279: the toe may only lift beyond slopeMax when the frame explicitly asks for strong shadow lift
+ const cap=q.shadow>T.shadowForWide?T.slopeMaxShadow:T.slopeMax;
+ assert.ok(slope>=T.slopeMin-1e-12 && slope<=cap+1e-12, label+' toe slope '+slope);
  const k=cubeAt(rgb,0,0,0); assert.ok(Math.max(...k)<=1e-9, label+' black lifted '+k);
  let prev=-1;
  for(let i=0;i<=16;i++){
   const v=i/32, out=Yl(cubeAt(rgb,i,i,i));
   assert.ok(out>=prev-1e-9, label+' neutral ramp non-monotonic at '+v);
   prev=out;
-  if(i>0 && v<=T.toeFull) assert.ok(out/v>=T.slopeMin-1e-6 && out/v<=T.slopeMax+1e-6, label+' toe ratio '+(out/v)+' at '+v);
+  if(i>0 && v<=T.toeFull) assert.ok(out/v>=T.slopeMin-1e-6 && out/v<=cap+1e-6, label+' toe ratio '+(out/v)+' at '+v);
  }
  for(const [ri,gi,bi] of [[2,1,1],[1,1,2],[1,1,1],[2,2,1]]){
   const o=cubeAt(rgb,ri,gi,bi), src=[ri/32,gi/32,bi/32];
@@ -43,6 +45,12 @@ function shoulderContract(q,label){
  const px=[];for(let i=0;i<=40;i++){const v=0.5+i/80;px.push(v,v*.80,v*.66);}
  const o=port.renderArray(new Float32Array(px),q);
  for(let i=0;i<o.length;i+=3){const y=Yl([o[i],o[i+1],o[i+2]]);assert.ok(y>=prev-1e-6,label+' shoulder non-monotonic');assert.ok(y<=SH.ceil+1e-6,label+' above shoulder ceiling '+y);prev=y;}
+}
+// Build 279 white anchor: bright neutral source keeps its luminance (no grey whites / haze on high-key scenes).
+function whiteAnchorContract(q,label){
+ const px=[];for(let i=0;i<=20;i++){const v=0.80+i*0.01;px.push(v,v,v*0.985);}
+ const o=port.renderArray(new Float32Array(px),q);
+ for(let i=0;i<o.length;i+=3){const yi=Yl([px[i],px[i+1],px[i+2]]),yo=Yl([o[i],o[i+1],o[i+2]]);assert.ok(Math.abs(yo-yi)<=0.006||(yi>0.97&&yo>=0.97),label+' white luma moved '+yi+'→'+yo);}
 }
 // Build 278 skin: never rotated into magenta (mean skin hue below 0 deg = >360).
 function skinNotMagenta(px,q,label){
@@ -77,6 +85,8 @@ for(const [name,base] of [['dark',[.16,.13,.12]],['bright',[.85,.76,.64]],['high
    const r0=(e%33)/32,g0=(Math.floor(e/33)%33)/32,b0=Math.floor(e/1089)/32;
    if(.2126*r0+.7152*g0+.0722*b0 < TOE.toeEnd) continue;
    if(Yl([rgb[e*3],rgb[e*3+1],rgb[e*3+2]]) > SH.knee-1e-9 || Math.max(rgb[e*3],rgb[e*3+1],rgb[e*3+2]) >= 0.999) continue;
+   { const WA=port.CONFIG.whiteAnchor, mx=Math.max(r0,g0,b0), mn=Math.min(r0,g0,b0);
+     if(.2126*r0+.7152*g0+.0722*b0 > WA.lumLo && (mx>0?(mx-mn)/mx:0) < WA.satHi) continue; }
    for(let c=0;c<3;c++) assert.strictEqual(rgb[e*3+c],rgba[e*4+c]);
    checked++;
   }
@@ -84,6 +94,7 @@ for(const [name,base] of [['dark',[.16,.13,.12]],['bright',[.85,.76,.64]],['high
  }
  toeContract(q,rgbPort,name+mode);
  shoulderContract(q,name+mode);
+ whiteAnchorContract(q,name+mode);
  if(mode!==1) skinNotMagenta(new Float32Array(pixels),q,name+mode);
  cases.push({name:name+mode,pixels,info,extreme:mode===1,high:mode===2,params:q,rgb:rgbPort.slice(0,120)});
  }
@@ -93,7 +104,7 @@ assert.ok(same678>=12, 'Build 278 must keep the 6.7.8 params on non-failing fixt
 {
  const harsh={temp:-31,tint:5,sat:-1,bright:18,contrast:6,highlight:-7,shadow:2};
  const rgb=Array.from(port.generateLutData(33,harsh));
- toeContract(harsh,rgb,'harsh'); shoulderContract(harsh,'harsh');
+ toeContract(harsh,rgb,'harsh'); shoulderContract(harsh,'harsh'); whiteAnchorContract(harsh,'harsh');
  const oracleRgb=Array.from(ref.generateLutData(33,harsh));
  assert.ok(Yl(cubeAt(oracleRgb,1,1,1))<0.01, 'oracle toe expected crushed');
  assert.ok(Yl(cubeAt(rgb,1,1,1))>=0.029, 'mobile toe preserved');
@@ -116,6 +127,8 @@ const scenes=[
  ['bright-window',[.78,.60,.50],(x,y)=>((x+y)%7<4?[.92,.90,.86]:[.80,.78,.74])],
  ['black-stocking',[.62,.45,.38],(x,y)=>(y>48?((x%3)?[.035,.03,.03]:[.09,.08,.08]):[.40,.36,.33])],
  ['yellow-room',[.70,.50,.34],()=>[.55,.48,.38]],
+ // Build 279 on-device regression (user screenshot, high-key): white rug/bed, beige wall, sheer black stocking.
+ ['highkey-white-rug',[.78,.60,.52],(x,y)=>(y>50?((x%3)?[.07,.06,.065]:[.16,.14,.14]):((x+y)%5<3?[.88,.87,.85]:[.80,.74,.68]))],
 ];
 for(const [nm,skin,scene] of scenes){
  const W=96,H=64, bytes=makeScene(W,H,skin,scene,0.05);
@@ -125,7 +138,19 @@ for(const [nm,skin,scene] of scenes){
  const ctx=port.safetyContext(fr.global_sample,coarseSkin);
  const f=port.safetyFailure(ctx,Object.assign({},res.params));
  assert.ok(f===null, nm+' still fails '+f+' '+JSON.stringify(res.params));
- const rgb=Array.from(port.generateLutData(33,res.params)); toeContract(res.params,rgb,nm); shoulderContract(res.params,nm);
+ const rgb=Array.from(port.generateLutData(33,res.params)); toeContract(res.params,rgb,nm); shoulderContract(res.params,nm); whiteAnchorContract(res.params,nm);
+ // Build 279: what the user sees vs LUT-off on the whole frame — no lifted blacks, no haze, no grey whites,
+ // no extra brightness on high-key frames, stocking density kept.
+ { const g=fr.global_sample, y0=new Float32Array(g.length/3), out=port.renderArray(g,res.params), y1=new Float32Array(g.length/3);
+   for(let i=0;i<y0.length;i++){y0[i]=Yl([g[i*3],g[i*3+1],g[i*3+2]]);y1[i]=Yl([out[i*3],out[i*3+1],out[i*3+2]]);}
+   const a=port.globalShape(g,y0), b=port.globalShape(out,y1,a);
+   assert.ok(b.p5-a.p5<=0.02 && b.dark3-a.dark3<=0.02, nm+' lifted blacks '+JSON.stringify([a.p5,b.p5,a.dark3,b.dark3]));
+   assert.ok(b.std/a.std>=0.93, nm+' haze std '+b.std/a.std);
+   if(a.white.length/y0.length>=0.02) assert.ok(b.whiteMean>=a.whiteMean-0.03, nm+' grey whites '+a.whiteMean+'→'+b.whiteMean);
+   if(a.p50>=0.5) assert.ok(b.p50-a.p50<=0.03, nm+' high-key brightened '+a.p50+'→'+b.p50);
+   if(nm==='highkey-white-rug'){ assert.ok(a.p50>=0.5 && a.white.length/y0.length>=0.2, 'fixture must be high-key');
+     assert.ok(Math.abs(b.whiteMean-a.whiteMean)<=0.02, 'rug white must stay at source '+a.whiteMean+'→'+b.whiteMean);
+     assert.ok(Math.abs(b.dark3-a.dark3)<=0.015, 'stocking density '+a.dark3+'→'+b.dark3); } }
  cases.push({name:'scene-'+nm,pixels:Array.from(fr.pixels.slice(0,3*400)),global:Array.from(fr.global_sample),info:res.info,extreme:res.stage==='极端暗部',high:res.stage==='高命中',params:null,rgb:null});
 }
 assert.strictEqual(port.sampleSkinStats([]),null);
@@ -237,7 +262,7 @@ assert.strictEqual(typeof port.selectCoherentPairs, 'function');
 assert.strictEqual(port.SCENE_GUARD_LUM_SPAN, 0.08);
 assert.strictEqual(port.SCENE_GUARD_RB_SPAN, 0.18);
 for(const c of cases){ if(c.params===null){ c.params=port.predictParams(c.info,new Float32Array(c.pixels),c.extreme,c.high,new Float32Array(c.global)); c.rgb=Array.from(port.generateLutData(33,c.params)).slice(0,120); } }
-fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: Build278 6.7.8 params where safe ('+same678+' fixtures identical, '+guarded+' guarded) + toe/shoulder/magenta contracts + per-frame safety scenes + classifiers + multi-frame/scene-guard; cube self-consistency');
+fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: Build279 6.7.8 params where safe ('+same678+' fixtures identical, '+guarded+' guarded) + toe/shoulder/white-anchor/magenta contracts + high-key/haze/lift scene metrics + per-frame safety scenes + classifiers + multi-frame/scene-guard; cube self-consistency');
 '''
 with tempfile.TemporaryDirectory() as tmp:
  t=Path(tmp);(t/'oracle.js').write_text(oracle);(t/'test.js').write_text(js)
@@ -268,7 +293,7 @@ for c in cases {
  let want = c["rgb"] as! [NSNumber]
  for i in out.indices { precondition(abs(out[i].doubleValue-want[i].doubleValue) <= 1e-7) }
 }
-print("PASS: native JavaScriptCore vs Node: \(cases.count) searches (incl. Build 278 safety scenes) and LUT scalar samples (1e-7)")
+print("PASS: native JavaScriptCore vs Node: \(cases.count) searches (incl. Build 279 safety scenes) and LUT scalar samples (1e-7)")
 '''
  (t/'main.swift').write_text(swift)
  subprocess.run(['swift',str(t/'main.swift'),str(root/'AVDB/Resources/OriginalLUT.js'),str(t/'cases.json')],check=True)

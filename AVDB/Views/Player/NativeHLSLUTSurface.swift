@@ -7,6 +7,12 @@ import UIKit
 /// Own on the main actor; insert `view` above only the AVPlayerLayer, below controls.
 @MainActor
 final class NativeHLSLUTSurface: NSObject {
+    /// Build 279: decoded 32BGRA SDR values are the display-referred pixels AVPlayerLayer shows.
+    /// Tag them sRGB so CoreImage does NOT honour the buffer's BT.709 transfer attachment and run a
+    /// 709-OETF→sRGB conversion (that lifted shadows ~+0.06, flattened contrast and hazed the picture).
+    nonisolated static func sourceImage(_ buffer: CVPixelBuffer) -> CIImage {
+        CIImage(cvPixelBuffer: buffer, options: [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
+    }
     let view: MTKView
     private(set) var output: AVPlayerItemVideoOutput?
     var onStatus: ((String) -> Void)?
@@ -262,7 +268,7 @@ final class NativeHLSLUTSurface: NSObject {
             return
         }
         dirty = false
-        var source = CIImage(cvPixelBuffer: buffer)
+        var source = Self.sourceImage(buffer)
         if let aspect = CVBufferCopyAttachment(buffer, kCVImageBufferPixelAspectRatioKey, nil) as? [String: NSNumber],
            let horizontal = aspect[kCVImageBufferPixelAspectRatioHorizontalSpacingKey as String]?.doubleValue,
            let vertical = aspect[kCVImageBufferPixelAspectRatioVerticalSpacingKey as String]?.doubleValue,

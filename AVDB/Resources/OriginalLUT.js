@@ -100,13 +100,23 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             oversatAbs: 0.60, oversatRatio: 1.35,
             minSkinSat: 0.03, maxSkinSat: 0.75, minSkinLum: 0.08, hueRange: [-25, 60],
             brightFloor: 0, highlightFloor: -18, contrastFloor: -5, shadowCeil: 20, satFloor: -15,
+            // Build 279 (on-device haze report): contrast / black point / high-key / pink limits
+            hazeStdMin: 0.93, hazeRangeMin: 0.93,      // global luma std and p95-p5 range kept
+            p5RiseMax: 0.02, dark3RiseMax: 0.02,       // black point / deepest 3% not lifted (stockings)
+            whiteMinFrac: 0.02, whiteDropMax: 0.03,    // neutral whites not greyed
+            highKeyP50: 0.50, highKeyRiseMax: 0.03, highKeySkinLum: 0.55, highKeySkinRiseMax: 0.03,
+            pinkHue: 9, pinkRotMax: 7,                // skin rotated toward pink
+            hlblowHighlightFloor: -15,
         },
         // Build 278 shadow toe: near-black keeps the black point, its own hue and a bounded slope;
         // lift is allowed (6.7.8 shadow/bright intent), crushing is not.
         shoulder: { enabled: true, knee: 0.78, ceil: 0.97 },
         shadowToe: {
-            toeEnd: 0.20, toeFull: 0.08, slopeMin: 0.97, slopeMax: 1.60,
+            toeEnd: 0.20, toeFull: 0.08, slopeMin: 0.97, slopeMax: 1.10, slopeMaxShadow: 1.35, shadowForWide: 12,
         },
+        // Build 279: bright low-saturation (white / near-white) source keeps its luminance, so
+        // high-key white scenes are not greyed by the highlight pull or hazed by the shoulder.
+        whiteAnchor: { enabled: true, lumLo: 0.62, lumHi: 0.80, satLo: 0.10, satHi: 0.22 },
     }
     const KR = 0.2126, KG = 0.7152, KB = 0.0722;
     const HL_THRESHOLD = 0.65;
@@ -565,7 +575,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         const out = applyParamsToSkinArray(pixels, params, true);
         const slope = shadowToeSlope(params);
         for (let i = 0; i < out.length; i += 3) {
-            const t = applyShadowToe(pixels[i], pixels[i + 1], pixels[i + 2], out[i], out[i + 1], out[i + 2], slope);
+            let t = applyShadowToe(pixels[i], pixels[i + 1], pixels[i + 2], out[i], out[i + 1], out[i + 2], slope);
+            t = applyWhiteAnchor(pixels[i], pixels[i + 1], pixels[i + 2], t[0], t[1], t[2]);
             out[i] = Math.min(1, Math.max(0, t[0])); out[i + 1] = Math.min(1, Math.max(0, t[1])); out[i + 2] = Math.min(1, Math.max(0, t[2]));
         }
         return out;
@@ -587,6 +598,30 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         return [m, Math.sqrt(v / idx.length)];
     }
 
+    // Build 279: contrast / black point / white shape of a whole-frame sample (y = its luma).
+    function globalShape(px, y, ref) {
+        const n = y.length;
+        let m = 0; for (let i = 0; i < n; i++) m += y[i]; m /= n;
+        let v = 0; for (let i = 0; i < n; i++) v += (y[i] - m) * (y[i] - m);
+        const sorted = Float32Array.from(y).sort();
+        const q = (p) => sorted[Math.min(n - 1, Math.floor(p * n))];
+        const o = { std: Math.sqrt(v / n), p5: q(0.05), p50: q(0.5), p95: q(0.95) };
+        // index sets are fixed by the SOURCE frame so before/after compare the same pixels
+        if (!ref) {
+            const white = [], d3 = [];
+            const cut = q(0.03);
+            for (let i = 0; i < n; i++) {
+                const r = px[i * 3], g = px[i * 3 + 1], b = px[i * 3 + 2];
+                const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+                if (y[i] > 0.70 && (mx > 0 ? (mx - mn) / mx : 0) < 0.15) white.push(i);
+                if (y[i] <= cut) d3.push(i);
+            }
+            o.white = white; o.d3 = d3;
+        } else { o.white = ref.white; o.d3 = ref.d3; }
+        o.whiteMean = meanStd(y, o.white)[0]; o.dark3 = meanStd(y, o.d3)[0];
+        return o;
+    }
+
     // Build 278: per-frame failure check of a param set. Returns the first failure or null.
     function safetyContext(globalSample, skinSample) {
         const SF = CONFIG.safety;
@@ -603,6 +638,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             const d = meanStd(y0, dark), h = meanStd(y0, hl);
             ctx.g = { px: globalSample, y0, n: y0.length, dark, hl, clip0: clip0 / y0.length, p1: quantile(y0, 0.01),
                 darkMean: d[0], darkStd: d[1], hlMean: h[0], hlStd: h[1] };
+            Object.assign(ctx.g, globalShape(globalSample, y0));
         }
         if (skinSample && skinSample.length >= 3 * 20) {
             const b = meanHueSat(skinSample);
@@ -618,6 +654,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             const floor = Math.min(SF.magentaHue, b.hue - SF.magentaExtraRot);
             if (a.hue < floor + SF.magentaMargin) return 'magenta';
             if (a.lum > SF.skinLumMax && a.lum > b.lum + 0.02) return 'skinwash';
+            if (b.lum >= SF.highKeySkinLum && a.lum > b.lum + SF.highKeySkinRiseMax) return 'highkey';
+            if (a.hue < SF.pinkHue && b.hue - a.hue > SF.pinkRotMax) return 'pink';
             if ((a.sat > SF.oversatAbs && a.sat > b.sat + 0.02) || (b.sat > 1e-6 && a.sat / b.sat > SF.oversatRatio)) return 'oversat';
         }
         if (ctx.g) {
@@ -637,6 +675,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             const p1 = quantile(y1, 0.01);
             if (g.p1 - p1 > SF.p1DropMax) return 'crush';
             if (p1 - g.p1 > SF.p1RiseMax) return 'lift';
+            const o = globalShape(g.px, y1, g);
+            if (o.p5 - g.p5 > SF.p5RiseMax || (g.d3.length && o.dark3 - g.dark3 > SF.dark3RiseMax)) return 'lift';
+            if (g.white.length / g.n >= SF.whiteMinFrac && o.whiteMean < g.whiteMean - SF.whiteDropMax) return 'greywhite';
+            if (g.p50 >= SF.highKeyP50 && o.p50 - g.p50 > SF.highKeyRiseMax) return 'highkey';
+            if (g.std > 0.02 && (o.std / g.std < SF.hazeStdMin || (g.p95 - g.p5 > 0.02 && (o.p95 - o.p5) / (g.p95 - g.p5) < SF.hazeRangeMin))) return 'haze';
         }
         return null;
     }
@@ -657,10 +700,29 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 else if (params.sat > SF.satFloor) params.sat -= 1;
                 else moved = false;
             } else if (f === 'hlblow') {
-                // keep the mid-tone/skin lift, pull the highlights back first
-                if (params.highlight > SF.highlightFloor) params.highlight -= 1;
+                // Build 279: bounded highlight pull first (white anchor keeps neutral whites), then the lift
+                if (params.highlight > SF.hlblowHighlightFloor) params.highlight -= 1;
                 else if (params.bright > SF.brightFloor) params.bright -= 1;
                 else if (params.contrast > 0) params.contrast -= 1;
+                else moved = false;
+            } else if (f === 'pink') {
+                if (params.tint > 0) params.tint -= 1;
+                else if (params.temp < 0) params.temp += 1;
+                else moved = false;
+            } else if (f === 'highkey') {
+                if (params.bright > SF.brightFloor) params.bright -= 1;
+                else if (params.shadow > 0) params.shadow -= 1;
+                else if (params.highlight > 0) params.highlight -= 1;
+                else moved = false;
+            } else if (f === 'greywhite') {
+                if (params.highlight < 0) params.highlight += 1;
+                else if (params.contrast < 0) params.contrast += 1;
+                else moved = false;
+            } else if (f === 'haze') {
+                if (params.shadow > 0) params.shadow -= 1;
+                else if (params.highlight < 0) params.highlight += 1;
+                else if (params.bright > SF.brightFloor) params.bright -= 1;
+                else if (params.contrast < 4) params.contrast += 1;
                 else moved = false;
             } else if (f === 'skinwash') {
                 if (params.bright > SF.brightFloor) params.bright -= 1;
@@ -675,12 +737,13 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             } else if (f === 'lift') {
                 if (params.shadow > 0) params.shadow -= 1;
                 else if (params.bright > SF.brightFloor) params.bright -= 1;
+                else if (params.contrast < 4) params.contrast += 1;
                 else moved = false;
             }
             if (!moved) break;
             f = safetyFailure(ctx, params);
         }
-        if (steps > 0) console.log(`[LUT-算法-278安全] ${fixed.join('/')} ${steps} 步 → ${JSON.stringify(params)}`);
+        if (steps > 0) console.log(`[LUT-算法-279安全] ${fixed.join('/')} ${steps} 步 → ${JSON.stringify(params)}`);
         return { params, steps, fixed, residual: f };
     }
 
@@ -1711,7 +1774,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                     }
 
                     const r0 = r / (size - 1), g0 = g / (size - 1), b0 = b / (size - 1);
-                    const t2 = applyShadowToe(r0, g0, b0, rIn, gIn, bIn, toeSlope);
+                    let t2 = applyShadowToe(r0, g0, b0, rIn, gIn, bIn, toeSlope);
+                    t2 = applyWhiteAnchor(r0, g0, b0, t2[0], t2[1], t2[2]);
                     rIn = t2[0]; gIn = t2[1]; bIn = t2[2];
 
                     data[idx++] = Math.min(1, Math.max(0, rIn));
@@ -1731,7 +1795,25 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         t = applySaturationScalar(t[0], t[1], t[2], params.sat);
         t = applyTempTintScalar(t[0], t[1], t[2], params.temp, params.tint);
         const outT = KR * t[0] + KG * t[1] + KB * t[2];
-        return Math.max(ST.slopeMin, Math.min(ST.slopeMax, outT / T));
+        const cap = params.shadow > ST.shadowForWide ? ST.slopeMaxShadow : ST.slopeMax;
+        return Math.max(ST.slopeMin, Math.min(cap, outT / T));
+    }
+
+    function applyWhiteAnchor(r0, g0, b0, r, g, b) {
+        const WA = CONFIG.whiteAnchor;
+        if (!WA.enabled) return [r, g, b];
+        const lin = KR * r0 + KG * g0 + KB * b0;
+        if (lin <= WA.lumLo) return [r, g, b];
+        const mx = Math.max(r0, g0, b0), mn = Math.min(r0, g0, b0);
+        const sat = mx > 1e-6 ? (mx - mn) / mx : 0;
+        if (sat >= WA.satHi) return [r, g, b];
+        const sm = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+        const w = sm(WA.lumLo, WA.lumHi, lin) * (1 - sm(WA.satLo, WA.satHi, sat));
+        const lout = KR * r + KG * g + KB * b;
+        if (w <= 0 || lout <= 1e-6) return [r, g, b];
+        // keep the colour correction (white balance), restore the source luminance
+        const k = 1 + (lin / lout - 1) * w;
+        return [r * k, g * k, b * k];
     }
 
     function applyShadowToe(r0, g0, b0, r, g, b, slope) {
@@ -2012,5 +2094,5 @@ function cubeRGBA(values) {
  return Array.from(out);
 }
 
-return {analyzeFrame, analyzeMultiFrame, cubeRGBA, applyShadowToe, shadowToeSlope, meanHueSat, renderArray, safetyGuard, safetyFailure, safetyContext, globalSample, CONFIG, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
+return {analyzeFrame, analyzeMultiFrame, cubeRGBA, applyShadowToe, applyWhiteAnchor, globalShape, shadowToeSlope, meanHueSat, renderArray, safetyGuard, safetyFailure, safetyContext, globalSample, CONFIG, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
 })();

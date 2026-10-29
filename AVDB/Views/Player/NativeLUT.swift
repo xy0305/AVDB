@@ -505,7 +505,7 @@ final class NativeLUTController: ObservableObject {
                 }
                 lastBufferID = bufferID
                 if CMTIME_IS_VALID(grabbed.pts) { lastPTS = grabbed.pts }
-                let ciImage = CIImage(cvPixelBuffer: buffer)
+                let ciImage = NativeHLSLUTSurface.sourceImage(buffer) // Build 279: same untransformed SDR values as presentation
                 let sourceWidth = ciImage.extent.width, sourceHeight = ciImage.extent.height
                 let aw = sourceWidth >= sourceHeight ? 640 : max(1, Int(floor(sourceWidth * 640 / sourceHeight + 0.5)))
                 let ah = sourceWidth >= sourceHeight ? max(1, Int(floor(sourceHeight * 640 / sourceWidth + 0.5))) : 640
