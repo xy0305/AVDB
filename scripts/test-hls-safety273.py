@@ -10,7 +10,9 @@ assert 'self.generation == sourceGeneration' in c and 'self.buildGeneration == r
 assert 'surface?.copyDecodedFrameForAnalysis(force: true)' in c
 assert '最多3帧' in c
 assert 'copyAnalysisFrame' in c
-assert '80_000_000' in c
+assert '120_000_000' in c  # sampleIntervalMs aligned
+assert '400_000_000' in c  # enable delay
+assert 'filterCrossfadeSeconds' in c
 assert 'prepareForcedAnalysisFrame()' in c
 assert ('原版 6.7.8' in c or '原版6.7.8' in c)
 assert '开启 LUT（自动分析）' in c and '关闭 LUT（恢复原画）' in c
