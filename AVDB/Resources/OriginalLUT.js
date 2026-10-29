@@ -33,9 +33,23 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         canvasResizeThreshold: 4,
         severeSatThreshold: 0.45,
         severeSatMin: -15,
-        autoHlCompBrightThreshold: 15,
-        autoHlCompStrength: 0.5,
+        autoHlCompBrightThreshold: 10,
+        autoHlCompStrength: 0.85,
         autoHlCompMinOrigHl: 0.01,
+        // Build 275 mobile anti-washout (deliberate divergence from desktop 6.7.8 defaults)
+        washoutRisk: {
+            hlRatioSoft: 0.16,
+            lumSoft: 0.46,
+            hlRatioHard: 0.22,
+            lumHard: 0.40,
+            brightRaiseFactor: 0.4,
+            brightCapDelta: 8,
+            hlFinalMin: -14,
+            hlCompMin: -14,
+            highlightFloorSoft: -9,
+            highlightFloorHard: -12,
+            hlRatioHardFloor: 0.35,
+        },
         nearWhiteDelta: 0.08,
         nearWhiteMinC: 0.85,
         brightGuardMaxAdd: 2,
@@ -81,7 +95,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             satTargetFactor: 1.05,
             satMaxExtra: 3,
             shadowMaxFactor: 0.5,
-            brightMaxExtra: 5,
+            brightMaxExtra: 0,
         },
     }
     const KR = 0.2126, KG = 0.7152, KB = 0.0722;
@@ -564,6 +578,20 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             );
         }
 
+        const WR = CONFIG.washoutRisk;
+        const origHlForRisk = info.full_hl_ratio || 0;
+        const isWashoutRisk = !useExtreme && (
+            isHighHlScene ||
+            (origHlForRisk >= WR.hlRatioSoft && origLum >= WR.lumSoft) ||
+            (origHlForRisk >= WR.hlRatioHard && origLum >= WR.lumHard)
+        );
+        if (isWashoutRisk && !isHighHlScene) {
+            console.log(
+                `[LUT-算法-过曝风险场景] full_hl_ratio=${origHlForRisk.toFixed(3)} ` +
+                `skin_lum=${origLum.toFixed(3)} → 收紧 bright / 加强高光压缩（Build 275）`
+            );
+        }
+
         let skinInherentlyYellow = false;
         let sceneColorCast = false;
         if (skinRB > CONFIG.skinRBHighThreshold &&
@@ -780,8 +808,13 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                        _orig_lum_for_target !== undefined && _orig_lum_for_target !== null &&
                        _orig_lum_for_target > 0.35 && _orig_lum_for_target < 0.50 &&
                        (info.full_hl_ratio || 0) > 0.005) {
-                lumTarget = Math.min(_orig_lum_for_target + 0.09, 0.54);
-                console.log(`[LUT-算法-亮度搜索-动态] R/B=${_orig_rb_for_target.toFixed(3)} < 2.0、原片亮度=${_orig_lum_for_target.toFixed(3)} ∈ (0.35, 0.50)、原片高光=${(info.full_hl_ratio||0).toFixed(3)} > 0.005，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.09，上限 0.54）`);
+                if (isWashoutRisk) {
+                    lumTarget = Math.min(_orig_lum_for_target + 0.03, 0.50);
+                    console.log(`[LUT-算法-亮度搜索-过曝风险] R/B=${_orig_rb_for_target.toFixed(3)}、原片亮度=${_orig_lum_for_target.toFixed(3)}、高光=${(info.full_hl_ratio||0).toFixed(3)}，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.03，上限 0.50）`);
+                } else {
+                    lumTarget = Math.min(_orig_lum_for_target + 0.09, 0.54);
+                    console.log(`[LUT-算法-亮度搜索-动态] R/B=${_orig_rb_for_target.toFixed(3)} < 2.0、原片亮度=${_orig_lum_for_target.toFixed(3)} ∈ (0.35, 0.50)、原片高光=${(info.full_hl_ratio||0).toFixed(3)} > 0.005，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.09，上限 0.54）`);
+                }
             }
             console.log(`[LUT-算法-亮度搜索] 目标 = ${lumTarget.toFixed(3)}`);
 
@@ -794,7 +827,10 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 params.bright = lo;
                 console.log(`[LUT-算法-亮度搜索-极亮锁定] 原片 ${origLum.toFixed(3)} > 0.60，亮度直接锁定为 +${lo - template.bright}`);
             } else {
-                if (isHighHlScene) {
+                if (isWashoutRisk) {
+                    bMax = Math.min(bMax, template.bright + WR.brightCapDelta);
+                    console.log(`[LUT-算法-亮度] 过曝风险场景，bright 上限收紧到 ${bMax}`);
+                } else if (isHighHlScene && HH.brightMaxExtra) {
                     bMax += HH.brightMaxExtra;
                     console.log(`[LUT-算法-亮度] 高光过量场景，bright 上限放宽到 ${bMax}`);
                 }
@@ -968,7 +1004,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         // ---- 高光补偿 ----
         let hlCompensation = 0;
-        const hlCompMin = isHighHlScene ? HH.hlCompMin : -10;
+        const hlCompMin = isHighHlScene ? HH.hlCompMin : (isWashoutRisk ? WR.hlCompMin : -10);
         if (!useExtreme) {
             const origHl = info.full_hl_ratio || 0;
             const origLumForHl = info.skin_lum || 0.5;
@@ -1007,11 +1043,12 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
             const hlBase = template.highlight + hlCompensation;
             let bestHl = params.highlight, bestErr = Infinity;
-            const hMin = isHighHlScene ? -16 : adjustRange.highlight[0];
+            const hMin = (isHighHlScene || isWashoutRisk) ? -16 : adjustRange.highlight[0];
             const hMax = adjustRange.highlight[1];
             const hlHardMin = isHighHlScene
                 ? HH.highlightHardMin
-                : (isCenterFallback && useHighMatch ? -5 : -10);
+                : (isWashoutRisk ? WR.hlFinalMin
+                : (isCenterFallback && useHighMatch ? -5 : -10));
 
             for (let delta = hMin; delta <= hMax; delta += 1) {
                 const hl = hlBase + delta;
@@ -1240,16 +1277,21 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         {
             const _hl_for_clamp = info.full_hl_ratio || 0;
             const _rb_for_clamp = info.skin_rb || 1.0;
-            if (_hl_for_clamp > 0.18 && _rb_for_clamp > 1.8) {
+            const _clampHit = isWashoutRisk ||
+                (_hl_for_clamp > 0.15 && (_rb_for_clamp > 1.5 || highRB > 1.2)) ||
+                (_hl_for_clamp > 0.18 && _rb_for_clamp > 1.8);
+            if (_clampHit) {
+                const factor = isWashoutRisk ? WR.brightRaiseFactor : 0.7;
                 const brightRaise = params.bright - template.bright;
                 if (brightRaise > 0) {
-                    const reduced = Math.round(brightRaise * 0.7);
-                    console.log(`[LUT-算法-高光钳制] 亮度提高量 ${brightRaise} → ${reduced}（×0.7）`);
+                    const reduced = Math.round(brightRaise * factor);
+                    console.log(`[LUT-算法-高光钳制] 亮度提高量 ${brightRaise} → ${reduced}（×${factor}）`);
                     params.bright = template.bright + reduced;
                 }
-                if (params.highlight > 0) {
-                    console.log(`[LUT-算法-高光钳制] highlight=${params.highlight} > 0 → 强制为 -1`);
-                    params.highlight = -1;
+                const hlFloor = isWashoutRisk ? -4 : -1;
+                if (params.highlight > hlFloor) {
+                    console.log(`[LUT-算法-高光钳制] highlight=${params.highlight} → 强制为 ${hlFloor}`);
+                    params.highlight = hlFloor;
                 }
             }
         }
@@ -1413,10 +1455,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         if (!useExtreme && params.bright > template.bright && !NO_HL_EXEMPT) {
             const _post_hl_detected = statsOfCoarse(params);
             const _post_hl_lum = _post_hl_detected.skin_lum;
-            const [_post_hl_lo, _post_hl_hi] = getDynamicHlTarget(_post_hl_lum);
+            let [_post_hl_lo, _post_hl_hi] = getDynamicHlTarget(_post_hl_lum);
+            if (isWashoutRisk) _post_hl_hi = Math.min(_post_hl_hi, 0.08);
             console.log(`[LUT-算法-缺亮补亮后-高光复检] bright=${params.bright}，当前 hl=${_post_hl_detected.full_hl_ratio.toFixed(3)}`);
             let best_hl2 = params.highlight, best_err2 = Infinity;
-            const lo2 = adjustRange.highlight[0];
+            const lo2 = (isHighHlScene || isWashoutRisk) ? -16 : adjustRange.highlight[0];
             const hi2 = adjustRange.highlight[1];
             const hl_base2 = template.highlight + hlCompensation;
             for (let delta = lo2; delta <= hi2; delta += 1) {
@@ -1434,7 +1477,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         // ---- 高光最终钳制 ----
         if (!useExtreme) {
-            const HL_FINAL_MIN = -7;
+            // Build 275: washout-risk scenes keep deeper highlight compression (desktop 6.7.8 used -7 always).
+            const HL_FINAL_MIN = isWashoutRisk ? WR.hlFinalMin : -7;
             if (params.highlight < HL_FINAL_MIN) {
                 console.log(`[LUT-算法-高光最终钳制] highlight ${params.highlight} < ${HL_FINAL_MIN} → ${HL_FINAL_MIN}`);
                 params.highlight = HL_FINAL_MIN;
@@ -1442,7 +1486,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         }
 
         // ---- 标准模板-高光放行提亮 ----
-        if (!useExtreme && !useHighMatch) {
+        // Build 275: skip when washout-risk — re-pushing bright to 18 blows highlights on lit SDR.
+        if (!useExtreme && !useHighMatch && !isWashoutRisk) {
             if (skinPixels !== null && skinPixels.length > 0) {
                 const BRIGHT_CAP = 18;
                 const HL_START = 0.20;
@@ -1475,6 +1520,22 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                         console.log(`[LUT-算法-标准-高光放行提亮] 未触发：当前高光=${_hl_now.toFixed(3)} ≥ ${HL_START}`);
                     }
                 }
+            }
+        }
+
+        // ---- Build 275 过曝风险 bright/highlight 硬顶 ----
+        if (isWashoutRisk) {
+            const brightCap = template.bright + WR.brightCapDelta;
+            if (params.bright > brightCap) {
+                console.log(`[LUT-算法-过曝风险] bright ${params.bright} → ${brightCap} 硬顶`);
+                params.bright = brightCap;
+            }
+            const hlFloor = (origHlForRisk >= WR.hlRatioHardFloor)
+                ? WR.highlightFloorHard
+                : WR.highlightFloorSoft;
+            if (params.highlight > hlFloor) {
+                console.log(`[LUT-算法-过曝风险] highlight ${params.highlight} → ${hlFloor}`);
+                params.highlight = hlFloor;
             }
         }
 
