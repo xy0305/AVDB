@@ -15,4 +15,10 @@ Deliberately not transplanted: userscript CORS/src hijacks, 115vod DOM/WebGL ove
 - a shadow toe in `generateLutData`: below luma 0.20 it blends to source colour × a slope clamped to 0.92–1.05, so black stays 0 and near-black is neither crushed by contrast nor tinted by temp/tint
 - a post-search skin guard in `predictParams` (non-extreme): skin hue rotates at most 6°, never goes magenta, and saturation stays within ×0.80–1.15
 
-The neutral cube is unchanged, and default strength stays 1.0. KSPlayer remains an external GPL-3.0 dependency: preserve its notices/license and provide corresponding source for the exact application and dependency revision with any binary distribution. Its GPL notice is not a claim that the supplied userscript is GPL licensed.
+The neutral cube is unchanged, and default strength stays 1.0. Build 276 also changes the parameter search, calibrated on a studio-graded still reference (stats only):
+
+- standard and center skin TARGETS are widened
+- non-extreme shadow is capped at template + 4
+- frames already inside the graded band get params damped ×0.5 toward neutral
+
+See `Build276-LUT-ShadowSkin.md`. KSPlayer remains an external GPL-3.0 dependency: preserve its notices/license and provide corresponding source for the exact application and dependency revision with any binary distribution. Its GPL notice is not a claim that the supplied userscript is GPL licensed.

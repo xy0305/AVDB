@@ -69,6 +69,14 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             minLum: 0.12,
             hueRange: [-20, 50],
         },
+        // Build 276: frames whose skin stats already sit in the graded reference band get near-neutral params.
+        gradedRef: {
+            rb: [1.30, 1.75], rg: [1.18, 1.45], lum: [0.38, 0.60], sat: [0.25, 0.43],
+            damp: 0.5,            // scale every param toward 0
+            brightMax: 6, contrastMax: 3, shadowMax: 4,
+            highlightMin: -5, highlightMinWashout: -7,
+            shadowMaxDelta: 4,    // all non-extreme scenes: shadow <= template.shadow + 4
+        },
         nearWhiteDelta: 0.08,
         nearWhiteMinC: 0.85,
         brightGuardMaxAdd: 2,
@@ -129,11 +137,14 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     const FACE_SKIN_LUM_MAX = 0.9;
 
     // ---- 校准目标区间 ----
+    // Build 276: skin targets widened to the studio-graded reference distribution (whos.tv stills,
+    // n=259, p10..p90: rb 1.31-1.74, rg 1.18-1.44, lum 0.36-0.59, sat 0.24-0.43). Desktop 6.7.8 used
+    // rb [1.24,1.50] / rg [1.20,1.35] / sat [0.22,0.34], which cooled and desaturated graded skin.
     const TARGETS = {
-        skin_rb:       [1.24, 1.50],
-        skin_rg:       [1.20, 1.35],
+        skin_rb:       [1.30, 1.70],
+        skin_rg:       [1.18, 1.44],
         skin_lum:      [0.35, 0.54],
-        skin_sat:      [0.22, 0.34],
+        skin_sat:      [0.24, 0.42],
         full_contrast: [0.10, 0.20],
         full_hl_ratio: [0.00, 0.22],
         full_sh_ratio: [0.00, 0.40],
@@ -634,11 +645,12 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         // 没有 CENTER 目标覆盖（predict_params 里没有 regionName 分支），
         // 但油猴的中央50%采样需要目标下移，这里保留油猴原版的 CENTER 目标适配（仅目标区间，不影响算法逻辑）
+        // Build 276: center-fallback targets retuned to the graded reference (same sampleFrame path).
         const TARGETS_CENTER = {
-            skin_rb:       [1.05, 1.35],
-            skin_rg:       [1.15, 1.35],
-            skin_lum:      [0.55, 0.75],
-            skin_sat:      [0.08, 0.22],
+            skin_rb:       [1.30, 1.70],
+            skin_rg:       [1.18, 1.44],
+            skin_lum:      [0.38, 0.60],
+            skin_sat:      [0.24, 0.42],
             full_contrast: [0.10, 0.20],
             full_hl_ratio: [0.00, 0.20],
             full_sh_ratio: [0.00, 0.40],
@@ -1174,9 +1186,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             if (nDark > 0) {
                 let bestSh = params.shadow, bestErr = Infinity;
                 const sMin = template.shadow + adjustRange.shadow[0];
-                const sMax = isHighHlScene
+                let sMax = isHighHlScene
                     ? template.shadow + Math.round(adjustRange.shadow[1] * HH.shadowMaxFactor)
                     : template.shadow + adjustRange.shadow[1];
+                // Build 276: graded footage keeps its shadows; non-extreme lift capped (+4 over template).
+                if (!useExtreme) sMax = Math.min(sMax, template.shadow + CONFIG.gradedRef.shadowMaxDelta);
                 for (let sh = sMin; sh <= sMax; sh += 1) {
                     const p = Object.assign({}, params, { shadow: sh });
                     const transformed = applyParamsToSkinArray(coarse, p);
@@ -1631,6 +1645,24 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             if (params.highlight > hlFloor) {
                 console.log(`[LUT-算法-过曝风险] highlight ${params.highlight} → ${hlFloor}`);
                 params.highlight = hlFloor;
+            }
+        }
+
+        // ---- Build 276 已调色素材近中性 ----
+        if (!useExtreme && !info.no_skin_data) {
+            const GR = CONFIG.gradedRef;
+            const inb = (v, r) => v !== undefined && v !== null && v >= r[0] && v <= r[1];
+            if (inb(info.skin_rb, GR.rb) && inb(info.skin_rg, GR.rg) &&
+                inb(info.skin_lum, GR.lum) && inb(info.skin_sat, GR.sat)) {
+                for (const k of ['temp', 'tint', 'sat', 'bright', 'contrast', 'highlight', 'shadow']) {
+                    params[k] = Math.round(params[k] * GR.damp);
+                }
+                params.bright = Math.min(params.bright, GR.brightMax);
+                params.contrast = Math.max(-GR.contrastMax, Math.min(params.contrast, GR.contrastMax));
+                params.shadow = Math.min(params.shadow, GR.shadowMax);
+                params.highlight = Math.max(params.highlight, isWashoutRisk ? GR.highlightMinWashout : GR.highlightMin);
+                if (isWashoutRisk && params.highlight > -3) params.highlight = -3;
+                console.log(`[LUT-算法-已调色素材] 肤色统计在参考区间内 → 参数收敛到近中性 ${JSON.stringify(params)}`);
             }
         }
 

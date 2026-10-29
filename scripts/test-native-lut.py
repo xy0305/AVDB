@@ -155,6 +155,32 @@ for(const [name,base] of [['dark',[.16,.13,.12]],['bright',[.85,.76,.64]],['high
   toeContract(q,Array.from(port.generateLutData(33,q)),nm);
  }
 }
+// Build 276 graded-reference regression: frames shaped like studio-graded stills (whos.tv sample, n=259,
+// skin p25/p50/p75 + hl/sh medians) are already well graded → params must stay near-neutral.
+{
+ seed=2760;
+ const refs=[['ref-p25',1.38,1.25,0.41,0.06,0.004],['ref-p50',1.50,1.32,0.475,0.19,0.031],['ref-p75',1.62,1.38,0.54,0.39,0.075],['ref-p50-lowhl',1.50,1.32,0.475,0.02,0.10]];
+ for(const [nm,rb,rg,lum,hl,sh] of refs){
+  const r=lum/(.2126+.7152/rg+.0722/rb), base=[r,r/rg,r/rb];
+  const px=[];for(let i=0;i<400;i++)for(const c of base)px.push(Math.min(1,Math.max(0,c+(rnd()-.5)*.06)));
+  const f=new Float32Array(px), st=port.sampleSkinStats(f);
+  for(const region of ['人脸框','中央50%']){
+   const info={...st,full_hl_ratio:hl,full_sh_ratio:sh,high_rb:1.2,high_pixels:300,regionName:region};
+   const ex=port.isExtremeDark(info), hm=ex?false:port.isHighMatch(info);
+   assert.ok(!ex, nm+' unexpectedly extreme');
+   const q=port.predictParams(info,f,ex,hm), L=nm+'/'+region+' '+JSON.stringify(q);
+   assert.ok(Math.abs(q.temp)<=10, L+' temp'); assert.ok(Math.abs(q.tint)<=3, L+' tint');
+   assert.ok(Math.abs(q.sat)<=3, L+' sat'); assert.ok(q.bright>=-3 && q.bright<=6, L+' bright');
+   assert.ok(Math.abs(q.contrast)<=3, L+' contrast'); assert.ok(q.highlight>=-7 && q.highlight<=2, L+' highlight');
+   assert.ok(q.shadow>=-3 && q.shadow<=4, L+' shadow');
+   const a=port.meanHueSat(f), b=port.meanHueSat(port.applyParamsToSkinArray(f,q));
+   assert.ok(Math.abs(b.hue-a.hue)<=4, L+' hue rot '+(b.hue-a.hue));
+   assert.ok(b.sat/a.sat>=0.85 && b.sat/a.sat<=1.10, L+' sat ratio '+(b.sat/a.sat));
+   assert.ok(Math.abs(b.lum-a.lum)<=0.05, L+' skin lum shift '+(b.lum-a.lum));
+   toeContract(q,Array.from(port.generateLutData(33,q)),nm);
+  }
+ }
+}
 assert.strictEqual(port.sampleSkinStats([]),null);
 // Cold-scene high-match protection (v6.7.8): low R/B+R/G+sat with moderate luma → high-match
 const cold={skin_rb:1.1,skin_rg:1.1,skin_sat:0.2,skin_lum:0.4,full_hl_ratio:0.05,full_sh_ratio:0.1,no_skin_data:false,high_pixels:0};
@@ -263,7 +289,7 @@ assert.ok(faceMix.frameCount<=2);
 assert.strictEqual(typeof port.selectCoherentPairs, 'function');
 assert.strictEqual(port.SCENE_GUARD_LUM_SPAN, 0.08);
 assert.strictEqual(port.SCENE_GUARD_RB_SPAN, 0.18);
-fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: staged searches + Build276 shadow-toe/skin-guard + Build275 anti-OE + classifiers + multi-frame/scene-guard; cube self-consistency (6.7.8 param equality where unchanged)');
+fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: staged searches + Build276 shadow-toe/skin-guard/graded-reference + Build275 anti-OE + classifiers + multi-frame/scene-guard; cube self-consistency (6.7.8 param equality where unchanged)');
 '''
 with tempfile.TemporaryDirectory() as tmp:
  t=Path(tmp);(t/'oracle.js').write_text(oracle);(t/'test.js').write_text(js)
