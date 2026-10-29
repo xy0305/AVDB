@@ -33,50 +33,9 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         canvasResizeThreshold: 4,
         severeSatThreshold: 0.45,
         severeSatMin: -15,
-        autoHlCompBrightThreshold: 10,
-        autoHlCompStrength: 0.85,
+        autoHlCompBrightThreshold: 15,
+        autoHlCompStrength: 0.5,
         autoHlCompMinOrigHl: 0.01,
-        // Build 275 mobile anti-washout (deliberate divergence from desktop 6.7.8 defaults)
-        washoutRisk: {
-            hlRatioSoft: 0.16,
-            lumSoft: 0.46,
-            hlRatioHard: 0.22,
-            lumHard: 0.40,
-            brightRaiseFactor: 0.4,
-            brightCapDelta: 8,
-            hlFinalMin: -14,
-            hlCompMin: -14,
-            highlightFloorSoft: -9,
-            highlightFloorHard: -12,
-            hlRatioHardFloor: 0.35,
-        },
-        // Build 276 mobile shadow toe + skin guard (deliberate divergence from desktop 6.7.8)
-        shadowToe: {
-            toeEnd: 0.20,        // input luma above this: untouched 6.7.8 pipeline
-            toeFull: 0.10,       // input luma below this: fully toe-protected
-            slopeMin: 0.92,      // never crush near-black detail by more than 8%
-            slopeMax: 1.05,      // never lift near-black by more than 5% (black point stays 0)
-            extremeSlopePerShadow: 0.02, // extreme-dark templates (shadow>10) may lift a bit more
-            extremeSlopeMax: 1.25,
-        },
-        skinGuard: {
-            maxHueRotate: 6,     // degrees, mean skin hue (of mean RGB)
-            magentaFloor: 4,     // skin hue must stay >= this (wrap below 0 = magenta/pink)
-            minSatRatio: 0.80,   // skin saturation may drop at most 20%
-            maxSatRatio: 1.15,
-            maxSteps: 40,
-            satMaxDelta: 6,
-            minLum: 0.12,
-            hueRange: [-20, 50],
-        },
-        // Build 276: frames whose skin stats already sit in the graded reference band get near-neutral params.
-        gradedRef: {
-            rb: [1.30, 1.75], rg: [1.18, 1.45], lum: [0.38, 0.60], sat: [0.25, 0.43],
-            damp: 0.5,            // scale every param toward 0
-            brightMax: 6, contrastMax: 3, shadowMax: 4,
-            highlightMin: -5, highlightMinWashout: -7,
-            shadowMaxDelta: 4,    // all non-extreme scenes: shadow <= template.shadow + 4
-        },
         nearWhiteDelta: 0.08,
         nearWhiteMinC: 0.85,
         brightGuardMaxAdd: 2,
@@ -122,7 +81,31 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             satTargetFactor: 1.05,
             satMaxExtra: 3,
             shadowMaxFactor: 0.5,
-            brightMaxExtra: 0,
+            brightMaxExtra: 5,
+        },
+        // Build 278: the 6.7.8 look is the target again (whos.tv stills are raw source frames, not grades).
+        // Safety only engages on frames that would actually fail after the full bake pipeline,
+        // measured on a whole-frame sample + the skin sample; params are nudged one step at a time
+        // until the frame passes, so every other frame keeps the full 6.7.8 enhancement.
+        safety: {
+            enabled: true,
+            maxSteps: 60,
+            globalSamplePixels: 2048,
+            clipLuma: 0.96, clipAddMax: 0.015,          // new near-cap pixels (OVEREXPOSE_LIMIT flattens to 0.92)
+            hlLuma: 0.65, hlMinFrac: 0.03, hlDetailMin: 0.74, hlMeanMargin: 0.004, // highlight texture kept
+            skinLumMax: 0.70,                          // skin washout
+            darkLuma: 0.12, darkMinFrac: 0.02, darkMeanMin: 0.85, darkDetailMin: 0.85, p1DropMax: 0.02,
+            p1RiseMax: 0.06,                           // blacks lifted to grey (stockings lose depth)
+            magentaHue: 0, magentaExtraRot: 2, magentaMargin: 1.5,         // skin mean hue must not go below 0 deg (= >360 magenta)
+            oversatAbs: 0.60, oversatRatio: 1.35,
+            minSkinSat: 0.03, maxSkinSat: 0.75, minSkinLum: 0.08, hueRange: [-25, 60],
+            brightFloor: 0, highlightFloor: -18, contrastFloor: -5, shadowCeil: 20, satFloor: -15,
+        },
+        // Build 278 shadow toe: near-black keeps the black point, its own hue and a bounded slope;
+        // lift is allowed (6.7.8 shadow/bright intent), crushing is not.
+        shoulder: { enabled: true, knee: 0.78, ceil: 0.97 },
+        shadowToe: {
+            toeEnd: 0.20, toeFull: 0.08, slopeMin: 0.97, slopeMax: 1.60,
         },
     }
     const KR = 0.2126, KG = 0.7152, KB = 0.0722;
@@ -137,14 +120,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     const FACE_SKIN_LUM_MAX = 0.9;
 
     // ---- 校准目标区间 ----
-    // Build 276: skin targets widened to the studio-graded reference distribution (whos.tv stills,
-    // n=259, p10..p90: rb 1.31-1.74, rg 1.18-1.44, lum 0.36-0.59, sat 0.24-0.43). Desktop 6.7.8 used
-    // rb [1.24,1.50] / rg [1.20,1.35] / sat [0.22,0.34], which cooled and desaturated graded skin.
     const TARGETS = {
-        skin_rb:       [1.30, 1.70],
-        skin_rg:       [1.18, 1.44],
+        skin_rb:       [1.24, 1.50],
+        skin_rg:       [1.20, 1.35],
         skin_lum:      [0.35, 0.54],
-        skin_sat:      [0.24, 0.42],
+        skin_sat:      [0.22, 0.34],
         full_contrast: [0.10, 0.20],
         full_hl_ratio: [0.00, 0.22],
         full_sh_ratio: [0.00, 0.40],
@@ -465,7 +445,18 @@ const console = {log:function(){},warn:function(){},error:function(){}};
     }
 
     // 顺序：bright → hl/sh → contrast → sat → temp/tint → overexpose guard
-    function applyParamsToSkinArray(pixels, params) {
+    // Build 278: soft shoulder instead of the hard OVEREXPOSE_LIMIT plateau in the baked cube.
+    function applyHighlightShoulder(r, g, b) {
+        const SH = CONFIG.shoulder;
+        const lum = KR * r + KG * g + KB * b;
+        if (lum <= SH.knee || isNearWhite(r, g, b)) return [r, g, b];
+        const span = SH.ceil - SH.knee;
+        const target = SH.knee + span * (1 - Math.exp(-(lum - SH.knee) / span));
+        const s = target / lum;
+        return [r * s, g * s, b * s];
+    }
+
+    function applyParamsToSkinArray(pixels, params, bake) {
         const n = pixels.length / 3;
         const out = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) {
@@ -484,10 +475,14 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             t = applyTempTintScalar(r, g, b, params.temp, params.tint);
             r = t[0]; g = t[1]; b = t[2];
 
+            if (bake && CONFIG.shoulder.enabled) {
+                t = applyHighlightShoulder(r, g, b); r = t[0]; g = t[1]; b = t[2];
+            } else {
             const lum = KR * r + KG * g + KB * b;
             if (lum > OVEREXPOSE_LIMIT && !isNearWhite(r, g, b)) {
                 const s = OVEREXPOSE_LIMIT / lum;
                 r *= s; g *= s; b *= s;
+            }
             }
             out[i * 3] = Math.min(1, Math.max(0, r));
             out[i * 3 + 1] = Math.min(1, Math.max(0, g));
@@ -546,7 +541,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         };
     }
 
-    // Build 276: hue (deg) / saturation of the mean RGB of a pixel array
     function meanHueSat(pixels) {
         const n = pixels.length / 3;
         if (n === 0) return null;
@@ -561,63 +555,136 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             else h = (r - g) / d + 4;
             h *= 60;
         }
-        // signed around red: (-180, 180]; skin lives ~ +5..+35
         if (h > 180) h -= 360;
         if (h <= -180) h += 360;
         return { hue: h, sat: mx > 1e-6 ? d / mx : 0, lum: KR * r + KG * g + KB * b };
     }
 
-    function skinGuardViolation(before, after, SG) {
-        if (!before || !after) return null;
-        const rot = after.hue - before.hue;
-        const floor = Math.min(SG.magentaFloor, before.hue);
-        if (after.hue < floor || rot < -SG.maxHueRotate) return 'cool';   // toward pink/magenta
-        if (rot > SG.maxHueRotate) return 'warm';                         // toward yellow
-        const ratio = before.sat > 1e-6 ? after.sat / before.sat : 1;
-        if (ratio < SG.minSatRatio) return 'desat';
-        if (ratio > SG.maxSatRatio) return 'oversat';
+    // Full bake pipeline on an RGB float array (same maths as generateLutData).
+    function renderArray(pixels, params) {
+        const out = applyParamsToSkinArray(pixels, params, true);
+        const slope = shadowToeSlope(params);
+        for (let i = 0; i < out.length; i += 3) {
+            const t = applyShadowToe(pixels[i], pixels[i + 1], pixels[i + 2], out[i], out[i + 1], out[i + 2], slope);
+            out[i] = Math.min(1, Math.max(0, t[0])); out[i + 1] = Math.min(1, Math.max(0, t[1])); out[i + 2] = Math.min(1, Math.max(0, t[2]));
+        }
+        return out;
+    }
+
+    function lumaArray(px) {
+        const n = px.length / 3, y = new Float32Array(n);
+        for (let i = 0; i < n; i++) y[i] = KR * px[i * 3] + KG * px[i * 3 + 1] + KB * px[i * 3 + 2];
+        return y;
+    }
+    function quantile(arr, q) {
+        const s = Float32Array.from(arr).sort();
+        return s.length ? s[Math.min(s.length - 1, Math.floor(q * s.length))] : 0;
+    }
+    function meanStd(y, idx) {
+        if (!idx.length) return [0, 0];
+        let m = 0; for (const i of idx) m += y[i]; m /= idx.length;
+        let v = 0; for (const i of idx) v += (y[i] - m) * (y[i] - m);
+        return [m, Math.sqrt(v / idx.length)];
+    }
+
+    // Build 278: per-frame failure check of a param set. Returns the first failure or null.
+    function safetyContext(globalSample, skinSample) {
+        const SF = CONFIG.safety;
+        const ctx = { g: null, s: null };
+        if (globalSample && globalSample.length >= 3 * 64) {
+            const y0 = lumaArray(globalSample);
+            const dark = [], hl = [];
+            let clip0 = 0;
+            for (let i = 0; i < y0.length; i++) {
+                if (y0[i] < SF.darkLuma) dark.push(i);
+                if (y0[i] > SF.hlLuma) hl.push(i);
+                if (y0[i] >= SF.clipLuma) clip0++;
+            }
+            const d = meanStd(y0, dark), h = meanStd(y0, hl);
+            ctx.g = { px: globalSample, y0, n: y0.length, dark, hl, clip0: clip0 / y0.length, p1: quantile(y0, 0.01),
+                darkMean: d[0], darkStd: d[1], hlMean: h[0], hlStd: h[1] };
+        }
+        if (skinSample && skinSample.length >= 3 * 20) {
+            const b = meanHueSat(skinSample);
+            if (b && b.sat >= SF.minSkinSat && b.sat <= SF.maxSkinSat && b.lum >= SF.minSkinLum &&
+                b.hue >= SF.hueRange[0] && b.hue <= SF.hueRange[1]) ctx.s = { px: skinSample, before: b };
+        }
+        return ctx;
+    }
+    function safetyFailure(ctx, params) {
+        const SF = CONFIG.safety;
+        if (ctx.s) {
+            const a = meanHueSat(renderArray(ctx.s.px, params)), b = ctx.s.before;
+            const floor = Math.min(SF.magentaHue, b.hue - SF.magentaExtraRot);
+            if (a.hue < floor + SF.magentaMargin) return 'magenta';
+            if (a.lum > SF.skinLumMax && a.lum > b.lum + 0.02) return 'skinwash';
+            if ((a.sat > SF.oversatAbs && a.sat > b.sat + 0.02) || (b.sat > 1e-6 && a.sat / b.sat > SF.oversatRatio)) return 'oversat';
+        }
+        if (ctx.g) {
+            const g = ctx.g, y1 = lumaArray(renderArray(g.px, params));
+            let clip1 = 0; for (let i = 0; i < y1.length; i++) if (y1[i] >= SF.clipLuma) clip1++;
+            if (clip1 / g.n - g.clip0 > SF.clipAddMax) return 'hlblow';
+            if (g.hl.length / g.n >= SF.hlMinFrac && g.hlStd > 0.01) {
+                const h = meanStd(y1, g.hl);
+                // flattened *upward* = blown; pulled-down compression is the intended highlight recovery
+                if (h[1] / g.hlStd < SF.hlDetailMin && h[0] > g.hlMean - SF.hlMeanMargin) return 'hlblow';
+            }
+            if (g.dark.length / g.n >= SF.darkMinFrac) {
+                const d = meanStd(y1, g.dark);
+                if (g.darkMean > 0.004 && d[0] / g.darkMean < SF.darkMeanMin) return 'crush';
+                if (g.darkStd > 0.004 && d[1] / g.darkStd < SF.darkDetailMin) return 'crush';
+            }
+            const p1 = quantile(y1, 0.01);
+            if (g.p1 - p1 > SF.p1DropMax) return 'crush';
+            if (p1 - g.p1 > SF.p1RiseMax) return 'lift';
+        }
         return null;
     }
-
-    // Build 276: bound skin hue rotation / magenta / saturation change produced by temp/tint/sat.
-    function skinGuardParams(params, skinSample, template) {
-        const SG = CONFIG.skinGuard;
-        const before = meanHueSat(skinSample);
-        // only plausible skin samples (not black/white/saturated-red fallbacks)
-        if (!before || before.sat < 0.03 || before.sat > 0.75 || before.lum < SG.minLum ||
-            before.hue < SG.hueRange[0] || before.hue > SG.hueRange[1]) return params;
-        const evalP = () => meanHueSat(applyParamsToSkinArray(skinSample, params));
-        let v = skinGuardViolation(before, evalP(), SG);
-        let steps = 0;
-        while (v && steps < SG.maxSteps) {
+    function safetyGuard(params, globalSample, skinSample) {
+        const SF = CONFIG.safety;
+        if (!SF.enabled) return { params, steps: 0, fixed: [] };
+        const ctx = safetyContext(globalSample, skinSample);
+        if (!ctx.g && !ctx.s) return { params, steps: 0, fixed: [] };
+        let f = safetyFailure(ctx, params), steps = 0;
+        const fixed = [];
+        while (f && steps < SF.maxSteps) {
             steps++;
-            if (v === 'cool') {
-                // magenta/pink: first remove green-cut (tint), then warm temp
+            if (fixed.indexOf(f) < 0) fixed.push(f);
+            let moved = true;
+            if (f === 'magenta') {
                 if (params.tint > 0) params.tint -= 1;
                 else if (params.temp < 0) params.temp += 1;
-                else break;
-            } else if (v === 'warm') {
-                if (params.temp > template.temp) params.temp -= 1;
-                else if (params.tint < 6) params.tint += 1;
-                else break;
-            } else if (v === 'desat') {
-                // cold temp removes skin chroma; warm back first, then lift sat
-                if (params.temp < -12) params.temp += 1;
-                else if (params.sat < template.sat + SG.satMaxDelta) params.sat += 1;
-                else break;
-            } else if (v === 'oversat') {
-                if (params.sat > template.sat - SG.satMaxDelta) params.sat -= 1;
-                else break;
+                else if (params.sat > SF.satFloor) params.sat -= 1;
+                else moved = false;
+            } else if (f === 'hlblow') {
+                // keep the mid-tone/skin lift, pull the highlights back first
+                if (params.highlight > SF.highlightFloor) params.highlight -= 1;
+                else if (params.bright > SF.brightFloor) params.bright -= 1;
+                else if (params.contrast > 0) params.contrast -= 1;
+                else moved = false;
+            } else if (f === 'skinwash') {
+                if (params.bright > SF.brightFloor) params.bright -= 1;
+                else if (params.highlight > SF.highlightFloor) params.highlight -= 1;
+                else moved = false;
+            } else if (f === 'oversat') {
+                if (params.sat > SF.satFloor) params.sat -= 1; else moved = false;
+            } else if (f === 'crush') {
+                if (params.contrast > 0) params.contrast -= 1;
+                else if (params.shadow < SF.shadowCeil) params.shadow += 1;
+                else moved = false;
+            } else if (f === 'lift') {
+                if (params.shadow > 0) params.shadow -= 1;
+                else if (params.bright > SF.brightFloor) params.bright -= 1;
+                else moved = false;
             }
-            v = skinGuardViolation(before, evalP(), SG);
+            if (!moved) break;
+            f = safetyFailure(ctx, params);
         }
-        if (steps > 0) {
-            console.log(`[LUT-算法-肤色保护] ${steps} 步 → temp=${params.temp} tint=${params.tint} sat=${params.sat}`);
-        }
-        return params;
+        if (steps > 0) console.log(`[LUT-算法-278安全] ${fixed.join('/')} ${steps} 步 → ${JSON.stringify(params)}`);
+        return { params, steps, fixed, residual: f };
     }
 
-    function predictParams(info, skinPixels, useExtreme, useHighMatch) {
+    function predictParams(info, skinPixels, useExtreme, useHighMatch, globalSample) {
         // 输入结构适配（油猴无偏离帧逻辑）
         const features = Object.assign({}, info);
         features.skin_rgb = skinPixels;
@@ -645,12 +712,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         // 没有 CENTER 目标覆盖（predict_params 里没有 regionName 分支），
         // 但油猴的中央50%采样需要目标下移，这里保留油猴原版的 CENTER 目标适配（仅目标区间，不影响算法逻辑）
-        // Build 276: center-fallback targets retuned to the graded reference (same sampleFrame path).
         const TARGETS_CENTER = {
-            skin_rb:       [1.30, 1.70],
-            skin_rg:       [1.18, 1.44],
-            skin_lum:      [0.38, 0.60],
-            skin_sat:      [0.24, 0.42],
+            skin_rb:       [1.05, 1.35],
+            skin_rg:       [1.15, 1.35],
+            skin_lum:      [0.55, 0.75],
+            skin_sat:      [0.08, 0.22],
             full_contrast: [0.10, 0.20],
             full_hl_ratio: [0.00, 0.20],
             full_sh_ratio: [0.00, 0.40],
@@ -677,20 +743,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 `> ${HH.hlRatioMin} 且 skin_lum=${origLum.toFixed(3)} > ${HH.lumMin} ` +
                 `且 high_rb=${highRB.toFixed(3)} > ${HH.highRBMin} ` +
                 `→ 启用激进高光/色温/对比度策略`
-            );
-        }
-
-        const WR = CONFIG.washoutRisk;
-        const origHlForRisk = info.full_hl_ratio || 0;
-        const isWashoutRisk = !useExtreme && (
-            isHighHlScene ||
-            (origHlForRisk >= WR.hlRatioSoft && origLum >= WR.lumSoft) ||
-            (origHlForRisk >= WR.hlRatioHard && origLum >= WR.lumHard)
-        );
-        if (isWashoutRisk && !isHighHlScene) {
-            console.log(
-                `[LUT-算法-过曝风险场景] full_hl_ratio=${origHlForRisk.toFixed(3)} ` +
-                `skin_lum=${origLum.toFixed(3)} → 收紧 bright / 加强高光压缩（Build 275）`
             );
         }
 
@@ -910,13 +962,8 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                        _orig_lum_for_target !== undefined && _orig_lum_for_target !== null &&
                        _orig_lum_for_target > 0.35 && _orig_lum_for_target < 0.50 &&
                        (info.full_hl_ratio || 0) > 0.005) {
-                if (isWashoutRisk) {
-                    lumTarget = Math.min(_orig_lum_for_target + 0.03, 0.50);
-                    console.log(`[LUT-算法-亮度搜索-过曝风险] R/B=${_orig_rb_for_target.toFixed(3)}、原片亮度=${_orig_lum_for_target.toFixed(3)}、高光=${(info.full_hl_ratio||0).toFixed(3)}，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.03，上限 0.50）`);
-                } else {
-                    lumTarget = Math.min(_orig_lum_for_target + 0.09, 0.54);
-                    console.log(`[LUT-算法-亮度搜索-动态] R/B=${_orig_rb_for_target.toFixed(3)} < 2.0、原片亮度=${_orig_lum_for_target.toFixed(3)} ∈ (0.35, 0.50)、原片高光=${(info.full_hl_ratio||0).toFixed(3)} > 0.005，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.09，上限 0.54）`);
-                }
+                lumTarget = Math.min(_orig_lum_for_target + 0.09, 0.54);
+                console.log(`[LUT-算法-亮度搜索-动态] R/B=${_orig_rb_for_target.toFixed(3)} < 2.0、原片亮度=${_orig_lum_for_target.toFixed(3)} ∈ (0.35, 0.50)、原片高光=${(info.full_hl_ratio||0).toFixed(3)} > 0.005，亮度目标 = ${lumTarget.toFixed(3)}（原片+0.09，上限 0.54）`);
             }
             console.log(`[LUT-算法-亮度搜索] 目标 = ${lumTarget.toFixed(3)}`);
 
@@ -929,10 +976,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                 params.bright = lo;
                 console.log(`[LUT-算法-亮度搜索-极亮锁定] 原片 ${origLum.toFixed(3)} > 0.60，亮度直接锁定为 +${lo - template.bright}`);
             } else {
-                if (isWashoutRisk) {
-                    bMax = Math.min(bMax, template.bright + WR.brightCapDelta);
-                    console.log(`[LUT-算法-亮度] 过曝风险场景，bright 上限收紧到 ${bMax}`);
-                } else if (isHighHlScene && HH.brightMaxExtra) {
+                if (isHighHlScene) {
                     bMax += HH.brightMaxExtra;
                     console.log(`[LUT-算法-亮度] 高光过量场景，bright 上限放宽到 ${bMax}`);
                 }
@@ -1106,7 +1150,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         // ---- 高光补偿 ----
         let hlCompensation = 0;
-        const hlCompMin = isHighHlScene ? HH.hlCompMin : (isWashoutRisk ? WR.hlCompMin : -10);
+        const hlCompMin = isHighHlScene ? HH.hlCompMin : -10;
         if (!useExtreme) {
             const origHl = info.full_hl_ratio || 0;
             const origLumForHl = info.skin_lum || 0.5;
@@ -1145,12 +1189,11 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
             const hlBase = template.highlight + hlCompensation;
             let bestHl = params.highlight, bestErr = Infinity;
-            const hMin = (isHighHlScene || isWashoutRisk) ? -16 : adjustRange.highlight[0];
+            const hMin = isHighHlScene ? -16 : adjustRange.highlight[0];
             const hMax = adjustRange.highlight[1];
             const hlHardMin = isHighHlScene
                 ? HH.highlightHardMin
-                : (isWashoutRisk ? WR.hlFinalMin
-                : (isCenterFallback && useHighMatch ? -5 : -10));
+                : (isCenterFallback && useHighMatch ? -5 : -10);
 
             for (let delta = hMin; delta <= hMax; delta += 1) {
                 const hl = hlBase + delta;
@@ -1186,11 +1229,9 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             if (nDark > 0) {
                 let bestSh = params.shadow, bestErr = Infinity;
                 const sMin = template.shadow + adjustRange.shadow[0];
-                let sMax = isHighHlScene
+                const sMax = isHighHlScene
                     ? template.shadow + Math.round(adjustRange.shadow[1] * HH.shadowMaxFactor)
                     : template.shadow + adjustRange.shadow[1];
-                // Build 276: graded footage keeps its shadows; non-extreme lift capped (+4 over template).
-                if (!useExtreme) sMax = Math.min(sMax, template.shadow + CONFIG.gradedRef.shadowMaxDelta);
                 for (let sh = sMin; sh <= sMax; sh += 1) {
                     const p = Object.assign({}, params, { shadow: sh });
                     const transformed = applyParamsToSkinArray(coarse, p);
@@ -1381,21 +1422,16 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         {
             const _hl_for_clamp = info.full_hl_ratio || 0;
             const _rb_for_clamp = info.skin_rb || 1.0;
-            const _clampHit = isWashoutRisk ||
-                (_hl_for_clamp > 0.15 && (_rb_for_clamp > 1.5 || highRB > 1.2)) ||
-                (_hl_for_clamp > 0.18 && _rb_for_clamp > 1.8);
-            if (_clampHit) {
-                const factor = isWashoutRisk ? WR.brightRaiseFactor : 0.7;
+            if (_hl_for_clamp > 0.18 && _rb_for_clamp > 1.8) {
                 const brightRaise = params.bright - template.bright;
                 if (brightRaise > 0) {
-                    const reduced = Math.round(brightRaise * factor);
-                    console.log(`[LUT-算法-高光钳制] 亮度提高量 ${brightRaise} → ${reduced}（×${factor}）`);
+                    const reduced = Math.round(brightRaise * 0.7);
+                    console.log(`[LUT-算法-高光钳制] 亮度提高量 ${brightRaise} → ${reduced}（×0.7）`);
                     params.bright = template.bright + reduced;
                 }
-                const hlFloor = isWashoutRisk ? -4 : -1;
-                if (params.highlight > hlFloor) {
-                    console.log(`[LUT-算法-高光钳制] highlight=${params.highlight} → 强制为 ${hlFloor}`);
-                    params.highlight = hlFloor;
+                if (params.highlight > 0) {
+                    console.log(`[LUT-算法-高光钳制] highlight=${params.highlight} > 0 → 强制为 -1`);
+                    params.highlight = -1;
                 }
             }
         }
@@ -1559,11 +1595,10 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         if (!useExtreme && params.bright > template.bright && !NO_HL_EXEMPT) {
             const _post_hl_detected = statsOfCoarse(params);
             const _post_hl_lum = _post_hl_detected.skin_lum;
-            let [_post_hl_lo, _post_hl_hi] = getDynamicHlTarget(_post_hl_lum);
-            if (isWashoutRisk) _post_hl_hi = Math.min(_post_hl_hi, 0.08);
+            const [_post_hl_lo, _post_hl_hi] = getDynamicHlTarget(_post_hl_lum);
             console.log(`[LUT-算法-缺亮补亮后-高光复检] bright=${params.bright}，当前 hl=${_post_hl_detected.full_hl_ratio.toFixed(3)}`);
             let best_hl2 = params.highlight, best_err2 = Infinity;
-            const lo2 = (isHighHlScene || isWashoutRisk) ? -16 : adjustRange.highlight[0];
+            const lo2 = adjustRange.highlight[0];
             const hi2 = adjustRange.highlight[1];
             const hl_base2 = template.highlight + hlCompensation;
             for (let delta = lo2; delta <= hi2; delta += 1) {
@@ -1581,8 +1616,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
 
         // ---- 高光最终钳制 ----
         if (!useExtreme) {
-            // Build 275: washout-risk scenes keep deeper highlight compression (desktop 6.7.8 used -7 always).
-            const HL_FINAL_MIN = isWashoutRisk ? WR.hlFinalMin : -7;
+            const HL_FINAL_MIN = -7;
             if (params.highlight < HL_FINAL_MIN) {
                 console.log(`[LUT-算法-高光最终钳制] highlight ${params.highlight} < ${HL_FINAL_MIN} → ${HL_FINAL_MIN}`);
                 params.highlight = HL_FINAL_MIN;
@@ -1590,8 +1624,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         }
 
         // ---- 标准模板-高光放行提亮 ----
-        // Build 275: skip when washout-risk — re-pushing bright to 18 blows highlights on lit SDR.
-        if (!useExtreme && !useHighMatch && !isWashoutRisk) {
+        if (!useExtreme && !useHighMatch) {
             if (skinPixels !== null && skinPixels.length > 0) {
                 const BRIGHT_CAP = 18;
                 const HL_START = 0.20;
@@ -1627,43 +1660,9 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             }
         }
 
-        // ---- Build 276 肤色保护（限制色相旋转/洋红偏色/饱和度骤降）----
-        if (!useExtreme && skinPixels !== null && skinPixels.length > 0) {
-            skinGuardParams(params, coarse, template);
-        }
-
-        // ---- Build 275 过曝风险 bright/highlight 硬顶 ----
-        if (isWashoutRisk) {
-            const brightCap = template.bright + WR.brightCapDelta;
-            if (params.bright > brightCap) {
-                console.log(`[LUT-算法-过曝风险] bright ${params.bright} → ${brightCap} 硬顶`);
-                params.bright = brightCap;
-            }
-            const hlFloor = (origHlForRisk >= WR.hlRatioHardFloor)
-                ? WR.highlightFloorHard
-                : WR.highlightFloorSoft;
-            if (params.highlight > hlFloor) {
-                console.log(`[LUT-算法-过曝风险] highlight ${params.highlight} → ${hlFloor}`);
-                params.highlight = hlFloor;
-            }
-        }
-
-        // ---- Build 276 已调色素材近中性 ----
-        if (!useExtreme && !info.no_skin_data) {
-            const GR = CONFIG.gradedRef;
-            const inb = (v, r) => v !== undefined && v !== null && v >= r[0] && v <= r[1];
-            if (inb(info.skin_rb, GR.rb) && inb(info.skin_rg, GR.rg) &&
-                inb(info.skin_lum, GR.lum) && inb(info.skin_sat, GR.sat)) {
-                for (const k of ['temp', 'tint', 'sat', 'bright', 'contrast', 'highlight', 'shadow']) {
-                    params[k] = Math.round(params[k] * GR.damp);
-                }
-                params.bright = Math.min(params.bright, GR.brightMax);
-                params.contrast = Math.max(-GR.contrastMax, Math.min(params.contrast, GR.contrastMax));
-                params.shadow = Math.min(params.shadow, GR.shadowMax);
-                params.highlight = Math.max(params.highlight, isWashoutRisk ? GR.highlightMinWashout : GR.highlightMin);
-                if (isWashoutRisk && params.highlight > -3) params.highlight = -3;
-                console.log(`[LUT-算法-已调色素材] 肤色统计在参考区间内 → 参数收敛到近中性 ${JSON.stringify(params)}`);
-            }
+        // ---- Build 278 逐帧安全闸（仅在会出问题的帧上生效）----
+        if (skinPixels !== null && skinPixels.length > 0) {
+            safetyGuard(params, globalSample || null, coarse);
         }
 
         // ---- 非有限值兜底 ----
@@ -1701,13 +1700,16 @@ const console = {log:function(){},warn:function(){},error:function(){}};
                     t = applyTempTintScalar(rIn, gIn, bIn, params.temp, params.tint);
                     rIn = t[0]; gIn = t[1]; bIn = t[2];
 
-                    const lum = KR * rIn + KG * gIn + KB * bIn;
-                    if (lum > OVEREXPOSE_LIMIT && !isNearWhite(rIn, gIn, bIn)) {
-                        const s = OVEREXPOSE_LIMIT / lum;
-                        rIn *= s; gIn *= s; bIn *= s;
+                    if (CONFIG.shoulder.enabled) {
+                        t = applyHighlightShoulder(rIn, gIn, bIn); rIn = t[0]; gIn = t[1]; bIn = t[2];
+                    } else {
+                        const lum = KR * rIn + KG * gIn + KB * bIn;
+                        if (lum > OVEREXPOSE_LIMIT && !isNearWhite(rIn, gIn, bIn)) {
+                            const s = OVEREXPOSE_LIMIT / lum;
+                            rIn *= s; gIn *= s; bIn *= s;
+                        }
                     }
 
-                    // Build 276 shadow toe: keep black point, keep near-black slope, keep source shadow hue.
                     const r0 = r / (size - 1), g0 = g / (size - 1), b0 = b / (size - 1);
                     const t2 = applyShadowToe(r0, g0, b0, rIn, gIn, bIn, toeSlope);
                     rIn = t2[0]; gIn = t2[1]; bIn = t2[2];
@@ -1720,8 +1722,6 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         }
         return data;
     }
-
-    // Slope of the neutral pipeline at the toe end, clamped (black point preserved by construction).
     function shadowToeSlope(params) {
         const ST = CONFIG.shadowToe;
         const T = ST.toeEnd;
@@ -1731,11 +1731,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         t = applySaturationScalar(t[0], t[1], t[2], params.sat);
         t = applyTempTintScalar(t[0], t[1], t[2], params.temp, params.tint);
         const outT = KR * t[0] + KG * t[1] + KB * t[2];
-        let hi = ST.slopeMax;
-        if (params.shadow > 10) {
-            hi = Math.min(ST.extremeSlopeMax, ST.slopeMax + (params.shadow - 10) * ST.extremeSlopePerShadow);
-        }
-        return Math.max(ST.slopeMin, Math.min(hi, outT / T));
+        return Math.max(ST.slopeMin, Math.min(ST.slopeMax, outT / T));
     }
 
     function applyShadowToe(r0, g0, b0, r, g, b, slope) {
@@ -1747,10 +1743,20 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             const x = (lin - ST.toeFull) / (ST.toeEnd - ST.toeFull);
             w = 1 - x * x * (3 - 2 * x);
         }
-        // toe target: source colour (hue/chroma) scaled by a bounded slope
         const tr = r0 * slope, tg = g0 * slope, tb = b0 * slope;
         return [r + (tr - r) * w, g + (tg - g) * w, b + (tb - b) * w];
     }
+// Build 278: strided whole-frame RGB sample for the per-frame safety check.
+function globalSample(data, aw, ah) {
+ const n = aw * ah, want = CONFIG.safety.globalSamplePixels;
+ const step = Math.max(1, Math.floor(n / want));
+ const out = new Float32Array(Math.floor((n + step - 1) / step) * 3);
+ let j = 0;
+ for (let p = 0; p < n && j + 2 < out.length; p += step) {
+  const i = p * 4; out[j++] = data[i] / 255; out[j++] = data[i + 1] / 255; out[j++] = data[i + 2] / 255;
+ }
+ return j === out.length ? out : out.slice(0, j);
+}
 function computeGlobalHlRatio(data, step) {
         const nPix = data.length / 4;
         let hl = 0, cnt = 0;
@@ -1894,8 +1900,10 @@ function sampleFrame(data, aw, ah, faceBox) {
 
 
 function analyzeFrame(bytes, width, height, box) {
- const frame = sampleFrame(new Uint8ClampedArray(bytes), width, height, box);
+ const raster = new Uint8ClampedArray(bytes);
+ const frame = sampleFrame(raster, width, height, box);
  if (!frame.pixels) return null;
+ frame.global_sample = globalSample(raster, width, height);
  const info = sampleSkinStats(frame.pixels);
  info.full_hl_ratio = frame.full_hl_ratio_global;
  info.high_rb = frame.high_rb; info.high_pixels = frame.high_pixels;
@@ -1903,7 +1911,7 @@ function analyzeFrame(bytes, width, height, box) {
  // v6.7.8: remove forceHighMatch / condFace backdoors; route solely via classifiers.
  const useExtreme = isExtremeDark(info);
  const useHighMatch = useExtreme ? false : isHighMatch(info);
- return {params: predictParams(info, subsample(frame.pixels, CONFIG.maxSkinPixels), useExtreme, useHighMatch), info: info, stage: useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准'};
+ return {params: predictParams(info, subsample(frame.pixels, CONFIG.maxSkinPixels), useExtreme, useHighMatch, frame.global_sample), info: info, stage: useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准'};
 }
 // Bounded multi-frame path (userscript v6.7.8): prefer face-box frames, median skin stats, merge pixels.
 // Caller supplies up to CONFIG.sampleFrames (3) RGBA rasters; grab/timing lives in native Swift.
@@ -1947,8 +1955,9 @@ function analyzeMultiFrame(frames) {
   const f = frames[i];
   if (!f || f.bytes == null || !f.width || !f.height) continue;
   const box = (f.box === undefined || f.box === null) ? null : f.box;
-  const frame = sampleFrame(new Uint8ClampedArray(f.bytes), f.width | 0, f.height | 0, box);
-  if (frame && frame.pixels) sampled.push(frame);
+  const raster = new Uint8ClampedArray(f.bytes);
+  const frame = sampleFrame(raster, f.width | 0, f.height | 0, box);
+  if (frame && frame.pixels) { frame.global_sample = globalSample(raster, f.width | 0, f.height | 0); sampled.push(frame); }
  }
  if (!sampled.length) return null;
  const faceFrames = sampled.filter(f => f.regionName === '人脸框');
@@ -1986,7 +1995,7 @@ function analyzeMultiFrame(frames) {
  const useHighMatch = useExtreme ? false : isHighMatch(info);
  const stage = useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准';
  return {
-  params: predictParams(info, subsample(merged, CONFIG.maxSkinPixels), useExtreme, useHighMatch),
+  params: predictParams(info, subsample(merged, CONFIG.maxSkinPixels), useExtreme, useHighMatch, firstFrame.global_sample),
   info: info,
   stage: stage,
   frameCount: chosen.length,
@@ -2003,5 +2012,5 @@ function cubeRGBA(values) {
  return Array.from(out);
 }
 
-return {analyzeFrame, analyzeMultiFrame, cubeRGBA, applyShadowToe, shadowToeSlope, meanHueSat, skinGuardParams, CONFIG, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
+return {analyzeFrame, analyzeMultiFrame, cubeRGBA, applyShadowToe, shadowToeSlope, meanHueSat, renderArray, safetyGuard, safetyFailure, safetyContext, globalSample, CONFIG, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
 })();
