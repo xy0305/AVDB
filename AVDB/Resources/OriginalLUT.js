@@ -9,7 +9,7 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         initialDelayMs: 500,
         defaultEnabled: true,
         maxSkinPixels: 3000,
-        sampleFrames: 1,
+        sampleFrames: 3,
         sampleIntervalMs: 120,
         mediapipeVersion: '0.10.14',
         mediapipeModelUrl: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
@@ -1680,6 +1680,59 @@ function analyzeFrame(bytes, width, height, box) {
  const useHighMatch = useExtreme ? false : isHighMatch(info);
  return {params: predictParams(info, subsample(frame.pixels, CONFIG.maxSkinPixels), useExtreme, useHighMatch), info: info, stage: useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准'};
 }
+// Bounded multi-frame path (userscript v6.7.8): prefer face-box frames, median skin stats, merge pixels.
+// Caller supplies up to CONFIG.sampleFrames (3) RGBA rasters; grab/timing lives in native Swift.
+function analyzeMultiFrame(frames) {
+ if (!frames || !frames.length) return null;
+ const sampled = [];
+ for (let i = 0; i < frames.length; i++) {
+  const f = frames[i];
+  if (!f || f.bytes == null || !f.width || !f.height) continue;
+  const box = (f.box === undefined || f.box === null) ? null : f.box;
+  const frame = sampleFrame(new Uint8ClampedArray(f.bytes), f.width | 0, f.height | 0, box);
+  if (frame && frame.pixels) sampled.push(frame);
+ }
+ if (!sampled.length) return null;
+ const faceFrames = sampled.filter(f => f.regionName === '人脸框');
+ const used = faceFrames.length > 0 ? faceFrames : sampled;
+ const perFrameStats = [];
+ for (const f of used) {
+  const s = sampleSkinStats(f.pixels);
+  if (s) perFrameStats.push(s);
+ }
+ if (!perFrameStats.length) return null;
+ const firstFrame = used[0];
+ const globalHlRatio = firstFrame.full_hl_ratio_global !== undefined
+  ? firstFrame.full_hl_ratio_global : 0;
+ const info = {
+  skin_rb: median(perFrameStats.map(s => s.skin_rb)),
+  skin_rg: median(perFrameStats.map(s => s.skin_rg)),
+  skin_lum: median(perFrameStats.map(s => s.skin_lum)),
+  skin_sat: median(perFrameStats.map(s => s.skin_sat)),
+  full_contrast: median(perFrameStats.map(s => s.full_contrast)),
+  full_hl_ratio: globalHlRatio,
+  full_sh_ratio: median(perFrameStats.map(s => s.full_sh_ratio)),
+  high_rb: firstFrame.high_rb !== undefined ? firstFrame.high_rb : 1.0,
+  high_pixels: firstFrame.high_pixels !== undefined ? firstFrame.high_pixels : 0,
+  regionName: firstFrame.regionName || '人脸框',
+ };
+ let totalLen = 0;
+ for (const f of used) totalLen += f.pixels.length;
+ const merged = new Float32Array(totalLen);
+ let off = 0;
+ for (const f of used) { merged.set(f.pixels, off); off += f.pixels.length; }
+ const useExtreme = isExtremeDark(info);
+ const useHighMatch = useExtreme ? false : isHighMatch(info);
+ const stage = useExtreme ? '极端暗部' : useHighMatch ? '高命中' : '标准';
+ return {
+  params: predictParams(info, subsample(merged, CONFIG.maxSkinPixels), useExtreme, useHighMatch),
+  info: info,
+  stage: stage,
+  frameCount: used.length,
+  rawFrameCount: sampled.length,
+  usedFace: faceFrames.length > 0
+ };
+}
 function cubeRGBA(values) {
  const keys = ['temp','tint','sat','bright','contrast','highlight','shadow'];
  const params = {}; keys.forEach((k,i)=>params[k]=values[i]);
@@ -1688,5 +1741,5 @@ function cubeRGBA(values) {
  return Array.from(out);
 }
 
-return {analyzeFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio};
+return {analyzeFrame, analyzeMultiFrame, cubeRGBA, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median};
 })();

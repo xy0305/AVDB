@@ -36,6 +36,30 @@ enum NativeLUT {
         guard values.count == 7, values.allSatisfy({ $0.isFinite }) else { return nil }
         return (LUTParameters(values: values), dict["stage"] as? String ?? "标准")
     }
+    /// Userscript multi-frame path: prefer face frames, median skin stats, merge pixels.
+    /// `frames` entries are `{bytes,width,height,box}` dictionaries (box may be NSNull).
+    static func analyzeMulti(_ frames: [[String: Any]]) -> (LUTParameters, String, Int, Bool)? {
+        guard !frames.isEmpty, let context = engine() else { return nil }
+        let result: JSValue?
+        if frames.count == 1, let only = frames.first,
+           let bytes = only["bytes"] as? [UInt8],
+           let width = only["width"] as? Int,
+           let height = only["height"] as? Int {
+            // Single successful grab keeps the historical analyzeFrame entry (test parity).
+            let box = only["box"]
+            result = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("analyzeFrame")?.call(withArguments: [bytes, width, height, box ?? NSNull()])
+        } else {
+            result = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("analyzeMultiFrame")?.call(withArguments: [frames])
+        }
+        guard let result, context.exception == nil, !result.isNull, !result.isUndefined,
+              let dict = result.toDictionary(), let params = dict["params"] as? [String: Any] else { return nil }
+        let keys = ["temp", "tint", "sat", "bright", "contrast", "highlight", "shadow"]
+        let values = keys.compactMap { (params[$0] as? NSNumber)?.doubleValue }
+        guard values.count == 7, values.allSatisfy({ $0.isFinite }) else { return nil }
+        let frameCount = (dict["frameCount"] as? NSNumber)?.intValue ?? 1
+        let usedFace = (dict["usedFace"] as? Bool) ?? ((dict["info"] as? [String: Any])?["regionName"] as? String == "人脸框")
+        return (LUTParameters(values: values), dict["stage"] as? String ?? "标准", frameCount, usedFace)
+    }
     static func cube(_ p: LUTParameters) -> Data? {
         guard let context = engine(),
               let result = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("cubeRGBA")?.call(withArguments: [p.values]),
@@ -394,51 +418,106 @@ final class NativeLUTController: ObservableObject {
     }
     private func analyze() {
         guard let item else { return }
-        let buffer: CVPixelBuffer
-        if onlineMode {
-            // A nil/throttled frame must not consume the user's analysis request.
-            guard let frame = surface?.copyDecodedFrameForAnalysis(force: true) else { return }
-            buffer = frame
-        } else {
-            guard let output, item.videoComposition == nil else { return }
-            let time = item.currentTime()
-            guard output.hasNewPixelBuffer(forItemTime: time), let frame = output.copyPixelBuffer(forItemTime:time,itemTimeForDisplay:nil) else { return }
-            buffer = frame
-        }
-        // Conservative transfer-function check on the actual decoded frame too.
-        if let transfer = CVBufferCopyAttachment(buffer,kCVImageBufferTransferFunctionKey,nil) as? String,
-           transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
-            enabled = false; supported = false; status = "HDR 解码帧已禁用 LUT"; return
-        }
-        busy = true; requested = false; status = "一键分析：MediaPipe 关键点 → 6.7.8 动态 Cr / 分阶段搜索…"
+        // Mobile-bounded multi-frame grab (userscript: ≤3 @ ~80ms; early-stop on face).
+        // Paused / single available frame falls back to one-shot analyzeFrame.
+        let paused = (avPlayer?.rate ?? 0) == 0
+        let maxGrabs = paused ? 1 : 3
+        busy = true; requested = false
+        status = maxGrabs > 1
+            ? "一键分析：最多3帧 · MediaPipe → 6.7.8 多帧中位…"
+            : "一键分析：MediaPipe 关键点 → 6.7.8 动态 Cr / 分阶段搜索…"
         let token = generation
         let analysisToken = analysisGeneration
-        let ciImage = CIImage(cvPixelBuffer:buffer)
-        let sourceWidth = ciImage.extent.width, sourceHeight = ciImage.extent.height
-        let aw = sourceWidth >= sourceHeight ? 640 : max(1, Int(floor(sourceWidth * 640 / sourceHeight + 0.5)))
-        let ah = sourceWidth >= sourceHeight ? max(1, Int(floor(sourceHeight * 640 / sourceWidth + 0.5))) : 640
-        // Original canvas stretches to independently rounded integer dimensions (also upscales).
-        let resized = ciImage.transformed(by: CGAffineTransform(scaleX: CGFloat(aw)/sourceWidth, y: CGFloat(ah)/sourceHeight))
-        guard let image = context.createCGImage(resized, from: CGRect(x: 0, y: 0, width: aw, height: ah), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { busy = false; requested = true; return }
-        Task {
-            let result = await Task.detached(priority:.userInitiated) { () -> (LUTParameters, String)? in
-                let w = image.width, h = image.height
-                var bytes = [UInt8](repeating: 0, count: w*h*4)
-                guard let ctx = CGContext(data: &bytes, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w*4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-                ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-                // Feed the very same top-left RGBA raster to MediaPipe and sampleFrame.
-                guard let provider = CGDataProvider(data: Data(bytes) as CFData),
-                      let rgbaImage = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w*4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else { return nil }
-                let detection = OriginalFaceLandmarker.shared.region(image: rgbaImage)
-                let roi = detection.box
-                guard let analysis = NativeLUT.analyze(bytes: bytes, width: w, height: h, box: roi) else { return nil }
-                return (analysis.0, "原版6.7.8 · \(analysis.1) · \(detection.description)")
+        Task { @MainActor in
+            var prepared: [CGImage] = []
+            var lastPTS = CMTime.invalid
+            var lastBufferID: ObjectIdentifier?
+            for grabIndex in 0..<maxGrabs {
+                guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
+                let grabbed = self.copyAnalysisFrame()
+                guard let buffer = grabbed.buffer else {
+                    if prepared.isEmpty { busy = false; requested = true; return }
+                    break
+                }
+                if let transfer = CVBufferCopyAttachment(buffer, kCVImageBufferTransferFunctionKey, nil) as? String,
+                   transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String)
+                    || transfer == (kCVImageBufferTransferFunction_ITU_R_2100_HLG as String) {
+                    enabled = false; supported = false; busy = false
+                    status = "HDR 解码帧已禁用 LUT"; return
+                }
+                let bufferID = ObjectIdentifier(buffer)
+                if grabIndex > 0 {
+                    let samePTS = CMTIME_IS_VALID(lastPTS) && CMTIME_IS_VALID(grabbed.pts) && CMTimeCompare(lastPTS, grabbed.pts) == 0
+                    let sameBuffer = lastBufferID == bufferID
+                    if samePTS || sameBuffer { break }
+                }
+                lastBufferID = bufferID
+                if CMTIME_IS_VALID(grabbed.pts) { lastPTS = grabbed.pts }
+                let ciImage = CIImage(cvPixelBuffer: buffer)
+                let sourceWidth = ciImage.extent.width, sourceHeight = ciImage.extent.height
+                let aw = sourceWidth >= sourceHeight ? 640 : max(1, Int(floor(sourceWidth * 640 / sourceHeight + 0.5)))
+                let ah = sourceWidth >= sourceHeight ? max(1, Int(floor(sourceHeight * 640 / sourceWidth + 0.5))) : 640
+                let resized = ciImage.transformed(by: CGAffineTransform(scaleX: CGFloat(aw) / sourceWidth, y: CGFloat(ah) / sourceHeight))
+                guard let image = context.createCGImage(resized, from: CGRect(x: 0, y: 0, width: aw, height: ah), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else {
+                    if prepared.isEmpty { busy = false; requested = true; return }
+                    break
+                }
+                // Quick MediaPipe gate for early-stop (same raster later re-used for sampleFrame).
+                let probe = OriginalFaceLandmarker.shared.region(image: image)
+                prepared.append(image)
+                if probe.box != nil { break }
+                if grabIndex + 1 < maxGrabs {
+                    try? await Task.sleep(nanoseconds: 80_000_000)
+                }
+            }
+            guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
+            guard !prepared.isEmpty else { busy = false; requested = true; return }
+            let images = prepared
+            let result = await Task.detached(priority: .userInitiated) { () -> (LUTParameters, String)? in
+                var frames: [[String: Any]] = []
+                var descriptions: [String] = []
+                for image in images {
+                    let w = image.width, h = image.height
+                    var bytes = [UInt8](repeating: 0, count: w * h * 4)
+                    guard let ctx = CGContext(data: &bytes, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
+                    ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+                    guard let provider = CGDataProvider(data: Data(bytes) as CFData),
+                          let rgbaImage = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else { continue }
+                    let detection = OriginalFaceLandmarker.shared.region(image: rgbaImage)
+                    var entry: [String: Any] = ["bytes": bytes, "width": w, "height": h]
+                    if let roi = detection.box { entry["box"] = roi } else { entry["box"] = NSNull() }
+                    frames.append(entry)
+                    descriptions.append(detection.description)
+                }
+                guard let analysis = NativeLUT.analyzeMulti(frames) else { return nil }
+                let faceNote = analysis.3 ? "人脸优先" : "中央50%"
+                let multiNote = analysis.2 > 1 ? "多帧\(analysis.2)·中位" : "单帧"
+                let desc = descriptions.last ?? "中央50%"
+                return (analysis.0, "原版6.7.8 · \(analysis.1) · \(multiNote) · \(faceNote) · \(desc)")
             }.value
             guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
             busy = false
             guard let result else { status = "肤色采样不足（<150）或引擎失败；保留当前画面 / 旧 LUT"; return }
             parameters = result.0; apply(); status = "33³ LUT · \(result.1) · SDR"
         }
+    }
+
+    /// Shared grab for file composition and online Metal surface. Never seeks.
+    private func copyAnalysisFrame() -> (buffer: CVPixelBuffer?, pts: CMTime) {
+        if onlineMode {
+            surface?.prepareForcedAnalysisFrame()
+            guard let frame = surface?.copyDecodedFrameForAnalysis(force: true) else {
+                return (nil, .invalid)
+            }
+            return (frame, .invalid)
+        }
+        guard let item, let output, item.videoComposition == nil else { return (nil, .invalid) }
+        let time = item.currentTime()
+        guard output.hasNewPixelBuffer(forItemTime: time),
+              let frame = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) else {
+            return (nil, time)
+        }
+        return (frame, time)
     }
 }
 

@@ -39,7 +39,72 @@ assert.strictEqual(port.isHighMatch(cold), true);
 const dark={skin_rb:1.8,skin_lum:0.25,full_hl_ratio:0.005,full_sh_ratio:0.30,no_skin_data:false};
 assert.strictEqual(ref.isExtremeDark(dark), true);
 assert.strictEqual(port.isExtremeDark(dark), true);
-fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: 21 staged searches, stats, 21 complete 33³ RGB cubes + v6.7.8 classifiers: exact Node equality');
+assert.strictEqual(typeof port.analyzeMultiFrame, 'function');
+assert.strictEqual(typeof port.median, 'function');
+assert.strictEqual(port.median([1,3,2]), 2);
+assert.strictEqual(port.median([1,2,3,4]), 2.5);
+// Synthetic RGBA rasters with enough center skin for sampleFrame (≥150).
+function makeSkinRGBA(w,h,rgb,jitter){
+ const bytes=new Uint8ClampedArray(w*h*4);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const i=(y*w+x)*4;
+  const j=(rnd()-0.5)*jitter;
+  bytes[i]=Math.max(0,Math.min(255,Math.round((rgb[0]+j)*255)));
+  bytes[i+1]=Math.max(0,Math.min(255,Math.round((rgb[1]+j)*255)));
+  bytes[i+2]=Math.max(0,Math.min(255,Math.round((rgb[2]+j)*255)));
+  bytes[i+3]=255;
+ }
+ return bytes;
+}
+const W=64,H=64;
+const skinA=makeSkinRGBA(W,H,[0.62,0.45,0.38],0.04);
+const skinB=makeSkinRGBA(W,H,[0.58,0.42,0.36],0.04);
+const skinC=makeSkinRGBA(W,H,[0.66,0.48,0.40],0.04);
+const single=port.analyzeFrame(Array.from(skinA),W,H,null);
+assert.ok(single && single.params);
+const multiOne=port.analyzeMultiFrame([{bytes:Array.from(skinA),width:W,height:H,box:null}]);
+assert.ok(multiOne && multiOne.params);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(multiOne.params)), JSON.parse(JSON.stringify(single.params)));
+assert.strictEqual(multiOne.frameCount,1);
+// Manual median composition must match analyzeMultiFrame for three center frames.
+const framesRaw=[skinA,skinB,skinC].map(b=>port.sampleFrame(b,W,H,null)).filter(f=>f && f.pixels);
+assert.ok(framesRaw.length>=2, 'expected multiple sampled frames');
+const stats=framesRaw.map(f=>port.sampleSkinStats(f.pixels)).filter(Boolean);
+const med={
+ skin_rb:port.median(stats.map(s=>s.skin_rb)),
+ skin_rg:port.median(stats.map(s=>s.skin_rg)),
+ skin_lum:port.median(stats.map(s=>s.skin_lum)),
+ skin_sat:port.median(stats.map(s=>s.skin_sat)),
+ full_contrast:port.median(stats.map(s=>s.full_contrast)),
+ full_hl_ratio:framesRaw[0].full_hl_ratio_global,
+ full_sh_ratio:port.median(stats.map(s=>s.full_sh_ratio)),
+ high_rb:framesRaw[0].high_rb,
+ high_pixels:framesRaw[0].high_pixels,
+ regionName:framesRaw[0].regionName
+};
+let total=0; for(const f of framesRaw) total+=f.pixels.length;
+const merged=new Float32Array(total); let off=0;
+for(const f of framesRaw){ merged.set(f.pixels,off); off+=f.pixels.length; }
+const useExtreme=port.isExtremeDark(med);
+const useHigh=useExtreme?false:port.isHighMatch(med);
+// Re-subsample via analyzeMultiFrame path
+const multi=port.analyzeMultiFrame([skinA,skinB,skinC].map(b=>({bytes:Array.from(b),width:W,height:H,box:null})));
+assert.ok(multi && multi.params);
+assert.ok(multi.frameCount>=2);
+assert.strictEqual(multi.usedFace,false);
+assert.strictEqual(Math.abs(multi.info.skin_rb-med.skin_rb)<1e-12, true);
+assert.strictEqual(Math.abs(multi.info.skin_lum-med.skin_lum)<1e-12, true);
+// Face-box preference: mix a face-framed sample with center frames → only face contributes.
+const faceBox={x1:8,y1:8,x2:56,y2:56};
+const faceMulti=port.analyzeMultiFrame([
+ {bytes:Array.from(skinA),width:W,height:H,box:null},
+ {bytes:Array.from(skinB),width:W,height:H,box:faceBox},
+ {bytes:Array.from(skinC),width:W,height:H,box:null}
+]);
+assert.ok(faceMulti && faceMulti.usedFace===true);
+assert.strictEqual(faceMulti.info.regionName,'人脸框');
+assert.strictEqual(faceMulti.frameCount,1);
+fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: 21 staged searches, stats, 21 complete 33³ RGB cubes + v6.7.8 classifiers + multi-frame median: exact Node equality');
 '''
 with tempfile.TemporaryDirectory() as tmp:
  t=Path(tmp);(t/'oracle.js').write_text(oracle);(t/'test.js').write_text(js)

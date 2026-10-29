@@ -1,0 +1,99 @@
+name: LUT4 online App 273
+on:
+  push:
+    branches: [feat/lut4-online-from269]
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcodebuild -version
+      - name: Neutral preserved gesture, seek and original LUT regressions
+        run: |
+          set -euo pipefail
+          mkdir -p evidence-release
+          { python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; } 2>&1 | tee evidence-release/regressions.log
+      - name: Install actual pinned MediaPipe SDK
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod install --repo-update
+      - name: Compile production enhancement Metal
+        run: |
+          xcrun -sdk iphoneos metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphoneos metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Build full production App Release arm64 iOS17
+        run: |
+          set -euo pipefail
+          xcodebuild -workspace AVDB.xcworkspace -scheme AVDB -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES clean build 2>&1 | tee evidence-release/xcodebuild.log
+      - name: Package actual unsigned App and manifest
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/AVDB.app"
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceCommit string $GITHUB_SHA" "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app/Info.plist"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          ditto "$app" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
+          python3 scripts/package-lut273.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
+          file "$app/AVDB" | tee evidence-release/macho.txt
+          xcrun vtool -show-build "$app/AVDB" | tee -a evidence-release/macho.txt
+          codesign -dv "$app" 2> evidence-release/codesign.txt || true
+      - name: Preserve resolved production dependencies
+        if: always()
+        run: |
+          mkdir -p evidence-release
+          cp Podfile.lock evidence-release/Podfile.lock 2>/dev/null || true
+          cp "$RUNNER_TEMP/DerivedData/SourcePackages/workspace-state.json" evidence-release/workspace-state.json 2>/dev/null || true
+          cp AVDB.xcworkspace/xcshareddata/swiftpm/Package.resolved evidence-release/Package.resolved 2>/dev/null || cp AVDB.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved evidence-release/Package.resolved 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AVDB-273-release
+          path: |
+            AVDB-unsigned-1.0.2-273-lut4-online-from269.ipa
+            evidence-release/*
+          if-no-files-found: warn
+  app-integration:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: gem install cocoapods -v 1.16.2 --no-document
+      - name: Compile production enhancement for real controller host
+        run: |
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Actual NativeLUTController + KSAVPlayer + production cube on HTTP HLS
+        run: python3 scripts/test-hls-app270.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LUT4-273-production-controller-HLS
+          path: |
+            evidence-hls-app/*.json
+            evidence-hls-app/*.log
+            evidence-hls-app/*.png
+            evidence-hls-app/resolved-*
+          if-no-files-found: warn
+  strict-runtime:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: gem install xcodeproj --no-document
+      - name: Compile same production runtime without DEBUG hooks
+        run: |
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun --sdk iphoneos swiftc -sdk "$SDK" -target arm64-apple-ios17.0 -O -parse-as-library -emit-module -module-name NativeHLSRuntime AVDB/Views/Player/NativeHLSLUTSurface.swift -o /tmp/NativeHLSRuntime.swiftmodule
+      - run: python3 scripts/test-hls-runtime.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LUT4-273-strict-runtime
+          path: |
+            evidence-hls-runtime/*.json
+            evidence-hls-runtime/*.log
+            evidence-hls-runtime/*.png
+          if-no-files-found: warn
