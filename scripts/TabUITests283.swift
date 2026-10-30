@@ -9,7 +9,7 @@ final class TabUITests283: XCTestCase {
         let homeTab = app.buttons["app.tab.0"]
         XCTAssertTrue(homeTab.waitForExistence(timeout: 10), "tab bar visible on home")
         shot(app, "01-home-tabbar-visible")
-        app.buttons["fixture.search"].tap()
+        app.buttons["fixture.search.首頁"].firstMatch.tap()
         XCTAssertTrue(app.textFields["search.field"].waitForExistence(timeout: 5))
         _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
         let gone = NSPredicate(format: "exists == false")

@@ -14,10 +14,11 @@ private struct Root: View {
             ZStack {
                 ForEach(AppTab.allCases) { t in
                     Group {
-                        if t == .me { MeFixture() } else { HomeFixture(title: t.title) }
+                        if t == .me { MeFixture() } else if t == tab || t == .home { HomeFixture(title: t.title) }
                     }
                     .environment(\.appTab, t)
                     .opacity(tab == t ? 1 : 0).allowsHitTesting(tab == t).zIndex(tab == t ? 1 : 0)
+                    .accessibilityHidden(tab != t)
                 }
             }
         }
@@ -34,7 +35,7 @@ private struct HomeFixture: View {
         NavigationStack {
             List {
                 Button { search = true } label: { Label("搜索番號 / 關鍵詞", systemImage: "magnifyingglass") }
-                    .accessibilityIdentifier("fixture.search")
+                    .accessibilityIdentifier("fixture.search.\(title)")
                 ForEach(0..<30, id: \.self) { Text("\(title) 列表项 \($0)") }
             }
             .navigationTitle(title)

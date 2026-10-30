@@ -116,7 +116,7 @@ struct FloatingTabContainer<Content: View>: View {
                 if !chrome.hidden(selected: selection) {
                     AVDBNativeTabBar(selection: $selection)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .accessibilityIdentifier("app.tabbar")
+                        // No container identifier: it would override the app.tab.N button ids.
                 }
             }
             .animation(.easeInOut(duration: 0.22), value: chrome.hidden(selected: selection))
