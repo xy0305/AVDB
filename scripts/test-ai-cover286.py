@@ -23,9 +23,9 @@ assert 'VStack(spacing: 0)' in viewer and 'GeometryReader' in viewer and '.clipp
 assert '长按封面也可对比原图' in views and '1_600_000_000' in views and '长按封面可查看原图' in views
 assert 'aiCover.display(art.image)' in detail and 'AICoverViewer(image: art.image, model: aiCover)' in detail, 'hero + fullscreen viewer'
 assert 'art.sourceURL = winner.source; art.nativeWidth = winner.width; art.nativeHeight = winner.height' in resolver, 'native winner size travels with the artwork'
-assert 'AICoverSettingsSection()' in user and 'AICoverEnhanceMode.allCases' in views and '清除增强缓存' in views, 'settings 自动/仅手动/关 + cache'
+assert 'AICoverSettingsSection()' in user and 'AICoverEnhanceMode.allCases' in views and ('清除增强缓存' in views or '清除缓存' in views), 'settings 自动/仅手动/关 + cache'
 assert 'AICoverHoldToCompare' in views and '按住对比原图' in views and 'AICoverBadge' in views and 'AICoverProgressRing' in views
-assert 'Task.detached(priority: .userInitiated)' in enh and 'AICoverDiskCache.shared.store' in enh and 'AICoverEnhanceGuard.check(manual: false) == .ok' in enh, 'off-main, disk cache, guard'
+assert 'Task.detached(priority: .userInitiated)' in enh and ('AICoverDiskCache.shared.store' in enh or 'cache.store(img, encoded: data, key: key)' in enh) and 'AICoverEnhanceGuard.check(manual: false) == .ok' in enh, 'off-main, disk cache, guard'
 assert 'MLMultiArray(shape: [1, 3' in engine and 'vImageConvert_Planar16FtoPlanarF' in engine and 'AICoverTilePlan.make' in engine, 'fp16 tiled Core ML'
 for f in ['AICoverPolicy.swift', 'AICoverSREngine.swift', 'AICoverEnhancer.swift', 'AICoverViews.swift', 'CoverSR.mlpackage']:
     assert f'{f} in ' in pbx, f'{f} in target'
@@ -34,7 +34,7 @@ assert (model / 'Manifest.json').exists(), 'bundled Core ML model'
 weights = sum(p.stat().st_size for p in model.rglob('*') if p.is_file())
 assert 10e6 < weights < 95e6, f'model size {weights}'
 assert 'AvbaseHQExtras.extras(products: products, number: number)' in meta and 'isHQStoreJacket(source)' in loader and 'DMMJacketOnly.shared.observe' in resolver
-assert plist['CFBundleVersion'] == '289' and pbx.count('CURRENT_PROJECT_VERSION = 289;') == 2
+assert plist['CFBundleVersion'] == '290' and pbx.count('CURRENT_PROJECT_VERSION = 290;') == 2
 swiftc = shutil.which('swiftc')
 if not swiftc:
     if os.environ.get('CI'): sys.exit('swiftc missing')

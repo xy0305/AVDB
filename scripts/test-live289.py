@@ -37,7 +37,7 @@ for s in ['live.subtitle.settings.recognizer', 'live.subtitle.settings.apple.asr
 # project
 assert 'LiveSenseVoice.swift in Sources' in pbx and 'LiveSystemRecognizers.swift in Sources' in pbx
 assert 'SherpaOnnxC.xcframework in Frameworks' in pbx and 'SherpaOnnxC.xcframework in Embed Frameworks' in pbx
-assert pl['CFBundleVersion'] == '289' and pbx.count('CURRENT_PROJECT_VERSION = 289;') == 2
+assert int(pl['CFBundleVersion']) >= 289 and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
 assert 'NSSpeechRecognitionUsageDescription' in pl
 wf = (r / '.github/workflows/lut4-online289.yml').read_text()
 for s in ['fetch_live289.py', 'test-live289.py', 'package-lut289.py', 'test-live-bench289.py', 'AVDB-289-release']:

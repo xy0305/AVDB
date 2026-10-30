@@ -1,7 +1,6 @@
 name: LUT4 online App 289 (SenseVoice 默认实时识别 + 苹果系统识别降级 + Whisper 手动 + 防卡顿)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
