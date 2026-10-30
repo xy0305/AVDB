@@ -31,6 +31,8 @@ struct AVDBApp: App {
 
     // Audio is intentionally untouched at launch. Only a concrete player may own the session.
 
+    init() { AICoverCloudRuntime.start() }   // 290: Wi‑Fi flag for 仅 Wi‑Fi 上传 + pre-290 cache migration (background)
+
     var body: some Scene {
         WindowGroup {
             Group {

@@ -266,7 +266,8 @@ struct MovieDetailView: View {
         .task(id: aiCoverKey) {
             let art = usesLandscapeLayout ? nil : posterArtwork
             aiCover.prepare(image: art?.image, source: art?.sourceURL ?? "", nativeWidth: art?.nativeWidth ?? 0,
-                            nativeHeight: art?.nativeHeight ?? 0, mode: AICoverEnhanceMode(rawValue: aiCoverMode) ?? .auto)
+                            nativeHeight: art?.nativeHeight ?? 0, number: vm.movie?.displayNumber,
+                            mode: AICoverEnhanceMode(rawValue: aiCoverMode) ?? .auto)
         }
         .fullScreenCover(isPresented: $showCoverViewer) {
             if let art = posterArtwork { AICoverViewer(image: art.image, model: aiCover) }

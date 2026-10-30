@@ -118,12 +118,12 @@ struct AICoverMetaChip: View {
                 Button { model.cancel() } label: {
                     pill(stroke: true) {
                         AICoverProgressRing(value: p, size: 12)
-                        Text(verbatim: "AI 增强中 \(Int((p * 100).rounded()))%").font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                        Text(verbatim: model.cloudFetching ? "云端加载中" : "AI 增强中 \(Int((p * 100).rounded()))%").font(.system(size: 12, weight: .semibold)).monospacedDigit()
                         Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).opacity(0.7)
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: "AI 增强中 \(Int((p * 100).rounded()))%"))
+                .accessibilityLabel(Text(verbatim: model.cloudFetching ? "云端加载中" : "AI 增强中 \(Int((p * 100).rounded()))%"))
                 .accessibilityHint("轻点取消")
                 .accessibilityIdentifier("ai-cover-progress")
             case .done:
@@ -286,7 +286,7 @@ struct AICoverViewer: View {
                 VStack(spacing: 8) {
                     HStack {
                         AICoverProgressRing(value: p, size: 18)
-                        Text("AI 增强中…").font(.system(size: 15, weight: .semibold))
+                        Text(model.cloudFetching ? "云端加载中…" : "AI 增强中…").font(.system(size: 15, weight: .semibold))
                         Spacer()
                         Text(verbatim: "\(Int((p * 100).rounded()))%").font(.system(size: 15, weight: .semibold)).monospacedDigit()
                         Button { model.cancel() } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 18)) }
@@ -324,10 +324,17 @@ struct AICoverViewer: View {
     private var failedText: String? { if case .failed(let t) = model.phase { return t + "，轻点重试" }; return nil }
 }
 
-/// Build 285: 「AI 画质增强」 mode (自动 / 仅手动 / 关) and the persistent result cache.
+/// Build 285: 「AI 画质增强」 mode (自动 / 仅手动 / 关). Build 290: 云端增强图 (R2), local LRU cap, 仅 Wi‑Fi 上传,
+/// 清除缓存 with current usage, cloud stats and copyable diagnostics.
 struct AICoverSettingsSection: View {
     @AppStorage(AICoverEnhanceMode.defaultsKey) private var mode = AICoverEnhanceMode.auto.rawValue
+    @AppStorage(AICoverCloudSettings.enabledKey) private var cloudOn = true
+    @AppStorage(AICoverCloudSettings.capKey) private var capMB = AICoverCloudSettings.defaultCapMB
+    @AppStorage(AICoverCloudSettings.wifiOnlyKey) private var wifiOnly = false
     @State private var cacheBytes = 0
+    @State private var cacheFiles = 0
+    @State private var stats = AICoverCloudStats.read()
+    @State private var copied = false
 
     var body: some View {
         Section {
@@ -346,20 +353,85 @@ struct AICoverSettingsSection: View {
                 .accessibilityIdentifier("ai-cover-mode-setting")
             }
             .padding(.vertical, 4)
-            HStack {
-                Text("增强结果缓存")
-                Spacer()
-                Text(ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file)).foregroundStyle(.secondary).monospacedDigit()
+            Toggle("云端增强图", isOn: $cloudOn).accessibilityIdentifier("ai-cover-cloud-toggle")
+            Toggle("仅 Wi‑Fi 上传", isOn: $wifiOnly).disabled(!cloudOn).accessibilityIdentifier("ai-cover-cloud-wifi")
+            Picker("本地缓存上限", selection: $capMB) {
+                ForEach(AICoverCloudSettings.capChoicesMB, id: \.self) { Text(Self.mb($0)).tag($0) }
             }
-            Button("清除增强缓存", role: .destructive) {
-                AICoverDiskCache.shared.clear(); cacheBytes = 0
+            .accessibilityIdentifier("ai-cover-cache-cap")
+            .onChange(of: capMB) { _, _ in AICoverDiskCache.shared.trimNow(); refreshSoon() }
+            HStack {
+                Text("本地缓存")
+                Spacer()
+                Text(verbatim: "\(ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file)) / \(Self.mb(capMB)) · \(cacheFiles) 张")
+                    .foregroundStyle(.secondary).monospacedDigit()
+            }
+            .accessibilityIdentifier("ai-cover-cache-usage")
+            Button("清除缓存", role: .destructive) {
+                AICoverDiskCache.shared.clear(); refresh()
             }
             .disabled(cacheBytes == 0)
+            .accessibilityIdentifier("ai-cover-cache-clear")
+            HStack {
+                Text("云端")
+                Spacer()
+                Text(verbatim: "命中 \(stats.hits) · 未命中 \(stats.misses) · 上传 \(stats.uploads)（\(ByteCountFormatter.string(fromByteCount: Int64(stats.uploadBytes), countStyle: .file))）")
+                    .foregroundStyle(.secondary).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+            }
+            .accessibilityIdentifier("ai-cover-cloud-stats")
+            if stats.quotaFull {
+                Label("云端空间将满（507），已暂停上传；仍可读取云端图，本机继续增强。", systemImage: "externaldrive.badge.exclamationmark")
+                    .font(.footnote).foregroundStyle(.orange)
+                    .accessibilityIdentifier("ai-cover-cloud-quota")
+            }
+            if !stats.configured {
+                Label("此版本未配置云端密钥，仅本机增强。", systemImage: "key.slash").font(.footnote).foregroundStyle(.secondary)
+            }
+            Button {
+                UIPasteboard.general.string = AICoverCloudStats.diagnostics()
+                copied = true
+            } label: {
+                Label(copied ? "已复制诊断信息" : "复制云端诊断信息", systemImage: "doc.on.doc")
+            }
+            .accessibilityIdentifier("ai-cover-cloud-diagnostics")
         } header: {
             Text("AI 画质增强")
         } footer: {
-            Text("内置超分辨率模型，在本机运行，不上传图片。只处理低清封面（如 800px 封套裁切、MGS 小图、JavDB 兜底图），DMM 等高清原图永不增强。自动：打开详情时自动增强（设备过热、低电量模式或电量低于 20% 时暂停）；仅手动：点封面下方信息行里的「AI 增强」；关：不显示。增强结果会缓存到本机；按住「按住对比」或长按封面可查看原图。")
+            Text("内置超分辨率模型。只处理低清封面（如 800px 封套裁切、MGS 小图、JavDB 兜底图），DMM 等高清原图永不增强。自动：打开详情时自动增强（低电量模式或电量低于 20% 时暂停）；仅手动：点封面下方信息行里的「AI 增强」；关：不显示。云端增强图开启时，先从云端读取别人/自己已增强过的封面（约 2.5 秒超时，不影响原图显示），没有才在本机增强并在后台上传到云端；增强图不长期保存在手机上，本机只保留上限内的少量缓存。按住「按住对比」或长按封面可查看原图。")
         }
-        .onAppear { cacheBytes = AICoverDiskCache.shared.totalBytes() }
+        .onAppear { refresh() }
+    }
+
+    static func mb(_ v: Int) -> String { v >= 1000 ? "\(v / 1000) GB" : "\(v) MB" }
+    private func refresh() {
+        cacheBytes = AICoverDiskCache.shared.totalBytes(); cacheFiles = AICoverDiskCache.shared.fileCount(); stats = AICoverCloudStats.read()
+    }
+    private func refreshSoon() { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { refresh() } }
+}
+
+/// Snapshot for the settings rows and the copyable diagnostics (never includes the key itself).
+struct AICoverCloudStats {
+    var hits = 0, misses = 0, uploads = 0, uploadBytes = 0, failures = 0
+    var quotaFull = false, configured = false
+    var lastError: String?
+    static func read(_ s: AICoverCloudSettings = .shared) -> AICoverCloudStats {
+        AICoverCloudStats(hits: s.hits, misses: s.misses, uploads: s.uploads, uploadBytes: s.uploadBytes, failures: s.failures,
+                          quotaFull: s.quotaFull(), configured: AICoverCloudConfig.appKey() != nil, lastError: s.lastError)
+    }
+    static func diagnostics() -> String {
+        let s = AICoverCloudSettings.shared, st = read()
+        let bundle = Bundle.main.infoDictionary
+        return [
+            "AVDB \(bundle?["CFBundleShortVersionString"] ?? "?") (\(bundle?["CFBundleVersion"] ?? "?")) AI 封面云端诊断",
+            "云端: \(s.enabled ? "开" : "关") · 仅 Wi‑Fi 上传: \(s.wifiOnly ? "开" : "关") · 蜂窝/昂贵网络: \(AICoverNetworkState.isExpensive)",
+            "端点: \(AICoverCloudConfig.bases().map(\.absoluteString).joined(separator: " → ")) · 前缀: \(AICoverCloudConfig.prefix)",
+            "密钥: \(st.configured ? "已配置（构建时注入，不显示）" : "未配置")",
+            "本地缓存: \(AICoverDiskCache.shared.totalBytes()) B / 上限 \(s.capBytes) B · \(AICoverDiskCache.shared.fileCount()) 个文件",
+            "迁移保护至: \(AICoverMigration.protectBefore().map { "\($0.addingTimeInterval(AICoverMigration.grace))" } ?? "无")",
+            "命中 \(st.hits) · 未命中 \(st.misses) · 上传 \(st.uploads) (\(st.uploadBytes) B) · 失败 \(st.failures)",
+            "507 暂停上传: \(st.quotaFull ? "是，直到 \(s.quotaFullUntil.map { "\($0)" } ?? "?")" : "否")",
+            "最近错误: \(st.lastError ?? "无")",
+            "模型: \(AICoverSREngine.modelVersion)",
+        ].joined(separator: "\n")
     }
 }
