@@ -42,6 +42,7 @@
 		F9C8F3E48B9E68DFDE20F328 /* JavVerseLiveClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB1A4C64C857CD3647F6E80 /* JavVerseLiveClient.swift */; };
 		36911BA2DB310B86238FD29F /* Movie.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2983B5FE03DB5129649F2FCD /* Movie.swift */; };
 		3AD549DF754E6E22C53A8B20 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21E8365384D35AB1B1B4C52 /* ContentView.swift */; };
+		28800000000000000000A001 /* DetailPlayPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28800000000000000000A002 /* DetailPlayPill.swift */; };
 		40E4B2D1995E72416ED57E51 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14321A82C49C1554A3104999 /* MovieDetailView.swift */; };
 		B26000000000000000000001 /* PlaybackResourceCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000000000000000000002 /* PlaybackResourceCards.swift */; };
 		4D50D96B24BA7948B5C9B6BF /* JavDBSDK.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7231C462DD413E8C76270418 /* JavDBSDK.swift */; };
@@ -154,6 +155,7 @@
 		C25400000000000000000001 /* OnlinePlaybackCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlinePlaybackCore.swift; sourceTree = "<group>"; };
 		B25100000000000000000002 /* JavBusActorAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavBusActorAvatar.swift; sourceTree = "<group>"; };
 		0E30F604E876D29C296F9649 /* UserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserView.swift; sourceTree = "<group>"; };
+		28800000000000000000A002 /* DetailPlayPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPlayPill.swift; sourceTree = "<group>"; };
 		14321A82C49C1554A3104999 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
 		B26000000000000000000002 /* PlaybackResourceCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackResourceCards.swift; sourceTree = "<group>"; };
 		2983B5FE03DB5129649F2FCD /* Movie.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Movie.swift; sourceTree = "<group>"; };
@@ -315,6 +317,7 @@
 		83F964E04092BB67F0CACF0E /* Detail */ = {
 			isa = PBXGroup;
 			children = (
+				28800000000000000000A002 /* DetailPlayPill.swift */,
 				14321A82C49C1554A3104999 /* MovieDetailView.swift */,
 				B26000000000000000000002 /* PlaybackResourceCards.swift */,
 				AICOVER2850000000000003F /* AICoverViews.swift */,
@@ -648,6 +651,7 @@
 				CD4B023BF921455BB4C3DBFE /* ActorsView.swift in Sources */,
 				D021FB04DFDEB5A59E6D5ED7 /* MovieGridView.swift in Sources */,
 				3AD549DF754E6E22C53A8B20 /* ContentView.swift in Sources */,
+				28800000000000000000A001 /* DetailPlayPill.swift in Sources */,
 				40E4B2D1995E72416ED57E51 /* MovieDetailView.swift in Sources */,
 				B26000000000000000000001 /* PlaybackResourceCards.swift in Sources */,
 				1FCC523DAF4878448C890BF3 /* HomeView.swift in Sources */,
@@ -721,7 +725,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 287;
+				CURRENT_PROJECT_VERSION = 288;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -744,7 +748,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 287;
+				CURRENT_PROJECT_VERSION = 288;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

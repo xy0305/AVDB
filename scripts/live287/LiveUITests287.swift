@@ -47,4 +47,15 @@ final class LiveUITests287: XCTestCase {
         app = launch(["--mode", "bilingual", "--thermal"]); shot(app, "15-thermal-paused-notice"); app.terminate()
         app = launch(["--mode", "bilingual", "--loading", "--chrome"]); shot(app, "16-loading-model"); app.terminate()
     }
+
+    func test04Build288Loading() {
+        var app = launch(["--mode", "bilingual", "--staged"]); shot(app, "17-288-small-running-turbo-compiling"); app.terminate()
+        app = launch(["--mode", "bilingual", "--failed"])
+        XCTAssertTrue(app.buttons["live.subtitle.retry"].waitForExistence(timeout: 5))
+        shot(app, "18-288-load-failed-retry"); app.terminate()
+        app = launch(["--mode", "bilingual", "--staged", "--settings"]); sleep(1)
+        app.swipeUp(); sleep(1); shot(app, "19-288-settings-model-status-copylog"); app.terminate()
+        app = launch(["--mode", "bilingual", "--failed", "--settings"]); sleep(1)
+        app.swipeUp(); sleep(1); shot(app, "20-288-settings-failed-retry"); app.terminate()
+    }
 }

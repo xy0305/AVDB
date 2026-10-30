@@ -6,6 +6,58 @@ import CoreML
 import Foundation
 import WhisperKit
 
+/// Build 288 — ring-buffer diagnostic log for live subtitles (device, model files, per-stage load timings, errors).
+/// Persisted to Caches/LiveSubtitles/diagnostics.log; the settings sheet copies `report()` to the pasteboard.
+final class LiveDiagnostics: @unchecked Sendable {
+    static let shared = LiveDiagnostics()
+    private let lock = NSLock()
+    private var lines: [String] = []
+    private let t0 = Date()
+    private let fileURL: URL? = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+        .appendingPathComponent("LiveSubtitles/diagnostics.log")
+
+    init() {
+        if let fileURL, let old = try? String(contentsOf: fileURL, encoding: .utf8) {
+            lines = Array(old.split(separator: "\n").map(String.init).suffix(120))
+            lines.append("—— 上次会话结束 ——")
+        }
+    }
+
+    func log(_ s: String) {
+        let f = DateFormatter(); f.dateFormat = "MM-dd HH:mm:ss"
+        let line = "\(f.string(from: Date())) +\(String(format: "%.1f", Date().timeIntervalSince(t0)))s \(s)"
+        lock.lock(); lines.append(line); if lines.count > 300 { lines.removeFirst(lines.count - 300) }
+        let text = lines.joined(separator: "\n"); lock.unlock()
+        if let fileURL {
+            try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? text.write(to: fileURL, atomically: true, encoding: .utf8)
+        }
+    }
+
+    var recent: [String] { lock.lock(); defer { lock.unlock() }; return Array(lines.suffix(8)) }
+
+    static var machine: String {
+        var size = 0; sysctlbyname("hw.machine", nil, &size, nil, 0)
+        var b = [CChar](repeating: 0, count: max(1, size)); sysctlbyname("hw.machine", &b, &size, nil, 0)
+        return String(cString: b)
+    }
+
+    func report(extra: [String] = []) -> String {
+        let pi = ProcessInfo.processInfo
+        var head = ["AVDB 实时字幕诊断 build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?")",
+                    "设备 \(Self.machine) · \(pi.operatingSystemVersionString) · RAM \(pi.physicalMemory / 1_048_576) MB · 温度 \(pi.thermalState.rawValue) · 低电量 \(pi.isLowPowerModeEnabled)"]
+        if let root = LiveModels.root {
+            head.append("模型目录 \(root.path)")
+            for t in LiveASRTier.allCases {
+                head.append("\(t.rawValue): 编码器 \(FileManager.default.fileExists(atPath: root.appendingPathComponent(t.folder + "/AudioEncoder.mlmodelc").path) ? "✓" : "✗") 分词器 \(FileManager.default.fileExists(atPath: root.appendingPathComponent(t.tokenizer + "/tokenizer.json").path) ? "✓" : "✗")")
+            }
+            head.append("NLLB \(LiveModels.nllbAvailable ? "✓" : "✗")")
+        } else { head.append("模型目录 未打包") }
+        lock.lock(); let body = lines; lock.unlock()
+        return (head + extra + ["—— 日志 ——"] + body).joined(separator: "\n")
+    }
+}
+
 enum LiveModels {
     /// Folder reference `LiveModels` in the app bundle (populated by CI; see scripts/live287).
     static var root: URL? {
@@ -29,23 +81,49 @@ enum LiveModels {
 final class LiveWhisperRecognizer: LiveSpeechRecognizer, @unchecked Sendable {
     let tier: LiveASRTier
     private let kit: WhisperKit
+    /// Diagnostics: the tokenizer type actually in use (LiveBundledTokenizer = bundled files, no Hub).
+    var tokenizerKind: String { kit.tokenizer.map { String(describing: type(of: $0)) } ?? "nil" }
     private(set) var loadSeconds: Double = 0
 
     private init(tier: LiveASRTier, kit: WhisperKit) { self.tier = tier; self.kit = kit }
 
+    /// Compute units per tier (build 288): audio encoder on the Neural Engine (the expensive part), text decoder on
+    /// the GPU — avoids a second, slow ANE specialisation for the decoder on first launch; mel on GPU.
+    static func computeUnits(_ tier: LiveASRTier) -> (encoder: MLComputeUnits, decoder: MLComputeUnits) {
+        (.cpuAndNeuralEngine, .cpuAndGPU)
+    }
+
+    /// Loads strictly from the bundle: `download: false`, no prewarm pass (it doubles first-launch compile time),
+    /// and the tokenizer is built from the bundled tokenizer.json *before* `loadModels()`, so WhisperKit's Hub
+    /// fallback can never run (zero network). `log` receives stage timings for the diagnostic log.
     static func load(_ tier: LiveASRTier, root: URL? = LiveModels.root,
-                     encoder: MLComputeUnits = .cpuAndNeuralEngine, decoder: MLComputeUnits = .cpuAndNeuralEngine) async throws -> LiveWhisperRecognizer {
+                     units: (encoder: MLComputeUnits, decoder: MLComputeUnits)? = nil,
+                     log: @escaping @Sendable (String) -> Void = { _ in }) async throws -> LiveWhisperRecognizer {
         guard let root, LiveModels.whisperAvailable(tier) || ProcessInfo.processInfo.environment["AVDB_LIVE_MODELS"] != nil else {
             throw LiveEngineError.modelMissing(tier.folder)
         }
+        let u = units ?? computeUnits(tier)
         let t0 = Date()
+        let modelFolder = root.appendingPathComponent(tier.folder)
+        let tokFolder = root.appendingPathComponent(tier.tokenizer)
+        log("\(tier.rawValue): 开始加载 \(modelFolder.lastPathComponent) encoder=\(u.encoder.rawValue) decoder=\(u.decoder.rawValue)")
         let config = WhisperKitConfig(
             model: tier.folder,
-            modelFolder: root.appendingPathComponent(tier.folder).path,
-            tokenizerFolder: root.appendingPathComponent(tier.tokenizer),
-            computeOptions: ModelComputeOptions(melCompute: .cpuAndGPU, audioEncoderCompute: encoder, textDecoderCompute: decoder),
-            verbose: false, logLevel: .error, prewarm: true, load: true, download: false)
+            modelFolder: modelFolder.path,
+            tokenizerFolder: tokFolder,
+            computeOptions: ModelComputeOptions(melCompute: .cpuAndGPU, audioEncoderCompute: u.encoder, textDecoderCompute: u.decoder),
+            verbose: false, logLevel: .error, prewarm: false, load: false, download: false)
         let kit = try await WhisperKit(config)
+        let t1 = Date()
+        let tokenizer = try await LiveBundledTokenizer.load(folder: tokFolder)
+        kit.tokenizer = tokenizer
+        log(String(format: "%@: tokenizer（本地）%.2fs", tier.rawValue, Date().timeIntervalSince(t1)))
+        try await kit.loadModels()
+        kit.tokenizer = tokenizer
+        kit.textDecoder.isModelMultilingual = true          // both bundled tiers are multilingual (ja)
+        let tm = kit.currentTimings
+        log(String(format: "%@: 模型就绪 %.1fs（encoder %.1fs · decoder %.1fs）", tier.rawValue, Date().timeIntervalSince(t0),
+                   tm.encoderLoadTime, tm.decoderLoadTime))
         let r = LiveWhisperRecognizer(tier: tier, kit: kit)
         r.loadSeconds = Date().timeIntervalSince(t0)
         return r
@@ -71,6 +149,41 @@ final class LiveWhisperRecognizer: LiveSpeechRecognizer, @unchecked Sendable {
     }
 }
 
+/// WhisperTokenizer built only from the bundled tokenizer.json / tokenizer_config.json (no Hub API, no network).
+final class LiveBundledTokenizer: WhisperTokenizer, @unchecked Sendable {
+    let tok: TokenizerWrapper
+    let specialTokens: SpecialTokens
+    let allLanguageTokens: Set<Int>
+
+    static func load(folder: URL) async throws -> LiveBundledTokenizer {
+        guard FileManager.default.fileExists(atPath: folder.appendingPathComponent("tokenizer.json").path) else {
+            throw LiveEngineError.modelMissing(folder.lastPathComponent + "/tokenizer.json")
+        }
+        return LiveBundledTokenizer(try await AutoTokenizerWrapper.from(modelFolder: folder))
+    }
+
+    init(_ t: TokenizerWrapper) {
+        tok = t
+        func id(_ s: String, _ d: Int) -> Int { t.convertTokenToId(s) ?? d }
+        let eot = id("<|endoftext|>", 50257)
+        specialTokens = SpecialTokens(endToken: eot, englishToken: id("<|en|>", 50259), noSpeechToken: id("<|nospeech|>", 50363),
+                                      noTimestampsToken: id("<|notimestamps|>", 50364), specialTokenBegin: eot,
+                                      startOfPreviousToken: id("<|startofprev|>", 50362), startOfTranscriptToken: id("<|startoftranscript|>", 50258),
+                                      timeTokenBegin: id("<|0.00|>", 50365), transcribeToken: id("<|transcribe|>", 50360),
+                                      translateToken: id("<|translate|>", 50359), whitespaceToken: id(" ", 220))
+        allLanguageTokens = Set(Constants.languages.compactMap { t.convertTokenToId("<|\($0.value)|>") }.filter { $0 > eot })
+    }
+
+    func encode(text: String) -> [Int] { tok.encode(text: text) }
+    func decode(tokens: [Int]) -> String { tok.decode(tokens: tokens) }
+    func convertTokenToId(_ token: String) -> Int? { tok.convertTokenToId(token) }
+    func convertIdToToken(_ id: Int) -> String? { tok.convertIdToToken(id) }
+    /// Word timestamps are never requested by live subtitles; token-level split keeps the protocol honest.
+    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        (tokenIds.map { tok.decode(tokens: [$0]) }, tokenIds.map { [$0] })
+    }
+}
+
 // MARK: - NLLB (bundled fallback)
 
 final class NLLBCoreMLTranslator: LiveTranslating, @unchecked Sendable {
@@ -80,7 +193,7 @@ final class NLLBCoreMLTranslator: LiveTranslating, @unchecked Sendable {
     private let decoder: MLModel
     private let lock = NSLock()
 
-    init(root: URL, units: MLComputeUnits = .cpuAndNeuralEngine) throws {
+    init(root: URL, units: MLComputeUnits = .cpuAndGPU) throws {
         let dir = root.appendingPathComponent("nllb")
         tokenizer = try NLLBTokenizer(json: Data(contentsOf: dir.appendingPathComponent("nllb287_vocab.json")))
         let cfg = MLModelConfiguration()

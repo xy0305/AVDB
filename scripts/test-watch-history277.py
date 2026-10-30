@@ -45,7 +45,7 @@ for forbidden in ['token', 'streamURL', 'headers', 'magnetURL', 'playURL', 'cook
     assert forbidden not in schema, forbidden
 assert 'static let capacity = 500' in stores
 assert 'accountID.map { "user-\\($0)" } ?? Self.guestScope' in stores
-assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion'] == '287'
+assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion'] == '288'
 
 policy = 'struct PlaybackHistoryItem:' + stores.split('struct PlaybackHistoryItem:', 1)[1].split('@MainActor\nfinal class PlaybackHistoryStore', 1)[0]
 main = r'''

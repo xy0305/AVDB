@@ -1,3 +1,4 @@
+// Build 288 — staged model loading (small first, turbo warmed in background), timeouts + retry, diagnostics.
 // Build 287 — live subtitle engine: look-ahead reader → VAD → Whisper → (Apple Translation | NLLB) → overlay.
 // Nothing is generated ahead of playback beyond the ~lead window the reader keeps in front of the playhead;
 // segments are cached per video and reused on rewatch.
@@ -5,6 +6,86 @@ import Combine
 import Foundation
 import SwiftUI
 import UIKit
+#if os(iOS)
+import os
+#endif
+
+/// One in-flight load per tier, shared by every engine/player session (re-attaching never starts a second
+/// compile), with a wall-clock timeout that fails the *wait* — the Core ML compile itself keeps going in the
+/// background and its result is kept for the next attempt.
+@MainActor
+final class LiveModelLoader {
+    static let shared = LiveModelLoader()
+    enum State: Equatable { case idle, loading(since: Date), ready(seconds: Double), failed(String) }
+    private(set) var states: [LiveASRTier: State] = [:]
+    private var ready: [LiveASRTier: LiveSpeechRecognizer] = [:]
+    private var tasks: [LiveASRTier: Task<LiveSpeechRecognizer, Error>] = [:]
+    struct Timeout: LocalizedError {
+        let tier: LiveASRTier, seconds: Double
+        var errorDescription: String? { "\(tier.title) 模型加载超过 \(Int(seconds)) 秒仍未完成（首次编译可能较慢）" }
+    }
+
+    func state(_ t: LiveASRTier) -> State { states[t] ?? .idle }
+    func cached(_ t: LiveASRTier) -> LiveSpeechRecognizer? { ready[t] }
+    var isLoadingAny: Bool { states.values.contains { if case .loading = $0 { return true }; return false } }
+
+    func release(_ t: LiveASRTier) {
+        guard ready[t] != nil else { return }
+        ready[t] = nil; states[t] = .idle
+        LiveDiagnostics.shared.log("\(t.rawValue): 已释放")
+    }
+
+    /// Lets a failed tier be retried (a load still running is never restarted — retry just waits again).
+    func resetFailures() { for (t, s) in states { if case .failed = s { states[t] = .idle } } }
+
+    func get(_ tier: LiveASRTier, timeout: Double) async throws -> LiveSpeechRecognizer {
+        if let r = ready[tier] { return r }
+        let task: Task<LiveSpeechRecognizer, Error>
+        if let t = tasks[tier] { task = t; LiveDiagnostics.shared.log("\(tier.rawValue): 复用进行中的加载") }
+        else {
+            let avail = Double(LiveMemory.availableMB)
+            LiveDiagnostics.shared.log("\(tier.rawValue): 请求加载 可用内存 \(Int(avail)) MB")
+            states[tier] = .loading(since: Date())
+            task = Task.detached(priority: .userInitiated) {
+                try await LiveWhisperRecognizer.load(tier, log: { LiveDiagnostics.shared.log($0) })
+            }
+            tasks[tier] = task
+            Task { [weak self] in
+                do {
+                    let r = try await task.value
+                    self?.ready[tier] = r
+                    self?.states[tier] = .ready(seconds: (r as? LiveWhisperRecognizer)?.loadSeconds ?? 0)
+                    UserDefaults.standard.set((r as? LiveWhisperRecognizer)?.loadSeconds ?? 0, forKey: "live.load.\(tier.rawValue)")
+                } catch {
+                    self?.states[tier] = .failed(error.localizedDescription)
+                    LiveDiagnostics.shared.log("\(tier.rawValue): 加载失败 \(error)")
+                }
+                self?.tasks[tier] = nil
+            }
+        }
+        return try await withThrowingTaskGroup(of: LiveSpeechRecognizer.self) { g in
+            g.addTask { try await task.value }
+            g.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                throw Timeout(tier: tier, seconds: timeout)
+            }
+            defer { g.cancelAll() }
+            guard let r = try await g.next() else { throw Timeout(tier: tier, seconds: timeout) }
+            return r
+        }
+    }
+}
+
+enum LiveMemory {
+    /// App-available memory (jetsam headroom) on device; physical memory elsewhere.
+    static var availableMB: Int {
+        #if os(iOS) && !targetEnvironment(simulator)
+        return Int(os_proc_available_memory() / 1_048_576)
+        #else
+        return Int(ProcessInfo.processInfo.physicalMemory / 1_048_576)
+        #endif
+    }
+}
 
 @MainActor
 final class LiveSubtitleEngine: ObservableObject {
@@ -23,6 +104,9 @@ final class LiveSubtitleEngine: ObservableObject {
     @Published private(set) var translatorName = ""
     @Published private(set) var appleStatus: AppleTranslationStatus = .unknown
     @Published private(set) var latencyText = ""
+    /// Per-model status lines for the settings sheet: 加载中 / 编译中（首次） / 就绪 / 失败原因.
+    @Published private(set) var modelStatus: [String] = []
+    @Published private(set) var translatorStatus = ""
     @Published var mode: LiveSubtitleMode {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: LiveSubtitleMode.defaultsKey)
@@ -55,6 +139,15 @@ final class LiveSubtitleEngine: ObservableObject {
     private var worker: Task<Void, Never>?
     private var ticker: Task<Void, Never>?
     private var loadTask: Task<Void, Never>?
+    private var upgradeTask: Task<Void, Never>?
+    private var mtTask: Task<Void, Never>?
+    private var loadingLabel = ""
+    private var loadingSince = Date()
+    private var memoryObserver: NSObjectProtocol?
+    private var upgradeNoticeShown = false
+    private var upgradeNoticeDismissed = false
+    static let smallTimeout: Double = 120
+    static let turboTimeout: Double = 900
     private var asr: LiveSpeechRecognizer?
     private var mt: LiveTranslating?
     private var lastTick: (wall: Double, media: Double, rate: Double)?
@@ -78,9 +171,10 @@ final class LiveSubtitleEngine: ObservableObject {
     }
     private let shared = Shared()
 
-    /// Recognizers are expensive to load (ANE compile): keep the last one alive across player sessions.
-    private static var sharedASR: LiveSpeechRecognizer?
+    /// Translators are expensive to load: keep the chain alive across player sessions (recognizers live in
+    /// LiveModelLoader).
     private static var sharedMT: LiveTranslating?
+    private var loader: LiveModelLoader { .shared }
 
     init() {
         mode = LiveSubtitleMode(rawValue: UserDefaults.standard.string(forKey: LiveSubtitleMode.defaultsKey) ?? "") ?? .off
@@ -89,6 +183,9 @@ final class LiveSubtitleEngine: ObservableObject {
         UIDevice.current.isBatteryMonitoringEnabled = true
         wireReader()
         Task { appleStatus = await AppleTranslation.status() }
+        memoryObserver = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.memoryWarning() }
+        }
     }
 
     var preferredTier: LiveASRTier { tierPreference.resolve(physicalMemory: ProcessInfo.processInfo.physicalMemory) }
@@ -126,7 +223,7 @@ final class LiveSubtitleEngine: ObservableObject {
     private func modeChanged(from old: LiveSubtitleMode) {
         if mode == .off { saveCache(force: true); stopRunning(); phase = .off; caption = .init(ja: nil, zh: nil, partial: false, pendingChinese: false); return }
         if old == .off { start(); return }
-        if mode.needsChinese, mt == nil { Task { await ensureTranslator() } }
+        if mode.needsChinese, mt == nil { loadTranslatorInBackground() }
         refreshCaption()
     }
 
@@ -134,8 +231,43 @@ final class LiveSubtitleEngine: ObservableObject {
         guard mode != .off, source != nil else { return }
         saveCache(force: true)
         stopRunning()
-        Self.sharedASR = nil
         start()
+    }
+
+    /// 重试: clears failed states (an in-flight compile is awaited again, never restarted) and starts over.
+    func retry() {
+        LiveDiagnostics.shared.log("用户点击重试")
+        loader.resetFailures()
+        if mode == .off { mode = .bilingual; return }
+        start()
+    }
+
+    func diagnosticReport() -> String {
+        LiveDiagnostics.shared.report(extra: ["模式 \(mode.rawValue) · 偏好 \(tierPreference.rawValue) · 当前 \(activeTier?.rawValue ?? "-") · 阶段 \(phaseText)",
+                                              "可用内存 \(LiveMemory.availableMB) MB · 翻译 \(translatorName) · Apple \(appleStatus)"] + modelStatus)
+    }
+
+    var phaseText: String {
+        switch phase {
+        case .off: "关闭"
+        case .loading(let s): s
+        case .running: "运行中"
+        case .paused(let s): "暂停：\(s)"
+        case .failed(let s): "失败：\(s)"
+        }
+    }
+
+    private func memoryWarning() {
+        LiveDiagnostics.shared.log("收到内存警告 可用 \(LiveMemory.availableMB) MB")
+        if activeTier == .turbo, LiveModels.whisperAvailable(.small), tierPreference == .automatic {
+            perfDegraded = true
+            notice = "内存不足，已切换 small 模型"
+            saveCache(force: true)
+            loader.release(.turbo)
+            start()
+        } else if activeTier != .turbo {
+            upgradeTask?.cancel(); upgradeTask = nil
+        }
     }
 
     private func start() {
@@ -143,41 +275,92 @@ final class LiveSubtitleEngine: ObservableObject {
         stopRunning()
         let verdict = currentVerdict()
         if case .pause(let why) = verdict { phase = .paused(why); notice = why; startTicker(); return }
-        var tier = perfDegraded ? .small : preferredTier
-        if case .degrade(let t, let why) = verdict { tier = t; notice = why }
-        guardTier = tier
-        phase = .loading(LiveModels.whisperAvailable(tier) ? "正在加载语音模型 \(tier.title)…" : "模型未打包")
+        var target = perfDegraded ? .small : preferredTier
+        if case .degrade(let t, let why) = verdict { target = t; notice = why }
+        guardTier = target
+        if !LiveModels.whisperAvailable(target), target == .turbo, LiveModels.whisperAvailable(.small) { target = .small; notice = "turbo 模型未打包，改用 small" }
+        guard LiveModels.whisperAvailable(target) else {
+            phase = .failed("语音模型未打包（\(target.folder)）")
+            LiveDiagnostics.shared.log("模型缺失 \(target.folder)")
+            return
+        }
+        // Stage 1: the model that starts fastest — turbo if it is already resident, otherwise small (seconds),
+        // unless the user pinned turbo.
+        let first: LiveASRTier = {
+            if loader.cached(target) != nil { return target }
+            if target == .turbo, tierPreference == .automatic, LiveModels.whisperAvailable(.small) { return .small }
+            return target
+        }()
+        let timeout = first == .turbo ? Self.turboTimeout : Self.smallTimeout
+        setLoading(first == .turbo && UserDefaults.standard.object(forKey: "live.load.turbo") == nil
+                   ? "正在编译 \(first.title)（首次较慢）" : "正在加载 \(first.title)")
+        LiveDiagnostics.shared.log("start target=\(target.rawValue) first=\(first.rawValue) timeout=\(Int(timeout))s")
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let asr = try await self.recognizer(for: tier)
-                guard !Task.isCancelled else { return }
+                let asr = try await self.loader.get(first, timeout: timeout)
+                guard !Task.isCancelled, self.mode != .off else { return }
                 self.asr = asr
                 self.activeTier = asr.tier
-                await self.ensureTranslator()
-                guard !Task.isCancelled, self.mode != .off else { return }
+                LiveDiagnostics.shared.log("运行 \(asr.tier.rawValue)")
                 self.beginRunning()
+                self.loadTranslatorInBackground()
+                if target == .turbo, first != .turbo { self.scheduleUpgrade() }
             } catch {
+                guard !Task.isCancelled else { return }
                 self.phase = .failed(error.localizedDescription)
+                LiveDiagnostics.shared.log("启动失败 \(error.localizedDescription)")
             }
         }
         startTicker()
     }
 
-    private func recognizer(for tier: LiveASRTier) async throws -> LiveSpeechRecognizer {
-        if let s = Self.sharedASR, s.tier == tier { return s }
-        Self.sharedASR = nil
-        if !LiveModels.whisperAvailable(tier), tier == .turbo, LiveModels.whisperAvailable(.small) {
-            notice = "turbo 模型未打包，改用 small"
-            return try await recognizer(for: .small)
+    private func setLoading(_ label: String) {
+        loadingLabel = label
+        loadingSince = Date()
+        phase = .loading(label + "…")
+    }
+
+    /// Stage 2: compile/load turbo in the background while small is already producing subtitles, then swap.
+    private func scheduleUpgrade() {
+        upgradeTask?.cancel()
+        let avail = LiveMemory.availableMB
+        guard avail == 0 || avail > 1800 else {
+            notice = "可用内存不足（\(avail) MB），本次使用 small"
+            LiveDiagnostics.shared.log("跳过 turbo：可用内存 \(avail) MB")
+            return
         }
-        let r = try await LiveWhisperRecognizer.load(tier)
-        Self.sharedASR = r
-        return r
+        upgradeNoticeShown = true
+        upgradeTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.upgradeNoticeShown = false }
+            do {
+                let r = try await self.loader.get(.turbo, timeout: Self.turboTimeout)
+                guard !Task.isCancelled, self.phase == .running, !self.perfDegraded, self.guardTier == .turbo else { return }
+                self.asr = r
+                self.activeTier = .turbo
+                self.startWorker()
+                self.loader.release(.small)
+                self.notice = "已切换 large-v3-turbo 高精度模型"
+                LiveDiagnostics.shared.log("已切换 turbo")
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.notice = "turbo 未就绪（\(error.localizedDescription)），继续使用 small"
+            }
+        }
+    }
+
+    private func loadTranslatorInBackground() {
+        guard Self.sharedMT == nil || mt == nil else { return }
+        guard mtTask == nil else { return }
+        mtTask = Task { [weak self] in
+            await self?.ensureTranslator()
+            self?.mtTask = nil
+        }
     }
 
     private func ensureTranslator() async {
-        if let mt = Self.sharedMT { self.mt = mt; translatorName = mt.name; return }
+        if let mt = Self.sharedMT { self.mt = mt; translatorName = mt.name; if phase == .running { startWorker() }; return }
         appleStatus = await AppleTranslation.status()
         var primary: LiveTranslating?
         #if canImport(Translation)
@@ -188,7 +371,15 @@ final class LiveSubtitleEngine: ObservableObject {
         #endif
         var fallback: LiveTranslating?
         if let root = LiveModels.root, LiveModels.nllbAvailable {
-            fallback = await Task.detached(priority: .userInitiated) { try? NLLBCoreMLTranslator(root: root) }.value
+            translatorStatus = "NLLB 加载中…"
+            let t0 = Date()
+            do {
+                fallback = try await Task.detached(priority: .userInitiated) { try NLLBCoreMLTranslator(root: root) }.value
+                translatorStatus = String(format: "NLLB 就绪 %.1fs", Date().timeIntervalSince(t0))
+            } catch {
+                translatorStatus = "NLLB 加载失败：\(error.localizedDescription)"
+            }
+            LiveDiagnostics.shared.log(translatorStatus)
         }
         guard primary != nil || fallback != nil else { translatorName = "无可用翻译"; return }
         let chain = LiveTranslatorChain(primary: primary, fallback: fallback)
@@ -213,7 +404,7 @@ final class LiveSubtitleEngine: ObservableObject {
     private func beginRunning() {
         guard let source, let clock, let asr else { return }
         let now = clock()
-        pipeline = LivePipeline(store: cache.load(LiveSubtitleCache.key(video: videoKey, tier: asr.tier)) ?? LiveSegmentStore())
+        pipeline = LivePipeline(store: cache.load(cacheKey) ?? LiveSegmentStore())
         pipeline.mode = mode
         shared.set(pipeline: pipeline)
         lastSavedCount = pipeline.snapshotStore.segments.count
@@ -243,6 +434,7 @@ final class LiveSubtitleEngine: ObservableObject {
 
     private func stopRunning() {
         loadTask?.cancel(); loadTask = nil
+        upgradeTask?.cancel(); upgradeTask = nil
         worker?.cancel(); worker = nil
         reader.stop()
         ticker?.cancel(); ticker = nil
@@ -294,6 +486,18 @@ final class LiveSubtitleEngine: ObservableObject {
     }
 
     private func tick() {
+        updateModelStatus()
+        if case .loading = phase {
+            let el = Int(Date().timeIntervalSince(loadingSince))
+            var label = "\(loadingLabel)… \(el / 60):\(String(format: "%02d", el % 60))"
+            if el >= 15 { label += " · 首次需编译模型，请保持前台" }
+            phase = .loading(label)
+        }
+        if upgradeNoticeShown, !upgradeNoticeDismissed, phase == .running, case .loading(let since) = loader.state(.turbo) {
+            let el = Int(Date().timeIntervalSince(since))
+            let first = UserDefaults.standard.object(forKey: "live.load.turbo") == nil
+            notice = "large-v3-turbo 后台\(first ? "编译中（首次）" : "加载中")\(el / 60):\(String(format: "%02d", el % 60)) · 先用 small"
+        }
         guard let clock, phase == .running else { refreshCaption(); return }
         let c = clock()
         guard c.time.isFinite else { return }
@@ -310,6 +514,28 @@ final class LiveSubtitleEngine: ObservableObject {
         refreshCaption()
         saveCache(force: false)
         updateLatencyText()
+    }
+
+    private var statusCounter = 0
+    private func updateModelStatus() {
+        statusCounter += 1
+        guard statusCounter % 5 == 1 else { return }
+        var out: [String] = []
+        for t in LiveASRTier.allCases {
+            let name = t.title
+            switch loader.state(t) {
+            case .idle:
+                if !LiveModels.whisperAvailable(t) { out.append("\(name)：未打包") }
+            case .loading(let since):
+                let el = Int(Date().timeIntervalSince(since))
+                let first = t == .turbo && UserDefaults.standard.object(forKey: "live.load.turbo") == nil
+                out.append("\(name)：\(first ? "编译中（首次）" : "加载中") \(el / 60):\(String(format: "%02d", el % 60))")
+            case .ready(let s): out.append(String(format: "%@：就绪（加载 %.1fs）%@", name, s, activeTier == t ? " · 使用中" : ""))
+            case .failed(let why): out.append("\(name)：失败 — \(why)")
+            }
+        }
+        if !translatorStatus.isEmpty { out.append(translatorStatus) }
+        if out != modelStatus { modelStatus = out }
     }
 
     private func refreshCaption() {
@@ -363,11 +589,11 @@ final class LiveSubtitleEngine: ObservableObject {
             startTicker()
         case .degrade(let t, let why):
             if case .paused = phase { notice = why; start(); return }
-            if guardTier != t { notice = why; Self.sharedASR = nil; start() }
+            if guardTier != t { notice = why; if t == .small { loader.release(.turbo) }; start() }
         case .run(let t):
             if case .paused = phase { notice = nil; start(); return }
             let want = perfDegraded ? .small : t
-            if guardTier != want, phase == .running { notice = nil; Self.sharedASR = nil; start() }
+            if guardTier != want, phase == .running { notice = nil; start() }
         }
         checkPerformance()
     }
@@ -382,24 +608,28 @@ final class LiveSubtitleEngine: ObservableObject {
         perfDegraded = true
         notice = String(format: "turbo 在本机无法实时（%.1f× 实时），已切换 small 模型", st.rtfAvg)
         saveCache(force: true)
-        Self.sharedASR = nil
+        loader.release(.turbo)
+        LiveDiagnostics.shared.log(String(format: "turbo RTF %.2f → small", st.rtfAvg))
         start()
     }
 
     // MARK: cache
 
     private func saveCache(force: Bool) {
-        guard !videoKey.isEmpty, let tier = activeTier else { return }
+        guard !videoKey.isEmpty, activeTier != nil else { return }
         let store = pipeline.snapshotStore
         guard force || store.segments.count >= lastSavedCount + 8 else { return }
         guard !store.segments.isEmpty else { return }
         lastSavedCount = store.segments.count
-        let key = LiveSubtitleCache.key(video: videoKey, tier: tier)
+        let key = cacheKey
         let cache = self.cache
         Task.detached(priority: .utility) { cache.save(store, key: key) }
     }
 
+    /// Tier-independent since 288: small lines are kept when turbo takes over mid-video.
+    private var cacheKey: String { LiveSubtitleCache.key(video: videoKey, tier: .small) }
+
     func clearCache() { cache.clear() }
     var cacheBytes: Int { cache.totalBytes() }
-    func dismissNotice() { notice = nil }
+    func dismissNotice() { if upgradeNoticeShown { upgradeNoticeDismissed = true }; notice = nil }
 }

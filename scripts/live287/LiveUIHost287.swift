@@ -24,6 +24,20 @@ final class LiveSubtitleEngine: ObservableObject {
     func clearCache() {}
     var cacheBytes: Int { 18_432 }
     func dismissNotice() { notice = nil }
+    // Build 288 surface
+    @Published var modelStatus: [String] = ["large-v3-turbo：就绪（加载 8.4s） · 使用中", "small：就绪（加载 2.1s）", "NLLB 就绪 3.8s"]
+    @Published var translatorStatus = ""
+    var phaseText: String {
+        switch phase {
+        case .off: "关闭"
+        case .loading(let s): s
+        case .running: "运行中"
+        case .paused(let s): "暂停：\(s)"
+        case .failed(let s): "失败：\(s)"
+        }
+    }
+    func retry() { phase = .loading("正在加载 small… 0:00") }
+    func diagnosticReport() -> String { "AVDB 实时字幕诊断 (fixture)" }
     func recompute() { caption = store.caption(at: t, mode: mode) }
 }
 
@@ -106,7 +120,15 @@ struct LiveHostScreen: View {
         if args.contains("--settings") { settings = true }
         if args.contains("--editing") { editing = true }
         if args.contains("--thermal") { engine.phase = .paused("设备温度过高，实时字幕已暂停（降温后自动恢复）") }
-        if args.contains("--loading") { engine.phase = .loading("正在加载语音模型 large-v3-turbo…"); engine.mode = .bilingual }
+        if args.contains("--loading") { engine.phase = .loading("正在加载 small… 0:03"); engine.mode = .bilingual; engine.activeTier = nil
+            engine.modelStatus = ["small：加载中 0:03"] }
+        if args.contains("--staged") {   // small already subtitling; turbo compiling in background (288 auto mode)
+            engine.activeTier = .small; engine.notice = "large-v3-turbo 后台编译中（首次）1:12 · 先用 small"
+            engine.modelStatus = ["large-v3-turbo：编译中（首次） 1:12", "small：就绪（加载 2.4s） · 使用中", "NLLB 就绪 3.9s"] }
+        if args.contains("--failed") {
+            engine.phase = .failed("small 模型加载超过 120 秒仍未完成（首次编译可能较慢）"); engine.activeTier = nil
+            engine.modelStatus = ["large-v3-turbo：失败 — 加载超时", "small：失败 — small 模型加载超过 120 秒仍未完成"]
+            engine.store = LiveSegmentStore(); engine.recompute() }
         if let f = arg("--font"), let v = Double(f) { UserDefaults.standard.set(v, forKey: LiveSubtitleStyle.fontKey) }
         if let p = arg("--position"), let v = Double(p) { UserDefaults.standard.set(v, forKey: LiveSubtitleStyle.positionKey) }
         else { UserDefaults.standard.set(LiveSubtitleStyle.defaultPosition, forKey: LiveSubtitleStyle.positionKey) }

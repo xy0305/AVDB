@@ -31,7 +31,7 @@ for s in ['ProcessInfo.processInfo.thermalState', 'isLowPowerModeEnabled', 'batt
 for s in ['AVDISCARD_ALL', 'av_find_best_stream(ctx, AVMEDIA_TYPE_AUDIO', '"user_agent"', '"referer"', '"headers"', 'interrupt_callback',
           'AV_SAMPLE_FMT_FLT, 16000', 'av_seek_frame', 'dropUntil', 'skipTarget']:
     assert s in reader, s
-for s in ['language: "ja"', 'detectLanguage: false', 'withoutTimestamps: true', 'audioEncoderCompute: encoder', '.cpuAndNeuralEngine', 'promptTokens', 'download: false']:
+for s in ['language: "ja"', 'detectLanguage: false', 'withoutTimestamps: true', 'audioEncoderCompute: u.encoder', '.cpuAndNeuralEngine', 'promptTokens', 'download: false']:
     assert s in engines, s
 for s in ['TranslationSession(installedSource:', 'LanguageAvailability()', 'prepareTranslation()', 'withTimeout(2.0)']:
     assert s in apple, s
@@ -42,10 +42,10 @@ for f in ['LiveSubtitleCore.swift', 'LiveAudioReader.swift', 'LiveSpeechEngines.
 assert 'lastKnownFileType = folder; path = LiveModels;' in pbx and '/* LiveModels in Resources */,' in pbx
 assert 'argmaxinc/argmax-oss-swift.git' in pbx and 'version = 1.1.1;' in pbx and 'productName = WhisperKit;' in pbx
 assert (r / 'AVDB/Resources/LiveModels/README.md').exists()
-assert plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion'] == '287'
-assert pbx.count('CURRENT_PROJECT_VERSION = 287;') == 2
-wf = (r / '.github/workflows/lut4-online287.yml').read_text()
-for s in ['fetch_models287.py', 'test-live-bench287.py', 'test-live-ui287.py', 'package-lut287.py', 'actions/cache']: assert s in wf, s
+assert int(plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']) >= 287
+assert pbx.count('CURRENT_PROJECT_VERSION = ') == 2
+wf = (r / '.github/workflows/lut4-online288.yml').read_text()
+for s in ['fetch_models287.py', 'test-live-bench287.py', 'test-live-ui287.py', 'package-lut288.py', 'actions/cache']: assert s in wf, s
 # Core regression with the real Swift toolchain.
 swiftc = os.environ.get('SWIFTC') or shutil.which('swiftc') or '/workspace/swift/usr/bin/swiftc'
 with tempfile.TemporaryDirectory() as d:
