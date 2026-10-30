@@ -234,6 +234,8 @@ struct MovieDetailView: View {
             if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
             #endif
             await vm.load()
+            // Build 281: the detail payload feeds the on-device recommender (no extra request).
+            if let movie = vm.movie { RecommendationIngest.remember(movie) }
             if let autoLaunch, !autoLaunchDone, let movie = vm.movie {
                 autoLaunchDone = true
                 launchResume(autoLaunch, movie: movie)

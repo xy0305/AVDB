@@ -72,6 +72,7 @@ struct UserView: View {
                         .padding(.vertical, 8)
                     }
 
+                    RecommendationSection()
                     PlaybackHistorySection()
                     FollowUpdatesSection()
 
@@ -200,6 +201,7 @@ struct UserView: View {
                         .pressableGlass(scale: 0.98)
                     }
                     // Logged-out playback lives in the device-only guest scope.
+                    RecommendationSection()
                     PlaybackHistorySection()
                     FollowUpdatesSection()
                 }

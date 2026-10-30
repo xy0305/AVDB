@@ -23,8 +23,8 @@ pbx = rd('AVDB.xcodeproj/project.pbxproj')
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 
 # ---- Version / project
-assert plist['CFBundleVersion'] == '280'
-assert pbx.count('CURRENT_PROJECT_VERSION = 280;') == 2
+assert int(plist['CFBundleVersion']) >= 280
+assert pbx.count(f"CURRENT_PROJECT_VERSION = {plist['CFBundleVersion']};") == 2
 for f in ['PlaybackResume.swift', 'FollowUpdates.swift', 'FollowUpdatesView.swift']:
     assert pbx.count(f'/* {f} in Sources */') == 2 and pbx.count(f'path = {f};') == 1, f
 assert 'org.avdb.follow.refresh' in plist['BGTaskSchedulerPermittedIdentifiers']

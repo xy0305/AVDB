@@ -1,7 +1,6 @@
 name: LUT4 online App 280 (续播 + 追更提醒 + LUT 预设/按住看原图)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
