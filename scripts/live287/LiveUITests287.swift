@@ -54,8 +54,8 @@ final class LiveUITests287: XCTestCase {
         XCTAssertTrue(app.buttons["live.subtitle.retry"].waitForExistence(timeout: 5))
         shot(app, "18-288-load-failed-retry"); app.terminate()
         app = launch(["--mode", "bilingual", "--staged", "--settings"]); sleep(1)
-        app.swipeUp(); sleep(1); shot(app, "19-288-settings-model-status-copylog"); app.terminate()
+        sleep(1); shot(app, "19-288-settings-model-status-copylog"); app.terminate()
         app = launch(["--mode", "bilingual", "--failed", "--settings"]); sleep(1)
-        app.swipeUp(); sleep(1); shot(app, "20-288-settings-failed-retry"); app.terminate()
+        sleep(1); shot(app, "20-288-settings-failed-retry"); app.terminate()
     }
 }

@@ -192,8 +192,9 @@ struct LiveSubtitleStatusChip: View {
             .background(.black.opacity(0.62), in: Capsule())
             .frame(maxWidth: 520, alignment: .leading)
             .padding(.top, safeArea.top + 62).padding(.leading, safeArea.leading + 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("live.subtitle.status")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 }
@@ -217,6 +218,22 @@ struct LiveSubtitleSettingsSheet: View {
                     }.pickerStyle(.segmented)
                         .accessibilityIdentifier("live.subtitle.settings.mode")
                 } header: { Text("实时字幕（边播边识别，不预生成）") }
+                Section {
+                    LabeledContent("状态", value: engine.phaseText)
+                        .accessibilityIdentifier("live.subtitle.settings.phase")
+                    ForEach(engine.modelStatus, id: \.self) { Text($0).font(.caption).monospacedDigit() }
+                    if case .failed = engine.phase {
+                        Button { engine.retry() } label: { Label("重试加载", systemImage: "arrow.clockwise") }
+                            .accessibilityIdentifier("live.subtitle.settings.retry")
+                    }
+                    Button {
+                        UIPasteboard.general.string = engine.diagnosticReport()
+                        copied = true
+                    } label: { Label(copied ? "已复制诊断日志" : "复制诊断日志", systemImage: copied ? "checkmark" : "doc.on.doc") }
+                        .accessibilityIdentifier("live.subtitle.settings.copylog")
+                } header: { Text("模型状态与诊断") } footer: {
+                    Text("自动模式先用 small 立即出字幕，同时在后台准备 large-v3-turbo，就绪后自动切换。turbo 首次在本机编译可能需要数分钟（每次安装/更新一次），请保持前台。全部使用 App 内置模型，不联网。")
+                }
                 Section("样式") {
                     HStack { Text("字号"); Slider(value: $points, in: 14 ... 36, step: 1); Text("\(Int(points))").monospacedDigit() }
                         .accessibilityIdentifier("live.subtitle.settings.font")
@@ -241,22 +258,6 @@ struct LiveSubtitleSettingsSheet: View {
                     if !engine.latencyText.isEmpty { LabeledContent("延迟", value: engine.latencyText).font(.caption) }
                 } header: { Text("识别与翻译（全部在本机）") } footer: {
                     Text("在播放头前方预读音频并提前识别，字幕通常在台词开始前就已就绪；拖动进度后约 1–2 秒内先显示日文流式结果，中文随后。设备过热或低电量时自动切换 small 模型或暂停。")
-                }
-                Section {
-                    LabeledContent("状态", value: engine.phaseText)
-                        .accessibilityIdentifier("live.subtitle.settings.phase")
-                    ForEach(engine.modelStatus, id: \.self) { Text($0).font(.caption).monospacedDigit() }
-                    if case .failed = engine.phase {
-                        Button { engine.retry() } label: { Label("重试加载", systemImage: "arrow.clockwise") }
-                            .accessibilityIdentifier("live.subtitle.settings.retry")
-                    }
-                    Button {
-                        UIPasteboard.general.string = engine.diagnosticReport()
-                        copied = true
-                    } label: { Label(copied ? "已复制诊断日志" : "复制诊断日志", systemImage: copied ? "checkmark" : "doc.on.doc") }
-                        .accessibilityIdentifier("live.subtitle.settings.copylog")
-                } header: { Text("模型状态与诊断") } footer: {
-                    Text("自动模式先用 small 立即出字幕，同时在后台准备 large-v3-turbo，就绪后自动切换。turbo 首次在本机编译可能需要数分钟（每次安装/更新一次），请保持前台。全部使用 App 内置模型，不联网。")
                 }
                 Section("缓存") {
                     LabeledContent("已缓存字幕", value: ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file))
