@@ -15,7 +15,7 @@ plist = plistlib.loads((ROOT / 'AVDB/Resources/Info.plist').read_bytes())
 assert '"milk": ("h_1240", 5)' in seed, 'MILK label prefix seeded'
 assert 'DMMCID.candidates(number: raw).first' in policy and 'DMMCoverURLs.digital(cid)' in policy, 'detail guesses use the resolver'
 assert 'pics.dmm.co.jp/digital/video/\\(cid)/\\(cid)ps.jpg"' not in policy, 'no 147×200 pics ps guess'
-assert 'DMMCoverURLs.upgrade(image).first' in loader, 'list cards upgrade catalogue DMM images'
+assert 'DMMCoverURLs.upgrade(image).first' in loader or 'for hq in DMMCoverURLs.upgrade(image)' in loader, 'list cards upgrade catalogue DMM images'
 assert 'DMMCID.candidates(number: "\\(prefix)-\\(idx)")' in loader, 'CoverURLBuilder uses the resolver'
 assert 'DMMCoverURLs.isJacket(source)' in loader and '0.69' in loader, 'DMM jackets cropped with the measured ratio'
 assert 'upgradedDMM' in detail and 'DMMLabelPrefixes.shared.learn' in detail, 'avbase CID upgraded + learned'

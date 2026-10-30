@@ -29,6 +29,14 @@ struct DetailPosterQuality: Sendable {
     let height: Int
     let originalPortrait: Bool
     var score: Double { min(Double(width) / 0.7, Double(height)) }
+    /// 0 = publisher / store original (DMM, MGS, Amazon, Tenhow), 1 = other, 2 = JavDB re-host.
+    var officialRank: Int {
+        switch PosterProvenance(source: source).label {
+        case "DMM", "MGS", "Amazon", "Tenhow": return 0
+        case "JavDB": return 2
+        default: return 1
+        }
+    }
 
     static func winner(_ values: [Self]) -> Self? {
         let eligible = values.filter { DetailPosterPolicy.eligible(width: $0.width, height: $0.height) }
@@ -36,7 +44,11 @@ struct DetailPosterQuality: Sendable {
         // An untouched portrait within 5% of the maximum linear resolution is
         // preferable to a derived front. Do not accumulate pairwise tolerances.
         let originals = eligible.filter { $0.originalPortrait && $0.score >= maximum * 0.95 }
-        return (originals.isEmpty ? eligible : originals).sorted {
+        // Build 284: among derived fronts within 5% (e.g. the same 800×538 jacket cropped from
+        // DMM at 0.69 vs JavDB's watermarked re-host at 0.70), the official source wins.
+        let near = eligible.filter { $0.score >= maximum * 0.95 }
+        return (originals.isEmpty ? near : originals).sorted {
+            if $0.officialRank != $1.officialRank { return $0.officialRank < $1.officialRank }
             if $0.score != $1.score { return $0.score > $1.score }
             if $0.originalPortrait != $1.originalPortrait { return $0.originalPortrait }
             return $0.source < $1.source

@@ -9,7 +9,7 @@ assert "enum ListHQCoverCache" in loader
 assert "public enum ListCoverPolicy" in loader
 assert "ListCoverPolicy.sources(movie: movie)" in loader
 assert "secondFallbackURL: sources.dropFirst(2).first" in loader
-assert "DetailPosterPolicy.candidates(number: movie.number).first" in loader
+assert "DetailPosterPolicy.candidates(number: movie.number).first" in loader or "DetailPosterPolicy.candidates(number: movie.number).prefix(2)" in loader
 assert "ListHQCoverCache.url(for: movie.number)" in loader
 assert "AmazonPoster.allowedImage(url)" in loader
 assert "AvbaseMetadata.allowedDiscoveredImage(url)" in loader

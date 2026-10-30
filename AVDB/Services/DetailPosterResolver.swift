@@ -33,7 +33,13 @@ private final class PosterRedirectGuard: NSObject, URLSessionTaskDelegate {
 }
 
 enum DetailPosterResolver {
-    private static let cache = DetailPosterCache<DetailPosterArtwork>()
+    // Build 284: a JavDB fallback winner is kept only briefly, so a later DMM success
+    // (network/proxy recovered) replaces it on the next open instead of after 2 minutes.
+    private static let cache = DetailPosterCache<DetailPosterArtwork>(ttl: { value in
+        value?.provenance.label == "JavDB" ? DetailPosterResolver.fallbackTTL : nil
+    })
+    static let fallbackTTL: TimeInterval = 20
+    static let cacheVersion = "dmm284"
     private static let javbusPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 30 * 60)
     private static let tenhowPages = DetailPosterCache<String>(positiveTTL: 6 * 3600, negativeTTL: 300)
 
@@ -77,7 +83,7 @@ enum DetailPosterResolver {
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
         let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
         // Separate enhanced vs raw JavDB cover rasters in the detail cache.
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + "#" + (movie.catalogueMetadata?.images.joined(separator: "|") ?? "") + "#" + JavDBCoverEnhance.cacheTag
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + "#" + (movie.catalogueMetadata?.images.joined(separator: "|") ?? "") + "#" + JavDBCoverEnhance.cacheTag + "#" + cacheVersion
     }
 
     /// Drop detail poster winners when the JavDB cover-enhance toggle flips.
@@ -108,7 +114,10 @@ enum DetailPosterResolver {
             guard let url = URL(string: source) else { return false }
             return !DetailPosterPolicy.allowedPublicImage(url) && !AvbaseMetadata.allowedDiscoveredImage(url)
         }, validated.first { URL(string: $0)?.host == "image.mgstage.com" }].compactMap { $0 }
-        return anchors + validated.filter { !anchors.contains($0) }
+        // Build 284: DMM rule candidates (ps portrait, pl jacket) directly after the anchors, so a
+        // second JavDB size or metadata copy can never push the DMM jacket out of the 4 slots.
+        let dmm = validated.filter { rules.contains($0) && !anchors.contains($0) }
+        return anchors + dmm + validated.filter { !anchors.contains($0) && !dmm.contains($0) }
     }
 
     static func catalogueEligible(_ movie: Movie) -> Bool {
@@ -347,7 +356,20 @@ enum DetailPosterResolver {
         return DecodedPoster(image: UIImage(cgImage: cg), quality: quality)
     }
 
+    /// Build 284: one selection slot = the URL plus its same-image DMM alternates
+    /// (awsimgsrc ↔ pics, digital → mono). Stops at the first decodable non-placeholder.
     private static func download(url: URL, timeout: TimeInterval, derive: Bool) async -> DecodedPoster? {
+        let started = ProcessInfo.processInfo.systemUptime
+        if let hit = await downloadOne(url: url, timeout: timeout, derive: derive) { return hit }
+        for alternate in DMMCoverURLs.fallbacks(for: url.absoluteString) {
+            let left = timeout - (ProcessInfo.processInfo.systemUptime - started)
+            guard left > 0.5, !Task.isCancelled, let next = URL(string: alternate) else { break }
+            if let hit = await downloadOne(url: next, timeout: left, derive: derive) { return hit }
+        }
+        return nil
+    }
+
+    private static func downloadOne(url: URL, timeout: TimeInterval, derive: Bool) async -> DecodedPoster? {
         guard timeout > 0, !Task.isCancelled else { return nil }
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil

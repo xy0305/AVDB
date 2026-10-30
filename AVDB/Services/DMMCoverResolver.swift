@@ -151,6 +151,33 @@ enum DMMCoverURLs {
         return JRHTML.matches(#"/(?:digital/(?:video|amateur)|mono/movie(?:/adult|/japanese)?)/([a-z0-9_]+)/([a-z0-9_]+)(?:ps|pl|jp)\.jpg$"#, path)
             .first.flatMap { $0[1] == $0[2] ? $0[1] : nil }
     }
+    /// Build 284: DVD (mono) CID for a digital CID: same namespace, serial without the 5-digit pad
+    /// (ipx00706 → ipx706, h_1240milk00311 → h_1240milk311).
+    static func monoCID(_ digital: String) -> String? {
+        guard let m = JRHTML.matches(#"^([a-z0-9_]*?[a-z])0*([0-9]{1,6})$"#, digital).first, let n = Int(m[2]), n > 0 else { return nil }
+        return m[1] + DMMCID.pad(n, 3)
+    }
+    /// Build 284: same-image alternates tried inside one selection slot when a DMM URL fails
+    /// (HTTP error, timeout, proxy/region refusal or a NOW placeholder): other host, then the
+    /// DVD storefront. Never a different title: the CID namespace and serial are preserved.
+    static func fallbacks(for source: String) -> [String] {
+        guard let url = URL(string: source), url.host == "awsimgsrc.dmm.co.jp" || url.host == "pics.dmm.co.jp",
+              let cid = cid(source) else { return [] }
+        let kind = url.lastPathComponent.hasSuffix("pl.jpg") ? "pl" : (url.lastPathComponent.hasSuffix("ps.jpg") ? "ps" : "")
+        guard !kind.isEmpty else { return [] }
+        let isDigital = url.path.contains("/digital/video/")
+        var out: [String] = []
+        if isDigital {
+            if kind == "pl" { out.append("\(pics)/digital/video/\(cid)/\(cid)pl.jpg") }
+            if let mono = monoCID(cid) {
+                out.append("\(aws)/mono/movie/\(mono)/\(mono)\(kind).jpg")
+                if kind == "pl" { out.append("\(pics)/mono/movie/adult/\(mono)/\(mono)pl.jpg") }
+            }
+        } else if kind == "pl" {
+            out.append("\(pics)/mono/movie/adult/\(cid)/\(cid)pl.jpg")
+        }
+        return out.filter { $0 != source }
+    }
     static func isJacket(_ source: String) -> Bool {
         guard let url = URL(string: source), ["pics.dmm.co.jp", "awsimgsrc.dmm.co.jp"].contains(url.host ?? "") else { return false }
         return url.lastPathComponent.hasSuffix("pl.jpg")

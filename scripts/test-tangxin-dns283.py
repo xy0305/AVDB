@@ -27,7 +27,7 @@ assert '.transition(.move(edge: .bottom)' in chrome and '.animation(.easeInOut' 
 assert '.modifier(HidesFloatingTabBar())' in search
 for name in ('OnlineDNSPolicy.swift', 'TabBarChrome.swift'):
     assert pbx.count(f'/* {name} in Sources */') == 2 and pbx.count(f'path = {name};') == 1, name
-assert plist['CFBundleVersion'] == '283' and pbx.count('CURRENT_PROJECT_VERSION = 283;') == 2
+assert int(plist['CFBundleVersion']) >= 283 and pbx.count(f"CURRENT_PROJECT_VERSION = {plist['CFBundleVersion']};") == 2
 
 swiftc = shutil.which('swiftc')
 if not swiftc:

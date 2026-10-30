@@ -35,7 +35,10 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
     private let positiveTTL: TimeInterval
     private let negativeTTL: TimeInterval
     private let capacity: Int
-    init(positiveTTL: TimeInterval = 120, negativeTTL: TimeInterval = 30, capacity: Int = 24) {
+    /// Optional per-value TTL override (nil = default positive/negative TTL).
+    private let ttl: (@Sendable (Value?) -> TimeInterval?)?
+    init(positiveTTL: TimeInterval = 120, negativeTTL: TimeInterval = 30, capacity: Int = 24, ttl: (@Sendable (Value?) -> TimeInterval?)? = nil) {
+        self.ttl = ttl
         self.capacity = max(1, capacity)
         self.positiveTTL = positiveTTL
         self.negativeTTL = negativeTTL
@@ -113,7 +116,7 @@ final class DetailPosterCache<Value: Sendable>: @unchecked Sendable {
             guard !cancelled else { return }
             entries = entries.filter { $0.value.expires > Date() }
             if entries.count >= capacity, let oldest = entries.min(by: { $0.value.expires < $1.value.expires })?.key { entries[oldest] = nil }
-            entries[key] = Entry(value: value, expires: Date().addingTimeInterval(value == nil ? negativeTTL : positiveTTL))
+            entries[key] = Entry(value: value, expires: Date().addingTimeInterval(ttl?(value) ?? (value == nil ? negativeTTL : positiveTTL)))
         }
     }
 }

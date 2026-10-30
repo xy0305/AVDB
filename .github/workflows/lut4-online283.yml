@@ -1,7 +1,6 @@
 name: LUT4 online App 283 (糖心 Fake-IP DNS + 搜索隐藏导航栏 + 282)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

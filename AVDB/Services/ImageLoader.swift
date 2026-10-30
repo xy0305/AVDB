@@ -676,7 +676,7 @@ public enum ListCoverPolicy {
             for image in movie.catalogueMetadata?.images ?? [] {
                 guard let url = URL(string: image) else { continue }
                 // Build 282: pics.dmm.co.jp pl/ps (800 / 147 px) → awsimgsrc ps (full portrait).
-                if let hq = DMMCoverURLs.upgrade(image).first { append(hq) }
+                for hq in DMMCoverURLs.upgrade(image) { append(hq) }
                 if DetailPosterPolicy.allowedPublicImage(url)
                     || AvbaseMetadata.allowedDiscoveredImage(url)
                     || AmazonPoster.allowedImage(url)
@@ -684,9 +684,14 @@ public enum ListCoverPolicy {
                     append(image)
                 }
             }
-            // One guessed public portrait only — keeps list request budget small.
-            append(DetailPosterPolicy.candidates(number: movie.number).first)
+            // Build 284: guessed DMM portrait, then its jacket (front-cropped) — older titles
+            // (e.g. IPX-706) only have a 147×200 ps and an 800×538 pl.
+            for guess in DetailPosterPolicy.candidates(number: movie.number).prefix(2) { append(guess) }
         }
+        // MoviePosterImage tries three sources: at most two HQ attempts, then JavDB is
+        // always the third, so a DMM miss never leaves a list card empty.
+        let hq = result.prefix(2)
+        result = Array(hq)
         for source in javdb { append(source) }
         return result
     }
