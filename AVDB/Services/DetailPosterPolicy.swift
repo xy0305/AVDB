@@ -157,13 +157,13 @@ enum DetailPosterPolicy {
                 return ["\(base)/pf_e_\(lower)-\(digits).jpg", "\(base)/pf_o1_\(lower)-\(digits).jpg"]
             }
         }
-        let mapping = ["WSA":"2", "FSDSS":"1", "FCDSS":"1", "FNS":"1", "FTHTD":"1",
-                       "FALENO":"1", "FGAN":"1", "FSNF":"1", "FLAV":"1",
-                       "ABP":"118", "CHN":"118", "STARS":"1", "STAR":"1", "START":"1",
-                       "SODS":"1", "REBD":"h_346", "REBDB":"h_346", "GSHRB":"h_346"]
-        let cid = (mapping[prefix] ?? "") + lower + String(repeating: "0", count: max(0, 5 - String(index).count)) + String(index)
-        return ["https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/\(cid)/\(cid)ps.jpg",
-                "https://pics.dmm.co.jp/digital/video/\(cid)/\(cid)ps.jpg"]
+        // Build 282: CID from the DMM resolver (exact learned CID → label prefix table such as
+        // MILK → h_1240 → plain label + 5-digit serial). awsimgsrc ps is the full-resolution
+        // portrait front (e.g. 745×1081); awsimgsrc pl is the 1600-wide jacket fallback.
+        // (pics.dmm.co.jp ps is only a 147×200 thumbnail and can never win.)
+        _ = lower
+        guard let cid = DMMCID.candidates(number: raw).first else { return [] }
+        return DMMCoverURLs.digital(cid)
     }
 
     /// Portrait geometry is NOT a single-person or semantic classification.

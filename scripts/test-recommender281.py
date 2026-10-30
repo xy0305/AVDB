@@ -52,8 +52,8 @@ for name in ('Recommender.swift', 'RecommendationStore.swift', 'RecommendationJa
     assert pbx.count(f'path = {name};') == 1, name
 ids = re.findall(r'^\t\t([0-9A-Z]{24}) /\*', pbx, re.M)
 assert len(ids) == len(set(ids)), 'duplicate pbxproj object ids'
-assert plist['CFBundleVersion'] == '281'
-assert pbx.count('CURRENT_PROJECT_VERSION = 281;') == 2
+assert int(plist['CFBundleVersion']) >= 281
+assert pbx.count(f"CURRENT_PROJECT_VERSION = {plist['CFBundleVersion']};") == 2
 
 # ---- execute the core + store with swiftc
 swiftc = shutil.which('swiftc')

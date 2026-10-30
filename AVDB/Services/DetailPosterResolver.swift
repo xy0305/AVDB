@@ -140,7 +140,8 @@ enum DetailPosterResolver {
                     // never a second serial four-second gate before selection.
                     async let tenhow = discoverTenhow(paths: paths, number: movie.number ?? "", namespace: key, timeout: timeout)
                     async let metadata: ScrapedMetadata? = catalogue ? CatalogueMetadataService.shared.lookup(number: movie.number ?? "", originalURL: movie.originalURL, timeout: timeout) : nil
-                    let (images, record) = await (tenhow, metadata)
+                    let (images, fetched) = await (tenhow, metadata)
+                    let record = fetched.map { Self.upgradedDMM($0, number: movie.number ?? "") }
                     if paths.isEmpty, let record {
                         // Missing native actor identities may be filled by the
                         // exact record. Retain the old Tenhow/Amazon opportunity,
@@ -177,6 +178,27 @@ enum DetailPosterResolver {
             // independently downsampled source cache, is the only warm fast path.
             return await artwork(image: selected.image, source: winner.source, derive: false)
         }
+    }
+
+    /// Build 282: an exact avbase record names the real FANZA CID (e.g. h_1240milk00311).
+    /// Learn the label prefix for lists / later lookups and put the awsimgsrc HQ pair
+    /// (ps portrait 745×1081, pl jacket 1600×1081) ahead of the 800 px / 147 px pics copies.
+    static func upgradedDMM(_ record: ScrapedMetadata, number: String) -> ScrapedMetadata {
+        var out = record
+        var hq: [String] = []
+        if let cid = record.digitalCID?.lowercased(), !cid.isEmpty {
+            DMMLabelPrefixes.shared.learn(cid: cid, number: number)
+        }
+        for image in record.images {
+            if let cid = DMMCoverURLs.cid(image), image.contains("/digital/video/") {
+                DMMLabelPrefixes.shared.learn(cid: cid, number: number)
+            }
+            for url in DMMCoverURLs.upgrade(image) where !hq.contains(url) { hq.append(url) }
+        }
+        guard let portrait = hq.first(where: { $0.hasSuffix("ps.jpg") }) else { return record }
+        out.poster = portrait
+        out.cover = hq.first(where: { $0.hasSuffix("pl.jpg") }) ?? record.cover
+        return out
     }
 
     private static func discoverJavBus(number: String, timeout: TimeInterval) async -> [String] {
@@ -299,6 +321,9 @@ enum DetailPosterResolver {
                 kCGImageSourceShouldCacheImmediately: true,
                 kCGImageSourceThumbnailMaxPixelSize: max(rawWidth, rawHeight)
               ] as CFDictionary) else { return nil }
+        // DMM NOW PRINTING placeholders (147×200 ps, portrait 590×800 pl, 2,732-byte body).
+        if let host = URL(string: sourceURL)?.host, host.hasSuffix("dmm.co.jp"),
+           DMMImageValidation.classify(width: rawWidth, height: rawHeight, bytes: data.count, source: sourceURL) == .placeholder { return nil }
         var cropped = false
         let javbusJacket = URL(string: sourceURL).map(JavBusPoster.allowedImage) == true
         if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: sourceURL, validatedJacket: javbusJacket) {
@@ -333,11 +358,23 @@ enum DetailPosterResolver {
         config.urlCache = nil
         let session = URLSession(configuration: config, delegate: PosterRedirectGuard(url: url), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
+        let dmm = url.host?.hasSuffix("dmm.co.jp") == true
+        let started = ProcessInfo.processInfo.systemUptime
+        var attempt = 0
+        while true {
         do {
             var request = URLRequest(url: url)
             request.timeoutInterval = timeout
             request.setValue("image/*", forHTTPHeaderField: "Accept")
+            if dmm { request.setValue(DMMProbePolicy.userAgent, forHTTPHeaderField: "User-Agent") }
             let (bytes, response) = try await session.bytes(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode
+            // Build 282: one short backoff retry for transient DMM CDN failures (5xx / 429).
+            if dmm, status != 200, attempt < DMMProbePolicy.retries, DMMProbePolicy.shouldRetry(status: status),
+               ProcessInfo.processInfo.systemUptime - started + DMMProbePolicy.backoff(attempt) < timeout * 0.6 {
+                try? await Task.sleep(nanoseconds: UInt64(DMMProbePolicy.backoff(attempt) * 1_000_000_000))
+                attempt += 1; continue
+            }
             guard let http = response as? HTTPURLResponse, http.statusCode == 200,
                   response.expectedContentLength <= 12 * 1024 * 1024 else { return nil }
             var data = Data()
@@ -352,7 +389,16 @@ enum DetailPosterResolver {
             return await Task.detached(priority: .utility) {
                 decode(data: data, sourceURL: url.absoluteString, derive: derive)
             }.value
-        } catch { return nil }
+        } catch {
+            // Timeouts / dropped connections on DMM: one retry inside the same budget.
+            if dmm, !Task.isCancelled, attempt < DMMProbePolicy.retries,
+               ProcessInfo.processInfo.systemUptime - started + DMMProbePolicy.backoff(attempt) < timeout * 0.6 {
+                try? await Task.sleep(nanoseconds: UInt64(DMMProbePolicy.backoff(attempt) * 1_000_000_000))
+                attempt += 1; continue
+            }
+            return nil
+        }
+        }
     }
 
     private static func artwork(image: UIImage, source: String, derive: Bool) async -> DetailPosterArtwork? {

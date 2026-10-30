@@ -65,6 +65,7 @@ enum TenhowPoster {
             "fgan":["1"], "fsnf":["1"], "flav":["1"], "gshrb":["h_346"]]
         let retail: [String: Set<String>] = ["abf":["118"], "gvh":["d2"], "godr":["h_1059"]]
         guard m[1].isEmpty || common[m[2]]?.contains(m[1]) == true
+                || (storefront == .digital && DMMLabelPrefixes.shared.allows(label: m[2], prefix: m[1]))
                 || (storefront == .digital && digital[m[2]]?.contains(m[1]) == true)
                 || (storefront == .retail && retail[m[2]]?.contains(m[1]) == true) else { return nil }
         return m[2] + "-" + String(n)
@@ -262,6 +263,8 @@ enum DMMPoster {
     static func allowedImage(_ url: URL) -> Bool {
         guard url.query == nil, url.fragment == nil, let identity = pathIdentity(url) else { return false }
         let path = url.host == "awsimgsrc.dmm.co.jp" ? "/pics_dig" + identity.highPath : identity.standardPath
-        return url.path == path
+        // Build 282: the awsimgsrc 1600-wide jacket (pl) of the same proven CID is admitted too.
+        let jacket = url.host == "awsimgsrc.dmm.co.jp" ? String(path.dropLast(6)) + "pl.jpg" : nil
+        return url.path == path || url.path == jacket
     }
 }

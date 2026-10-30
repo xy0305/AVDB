@@ -74,10 +74,11 @@ public enum CoverURLBuilder {
             return (poster, backdrop)
         }
 
-        // DMM 默认
-        let poster = "https://pics.dmm.co.jp/digital/video/\(code)/\(code)ps.jpg"
-        let backdrop = "https://pics.dmm.co.jp/digital/video/\(code)/\(code)pl.jpg"
-        return (poster, backdrop)
+        // DMM 默认（Build 282）：解析器给出的 CID（学习/种子厂牌前缀，如 MILK → h_1240），
+        // awsimgsrc ps 为全尺寸竖版正面，pl 为 1600 宽完整封套。
+        let cid = DMMCID.candidates(number: "\(prefix)-\(idx)").first ?? code
+        let urls = DMMCoverURLs.digital(cid)
+        return (urls[0], urls[1])
     }
 }
 
@@ -277,11 +278,13 @@ public enum FrontPosterPolicy {
     }
 
     public static func cropRect(width: Int, height: Int, source: String, validatedJacket: Bool = false) -> CGRect? {
-        guard width > 0, height > 0, isKnownWrap(source) || validatedJacket else { return nil }
+        let dmmJacket = DMMCoverURLs.isJacket(source)
+        guard width > 0, height > 0, isKnownWrap(source) || validatedJacket || dmmJacket else { return nil }
         let ratio = Double(width) / Double(height)
         // Standard DVD jacket only; never blindly slice arbitrary landscape photos.
         guard (1.35...1.65).contains(ratio) else { return nil }
-        let frontWidth = Int(Double(height) * 0.7)
+        // DMM jackets: the front is 0.69 of the height wide (745 of 1081), no spine bleed.
+        let frontWidth = Int(Double(height) * (dmmJacket ? 0.69 : 0.7))
         guard frontWidth > 0, frontWidth < width else { return nil }
         return CGRect(x: width - frontWidth, y: 0, width: frontWidth, height: height)
     }
@@ -672,6 +675,8 @@ public enum ListCoverPolicy {
             // Catalogue-bound avbase / DMM / MGS packages: HQ (pl) already first in images.
             for image in movie.catalogueMetadata?.images ?? [] {
                 guard let url = URL(string: image) else { continue }
+                // Build 282: pics.dmm.co.jp pl/ps (800 / 147 px) → awsimgsrc ps (full portrait).
+                if let hq = DMMCoverURLs.upgrade(image).first { append(hq) }
                 if DetailPosterPolicy.allowedPublicImage(url)
                     || AvbaseMetadata.allowedDiscoveredImage(url)
                     || AmazonPoster.allowedImage(url)

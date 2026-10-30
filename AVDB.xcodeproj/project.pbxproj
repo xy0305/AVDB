@@ -101,6 +101,8 @@
 		RECSTORE281000000000001B /* RecommendationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECSTORE281000000000001F /* RecommendationStore.swift */; };
 		RECJAVDB281000000000001B /* RecommendationJavDBSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */; };
 		RECVIEW2810000000000001B /* RecommendationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECVIEW2810000000000001F /* RecommendationsView.swift */; };
+		DMMCOVER282000000000001B /* DMMCoverResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = DMMCOVER282000000000001F /* DMMCoverResolver.swift */; };
+		DMMSEED2820000000000001B /* DMMLabelSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = DMMSEED2820000000000001F /* DMMLabelSeed.swift */; };
 		FEATSTORE000000000000001 /* FeatureStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEATSTORE000000000000002 /* FeatureStores.swift */; };
 		FOLLOWTAG001E253E75F82001 /* FollowingTagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLOWTAG001E253E75F82002 /* FollowingTagsView.swift */; };
 		FOLLTAGS0000000000000001 /* FollowingTagsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLTAGS0000000000000002 /* FollowingTagsStore.swift */; };
@@ -203,6 +205,8 @@
 		RECSTORE281000000000001F /* RecommendationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationStore.swift; sourceTree = "<group>"; };
 		RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationJavDBSource.swift; sourceTree = "<group>"; };
 		RECVIEW2810000000000001F /* RecommendationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationsView.swift; sourceTree = "<group>"; };
+		DMMCOVER282000000000001F /* DMMCoverResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMCoverResolver.swift; sourceTree = "<group>"; };
+		DMMSEED2820000000000001F /* DMMLabelSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMLabelSeed.swift; sourceTree = "<group>"; };
 		FEATSTORE000000000000002 /* FeatureStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureStores.swift; sourceTree = "<group>"; };
 		FOLLOWTAG001E253E75F82002 /* FollowingTagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowingTagsView.swift; sourceTree = "<group>"; };
 		FOLLTAGS0000000000000002 /* FollowingTagsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowingTagsStore.swift; sourceTree = "<group>"; };
@@ -364,6 +368,8 @@
 				RECCORE2810000000000001F /* Recommender.swift */,
 				RECSTORE281000000000001F /* RecommendationStore.swift */,
 				RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */,
+				DMMCOVER282000000000001F /* DMMCoverResolver.swift */,
+				DMMSEED2820000000000001F /* DMMLabelSeed.swift */,
 				FEATSTORE000000000000002 /* FeatureStores.swift */,
 				B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */,
 				93251B289069D6793D7D2AA0 /* JavVerseSource.swift */,
@@ -608,6 +614,8 @@
 				RECSTORE281000000000001B /* RecommendationStore.swift in Sources */,
 				RECJAVDB281000000000001B /* RecommendationJavDBSource.swift in Sources */,
 				RECVIEW2810000000000001B /* RecommendationsView.swift in Sources */,
+				DMMCOVER282000000000001B /* DMMCoverResolver.swift in Sources */,
+				DMMSEED2820000000000001B /* DMMLabelSeed.swift in Sources */,
 				FEATSTORE000000000000001 /* FeatureStores.swift in Sources */,
 				BC9852482E251643D9E18203 /* ListsView.swift in Sources */,
 				A18900000000000000000001 /* OnlineSubtitle.swift in Sources */,
@@ -655,7 +663,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 281;
+				CURRENT_PROJECT_VERSION = 282;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -678,7 +686,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 281;
+				CURRENT_PROJECT_VERSION = 282;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
