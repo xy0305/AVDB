@@ -148,6 +148,9 @@ final class AICoverEnhanceModel: ObservableObject {
     @Published private(set) var original: UIImage?
     @Published private(set) var nativeSize: CGSize = .zero
     @Published var showingOriginal = false
+    /// Build 286: a cover long-press ends with a touch-up; the hero tap must not also open the viewer.
+    var lastCompareEnded = Date.distantPast
+    var viewerTapAllowed: Bool { Date().timeIntervalSince(lastCompareEnded) > 0.4 }
     private var key: String?
     private var task: Task<Void, Never>?
     private var input: UIImage?

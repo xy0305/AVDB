@@ -287,11 +287,6 @@ struct MovieDetailView: View {
         HStack {
             chromeButton("chevron.left") { dismiss() }
             Spacer(minLength: 0)
-            if !usesLandscapeLayout, posterArtwork != nil {
-                AICoverHeroControl(model: aiCover) { showCoverViewer = true }
-                    .padding(.trailing, 8)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-            }
             chromeButton("magnifyingglass") { showSearch = true }
         }
         .padding(.horizontal, 16)
@@ -411,7 +406,8 @@ struct MovieDetailView: View {
             .frame(width: width, height: imageHeight, alignment: .top)
             .clipped()
             .contentShape(Rectangle())
-            .onTapGesture { if art != nil { showCoverViewer = true } }
+            .onTapGesture { if art != nil, aiCover.viewerTapAllowed { showCoverViewer = true } }
+            .modifier(AICoverPressToCompare(model: aiCover))
             .accessibilityHidden(true)
             .accessibilityIdentifier("detail-hero-artwork")
             LinearGradient(stops: [
@@ -421,6 +417,7 @@ struct MovieDetailView: View {
                 .init(color: Color(tint), location: 1)
             ], startPoint: .top, endPoint: .bottom)
             .frame(height: imageHeight + 30)
+            .allowsHitTesting(false)   // Build 286: taps / long-press reach the cover underneath.
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
                     if showCoverTitle {
@@ -433,6 +430,12 @@ struct MovieDetailView: View {
                     }
                     portraitMetadata(movie)
                         .padding(.horizontal, 18).padding(.top, 16)
+                    // Build 286: AI 增强 sits under the metadata row, never on top of the cover art.
+                    if art != nil, AICoverMetaChip.visible(aiCover) {
+                        AICoverMetaChip(model: aiCover) { showCoverViewer = true }
+                            .padding(.horizontal, 18).padding(.top, 10)
+                            .transition(.opacity)
+                    }
                 }
                 // Lower the entire control row to the reference's ~64% viewport
                 // anchor. This is a minimum, never a fixed height or an overlay:

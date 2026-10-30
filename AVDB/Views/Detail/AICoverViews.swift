@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Build 285: 「AI 增强」 chrome for the detail hero cover and the fullscreen cover viewer.
+/// Build 285/286: 「AI 增强」 controls for the detail hero (below the art, in the metadata area) and the fullscreen viewer.
 /// Standalone (only the enhancer model), so the simulator screenshot host can compile it as is.
 enum AICoverStyle {
     static let gradient = tinted(1)
@@ -58,71 +58,141 @@ struct AICoverHoldToCompare: ViewModifier {
     }
 }
 
-/// Top-trailing control on the portrait hero.
-struct AICoverHeroControl: View {
+/// Build 286: hold the cover itself to see the original raster (long-press, then keep holding).
+/// A plain tap still opens the viewer; scrolling cancels the long press before it begins.
+struct AICoverPressToCompare: ViewModifier {
+    @ObservedObject var model: AICoverEnhanceModel
+    @GestureState private var holding = false
+    func body(content: Content) -> some View {
+        content
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.28, maximumDistance: 12)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
+                    .updating($holding) { value, state, _ in
+                        if case .second(true, _) = value { state = true }
+                    },
+                including: model.isEnhanced ? .all : .subviews)
+            .onChange(of: holding) { _, now in
+                guard model.isEnhanced else { return }
+                if now { model.lastCompareEnded = .distantFuture; UIImpactFeedbackGenerator(style: .light).impactOccurred() } else { model.lastCompareEnded = Date() }
+                model.showingOriginal = now
+            }
+            .accessibilityAction(named: "对比原图") { if model.isEnhanced { model.showingOriginal.toggle() } }
+    }
+}
+
+/// Build 286: the AI 增强 state lives in the metadata area BELOW the cover art (never over it).
+/// idle → 「✦ AI 增强」 button · running → ring + % (tap cancels) · done → badge + 「按住对比」 ·
+/// holding → 「原图」. A one-off 「长按封面也可对比原图」 hint fades out after ~1.6 s.
+struct AICoverMetaChip: View {
     @ObservedObject var model: AICoverEnhanceModel
     let openViewer: () -> Void
+    @State private var hint = false
+    @State private var hintTask: Task<Void, Never>?
+
+    static func visible(_ model: AICoverEnhanceModel) -> Bool {
+        switch model.phase {
+        case .ineligible: return false
+        case .idle: return model.canEnhance
+        case .running, .done, .failed: return true
+        }
+    }
 
     var body: some View {
-        Group {
+        ZStack {
             switch model.phase {
             case .ineligible:
                 EmptyView()
             case .idle:
                 if model.canEnhance {
                     Button { UIImpactFeedbackGenerator(style: .soft).impactOccurred(); model.toggle() } label: {
-                        capsule { Image(systemName: "sparkles").font(.system(size: 12, weight: .bold)); Text("AI 增强").font(.system(size: 13, weight: .semibold)) }
+                        pill(stroke: true) {
+                            Image(systemName: "sparkles").font(.system(size: 10, weight: .bold))
+                            Text("AI 增强").font(.system(size: 12, weight: .semibold))
+                        }
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("ai-cover-enhance-button")
                 }
             case .running(let p):
                 Button { model.cancel() } label: {
-                    capsule {
-                        AICoverProgressRing(value: p)
-                        Text(verbatim: "AI 增强中 \(Int((p * 100).rounded()))%").font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                    pill(stroke: true) {
+                        AICoverProgressRing(value: p, size: 12)
+                        Text(verbatim: "AI 增强中 \(Int((p * 100).rounded()))%").font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                        Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).opacity(0.7)
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("ai-cover-progress")
+                .accessibilityLabel(Text(verbatim: "AI 增强中 \(Int((p * 100).rounded()))%"))
                 .accessibilityHint("轻点取消")
+                .accessibilityIdentifier("ai-cover-progress")
             case .done:
-                HStack(spacing: 6) {
+                HStack(spacing: 0) {
                     Button(action: openViewer) {
-                        if model.showingOriginal {
-                            capsule { Text("原图").font(.system(size: 12, weight: .semibold)) }
-                        } else { AICoverBadge() }
+                        HStack(spacing: 4) {
+                            Image(systemName: model.showingOriginal ? "photo" : "sparkles").font(.system(size: 10, weight: .bold))
+                            Text(model.showingOriginal ? "原图" : "AI 增强").font(.system(size: 12, weight: .semibold))
+                        }
+                        .padding(.leading, 10).padding(.trailing, 8).frame(height: 26)
+                        .background(model.showingOriginal ? AnyShapeStyle(Color.white.opacity(0.22)) : AnyShapeStyle(AICoverStyle.tinted(0.9)), in: Capsule())
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    Image(systemName: "rectangle.lefthalf.inset.filled")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 0.5))
-                        .contentShape(Circle())
-                        .modifier(AICoverHoldToCompare(model: model))
-                        .accessibilityLabel("按住对比原图")
-                        .accessibilityIdentifier("ai-cover-compare")
+                    .accessibilityLabel(model.showingOriginal ? "原图" : "AI 增强")
+                    .accessibilityHint("轻点查看大图")
+                    .accessibilityIdentifier("ai-cover-badge")
+                    HStack(spacing: 4) {
+                        Image(systemName: "rectangle.lefthalf.inset.filled").font(.system(size: 10, weight: .semibold))
+                        Text(hint ? "长按封面也可对比原图" : (model.showingOriginal ? "松开恢复" : "按住对比"))
+                            .font(.system(size: 12, weight: .medium))
+                            .contentTransition(.opacity)
+                    }
+                    .padding(.leading, 8).padding(.trailing, 10).frame(height: 26)
+                    .contentShape(Rectangle())
+                    .modifier(AICoverHoldToCompare(model: model))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("按住对比原图")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { model.showingOriginal.toggle() }
+                    .accessibilityIdentifier("ai-cover-compare")
                 }
+                .padding(2)
+                .foregroundStyle(.white)
+                .background(.black.opacity(0.22), in: Capsule())
+                .overlay(Capsule().stroke(.white.opacity(0.28), lineWidth: 0.5))
             case .failed(let text):
                 Button { model.toggle() } label: {
-                    capsule { Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 11)); Text(text).font(.system(size: 12, weight: .medium)).lineLimit(1) }
+                    pill(stroke: false) {
+                        Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10))
+                        Text(text + " · 重试").font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("ai-cover-failed")
             }
         }
+        .frame(maxWidth: .infinity)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: model.phase)
+        .animation(.easeInOut(duration: 0.25), value: hint)
+        .onChange(of: model.phase) { old, new in
+            // Fresh result (not a cache hit on open): show the cover long-press hint briefly.
+            guard new == .done, case .running = old else { return }
+            hintTask?.cancel(); hint = true
+            hintTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_600_000_000)
+                if !Task.isCancelled { hint = false }
+            }
+        }
+        .onDisappear { hintTask?.cancel() }
     }
 
-    private func capsule<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        HStack(spacing: 6, content: content)
+    private func pill<C: View>(stroke: Bool, @ViewBuilder _ content: () -> C) -> some View {
+        HStack(spacing: 5, content: content)
             .foregroundStyle(.white)
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
-            .background(Color.black.opacity(0.18), in: Capsule())
-            .overlay(Capsule().stroke(AICoverStyle.tinted(0.75), lineWidth: 1))
-            .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
+            .padding(.horizontal, 11).frame(height: 28)
+            .background(.black.opacity(0.22), in: Capsule())
+            .overlay(Capsule().stroke(stroke ? AnyShapeStyle(AICoverStyle.tinted(0.8)) : AnyShapeStyle(Color.white.opacity(0.3)), lineWidth: 1))
+            .contentShape(Capsule())
     }
 }
 
@@ -137,43 +207,41 @@ struct AICoverViewer: View {
     @State private var lastOffset: CGSize = .zero
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            Image(uiImage: model.display(image))
-                .resizable().scaledToFit()
-                .scaleEffect(zoom).offset(offset)
-                .gesture(MagnificationGesture()
-                    .onChanged { zoom = min(6, max(1, lastZoom * $0)) }
-                    .onEnded { _ in lastZoom = zoom; if zoom <= 1.01 { withAnimation(.spring()) { offset = .zero; lastOffset = .zero } } })
-                .simultaneousGesture(DragGesture()
-                    .onChanged { v in guard zoom > 1 else { return }; offset = CGSize(width: lastOffset.width + v.translation.width, height: lastOffset.height + v.translation.height) }
-                    .onEnded { _ in lastOffset = offset })
-                .onTapGesture(count: 2) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        if zoom > 1 { zoom = 1; lastZoom = 1; offset = .zero; lastOffset = .zero } else { zoom = 2.5; lastZoom = 2.5 }
-                    }
+        // Build 286: top bar / image / toolbar are stacked, so at 1× nothing overlays the cover.
+        // Zoomed content is clipped to the image region instead of running under the controls.
+        VStack(spacing: 0) {
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                        .frame(width: 38, height: 38).background(Color.white.opacity(0.14), in: Circle())
                 }
-                .accessibilityIdentifier("ai-cover-viewer-image")
-            VStack {
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
-                            .frame(width: 38, height: 38).background(.ultraThinMaterial, in: Circle())
-                    }
-                    .buttonStyle(.plain).accessibilityLabel("关闭").accessibilityIdentifier("ai-cover-viewer-close")
-                    Spacer()
-                    if model.isEnhanced {
-                        if model.showingOriginal {
-                            Text("原图").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
-                                .padding(.horizontal, 10).padding(.vertical, 5).background(.ultraThinMaterial, in: Capsule())
-                        } else { AICoverBadge() }
-                    }
-                }
-                .padding(.horizontal, 16).padding(.top, 8)
+                .buttonStyle(.plain).accessibilityLabel("关闭").accessibilityIdentifier("ai-cover-viewer-close")
                 Spacer()
-                toolbar.padding(.horizontal, 16).padding(.bottom, 14)
             }
+            .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 8)
+            GeometryReader { _ in
+                Image(uiImage: model.display(image))
+                    .resizable().scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .scaleEffect(zoom).offset(offset)
+                    .contentShape(Rectangle())
+                    .gesture(MagnificationGesture()
+                        .onChanged { zoom = min(6, max(1, lastZoom * $0)) }
+                        .onEnded { _ in lastZoom = zoom; if zoom <= 1.01 { withAnimation(.spring()) { offset = .zero; lastOffset = .zero } } })
+                    .simultaneousGesture(DragGesture()
+                        .onChanged { v in guard zoom > 1 else { return }; offset = CGSize(width: lastOffset.width + v.translation.width, height: lastOffset.height + v.translation.height) }
+                        .onEnded { _ in lastOffset = offset })
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            if zoom > 1 { zoom = 1; lastZoom = 1; offset = .zero; lastOffset = .zero } else { zoom = 2.5; lastZoom = 2.5 }
+                        }
+                    }
+                    .accessibilityIdentifier("ai-cover-viewer-image")
+            }
+            .clipped()
+            toolbar.padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 10)
         }
+        .background(Color.black.ignoresSafeArea())
         .statusBarHidden()
     }
 
@@ -187,10 +255,18 @@ struct AICoverViewer: View {
 
     @ViewBuilder private var toolbar: some View {
         VStack(spacing: 10) {
-            if !sizeText.isEmpty {
-                Text(sizeText).font(.system(size: 12, weight: .medium)).monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.85))
-                    .accessibilityIdentifier("ai-cover-viewer-size")
+            HStack(spacing: 8) {
+                if model.isEnhanced {
+                    if model.showingOriginal {
+                        Text("原图").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 3).background(Color.white.opacity(0.2), in: Capsule())
+                    } else { AICoverBadge(compact: true) }
+                }
+                if !sizeText.isEmpty {
+                    Text(sizeText).font(.system(size: 12, weight: .medium)).monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.85))
+                        .accessibilityIdentifier("ai-cover-viewer-size")
+                }
             }
             switch model.phase {
             case .done:
@@ -282,7 +358,7 @@ struct AICoverSettingsSection: View {
         } header: {
             Text("AI 画质增强")
         } footer: {
-            Text("内置超分辨率模型，在本机运行，不上传图片。只处理低清封面（如 800px 封套裁切、MGS 小图、JavDB 兜底图），DMM 等高清原图永不增强。自动：打开详情时自动增强（设备过热、低电量模式或电量低于 20% 时暂停）；仅手动：点封面右上角「AI 增强」；关：不显示。增强结果会缓存到本机，按住对比按钮可查看原图。")
+            Text("内置超分辨率模型，在本机运行，不上传图片。只处理低清封面（如 800px 封套裁切、MGS 小图、JavDB 兜底图），DMM 等高清原图永不增强。自动：打开详情时自动增强（设备过热、低电量模式或电量低于 20% 时暂停）；仅手动：点封面下方信息行里的「AI 增强」；关：不显示。增强结果会缓存到本机；按住「按住对比」或长按封面可查看原图。")
         }
         .onAppear { cacheBytes = AICoverDiskCache.shared.totalBytes() }
     }

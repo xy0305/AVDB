@@ -1,7 +1,6 @@
 name: LUT4 online App 285 (AI 封面画质增强 Core ML + 0.703 裁切 / DUGA / MGS Prestige + 284)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
