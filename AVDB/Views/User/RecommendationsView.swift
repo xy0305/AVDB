@@ -51,10 +51,11 @@ enum RecHaptics {
 struct RecReasonChip: View {
     let reason: RecReason
     var onCover = false
+    var lines = 1
     var body: some View {
         let tint = RecStyle.tint(reason.kind)
         Label {
-            Text(reason.text).lineLimit(1).minimumScaleFactor(0.85)
+            Text(reason.text).lineLimit(lines).minimumScaleFactor(0.85)
         } icon: {
             Image(systemName: reason.symbol).imageScale(.small)
         }
@@ -191,7 +192,11 @@ struct RecHero: View {
     let result: RecResult
     let apply: (RecFeedbackAction, RecResult) -> Void
     var compact = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+    /// Accessibility text sizes stack the cover above the text instead of squeezing both side by side.
+    private var stacked: Bool { !compact && typeSize.isAccessibilitySize }
     var body: some View {
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(alignment: .bottom, spacing: 16))
         NavigationLink { MovieDetailView(movieID: result.id, seed: result.item.movie) } label: {
             ZStack(alignment: .bottomLeading) {
                 // Blurred cover backdrop (rendered once, no animation).
@@ -199,7 +204,7 @@ struct RecHero: View {
                     .overlay { MoviePosterImage(movie: result.item.movie, maxPixelSize: 400).scaleEffect(1.4).blur(radius: 28) }
                     .overlay(LinearGradient(colors: [.black.opacity(0.10), .black.opacity(0.62)], startPoint: .top, endPoint: .bottom))
                     .clipped()
-                HStack(alignment: .bottom, spacing: 16) {
+                layout {
                     RecPoster(item: result.item, maxPixelSize: 1000, scrim: false)
                         .frame(width: compact ? 104 : 150)
                         .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
@@ -207,23 +212,25 @@ struct RecHero: View {
                         Label("今日首选", systemImage: "sparkles")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white.opacity(0.9))
+                            .lineLimit(1).fixedSize()
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .background(RecStyle.brand, in: Capsule())
                         Text(result.item.number)
                             .font((compact ? Font.title3 : .title).weight(.heavy).monospaced())
                             .foregroundStyle(.white)
-                            .lineLimit(1).minimumScaleFactor(0.7)
+                            .lineLimit(stacked ? 2 : 1).minimumScaleFactor(0.7)
                         Text(result.item.title)
                             .font(compact ? .caption : .subheadline)
                             .foregroundStyle(.white.opacity(0.85))
-                            .lineLimit(compact ? 2 : 3)
-                        RecReasonChip(reason: result.reason, onCover: true)
+                            .lineLimit(compact ? 2 : (stacked ? 4 : 3))
+                        RecReasonChip(reason: result.reason, onCover: true, lines: stacked ? 2 : 1)
                     }
-                    Spacer(minLength: 0)
+                    if !stacked { Spacer(minLength: 0) }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(compact ? 14 : 20)
             }
-            .frame(height: compact ? 190 : 300)
+            .frame(height: stacked ? nil : (compact ? 190 : 300))
             .clipShape(RoundedRectangle(cornerRadius: compact ? 18 : 24, style: .continuous))
             .shadow(color: .black.opacity(0.18), radius: 16, y: 8)
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
