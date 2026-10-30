@@ -5,6 +5,11 @@ let a = CommandLine.arguments
 let tiers = a[2] == "none" ? [] : a[2].split(separator: ",").compactMap { LiveASRTier(rawValue: String($0)) }
 let sem = DispatchSemaphore(value: 0)
 Task {
+    if a[2].hasPrefix("legacy287:") {
+        let r = await ColdLoad288.legacy287(root: URL(fileURLWithPath: a[1]), tier: LiveASRTier(rawValue: String(a[2].dropFirst(10)))!, timeout: 300)
+        let d = try! JSONSerialization.data(withJSONObject: r, options: [.prettyPrinted, .sortedKeys])
+        try! d.write(to: URL(fileURLWithPath: a[5])); print(String(decoding: d, as: UTF8.self)); sem.signal(); return
+    }
     let r = await ColdLoad288.run(root: URL(fileURLWithPath: a[1]), tiers: tiers, sample: ColdLoad288.wav(URL(fileURLWithPath: a[3])),
                                   expected: a[4], nllb: a.count > 6 && a[6] == "nllb")
     let d = try! JSONSerialization.data(withJSONObject: r, options: [.prettyPrinted, .sortedKeys])

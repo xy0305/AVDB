@@ -46,7 +46,7 @@ final class LiveModelLoader {
             let avail = Double(LiveMemory.availableMB)
             LiveDiagnostics.shared.log("\(tier.rawValue): 请求加载 可用内存 \(Int(avail)) MB")
             states[tier] = .loading(since: Date())
-            task = Task.detached(priority: .userInitiated) {
+            task = Task.detached(priority: .userInitiated) { () async throws -> LiveSpeechRecognizer in
                 try await LiveWhisperRecognizer.load(tier, log: { LiveDiagnostics.shared.log($0) })
             }
             tasks[tier] = task
@@ -491,7 +491,7 @@ final class LiveSubtitleEngine: ObservableObject {
             let el = Int(Date().timeIntervalSince(loadingSince))
             var label = "\(loadingLabel)… \(el / 60):\(String(format: "%02d", el % 60))"
             if el >= 15 { label += " · 首次需编译模型，请保持前台" }
-            phase = .loading(label)
+            if phase != .loading(label) { phase = .loading(label) }
         }
         if upgradeNoticeShown, !upgradeNoticeDismissed, phase == .running, case .loading(let since) = loader.state(.turbo) {
             let el = Int(Date().timeIntervalSince(since))

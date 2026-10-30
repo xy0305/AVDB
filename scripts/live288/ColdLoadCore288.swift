@@ -3,6 +3,7 @@
 // against the bundled LiveModels folder only, one tier resident at a time, and times every stage.
 import CoreML
 import Foundation
+import WhisperKit
 
 enum ColdLoad288 {
     static func networkProbe() async -> String {
@@ -30,6 +31,29 @@ enum ColdLoad288 {
         return nil
     }
 
+    /// A/B: the exact build-287 configuration (WhisperKit's own tokenizer lookup, prewarm: true, decoder on ANE),
+    /// bounded by `timeout`, to show whether it completes without network.
+    static func legacy287(root: URL, tier: LiveASRTier, timeout: Double) async -> [String: Any] {
+        let t0 = Date()
+        let config = WhisperKitConfig(model: tier.folder, modelFolder: root.appendingPathComponent(tier.folder).path,
+                                      tokenizerFolder: root.appendingPathComponent(tier.tokenizer),
+                                      computeOptions: ModelComputeOptions(melCompute: .cpuAndGPU, audioEncoderCompute: .cpuAndNeuralEngine, textDecoderCompute: .cpuAndNeuralEngine),
+                                      verbose: true, logLevel: .debug, prewarm: true, load: true, download: false)
+        do {
+            let kind: String = try await withThrowingTaskGroup(of: String.self) { g in
+                g.addTask { let k = try await WhisperKit(config); return k.tokenizer.map { String(describing: type(of: $0)) } ?? "nil" }
+                g.addTask { try await Task.sleep(nanoseconds: UInt64(timeout * 1e9)); throw CancellationError() }
+                defer { g.cancelAll() }
+                return try await g.next()!
+            }
+            return ["tier": tier.rawValue, "config": "287", "load_s": Date().timeIntervalSince(t0), "tokenizer": kind, "ok": true]
+        } catch is CancellationError {
+            return ["tier": tier.rawValue, "config": "287", "load_s": Date().timeIntervalSince(t0), "timeout": true, "ok": false]
+        } catch {
+            return ["tier": tier.rawValue, "config": "287", "load_s": Date().timeIntervalSince(t0), "error": "\(error)", "ok": false]
+        }
+    }
+
     static func run(root: URL, tiers: [LiveASRTier], sample: [Float]?, expected: String, nllb: Bool) async -> [String: Any] {
         setenv("AVDB_LIVE_MODELS", root.path, 1)
         var out: [String: Any] = ["root": root.path, "network_probe": await networkProbe(),
@@ -40,13 +64,13 @@ enum ColdLoad288 {
             var row: [String: Any] = ["tier": tier.rawValue, "folder": tier.folder]
             let t0 = Date()
             do {
-                var stages: [String] = []
-                let lock = NSLock()
+                final class Box: @unchecked Sendable { let lock = NSLock(); var lines: [String] = [] }
+                let box = Box()
                 let r = try await LiveWhisperRecognizer.load(tier, root: root, log: { s in
-                    print("[\(tier.rawValue)] \(s)"); lock.lock(); stages.append(s); lock.unlock()
+                    print("[\(tier.rawValue)] \(s)"); box.lock.lock(); box.lines.append(s); box.lock.unlock()
                 })
                 row["load_s"] = Date().timeIntervalSince(t0)
-                row["stages"] = stages
+                row["stages"] = box.lines
                 row["tokenizer"] = r.tokenizerKind
                 if let sample {
                     let t1 = Date()
@@ -72,8 +96,8 @@ enum ColdLoad288 {
                 let load = Date().timeIntervalSince(t0)
                 let t1 = Date()
                 let zh = try m.translateSync(expected)
-                out["nllb"] = ["load_s": load, "translate_ms": Date().timeIntervalSince(t1) * 1000, "zh": zh, "ok": !zh.isEmpty]
-            } catch { out["nllb"] = ["error": "\(error)", "ok": false] }
+                out["nllb"] = ["load_s": load, "translate_ms": Date().timeIntervalSince(t1) * 1000, "zh": zh, "ok": !zh.isEmpty] as [String: Any]
+            } catch { out["nllb"] = ["error": "\(error)", "ok": false] as [String: Any] }
         }
         let hub = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("huggingface")
         out["hub_cache_created"] = FileManager.default.fileExists(atPath: hub.path)

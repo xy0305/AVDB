@@ -1,7 +1,6 @@
 name: LUT4 online App 287 (实时语音识别字幕 + 中文翻译 + 286)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
