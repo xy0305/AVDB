@@ -44,8 +44,8 @@ assert 'argmaxinc/argmax-oss-swift.git' in pbx and 'version = 1.1.1;' in pbx and
 assert (r / 'AVDB/Resources/LiveModels/README.md').exists()
 assert int(plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion']) >= 287
 assert pbx.count('CURRENT_PROJECT_VERSION = ') == 2
-wf = (r / '.github/workflows/lut4-online288.yml').read_text()
-for s in ['fetch_models287.py', 'test-live-bench287.py', 'test-live-ui287.py', 'package-lut288.py', 'actions/cache']: assert s in wf, s
+wf = (r / '.github/workflows/lut4-online289.yml').read_text()
+for s in ['fetch_models287.py', 'test-live-bench289.py', 'test-live-ui287.py', 'package-lut289.py', 'actions/cache']: assert s in wf, s
 # Core regression with the real Swift toolchain.
 swiftc = os.environ.get('SWIFTC') or shutil.which('swiftc') or '/workspace/swift/usr/bin/swiftc'
 with tempfile.TemporaryDirectory() as d:

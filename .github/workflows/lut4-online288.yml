@@ -1,7 +1,6 @@
 name: LUT4 online App 288 (实时字幕模型加载修复 + 续播按钮 + 287)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
