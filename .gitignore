@@ -24,3 +24,5 @@ AVDB/Resources/LiveModels/*
 scripts/live287/bench/Sources/LiveBench287/Live*.swift
 scripts/live287/bench/.build/
 evidence-live287/
+Vendor/
+.cache289/

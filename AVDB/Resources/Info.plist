@@ -20,8 +20,10 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0.2</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>实时字幕在设备发热或识别跟不上时，使用苹果系统的本机日语识别（音频只在本机处理，不上传）。</string>
 	<key>CFBundleVersion</key>
-	<string>288</string>
+	<string>289</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

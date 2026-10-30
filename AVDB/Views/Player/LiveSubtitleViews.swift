@@ -232,7 +232,7 @@ struct LiveSubtitleSettingsSheet: View {
                     } label: { Label(copied ? "已复制诊断日志" : "复制诊断日志", systemImage: copied ? "checkmark" : "doc.on.doc") }
                         .accessibilityIdentifier("live.subtitle.settings.copylog")
                 } header: { Text("模型状态与诊断") } footer: {
-                    Text("自动模式先用 small 立即出字幕，同时在后台准备 large-v3-turbo，就绪后自动切换。turbo 首次在本机编译可能需要数分钟（每次安装/更新一次），请保持前台。全部使用 App 内置模型，不联网。")
+                    Text("默认 SenseVoice（非自回归，约 1 秒加载，不编译）。设备发热、低电量或跟不上播放时自动切换苹果系统识别（需已安装日语离线模型）。Whisper 仅在手动选择时加载；turbo 需先下载。")
                 }
                 Section("样式") {
                     HStack { Text("字号"); Slider(value: $points, in: 14 ... 36, step: 1); Text("\(Int(points))").monospacedDigit() }
@@ -247,7 +247,28 @@ struct LiveSubtitleSettingsSheet: View {
                     Picker("识别模型", selection: $engine.tierPreference) {
                         ForEach(LiveTierPreference.allCases) { t in Text(t.title).tag(t) }
                     }
-                    LabeledContent("当前模型", value: engine.activeTier.map { "Whisper \($0.title)" } ?? "未加载")
+                    .accessibilityIdentifier("live.subtitle.settings.recognizer")
+                    LabeledContent("当前模型", value: engine.activeTier?.title ?? "未加载")
+                    LabeledContent("苹果系统识别", value: engine.appleASRStatus.title)
+                    if engine.appleASRStatus == .needsDownload {
+                        Button("下载苹果日语离线识别模型") { engine.prepareAppleASR() }
+                            .accessibilityIdentifier("live.subtitle.settings.apple.asr.download")
+                    }
+                    if engine.tierPreference == .turbo || engine.turboDownloaded {
+                        switch engine.turboDownload {
+                        case .downloading(let f):
+                            ProgressView(value: f) { Text(String(format: "下载 Whisper turbo %.0f%%", f * 100)).font(.caption) }
+                        case .failed(let why):
+                            Button("重试下载 Whisper turbo（\(why)）") { engine.downloadTurbo() }
+                        case .idle:
+                            if engine.turboDownloaded {
+                                Button("删除已下载的 Whisper turbo", role: .destructive) { engine.deleteTurbo() }
+                            } else {
+                                Button("下载 Whisper turbo（约 632 MB）") { engine.downloadTurbo() }
+                                    .accessibilityIdentifier("live.subtitle.settings.turbo.download")
+                            }
+                        }
+                    }
                     LabeledContent("翻译引擎", value: engine.translatorName.isEmpty ? "未加载" : engine.translatorName)
                     LabeledContent("Apple 翻译", value: engine.appleStatus.title)
                     if engine.appleStatus == .needsDownload {
@@ -257,7 +278,7 @@ struct LiveSubtitleSettingsSheet: View {
                     HStack { Text("预读"); Slider(value: $engine.lead, in: 6 ... 40, step: 2); Text("\(Int(engine.lead)) 秒").monospacedDigit() }
                     if !engine.latencyText.isEmpty { LabeledContent("延迟", value: engine.latencyText).font(.caption) }
                 } header: { Text("识别与翻译（全部在本机）") } footer: {
-                    Text("在播放头前方预读音频并提前识别，字幕通常在台词开始前就已就绪；拖动进度后约 1–2 秒内先显示日文流式结果，中文随后。设备过热或低电量时自动切换 small 模型或暂停。")
+                    Text("在播放头前方预读音频并提前识别，字幕通常在台词开始前就已就绪；拖动进度后约 1–2 秒内先显示日文流式结果，中文随后。设备发热时自动减少预读并切换苹果系统识别；识别与翻译以低优先级在后台运行，不抢占视频解码。")
                 }
                 Section("缓存") {
                     LabeledContent("已缓存字幕", value: ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file))

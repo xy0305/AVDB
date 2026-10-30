@@ -49,7 +49,7 @@ final class LiveAudioReader: @unchecked Sendable {
         let tok = token
         let t = Thread { [weak self] in self?.run(tok) }
         t.name = "live287.audio"
-        t.qualityOfService = .userInitiated
+        t.qualityOfService = .utility
         thread = t
         cond.unlock()
         t.start()

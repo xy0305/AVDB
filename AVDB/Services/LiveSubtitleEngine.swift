@@ -1,3 +1,5 @@
+// Build 289 — SenseVoice default, Apple on-device fallback (heat / falling behind), Whisper manual only (never
+// compiled unless selected), utility-QoS worker, thermal-throttled read-ahead, main-thread hitch counter.
 // Build 288 — staged model loading (small first, turbo warmed in background), timeouts + retry, diagnostics.
 // Build 287 — live subtitle engine: look-ahead reader → VAD → Whisper → (Apple Translation | NLLB) → overlay.
 // Nothing is generated ahead of playback beyond the ~lead window the reader keeps in front of the playhead;
@@ -46,16 +48,16 @@ final class LiveModelLoader {
             let avail = Double(LiveMemory.availableMB)
             LiveDiagnostics.shared.log("\(tier.rawValue): 请求加载 可用内存 \(Int(avail)) MB")
             states[tier] = .loading(since: Date())
-            task = Task.detached(priority: .userInitiated) { () async throws -> LiveSpeechRecognizer in
-                try await LiveWhisperRecognizer.load(tier, log: { LiveDiagnostics.shared.log($0) })
+            task = Task.detached(priority: .utility) { () async throws -> LiveSpeechRecognizer in
+                try await LiveRecognizerFactory.load(tier, log: { LiveDiagnostics.shared.log($0) })
             }
             tasks[tier] = task
             Task { [weak self] in
                 do {
                     let r = try await task.value
                     self?.ready[tier] = r
-                    self?.states[tier] = .ready(seconds: (r as? LiveWhisperRecognizer)?.loadSeconds ?? 0)
-                    UserDefaults.standard.set((r as? LiveWhisperRecognizer)?.loadSeconds ?? 0, forKey: "live.load.\(tier.rawValue)")
+                    self?.states[tier] = .ready(seconds: LiveRecognizerFactory.loadSeconds(r))
+                    UserDefaults.standard.set(LiveRecognizerFactory.loadSeconds(r), forKey: "live.load.\(tier.rawValue)")
                 } catch {
                     self?.states[tier] = .failed(error.localizedDescription)
                     LiveDiagnostics.shared.log("\(tier.rawValue): 加载失败 \(error)")
@@ -107,6 +109,11 @@ final class LiveSubtitleEngine: ObservableObject {
     /// Per-model status lines for the settings sheet: 加载中 / 编译中（首次） / 就绪 / 失败原因.
     @Published private(set) var modelStatus: [String] = []
     @Published private(set) var translatorStatus = ""
+    /// Apple on-device Japanese recognition (fallback) availability.
+    @Published private(set) var appleASRStatus: AppleASRStatus = .unknown
+    enum TurboDownload: Equatable { case idle, downloading(Double), failed(String) }
+    @Published private(set) var turboDownload: TurboDownload = .idle
+    @Published private(set) var hitchText = ""
     @Published var mode: LiveSubtitleMode {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: LiveSubtitleMode.defaultsKey)
@@ -139,22 +146,29 @@ final class LiveSubtitleEngine: ObservableObject {
     private var worker: Task<Void, Never>?
     private var ticker: Task<Void, Never>?
     private var loadTask: Task<Void, Never>?
-    private var upgradeTask: Task<Void, Never>?
     private var mtTask: Task<Void, Never>?
     private var loadingLabel = ""
     private var loadingSince = Date()
     private var memoryObserver: NSObjectProtocol?
-    private var upgradeNoticeShown = false
-    private var upgradeNoticeDismissed = false
+    private var toastTask: Task<Void, Never>?
+    private let hitches = LiveHitchMonitor()
+    /// Session-only override: .apple after SenseVoice/Whisper fell behind, .senseVoice after a memory warning.
+    private var sessionOverride: LiveASRTier?
     static let smallTimeout: Double = 120
     static let turboTimeout: Double = 900
+    static func timeout(_ t: LiveASRTier) -> Double {
+        switch t {
+        case .senseVoice: 60
+        case .apple: 120          // may include the one-time system model download
+        case .small: smallTimeout
+        case .turbo: turboTimeout
+        }
+    }
     private var asr: LiveSpeechRecognizer?
     private var mt: LiveTranslating?
     private var lastTick: (wall: Double, media: Double, rate: Double)?
     private var lastSavedCount = 0
     private var guardTier: LiveASRTier?
-    /// Set when the measured real-time factor shows turbo cannot keep up on this device (session-wide).
-    private var perfDegraded = false
     /// State the reader thread reads without hopping to the main actor.
     private final class Shared: @unchecked Sendable {
         private let lock = NSLock()
@@ -178,11 +192,12 @@ final class LiveSubtitleEngine: ObservableObject {
 
     init() {
         mode = LiveSubtitleMode(rawValue: UserDefaults.standard.string(forKey: LiveSubtitleMode.defaultsKey) ?? "") ?? .off
-        tierPreference = LiveTierPreference(rawValue: UserDefaults.standard.string(forKey: LiveTierPreference.defaultsKey) ?? "") ?? .automatic
+        tierPreference = LiveTierPreference.current
         pipeline.mode = mode
         UIDevice.current.isBatteryMonitoringEnabled = true
         wireReader()
         Task { appleStatus = await AppleTranslation.status() }
+        Task { appleASRStatus = await AppleSpeechRecognizer.status() }
         memoryObserver = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.memoryWarning() }
         }
@@ -228,6 +243,7 @@ final class LiveSubtitleEngine: ObservableObject {
     }
 
     private func restartForTier() {
+        sessionOverride = nil
         guard mode != .off, source != nil else { return }
         saveCache(force: true)
         stopRunning()
@@ -244,7 +260,8 @@ final class LiveSubtitleEngine: ObservableObject {
 
     func diagnosticReport() -> String {
         LiveDiagnostics.shared.report(extra: ["模式 \(mode.rawValue) · 偏好 \(tierPreference.rawValue) · 当前 \(activeTier?.rawValue ?? "-") · 阶段 \(phaseText)",
-                                              "可用内存 \(LiveMemory.availableMB) MB · 翻译 \(translatorName) · Apple \(appleStatus)"] + modelStatus)
+                                              "可用内存 \(LiveMemory.availableMB) MB · 翻译 \(translatorName) · Apple 翻译 \(appleStatus) · Apple 识别 \(appleASRStatus.rawValue)",
+                                              "热状态 \(ProcessInfo.processInfo.thermalState.rawValue) · 预读 \(Int(effectiveLead))s · \(latencyText) · \(hitchText)"] + modelStatus)
     }
 
     var phaseText: String {
@@ -259,14 +276,37 @@ final class LiveSubtitleEngine: ObservableObject {
 
     private func memoryWarning() {
         LiveDiagnostics.shared.log("收到内存警告 可用 \(LiveMemory.availableMB) MB")
-        if activeTier == .turbo, LiveModels.whisperAvailable(.small), tierPreference == .automatic {
-            perfDegraded = true
-            notice = "内存不足，已切换 small 模型"
-            saveCache(force: true)
-            loader.release(.turbo)
-            start()
-        } else if activeTier != .turbo {
-            upgradeTask?.cancel(); upgradeTask = nil
+        guard let t = activeTier, t.isWhisper, LiveModels.senseVoiceAvailable else { return }
+        sessionOverride = .senseVoice
+        toast("内存不足，已切换 SenseVoice")
+        saveCache(force: true)
+        loader.release(t)
+        start()
+    }
+
+    /// Small non-blocking notice in the top-left chip (never over subtitles or the centre); auto-hides.
+    private func toast(_ text: String, seconds: Double = 5) {
+        notice = text
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled, self?.notice == text else { return }
+            self?.notice = nil
+        }
+    }
+
+    /// Recognizers to try, in order, for `target` (only ones whose files exist; Whisper only when chosen).
+    private func candidates(for target: LiveASRTier) -> [LiveASRTier] {
+        let order: [LiveASRTier]
+        switch target {
+        case .senseVoice: order = [.senseVoice, .apple]
+        case .apple: order = [.apple, .senseVoice]
+        case .small, .turbo: order = [target, .senseVoice, .apple]
+        }
+        return order.filter { t in
+            guard LiveModels.available(t) else { return false }
+            if t == .apple { return appleASRStatus != .unsupported && appleASRStatus != .denied }
+            return true
         }
     }
 
@@ -274,43 +314,49 @@ final class LiveSubtitleEngine: ObservableObject {
         guard source != nil, clock != nil, mode != .off else { return }
         stopRunning()
         let verdict = currentVerdict()
-        if case .pause(let why) = verdict { phase = .paused(why); notice = why; startTicker(); return }
-        var target = perfDegraded ? .small : preferredTier
-        if case .degrade(let t, let why) = verdict { target = t; notice = why }
-        guardTier = target
-        if !LiveModels.whisperAvailable(target), target == .turbo, LiveModels.whisperAvailable(.small) { target = .small; notice = "turbo 模型未打包，改用 small" }
-        guard LiveModels.whisperAvailable(target) else {
-            phase = .failed("语音模型未打包（\(target.folder)）")
-            LiveDiagnostics.shared.log("模型缺失 \(target.folder)")
+        if case .pause(let why) = verdict { phase = .paused(why); toast(why); startTicker(); return }
+        var target = sessionOverride ?? preferredTier
+        if case .degrade(let t, let why) = verdict {
+            guardTier = t
+            // Heat / Low Power: hand over to Apple only when its Japanese model is already on the device —
+            // otherwise keep SenseVoice and rely on the throttled read-ahead.
+            if t == .apple, appleASRStatus != .installed {
+                target = target.isWhisper ? .senseVoice : (target == .apple ? .senseVoice : target)
+                toast(why.replacingOccurrences(of: "已切换苹果系统识别", with: "已降低识别负载"))
+            } else { target = t; toast(why) }
+        } else { guardTier = target }
+        let list = candidates(for: target)
+        guard let first = list.first else {
+            phase = .failed("没有可用的识别模型（\(target.title)）")
+            LiveDiagnostics.shared.log("无可用识别器 target=\(target.rawValue)")
             return
         }
-        // Stage 1: the model that starts fastest — turbo if it is already resident, otherwise small (seconds),
-        // unless the user pinned turbo.
-        let first: LiveASRTier = {
-            if loader.cached(target) != nil { return target }
-            if target == .turbo, tierPreference == .automatic, LiveModels.whisperAvailable(.small) { return .small }
-            return target
-        }()
-        let timeout = first == .turbo ? Self.turboTimeout : Self.smallTimeout
+        if first != target { toast("\(target.title) 不可用，改用 \(first.title)") }
         setLoading(first == .turbo && UserDefaults.standard.object(forKey: "live.load.turbo") == nil
                    ? "正在编译 \(first.title)（首次较慢）" : "正在加载 \(first.title)")
-        LiveDiagnostics.shared.log("start target=\(target.rawValue) first=\(first.rawValue) timeout=\(Int(timeout))s")
+        LiveDiagnostics.shared.log("start target=\(target.rawValue) candidates=\(list.map(\.rawValue))")
         loadTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                let asr = try await self.loader.get(first, timeout: timeout)
-                guard !Task.isCancelled, self.mode != .off else { return }
-                self.asr = asr
-                self.activeTier = asr.tier
-                LiveDiagnostics.shared.log("运行 \(asr.tier.rawValue)")
-                self.beginRunning()
-                self.loadTranslatorInBackground()
-                if target == .turbo, first != .turbo { self.scheduleUpgrade() }
-            } catch {
-                guard !Task.isCancelled else { return }
-                self.phase = .failed(error.localizedDescription)
-                LiveDiagnostics.shared.log("启动失败 \(error.localizedDescription)")
+            var lastError: Error?
+            for t in list {
+                do {
+                    if t != first { self.setLoading("正在加载 \(t.title)") }
+                    let asr = try await self.loader.get(t, timeout: Self.timeout(t))
+                    guard !Task.isCancelled, self.mode != .off else { return }
+                    self.asr = asr
+                    self.activeTier = asr.tier
+                    if t != first { self.toast("\(first.title) 加载失败，已改用 \(t.title)") }
+                    LiveDiagnostics.shared.log("运行 \(asr.tier.rawValue)")
+                    self.beginRunning()
+                    self.loadTranslatorInBackground()
+                    return
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    lastError = error
+                    LiveDiagnostics.shared.log("\(t.rawValue) 加载失败 \(error.localizedDescription)")
+                }
             }
+            self.phase = .failed(lastError?.localizedDescription ?? "识别模型加载失败")
         }
         startTicker()
     }
@@ -321,34 +367,40 @@ final class LiveSubtitleEngine: ObservableObject {
         phase = .loading(label + "…")
     }
 
-    /// Stage 2: compile/load turbo in the background while small is already producing subtitles, then swap.
-    private func scheduleUpgrade() {
-        upgradeTask?.cancel()
-        let avail = LiveMemory.availableMB
-        guard avail == 0 || avail > 1800 else {
-            notice = "可用内存不足（\(avail) MB），本次使用 small"
-            LiveDiagnostics.shared.log("跳过 turbo：可用内存 \(avail) MB")
-            return
+    // MARK: settings actions
+
+    /// Downloads the Apple Japanese on-device model (iOS 26 asset inventory); user-initiated from settings.
+    func prepareAppleASR() {
+        Task {
+            do { try await AppleSpeechRecognizer.installAssets() } catch { toast("苹果日语识别模型下载失败：\(error.localizedDescription)") }
+            appleASRStatus = await AppleSpeechRecognizer.status()
+            LiveDiagnostics.shared.log("Apple 识别状态 \(appleASRStatus.rawValue)")
         }
-        upgradeNoticeShown = true
-        upgradeTask = Task { [weak self] in
-            guard let self else { return }
-            defer { self.upgradeNoticeShown = false }
+    }
+
+    /// Whisper turbo is downloaded only when the user asks (≈ 632 MB); never compiled unless selected.
+    func downloadTurbo() {
+        guard turboDownload == .idle || { if case .failed = turboDownload { return true }; return false }() else { return }
+        turboDownload = .downloading(0)
+        Task {
             do {
-                let r = try await self.loader.get(.turbo, timeout: Self.turboTimeout)
-                guard !Task.isCancelled, self.phase == .running, !self.perfDegraded, self.guardTier == .turbo else { return }
-                self.asr = r
-                self.activeTier = .turbo
-                self.startWorker()
-                self.loader.release(.small)
-                self.notice = "已切换 large-v3-turbo 高精度模型"
-                LiveDiagnostics.shared.log("已切换 turbo")
+                _ = try await LiveModels.downloadTurbo { f in Task { @MainActor [weak self] in self?.turboDownload = .downloading(f) } }
+                turboDownload = .idle
+                toast("Whisper turbo 已下载")
+                if tierPreference == .turbo { restartForTier() }
             } catch {
-                guard !Task.isCancelled else { return }
-                self.notice = "turbo 未就绪（\(error.localizedDescription)），继续使用 small"
+                turboDownload = .failed(error.localizedDescription)
             }
         }
     }
+
+    func deleteTurbo() {
+        loader.release(.turbo)
+        LiveModels.deleteTurboDownload()
+        if tierPreference == .turbo { restartForTier() }
+    }
+
+    var turboDownloaded: Bool { LiveModels.whisperAvailable(.turbo) }
 
     private func loadTranslatorInBackground() {
         guard Self.sharedMT == nil || mt == nil else { return }
@@ -374,7 +426,7 @@ final class LiveSubtitleEngine: ObservableObject {
             translatorStatus = "NLLB 加载中…"
             let t0 = Date()
             do {
-                fallback = try await Task.detached(priority: .userInitiated) { try NLLBCoreMLTranslator(root: root) }.value
+                fallback = try await Task.detached(priority: .utility) { try NLLBCoreMLTranslator(root: root) }.value
                 translatorStatus = String(format: "NLLB 就绪 %.1fs", Date().timeIntervalSince(t0))
             } catch {
                 translatorStatus = "NLLB 加载失败：\(error.localizedDescription)"
@@ -415,17 +467,19 @@ final class LiveSubtitleEngine: ObservableObject {
         pipeline.setPlayhead(now.time)
         reader.start(source, at: start, generation: pipeline.currentGeneration)
         phase = .running
+        hitches.start()
         startWorker()
         refreshCaption()
     }
 
-    /// Single serial worker: ASR and MT run in playhead order (finals first, then streaming partials).
+    /// Single serial worker (concurrency cap = 1 ASR or MT call at a time): ASR and MT run in playhead order at
+    /// utility QoS so AVPlayer decoding, audio and the UI always win the CPU; never on the main thread.
     private func startWorker() {
         guard let asr else { return }
         worker?.cancel()
         let pipeline = self.pipeline
         let mt = self.mt
-        worker = Task.detached(priority: .userInitiated) {
+        worker = Task.detached(priority: .utility) {
             while !Task.isCancelled {
                 if await !pipeline.work(asr: asr, mt: mt) { try? await Task.sleep(nanoseconds: 40_000_000) }
             }
@@ -434,8 +488,8 @@ final class LiveSubtitleEngine: ObservableObject {
 
     private func stopRunning() {
         loadTask?.cancel(); loadTask = nil
-        upgradeTask?.cancel(); upgradeTask = nil
         worker?.cancel(); worker = nil
+        hitches.stop()
         reader.stop()
         ticker?.cancel(); ticker = nil
         lastTick = nil
@@ -454,7 +508,19 @@ final class LiveSubtitleEngine: ObservableObject {
 
     // MARK: reader wiring (reader thread)
 
-    private func setPace(_ t: Double, _ r: Double) { shared.set(playhead: t, rate: r, lead: lead) }
+    private func setPace(_ t: Double, _ r: Double) { shared.set(playhead: t, rate: r, lead: effectiveLead) }
+
+    private var thermalLevel: Int {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: 0
+        case .fair: 1
+        case .serious: 2
+        case .critical: 3
+        @unknown default: 0
+        }
+    }
+    /// Read-ahead after thermal throttling (fair ×0.75, serious/critical ≤ 8 s).
+    var effectiveLead: Double { LiveSubtitleGuard.throttledLead(lead, thermal: thermalLevel) }
 
     private func wireReader() {
         let shared = self.shared
@@ -490,13 +556,8 @@ final class LiveSubtitleEngine: ObservableObject {
         if case .loading = phase {
             let el = Int(Date().timeIntervalSince(loadingSince))
             var label = "\(loadingLabel)… \(el / 60):\(String(format: "%02d", el % 60))"
-            if el >= 15 { label += " · 首次需编译模型，请保持前台" }
+            if el >= 15, loadingLabel.contains("Whisper") { label += " · 首次需编译模型，请保持前台" }
             if phase != .loading(label) { phase = .loading(label) }
-        }
-        if upgradeNoticeShown, !upgradeNoticeDismissed, phase == .running, case .loading(let since) = loader.state(.turbo) {
-            let el = Int(Date().timeIntervalSince(since))
-            let first = UserDefaults.standard.object(forKey: "live.load.turbo") == nil
-            notice = "large-v3-turbo 后台\(first ? "编译中（首次）" : "加载中")\(el / 60):\(String(format: "%02d", el % 60)) · 先用 small"
         }
         guard let clock, phase == .running else { refreshCaption(); return }
         let c = clock()
@@ -525,7 +586,17 @@ final class LiveSubtitleEngine: ObservableObject {
             let name = t.title
             switch loader.state(t) {
             case .idle:
-                if !LiveModels.whisperAvailable(t) { out.append("\(name)：未打包") }
+                switch t {
+                case .senseVoice: out.append(LiveModels.senseVoiceAvailable ? "\(name)：已打包（默认）" : "\(name)：未打包")
+                case .apple: out.append("\(name)：\(appleASRStatus.title)")
+                case .small: out.append(LiveModels.whisperAvailable(.small) ? "\(name)：已打包（手动选择时才加载）" : "\(name)：未打包")
+                case .turbo:
+                    switch turboDownload {
+                    case .downloading(let f): out.append(String(format: "%@：下载中 %.0f%%", name, f * 100))
+                    case .failed(let why): out.append("\(name)：下载失败 — \(why)")
+                    case .idle: out.append(LiveModels.whisperAvailable(.turbo) ? "\(name)：已下载（手动选择时才加载）" : "\(name)：未下载（按需下载约 632 MB）")
+                    }
+                }
             case .loading(let since):
                 let el = Int(Date().timeIntervalSince(since))
                 let first = t == .turbo && UserDefaults.standard.object(forKey: "live.load.turbo") == nil
@@ -534,6 +605,8 @@ final class LiveSubtitleEngine: ObservableObject {
             case .failed(let why): out.append("\(name)：失败 — \(why)")
             }
         }
+        hitchText = hitches.summary
+        if !hitchText.isEmpty { out.append(hitchText) }
         if !translatorStatus.isEmpty { out.append(translatorStatus) }
         if out != modelStatus { modelStatus = out }
     }
@@ -562,54 +635,48 @@ final class LiveSubtitleEngine: ObservableObject {
 
     private func currentVerdict() -> LiveSubtitleGuard.Verdict {
         let d = UIDevice.current
-        let thermal: Int = {
-            switch ProcessInfo.processInfo.thermalState {
-            case .nominal: 0
-            case .fair: 1
-            case .serious: 2
-            case .critical: 3
-            @unknown default: 0
-            }
-        }()
         let battery = d.batteryLevel < 0 ? 1 : d.batteryLevel
         let charging = d.batteryState == .charging || d.batteryState == .full || d.batteryState == .unknown
-        return LiveSubtitleGuard.verdict(preferred: preferredTier, thermal: thermal,
+        return LiveSubtitleGuard.verdict(preferred: sessionOverride ?? preferredTier, thermal: thermalLevel,
                                          lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled, battery: battery, charging: charging)
     }
 
     private func checkGuard() {
         guard mode != .off, source != nil else { return }
+        if appleASRStatus == .unknown { Task { appleASRStatus = await AppleSpeechRecognizer.status() } }
+        setPace(shared.pace.playhead, shared.pace.rate)          // re-apply the thermal read-ahead throttle
         switch currentVerdict() {
         case .pause(let why):
             if case .paused = phase { return }
             saveCache(force: true)
             stopRunning()
             phase = .paused(why)
-            notice = why
+            toast(why)
             startTicker()
-        case .degrade(let t, let why):
-            if case .paused = phase { notice = why; start(); return }
-            if guardTier != t { notice = why; if t == .small { loader.release(.turbo) }; start() }
+        case .degrade(let t, _):
+            if case .paused = phase { start(); return }
+            if guardTier != t { start() }
         case .run(let t):
-            if case .paused = phase { notice = nil; start(); return }
-            let want = perfDegraded ? .small : t
-            if guardTier != want, phase == .running { notice = nil; start() }
+            if case .paused = phase { start(); return }
+            if guardTier != t, phase == .running { start() }
         }
         checkPerformance()
     }
 
-    /// Realtime first: if turbo's measured compute time exceeds 0.8 s per second of speech (it would fall
-    /// behind the look-ahead window), drop to small for this session — unless the user pinned turbo.
+    /// Realtime first: when the active recognizer falls behind the playhead (compute > 0.7 s per second of
+    /// speech, or ≥ 3 of the last 5 lines shown > 2 s late) hand over to Apple on-device recognition for this
+    /// session (when installed), unless the user explicitly chose a Whisper model.
     private func checkPerformance() {
-        guard phase == .running, activeTier == .turbo, !perfDegraded, tierPreference == .automatic,
-              LiveModels.whisperAvailable(.small) else { return }
+        guard phase == .running, let t = activeTier, t != .apple, sessionOverride == nil, !preferredTier.isWhisper,
+              appleASRStatus == .installed else { return }
         let st = pipeline.snapshotStats
-        guard st.finalsMeasured >= 3, st.rtfAvg > 0.8 else { return }
-        perfDegraded = true
-        notice = String(format: "turbo 在本机无法实时（%.1f× 实时），已切换 small 模型", st.rtfAvg)
+        let recent = pipeline.latency.filter { $0.segment >= 0 }.suffix(5)
+        let late = recent.filter { $0.jaLatency > 2.0 }.count
+        guard st.finalsMeasured >= 3, st.rtfAvg > 0.7 || (recent.count >= 5 && late >= 3) else { return }
+        sessionOverride = .apple
+        toast(String(format: "%@ 跟不上播放（%.2f× 实时），已切换苹果系统识别", t.title, st.rtfAvg))
         saveCache(force: true)
-        loader.release(.turbo)
-        LiveDiagnostics.shared.log(String(format: "turbo RTF %.2f → small", st.rtfAvg))
+        LiveDiagnostics.shared.log(String(format: "%@ RTF %.2f late %d/5 → apple", t.rawValue, st.rtfAvg, late))
         start()
     }
 
@@ -631,5 +698,38 @@ final class LiveSubtitleEngine: ObservableObject {
 
     func clearCache() { cache.clear() }
     var cacheBytes: Int { cache.totalBytes() }
-    func dismissNotice() { if upgradeNoticeShown { upgradeNoticeDismissed = true }; notice = nil }
+    func dismissNotice() { toastTask?.cancel(); notice = nil }
+}
+
+/// Main-thread hitch counter while live subtitles run: CADisplayLink frame gaps > 50 ms (≥ 3 frames at 60 Hz).
+/// Measures UI/main-thread stalls only (AVPlayer decodes off the main thread).
+@MainActor
+final class LiveHitchMonitor: NSObject {
+    private var link: CADisplayLink?
+    private var last: CFTimeInterval = 0
+    private var started: CFTimeInterval = 0
+    private(set) var hitches = 0
+    private(set) var worstMs = 0.0
+
+    func start() {
+        stop()
+        hitches = 0; worstMs = 0; last = 0; started = CACurrentMediaTime()
+        let l = CADisplayLink(target: self, selector: #selector(frame(_:)))
+        l.add(to: .main, forMode: .common)
+        link = l
+    }
+    func stop() { link?.invalidate(); link = nil }
+
+    @objc private func frame(_ l: CADisplayLink) {
+        defer { last = l.timestamp }
+        guard last > 0 else { return }
+        let gap = (l.timestamp - last) * 1000
+        if gap > 50 { hitches += 1; worstMs = max(worstMs, gap) }
+    }
+
+    var summary: String {
+        guard link != nil, started > 0 else { return "" }
+        let minutes = max(1.0 / 60, (CACurrentMediaTime() - started) / 60)
+        return String(format: "主线程卡顿 %d 次（%.1f/分钟，最长 %.0f ms）", hitches, Double(hitches) / minutes, worstMs)
+    }
 }

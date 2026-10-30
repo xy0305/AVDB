@@ -10,12 +10,12 @@ final class LiveSubtitleEngine: ObservableObject {
     @Published var caption = LiveCaption(ja: nil, zh: nil, partial: false, pendingChinese: false)
     @Published var phase: Phase = .running
     @Published var notice: String?
-    @Published var activeTier: LiveASRTier? = .turbo
+    @Published var activeTier: LiveASRTier? = .senseVoice
     @Published var translatorName = "Apple 翻译 → NLLB-200 600M (本地)"
     @Published var appleStatus: AppleTranslationStatus = .needsDownload
-    @Published var latencyText = "同步 18/18 · 平均滞后 0.00s · ASR 212ms"
+    @Published var latencyText = "同步 18/18 · 平均滞后 0.00s · ASR 96ms (0.05× 实时)"
     @Published var mode: LiveSubtitleMode = .bilingual { didSet { recompute() } }
-    @Published var tierPreference: LiveTierPreference = .automatic
+    @Published var tierPreference: LiveTierPreference = .senseVoice
     @Published var lead: Double = 20
     let appleBridgeBox: AnyObject? = nil
     var store = LiveSegmentStore()
@@ -25,7 +25,16 @@ final class LiveSubtitleEngine: ObservableObject {
     var cacheBytes: Int { 18_432 }
     func dismissNotice() { notice = nil }
     // Build 288 surface
-    @Published var modelStatus: [String] = ["large-v3-turbo：就绪（加载 8.4s） · 使用中", "small：就绪（加载 2.1s）", "NLLB 就绪 3.8s"]
+    @Published var modelStatus: [String] = ["SenseVoice：就绪（加载 0.9s） · 使用中", "苹果系统识别：可用（本机）", "Whisper small：已打包（手动选择时才加载）",
+                                            "Whisper large-v3-turbo：未下载（按需下载约 632 MB）", "NLLB 就绪 3.8s", "主线程卡顿 0 次（0.0/分钟，最长 0 ms）"]
+    @Published var appleASRStatus: AppleASRStatus = .installed
+    enum TurboDownload: Equatable { case idle, downloading(Double), failed(String) }
+    @Published var turboDownload: TurboDownload = .idle
+    @Published var hitchText = ""
+    var turboDownloaded = false
+    func prepareAppleASR() {}
+    func downloadTurbo() { turboDownload = .downloading(0.42) }
+    func deleteTurbo() {}
     @Published var translatorStatus = ""
     var phaseText: String {
         switch phase {
@@ -36,7 +45,7 @@ final class LiveSubtitleEngine: ObservableObject {
         case .failed(let s): "失败：\(s)"
         }
     }
-    func retry() { phase = .loading("正在加载 small… 0:00") }
+    func retry() { phase = .loading("正在加载 SenseVoice… 0:00") }
     func diagnosticReport() -> String { "AVDB 实时字幕诊断 (fixture)" }
     func recompute() { caption = store.caption(at: t, mode: mode) }
 }
@@ -120,14 +129,16 @@ struct LiveHostScreen: View {
         if args.contains("--settings") { settings = true }
         if args.contains("--editing") { editing = true }
         if args.contains("--thermal") { engine.phase = .paused("设备温度过高，实时字幕已暂停（降温后自动恢复）") }
-        if args.contains("--loading") { engine.phase = .loading("正在加载 small… 0:03"); engine.mode = .bilingual; engine.activeTier = nil
-            engine.modelStatus = ["small：加载中 0:03"] }
-        if args.contains("--staged") {   // small already subtitling; turbo compiling in background (288 auto mode)
-            engine.activeTier = .small; engine.notice = "large-v3-turbo 后台编译中（首次）1:12 · 先用 small"
-            engine.modelStatus = ["large-v3-turbo：编译中（首次） 1:12", "small：就绪（加载 2.4s） · 使用中", "NLLB 就绪 3.9s"] }
+        if args.contains("--loading") { engine.phase = .loading("正在加载 SenseVoice… 0:01"); engine.mode = .bilingual; engine.activeTier = nil
+            engine.modelStatus = ["SenseVoice：加载中 0:01"] }
+        if args.contains("--hot") {   // 289: thermal serious → Apple on-device recognition, small non-blocking toast
+            engine.activeTier = .apple; engine.notice = "设备发热，已切换苹果系统识别"
+            engine.modelStatus = ["SenseVoice：已打包（默认）", "苹果系统识别：就绪（加载 0.2s） · 使用中", "Whisper small：已打包（手动选择时才加载）", "NLLB 就绪 3.9s"] }
+        if args.contains("--turbo") { engine.tierPreference = .turbo; engine.activeTier = .senseVoice; engine.notice = "Whisper large-v3-turbo 不可用，改用 SenseVoice" }
         if args.contains("--failed") {
-            engine.phase = .failed("small 模型加载超过 120 秒仍未完成（首次编译可能较慢）"); engine.activeTier = nil
-            engine.modelStatus = ["large-v3-turbo：失败 — 加载超时", "small：失败 — small 模型加载超过 120 秒仍未完成"]
+            engine.phase = .failed("SenseVoice 初始化失败（cpu）"); engine.activeTier = nil
+            engine.modelStatus = ["SenseVoice：失败 — SenseVoice 初始化失败（cpu）", "苹果系统识别：失败 — 苹果日语识别：需下载系统日语识别模型"]
+            engine.appleASRStatus = .needsDownload
             engine.store = LiveSegmentStore(); engine.recompute() }
         if let f = arg("--font"), let v = Double(f) { UserDefaults.standard.set(v, forKey: LiveSubtitleStyle.fontKey) }
         if let p = arg("--position"), let v = Double(p) { UserDefaults.standard.set(v, forKey: LiveSubtitleStyle.positionKey) }

@@ -71,6 +71,20 @@ enum LiveTierPreference: String, CaseIterable, Identifiable, Sendable {
     func resolve(physicalMemory: UInt64) -> LiveASRTier { tier }
 }
 
+/// Apple on-device Japanese recognition availability (289 fallback recognizer).
+enum AppleASRStatus: String, Sendable {
+    case unknown, installed, needsDownload, unsupported, denied
+    var title: String {
+        switch self {
+        case .unknown: "检测中"
+        case .installed: "可用（本机）"
+        case .needsDownload: "需下载系统日语识别模型"
+        case .unsupported: "本机不支持离线日语识别"
+        case .denied: "未授权语音识别"
+        }
+    }
+}
+
 // MARK: - Guard (thermal / battery)
 
 enum LiveSubtitleGuard {

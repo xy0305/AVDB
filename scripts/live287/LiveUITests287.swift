@@ -48,14 +48,18 @@ final class LiveUITests287: XCTestCase {
         app = launch(["--mode", "bilingual", "--loading", "--chrome"]); shot(app, "16-loading-model"); app.terminate()
     }
 
-    func test04Build288Loading() {
-        var app = launch(["--mode", "bilingual", "--staged"]); shot(app, "17-288-small-running-turbo-compiling"); app.terminate()
+    func test04Build289Recognizers() {
+        var app = launch(["--mode", "bilingual", "--hot", "--chrome"]); shot(app, "17-289-hot-apple-toast-chrome"); app.terminate()
+        app = launch(["--mode", "bilingual", "--hot"]); shot(app, "18-289-hot-apple-toast"); app.terminate()
+        app = launch(["--mode", "bilingual", "--hot"], landscape: true); shot(app, "19-289-landscape-hot-apple-toast"); app.terminate()
         app = launch(["--mode", "bilingual", "--failed"])
         XCTAssertTrue(app.buttons["live.subtitle.retry"].waitForExistence(timeout: 5))
-        shot(app, "18-288-load-failed-retry"); app.terminate()
-        app = launch(["--mode", "bilingual", "--staged", "--settings"]); sleep(1)
-        sleep(1); shot(app, "19-288-settings-model-status-copylog"); app.terminate()
-        app = launch(["--mode", "bilingual", "--failed", "--settings"]); sleep(1)
-        sleep(1); shot(app, "20-288-settings-failed-retry"); app.terminate()
+        shot(app, "20-289-load-failed-retry"); app.terminate()
+        app = launch(["--mode", "bilingual", "--settings"]); sleep(1); shot(app, "21-289-settings-status-sensevoice"); app.swipeUp(); sleep(1)
+        let picker = app.descendants(matching: .any)["live.subtitle.settings.recognizer"]
+        if picker.waitForExistence(timeout: 3) { app.swipeUp(); sleep(1) }
+        shot(app, "22-289-settings-recognizer-picker"); app.terminate()
+        app = launch(["--mode", "bilingual", "--settings", "--turbo"]); sleep(1); app.swipeUp(); sleep(1); app.swipeUp(); sleep(1)
+        shot(app, "23-289-settings-turbo-download"); app.terminate()
     }
 }

@@ -10,6 +10,10 @@
 		LIVE2870000000000000009A /* LiveAppleTranslation.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000009F /* LiveAppleTranslation.swift */; };
 		LIVE2870000000000000001A /* LiveSubtitleCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000001F /* LiveSubtitleCore.swift */; };
 		LIVE2870000000000000002A /* LiveAudioReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000002F /* LiveAudioReader.swift */; };
+		LIVE2890000000000000001A /* LiveSenseVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2890000000000000001F /* LiveSenseVoice.swift */; };
+		LIVE2890000000000000002A /* LiveSystemRecognizers.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2890000000000000002F /* LiveSystemRecognizers.swift */; };
+		SHERPA289000000000000001 /* SherpaOnnxC.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = SHERPA289000000000000003 /* SherpaOnnxC.xcframework */; };
+		SHERPA289000000000000002 /* SherpaOnnxC.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = SHERPA289000000000000003 /* SherpaOnnxC.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		LIVE2870000000000000003A /* LiveSpeechEngines.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000003F /* LiveSpeechEngines.swift */; };
 		LIVE2870000000000000004A /* LiveSubtitleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000004F /* LiveSubtitleEngine.swift */; };
 		LIVE2870000000000000005A /* LiveSubtitleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000005F /* LiveSubtitleViews.swift */; };
@@ -129,6 +133,9 @@
 		LIVE2870000000000000009F /* LiveAppleTranslation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAppleTranslation.swift; sourceTree = "<group>"; };
 		LIVE2870000000000000001F /* LiveSubtitleCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSubtitleCore.swift; sourceTree = "<group>"; };
 		LIVE2870000000000000002F /* LiveAudioReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAudioReader.swift; sourceTree = "<group>"; };
+		LIVE2890000000000000001F /* LiveSenseVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSenseVoice.swift; sourceTree = "<group>"; };
+		LIVE2890000000000000002F /* LiveSystemRecognizers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSystemRecognizers.swift; sourceTree = "<group>"; };
+		SHERPA289000000000000003 /* SherpaOnnxC.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SherpaOnnxC.xcframework; path = Vendor/SherpaOnnxC.xcframework; sourceTree = SOURCE_ROOT; };
 		LIVE2870000000000000003F /* LiveSpeechEngines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSpeechEngines.swift; sourceTree = "<group>"; };
 		LIVE2870000000000000004F /* LiveSubtitleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSubtitleEngine.swift; sourceTree = "<group>"; };
 		LIVE2870000000000000005F /* LiveSubtitleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSubtitleViews.swift; sourceTree = "<group>"; };
@@ -244,12 +251,27 @@
 		LIBFEAT00000000000000002 /* LibraryFeaturesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFeaturesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		SHERPA289000000000000004 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				SHERPA289000000000000002 /* SherpaOnnxC.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		AVDB00000000000000000000C2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A115C11E7A7B115C11E7A009 /* KSPlayer in Frameworks */,
+				SHERPA289000000000000001 /* SherpaOnnxC.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -406,6 +428,8 @@
 				DMMCOVER282000000000001F /* DMMCoverResolver.swift */,
 				LIVE2870000000000000001F /* LiveSubtitleCore.swift */,
 				LIVE2870000000000000002F /* LiveAudioReader.swift */,
+				LIVE2890000000000000001F /* LiveSenseVoice.swift */,
+				LIVE2890000000000000002F /* LiveSystemRecognizers.swift */,
 				LIVE2870000000000000003F /* LiveSpeechEngines.swift */,
 				LIVE2870000000000000009F /* LiveAppleTranslation.swift */,
 				LIVE2870000000000000004F /* LiveSubtitleEngine.swift */,
@@ -440,6 +464,7 @@
 			isa = PBXGroup;
 			children = (
 				5AF0A8AA6CE0C53609C6E140 /* AVDB */,
+				SHERPA289000000000000003 /* SherpaOnnxC.xcframework */,
 				AVDB00000000000000000000B1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -530,6 +555,7 @@
 			buildPhases = (
 				AVDB00000000000000000000C1 /* Sources */,
 				AVDB00000000000000000000C2 /* Frameworks */,
+				SHERPA289000000000000004 /* Embed Frameworks */,
 				AVDB00000000000000000000C3 /* Resources */,
 			);
 			buildRules = (
@@ -670,6 +696,8 @@
 				AICOVER2850000000000003A /* AICoverViews.swift in Sources */,
 				LIVE2870000000000000001A /* LiveSubtitleCore.swift in Sources */,
 				LIVE2870000000000000002A /* LiveAudioReader.swift in Sources */,
+				LIVE2890000000000000001A /* LiveSenseVoice.swift in Sources */,
+				LIVE2890000000000000002A /* LiveSystemRecognizers.swift in Sources */,
 				LIVE2870000000000000003A /* LiveSpeechEngines.swift in Sources */,
 				LIVE2870000000000000009A /* LiveAppleTranslation.swift in Sources */,
 				LIVE2870000000000000004A /* LiveSubtitleEngine.swift in Sources */,
@@ -725,7 +753,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 288;
+				CURRENT_PROJECT_VERSION = 289;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -748,7 +776,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 288;
+				CURRENT_PROJECT_VERSION = 289;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
