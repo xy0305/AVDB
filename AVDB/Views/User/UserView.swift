@@ -73,6 +73,7 @@ struct UserView: View {
                     }
 
                     PlaybackHistorySection()
+                    FollowUpdatesSection()
 
                     Section("我的") {
                         NavigationLink {
@@ -200,6 +201,7 @@ struct UserView: View {
                     }
                     // Logged-out playback lives in the device-only guest scope.
                     PlaybackHistorySection()
+                    FollowUpdatesSection()
                 }
 
                 CoverTitleSettingsSection()
@@ -266,6 +268,7 @@ struct UserView: View {
             .navigationTitle("我的")
             .liquidGlassList()
             .modifier(TangxinHistoryDestinations())
+            .modifier(PlaybackHistoryMenuDestinations())
             .sheet(isPresented: $showLogin) {
                 LoginView()
             }

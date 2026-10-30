@@ -117,6 +117,18 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         // Build 279: bright low-saturation (white / near-white) source keeps its luminance, so
         // high-key white scenes are not greyed by the highlight pull or hazed by the shoulder.
         whiteAnchor: { enabled: true, lumLo: 0.62, lumHi: 0.80, satLo: 0.10, satHi: 0.22 },
+        // Build 280 presets. Every preset runs the 279 per-frame safety gate (crush / lift / grey-white /
+        // magenta / hlblow / oversat stay at the 279 limits); presets only scale the 6.7.8 params and relax
+        // the purely aesthetic limits. 'standard' is exactly Build 279.
+        preset: 'standard',
+        presets: {
+            natural: { scale: 0.75, safety: {} },
+            standard: { scale: 1, safety: {} },
+            // Build 280 benchmark (whos.tv held-out, 3887 frames): relaxing the high-key limits brightened 18.7 %
+            // of high-key frames, so 增强 only widens the skin-rotation allowance (6.7.8's warmer skin), the haze
+            // floor and the highlight-recovery floor. Black / white / magenta / high-key limits stay at 279.
+            enhanced: { scale: 1, safety: { pinkRotMax: 12, hazeStdMin: 0.90, hazeRangeMin: 0.90, hlblowHighlightFloor: -18 } },
+        },
     }
     const KR = 0.2126, KG = 0.7152, KB = 0.0722;
     const HL_THRESHOLD = 0.65;
@@ -745,6 +757,20 @@ const console = {log:function(){},warn:function(){},error:function(){}};
         }
         if (steps > 0) console.log(`[LUT-算法-279安全] ${fixed.join('/')} ${steps} 步 → ${JSON.stringify(params)}`);
         return { params, steps, fixed, residual: f };
+    }
+
+    function activePreset() {
+        return CONFIG.presets[CONFIG.preset] || CONFIG.presets.standard;
+    }
+    // Temporarily apply a preset's safety overrides (restored even if the guard throws).
+    function withPresetSafety(preset, work) {
+        const saved = {};
+        for (const k of Object.keys(preset.safety)) { saved[k] = CONFIG.safety[k]; CONFIG.safety[k] = preset.safety[k]; }
+        try { return work(); } finally { for (const k of Object.keys(saved)) CONFIG.safety[k] = saved[k]; }
+    }
+    function setPreset(name) {
+        CONFIG.preset = Object.prototype.hasOwnProperty.call(CONFIG.presets, name) ? name : 'standard';
+        return CONFIG.preset;
     }
 
     function predictParams(info, skinPixels, useExtreme, useHighMatch, globalSample) {
@@ -1723,9 +1749,18 @@ const console = {log:function(){},warn:function(){},error:function(){}};
             }
         }
 
-        // ---- Build 278 逐帧安全闸（仅在会出问题的帧上生效）----
+        // ---- Build 278 逐帧安全闸（仅在会出问题的帧上生效）; Build 280 preset scale + relaxed aesthetic limits ----
         if (skinPixels !== null && skinPixels.length > 0) {
-            safetyGuard(params, globalSample || null, coarse);
+            const preset = activePreset();
+            withPresetSafety(preset, () => {
+                safetyGuard(params, globalSample || null, coarse);
+                if (preset.scale !== 1) {
+                    for (const k of ['temp', 'tint', 'sat', 'bright', 'contrast', 'highlight', 'shadow']) {
+                        params[k] = Math.round(params[k] * preset.scale);
+                    }
+                    safetyGuard(params, globalSample || null, coarse);
+                }
+            });
         }
 
         // ---- 非有限值兜底 ----
@@ -2094,5 +2129,5 @@ function cubeRGBA(values) {
  return Array.from(out);
 }
 
-return {analyzeFrame, analyzeMultiFrame, cubeRGBA, applyShadowToe, applyWhiteAnchor, globalShape, shadowToeSlope, meanHueSat, renderArray, safetyGuard, safetyFailure, safetyContext, globalSample, CONFIG, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
+return {analyzeFrame, analyzeMultiFrame, cubeRGBA, setPreset, activePreset, withPresetSafety, applyShadowToe, applyWhiteAnchor, globalShape, shadowToeSlope, meanHueSat, renderArray, safetyGuard, safetyFailure, safetyContext, globalSample, CONFIG, sampleFrame, sampleSkinStats, predictParams, generateLutData, applyParamsToSkinArray, computeRegionCrRange, isSkinColorRegion, isExtremeDark, isHighMatch, computeGlobalHlRatio, median, selectCoherentPairs, SCENE_GUARD_LUM_SPAN, SCENE_GUARD_RB_SPAN};
 })();

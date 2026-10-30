@@ -31,7 +31,9 @@ struct PlayerView: View {
                     subtitle: vm.currentQuality,
                     headers: vm.headers,
                     historyMovie: vm.historyMovie,
-                    historySource: "JavDB"
+                    historySource: "JavDB",
+                    // Catalog player: stable JavDB movie id (番号 arrives later with the detail request).
+                    resumeKey: PlaybackResumeKey.make(number: movieID, source: "JavDB")
                 )
             } else if vm.isLoading {
                 ProgressView("加载播放源…")
@@ -168,6 +170,16 @@ struct KSChromePlayer: View {
     /// Tangxin only: public page + poster so the history entry reopens its own detail.
     var historyPage: URL? = nil
     var historyPoster: URL? = nil
+    /// Build 280 续播: 番号 + 来源 key (PlaybackResumeKey). Online session ids change, so the caller
+    /// re-resolves the stream and the player seeks to the stored position once the new item is ready.
+    var resumeKey: String? = nil
+    /// 「从头播放」: ignore any stored position for this session (still records new progress).
+    var startFromBeginning: Bool = false
+    @State private var resumeHandledURL: URL?
+    @State private var resumeToast: TimeInterval?
+    @State private var resumeToastTask: Task<Void, Never>?
+    @GestureState private var lutHold = false
+    @State private var lutHoldConsumed = false
     @State private var historyGate = PlaybackHistoryStartGate()
     @State private var historyRecordedID: String?
     @State private var historyScope = PlaybackHistoryStore.shared.scope
@@ -413,6 +425,20 @@ struct KSChromePlayer: View {
                     .scaleEffect(1.15)
                     .allowsHitTesting(false)
             }
+            if let resumeToast {
+                // Only the capsule is hit-testable; the rest of the screen stays with the gesture layer.
+                resumeToastView(resumeToast, safeArea: safeArea).zIndex(40)
+            }
+            if lut.holdingOriginal {
+                Text("原图 · 松开恢复 LUT")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(.black.opacity(0.6), in: Capsule())
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, safeArea.top + 70)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("player.lut.hold-original")
+            }
             if let overlay {
                 overlayHUD(overlay)
                     .allowsHitTesting(false)
@@ -601,7 +627,10 @@ struct KSChromePlayer: View {
                 }.buttonStyle(.plain)
                     .fixedSize().layoutPriority(2).zIndex(20)
                     .accessibilityLabel("在线字幕").accessibilityIdentifier("player.subtitle.settings")
-                Button { showLUT = true } label: {
+                Button {
+                    // A completed press-and-hold must not also open the panel on release.
+                    if lutHoldConsumed { lutHoldConsumed = false } else { showLUT = true }
+                } label: {
                     Image(systemName: "camera.filters")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(.white)
@@ -613,7 +642,31 @@ struct KSChromePlayer: View {
                 .layoutPriority(2)
                 .zIndex(20)
                 .accessibilityLabel("LUT 调色设置")
+                .accessibilityHint("轻点打开设置；按住临时查看原图，松开恢复")
                 .accessibilityIdentifier("player.lut.settings")
+                // Build 280 按住看原图: lives in the top chrome bar, which the UIKit gesture receiver excludes
+                // (excludedTop), so it never competes with pan seek / brightness / volume / double tap.
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: 0.35)
+                        .sequenced(before: DragGesture(minimumDistance: 0))
+                        .updating($lutHold) { value, state, _ in
+                            if case .second(true, _) = value { state = true }
+                        }
+                )
+                .onChange(of: lutHold) { _, holding in
+                    if holding {
+                        lutHoldConsumed = true
+                        hideTask?.cancel()
+                        lut.holdOriginal(true)
+                    } else {
+                        lut.holdOriginal(false)
+                        scheduleHide()
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                            lutHoldConsumed = false
+                        }
+                    }
+                }
                 Spacer(minLength: 8)
 
                 Menu {
@@ -910,16 +963,9 @@ struct KSChromePlayer: View {
                     hasStarted = true
                 }
                 if state == .readyToPlay {
-                    if let progressID, let saved = PlaybackProgressStore.progress(for: progressID), saved.time >= 5 {
-                        seekGeneration += 1
-                        let token = seekGeneration
-                        seekPending = true
-                        coordinator.playerLayer?.seek(time: saved.time, autoPlay: true) { _ in
-                            Task { @MainActor in
-                                guard seekGeneration == token else { return }
-                                seekPending = false
-                            }
-                        }
+                    if resumeHandledURL != url {
+                        resumeHandledURL = url
+                        applyResume()
                     }
                     audio.begin()
                     coordinator.playerLayer?.play()
@@ -929,6 +975,84 @@ struct KSChromePlayer: View {
                 }
             }
         }
+    }
+
+    /// Build 280: 番号+来源 position first, then the legacy per-item PlaybackProgressStore (115 / 糖心).
+    /// Items watched beyond 95 % (or within the last 15 s) start from the beginning.
+    private func applyResume() {
+        var saved: (Double, Double)?
+        if let resumeKey, let entry = PlaybackResumeStore.shared.entry(resumeKey, scope: historyScope) {
+            saved = (entry.position, entry.length)
+        } else if let progressID, let legacy = PlaybackProgressStore.progress(for: progressID) {
+            saved = (legacy.time, legacy.duration)
+        }
+        let engineDuration = coordinator.playerLayer?.player.duration ?? 0
+        guard let saved,
+              let start = PlaybackResumePolicy.startPosition(position: saved.0, length: saved.1 > 1 ? saved.1 : engineDuration,
+                                                             fromBeginning: startFromBeginning) else { return }
+        seekGeneration += 1
+        let token = seekGeneration
+        seekPending = true
+        coordinator.playerLayer?.seek(time: start, autoPlay: true) { _ in
+            Task { @MainActor in
+                guard seekGeneration == token else { return }
+                seekPending = false
+            }
+        }
+        currentTime = start
+        showResumeToast(start)
+    }
+
+    private func showResumeToast(_ position: TimeInterval) {
+        resumeToastTask?.cancel()
+        resumeToast = position
+        resumeToastTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation { resumeToast = nil }
+        }
+    }
+
+    /// Toast 「从头」: seek to zero and remember it, so the next session also starts from the beginning.
+    private func restartFromBeginning() {
+        resumeToastTask?.cancel()
+        withAnimation { resumeToast = nil }
+        seek(to: 0)
+        currentTime = 0
+        if let resumeKey { PlaybackResumeStore.shared.save(resumeKey, position: 0, length: duration, scope: historyScope, force: true) }
+    }
+
+    /// Only after this item's resume decision and real start; never overwrite a stored point with the 0 s of a loading item.
+    private func saveResume(force: Bool, position: TimeInterval? = nil) {
+        guard let resumeKey, resumeHandledURL == url, hasStarted, !seekPending else { return }
+        let value = position ?? currentTime
+        guard value.isFinite, value >= 1 || force else { return }
+        PlaybackResumeStore.shared.save(resumeKey, position: value, length: duration, scope: historyScope, force: force)
+    }
+
+    private func resumeToastView(_ position: TimeInterval, safeArea: EdgeInsets) -> some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 12) {
+                Image(systemName: "clock.arrow.circlepath")
+                Text(PlaybackResumePolicy.toast(position))
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                Button("从头") { restartFromBeginning() }
+                    .font(.subheadline.weight(.bold))
+                    .padding(.horizontal, 12).frame(minHeight: 36)
+                    .background(.white.opacity(0.22), in: Capsule())
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("player.resume.restart")
+            }
+            .foregroundStyle(.white)
+            .padding(.leading, 16).padding(.trailing, 8).padding(.vertical, 6)
+            .background(.black.opacity(0.72), in: Capsule())
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("player.resume.toast")
+            .padding(.bottom, safeArea.bottom + 128)
+        }
+        .frame(maxWidth: .infinity)
+        .transition(.opacity)
     }
 
     private func startTicker() {
@@ -1005,12 +1129,14 @@ struct KSChromePlayer: View {
         if let progressID {
             PlaybackProgressStore.save(movieID: progressID, time: currentTime, duration: duration)
         }
+        saveResume(force: false)
         flushHistory(force: false)
     }
 
     /// 观看历史 resume point. Only after the start gate recorded this session; ticks write every ≥10 s,
     /// pause / end / exit / background force a write.
     private func flushHistory(force: Bool, position: TimeInterval? = nil) {
+        if force { saveResume(force: true, position: position) }
         guard let id = historyRecordedID, APIClient.shared.token == historyToken else { return }
         PlaybackHistoryStore.shared.updateProgress(id, position: position ?? currentTime, duration: duration,
                                                    scope: historyScope, force: force)

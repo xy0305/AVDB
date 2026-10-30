@@ -250,7 +250,10 @@ struct SeriesMoviesView: View {
         .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { FollowToggleButton(kind: .series, tagID: seriesID, name: title, type: type) }
+            ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) }
+        }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }
@@ -321,7 +324,10 @@ struct MakerMoviesView: View {
         .nestedMovieListChrome()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) } }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { FollowToggleButton(kind: .maker, tagID: makerID, name: title, type: type) }
+            ToolbarItem(placement: .topBarTrailing) { MovieSortToolbar(vm: vm) }
+        }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
     }

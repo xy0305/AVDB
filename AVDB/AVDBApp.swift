@@ -13,6 +13,11 @@ import Network
 import CryptoKit
 
 final class AVDBAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Build 280 追更提醒: BGAppRefreshTask must be registered before launch finishes.
+        FollowBackgroundRefresh.register()
+        return true
+    }
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         UIDevice.current.userInterfaceIdiom == .pad ? .all : KSOptions.supportedInterfaceOrientations
     }
@@ -43,7 +48,11 @@ struct AVDBApp: App {
                     PlaybackHistoryStore.shared.activate(accountID: accountID)
                 }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { appState.restoreLogin() }
+                    if phase == .active {
+                        appState.restoreLogin()
+                        FollowUpdateChecker.shared.foregroundCheck()
+                    }
+                    if phase == .background, !FollowStore.shared.targets.isEmpty { FollowBackgroundRefresh.schedule() }
                 }
         }
     }

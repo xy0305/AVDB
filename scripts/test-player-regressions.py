@@ -54,7 +54,7 @@ stop = player.split('private func stopPlayback()')[1].split('@ViewBuilder')[0]
 assert 'if controller.entered { OrientationLock.set(.portrait' in player
 assert 'lut.detach()' in stop and 'playerLayer?.pause()' in stop
 assert 'Button("横屏全屏")' in player and 'Button("竖屏播放")' in player
-button = player.split('Button { showLUT = true } label: {')[1].split('Spacer(minLength: 8)')[0]
+button = player.split('if lutHoldConsumed { lutHoldConsumed = false } else { showLUT = true }')[1].split('Spacer(minLength: 8)')[0]
 assert '.frame(width: 48, height: 48)' in button
 assert '.contentShape(Rectangle())' in button and '.zIndex(20)' in button
 assert '.accessibilityIdentifier("player.lut.settings")' in button

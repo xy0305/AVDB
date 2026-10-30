@@ -272,6 +272,7 @@ struct ActorDetailView: View {
     }
 
     @EnvironmentObject private var appState: AppState
+    @ObservedObject private var followStore = FollowStore.shared
     @State private var showLogin = false
     @AppStorage("avdb.actor.browseMode") private var browseMode = "grid"
     @State private var filterPanelHeight: CGFloat = 0
@@ -527,14 +528,20 @@ struct ActorDetailView: View {
                     info("@" + twitter)
                 }
                 HStack(spacing: 18) {
+                    // Build 280: 关注 = local 追更提醒 (works signed-out); signed-in also syncs JavDB's 关注.
+                    let following = vm.hasFollowed || followStore.isFollowing(.actor, tagID: actorID)
                     actorActionButton(
-                        icon: vm.hasFollowed ? "eye.fill" : "eye",
-                        title: vm.hasFollowed ? "已关注" : "关注",
-                        active: vm.hasFollowed
+                        icon: following ? "eye.fill" : "eye",
+                        title: following ? "已关注" : "关注",
+                        active: following
                     ) {
-                        if appState.isLoggedIn { Task { await vm.toggleFollow() } }
-                        else { showLogin = true }
+                        let next = !following
+                        if followStore.isFollowing(.actor, tagID: actorID) != next {
+                            followStore.toggle(.actor, tagID: actorID, name: actor.displayName)
+                        }
+                        if appState.isLoggedIn, vm.hasFollowed != next { Task { await vm.toggleFollow() } }
                     }
+                    .accessibilityIdentifier("follow.toggle.actor")
                     actorActionButton(
                         icon: vm.hasCollected ? "heart.fill" : "heart",
                         title: vm.hasCollected ? "已收藏" : "收藏",

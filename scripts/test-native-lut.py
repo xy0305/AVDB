@@ -261,8 +261,49 @@ assert.ok(faceMix.frameCount<=2);
 assert.strictEqual(typeof port.selectCoherentPairs, 'function');
 assert.strictEqual(port.SCENE_GUARD_LUM_SPAN, 0.08);
 assert.strictEqual(port.SCENE_GUARD_RB_SPAN, 0.18);
+// Build 280 LUT presets: 自然 / 标准 / 增强 all keep the black, white, magenta and high-key contracts.
+assert.strictEqual(port.activePreset(), port.CONFIG.presets.standard);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(port.CONFIG.presets.standard)), {scale:1,safety:{}}, '标准 must be exactly the 279 engine');
+assert.strictEqual(port.setPreset('bogus'), 'standard');
+assert.strictEqual(port.CONFIG.presets.natural.scale, 0.75);
+for(const k of ['highKeyRiseMax','highKeySkinRiseMax','magentaExtraRot','minSkinSat','hueRange','pinkHue'])
+ assert.ok(!(k in port.CONFIG.presets.enhanced.safety), '增强 must not relax '+k);
+const magOf=q=>['temp','tint','sat','bright','contrast','highlight','shadow'].reduce((a,k)=>a+Math.abs(q[k]),0);
+const presetSum={natural:0,standard:0,enhanced:0}; let presetCases=0;
+seed=280;
+for(const [nm,skin,scene] of scenes){
+ const W=96,H=64, bytes=makeScene(W,H,skin,scene,0.05);
+ const fr=port.sampleFrame(new Uint8ClampedArray(bytes),W,H,null); const g=port.globalSample(new Uint8ClampedArray(bytes),W,H);
+ for(const pr of ['standard','natural','enhanced']){
+  assert.strictEqual(port.setPreset(pr), pr);
+  const safetyBefore=JSON.stringify(port.CONFIG.safety);
+  const res=port.analyzeFrame(Array.from(bytes),W,H,null); assert.ok(res&&res.params, pr+nm);
+  assert.strictEqual(JSON.stringify(port.CONFIG.safety), safetyBefore, pr+' safety overrides must be restored');
+  const q=res.params, rgb=Array.from(port.generateLutData(33,q));
+  presetSum[pr]+=magOf(q);
+  toeContract(q,rgb,pr+'-'+nm); shoulderContract(q,pr+'-'+nm); whiteAnchorContract(q,pr+'-'+nm);
+  skinNotMagenta(new Float32Array(fr.pixels),q,pr+'-'+nm);
+  const y0=new Float32Array(g.length/3), out=port.renderArray(g,q), y1=new Float32Array(g.length/3);
+  for(let i=0;i<y0.length;i++){y0[i]=Yl([g[i*3],g[i*3+1],g[i*3+2]]);y1[i]=Yl([out[i*3],out[i*3+1],out[i*3+2]]);}
+  const a=port.globalShape(g,y0), b=port.globalShape(out,y1,a);
+  assert.ok(b.p5-a.p5<=0.02 && b.dark3-a.dark3<=0.02, pr+'-'+nm+' lifted blacks');
+  assert.ok(b.std/a.std>=(pr==='enhanced'?0.90:0.93), pr+'-'+nm+' haze '+b.std/a.std);
+  if(a.white.length/y0.length>=0.02) assert.ok(b.whiteMean>=a.whiteMean-0.03, pr+'-'+nm+' grey whites');
+  if(a.p50>=0.5) assert.ok(b.p50-a.p50<=0.03, pr+'-'+nm+' high-key brightened');
+  if(pr!=='standard'){
+   const pixels=Array.from(fr.pixels.slice(0,3*400)), extreme=res.stage==='极端暗部', high=res.stage==='高命中';
+   const pq=port.predictParams(res.info,new Float32Array(pixels),extreme,high,new Float32Array(g));
+   cases.push({name:'preset-'+pr+'-'+nm,preset:pr,pixels,global:Array.from(g),info:res.info,extreme,high,params:pq,rgb:Array.from(port.generateLutData(33,pq)).slice(0,120)});
+   presetCases++;
+  }
+ }
+}
+port.setPreset('standard');
+assert.ok(presetSum.natural<presetSum.standard, '自然 must be milder than 标准 '+JSON.stringify(presetSum));
+assert.ok(presetSum.enhanced>=presetSum.standard, '增强 must not be weaker than 标准 '+JSON.stringify(presetSum));
+assert.strictEqual(presetCases, scenes.length*2);
 for(const c of cases){ if(c.params===null){ c.params=port.predictParams(c.info,new Float32Array(c.pixels),c.extreme,c.high,new Float32Array(c.global)); c.rgb=Array.from(port.generateLutData(33,c.params)).slice(0,120); } }
-fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: Build279 6.7.8 params where safe ('+same678+' fixtures identical, '+guarded+' guarded) + toe/shoulder/white-anchor/magenta contracts + high-key/haze/lift scene metrics + per-frame safety scenes + classifiers + multi-frame/scene-guard; cube self-consistency');
+fs.writeFileSync(process.argv[5],JSON.stringify(cases)); console.log('PASS: Build279 6.7.8 params where safe ('+same678+' fixtures identical, '+guarded+' guarded) + toe/shoulder/white-anchor/magenta contracts + high-key/haze/lift scene metrics + per-frame safety scenes + classifiers + multi-frame/scene-guard; cube self-consistency; Build280 presets 自然/标准/增强 contracts ('+JSON.stringify(presetSum)+')');
 '''
 with tempfile.TemporaryDirectory() as tmp:
  t=Path(tmp);(t/'oracle.js').write_text(oracle);(t/'test.js').write_text(js)
@@ -282,6 +323,8 @@ for c in cases {
  let pixels = context.evaluateScript("new Float32Array(inputPixels)")!
  var global: Any = NSNull()
  if let g = c["global"] { context.setObject(g, forKeyedSubscript: "inputGlobal" as NSString); global = context.evaluateScript("new Float32Array(inputGlobal)")! }
+ // Build 280: the native path calls OriginalLUT.setPreset before analysis (NativeLUT.engine(preset:)).
+ _ = api.objectForKeyedSubscript("setPreset")!.call(withArguments: [(c["preset"] as? String) ?? "standard"])
  let p = api.objectForKeyedSubscript("predictParams")!.call(withArguments: [c["info"]!,pixels,c["extreme"]!,c["high"]!,global])!
  precondition(context.exception == nil, "JavaScriptCore exception")
  let expected = c["params"] as! [String:NSNumber]
@@ -293,7 +336,7 @@ for c in cases {
  let want = c["rgb"] as! [NSNumber]
  for i in out.indices { precondition(abs(out[i].doubleValue-want[i].doubleValue) <= 1e-7) }
 }
-print("PASS: native JavaScriptCore vs Node: \(cases.count) searches (incl. Build 279 safety scenes) and LUT scalar samples (1e-7)")
+print("PASS: native JavaScriptCore vs Node: \(cases.count) searches (incl. Build 279 safety scenes + Build 280 presets) and LUT scalar samples (1e-7)")
 '''
  (t/'main.swift').write_text(swift)
  subprocess.run(['swift',str(t/'main.swift'),str(root/'AVDB/Resources/OriginalLUT.js'),str(t/'cases.json')],check=True)

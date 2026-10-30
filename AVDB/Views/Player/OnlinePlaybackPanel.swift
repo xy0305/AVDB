@@ -155,6 +155,46 @@ final class OnlinePlaybackModel: ObservableObject {
 #if !ONLINE_CORE_TEST
 import SwiftUI
 
+/// Build 280 续播 for online sources. The user explicitly asked to resume this 番号 on this source, so
+/// one discovery is sent to that same source (never another one), the line with the same 番号 is
+/// re-resolved and validated as usual, then the player seeks to the stored position.
+@MainActor
+final class OnlineResumeRequest: ObservableObject {
+    enum Phase: Equatable { case idle, working(String), failed(String) }
+    @Published private(set) var phase: Phase = .idle
+    @Published var plan: OnlinePlaybackPlan?
+    private(set) var startFromBeginning = false
+    private var task: Task<Void, Never>?
+    private var epoch = UUID()
+    func start(_ source: OnlineSource, number: String, fromBeginning: Bool, preferences: UserDefaults = .standard) {
+        cancel()
+        startFromBeginning = fromBeginning
+        let epoch = UUID(); self.epoch = epoch
+        phase = .working(source.label + "：正在重新查询并解析线路…")
+        let compat = preferences.bool(forKey: OnlinePlaybackModel.proxyPreferenceKey)
+        let provider = OnlineProvider(transport: OnlineProvider().transport.withDNSMode(compat ? .systemProxy : .strict))
+        let preference = OnlineQualityPreference(preferences: preferences)
+        task = Task { [weak self] in
+            do {
+                let rows = try await OnlinePlaybackModel.bounded { try await provider.discover(source, number: number, versions: false) }
+                guard let self, !Task.isCancelled, self.epoch == epoch else { return }
+                guard let index = OnlineResumeLinePolicy.pick(codes: rows.map(\.code), number: number) else {
+                    self.phase = .failed(source.label + "：未找到同番号线路，请手动选择"); return
+                }
+                var result = try await OnlinePlaybackModel.bounded { try await provider.resolve(rows[index], number: number, versions: false) }
+                guard !Task.isCancelled, self.epoch == epoch else { return }
+                result.preference = preference
+                self.phase = .idle
+                self.plan = result
+            } catch {
+                guard let self, !Task.isCancelled, self.epoch == epoch else { return }
+                self.phase = .failed(source.label + "：" + OnlineFailure.captured(error, at: .discovery).presentation(at: .discovery).display)
+            }
+        }
+    }
+    func cancel() { task?.cancel(); task = nil; epoch = UUID(); phase = .idle }
+}
+
 /// Compact peer actions shared by the detail screen and the offline UI host.
 struct PlaybackResourceActions: View {
     let onlineAvailable: Bool
@@ -307,6 +347,8 @@ struct OnlineQualityPlayer: View {
     let plan: OnlinePlaybackPlan
     var historyMovie: Movie? = nil
     var historyArtwork: UIImage? = nil
+    /// Build 280 「从头播放」; default resumes the 番号 + 来源 position after re-resolving this line.
+    var startFromBeginning: Bool = false
     @State private var manual: HLSVariant?
     private var choice: OnlineQualityChoice {
         OnlineQualitySelector.select(plan.ladder, preferHighest: plan.preference.preferHighest, manual: manual)
@@ -317,7 +359,9 @@ struct OnlineQualityPlayer: View {
                        progressID: "online:" + plan.id.uuidString,
                        supportsFramePreview: false, publicSubtitleQuery: plan.number,
                        historyMovie: historyMovie, historyArtwork: historyArtwork,
-                       historySource: plan.source.label)
+                       historySource: plan.source.label,
+                       resumeKey: PlaybackResumeKey.make(number: plan.number, source: plan.source.label),
+                       startFromBeginning: startFromBeginning)
         .overlay(alignment: .topTrailing) {
             if plan.ladder.count > 1 {
                 Menu {

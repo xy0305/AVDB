@@ -12,6 +12,8 @@ struct Pan115PlayerView: View {
     let movie: Movie
     var magnetURL: String? = nil
     var historyArtwork: UIImage? = nil
+    /// Build 280 「从头播放」 from 观看历史 / detail; default resumes.
+    var startFromBeginning: Bool = false
     @Environment(\.dismiss) private var dismiss
     @StateObject private var vm = Pan115PlayerViewModel()
     @State private var showEpisodes = false
@@ -45,7 +47,9 @@ struct Pan115PlayerView: View {
                     },
                     historyMovie: movie,
                     historyArtwork: historyArtwork,
-                    historySource: "115"
+                    historySource: "115",
+                    resumeKey: PlaybackResumeKey.make(number: movie.displayNumber, source: "115"),
+                    startFromBeginning: startFromBeginning
                 )
                 .id(url)
                 .id(metricsGeneration)

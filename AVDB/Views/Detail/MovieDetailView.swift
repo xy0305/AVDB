@@ -14,6 +14,13 @@ struct MovieDetailView: View {
     @AppStorage("detail.showCoverTitle") private var showCoverTitle = true
     @ScaledMetric(relativeTo: .largeTitle) private var portraitTitleSize: CGFloat = 34
     @State private var play115 = false
+    /// Build 280: 「从头播放」 for the next 115 session only.
+    @State private var pan115FromStart = false
+    /// Build 280: 观看历史 tap → resume on the same source (115 or re-resolved online line).
+    private var autoLaunch: PlaybackAutoLaunch?
+    @State private var autoLaunchDone = false
+    @StateObject private var onlineResume = OnlineResumeRequest()
+    @ObservedObject private var historyStore = PlaybackHistoryStore.shared
     @State private var showOnlinePlayback = false
     @State private var onlineVersions = false
     @StateObject private var onlinePlaybackModel = OnlinePlaybackModel()
@@ -57,8 +64,9 @@ struct MovieDetailView: View {
     @Environment(\.availableLayoutSize) private var layoutSize
     @Environment(\.dismiss) private var dismiss
 
-    init(movieID: String, seed: Movie? = nil) {
+    init(movieID: String, seed: Movie? = nil, autoLaunch: PlaybackAutoLaunch? = nil) {
         self.movieID = movieID
+        self.autoLaunch = autoLaunch
         // A clicked list record with a complete poster identity can start image
         // discovery immediately, independently of the detail/review requests.
         // Incomplete records retain the existing metadata-first path.
@@ -226,13 +234,25 @@ struct MovieDetailView: View {
             if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
             #endif
             await vm.load()
+            if let autoLaunch, !autoLaunchDone, let movie = vm.movie {
+                autoLaunchDone = true
+                launchResume(autoLaunch, movie: movie)
+            }
             if let movie = vm.movie {
                 await reviewsVM.load(movieID: movie.id)
             }
         }
-        .fullScreenCover(isPresented: $play115) {
-            if let movie = vm.movie { Pan115PlayerView(movie: movie, historyArtwork: posterArtwork?.image ?? activeTPDBArtwork?.image) }
+        .fullScreenCover(isPresented: $play115, onDismiss: { pan115FromStart = false }) {
+            if let movie = vm.movie { Pan115PlayerView(movie: movie, historyArtwork: posterArtwork?.image ?? activeTPDBArtwork?.image, startFromBeginning: pan115FromStart) }
         }
+        .fullScreenCover(item: $onlineResume.plan) { plan in
+            OnlineQualityPlayer(plan: plan, historyMovie: vm.movie,
+                                historyArtwork: posterArtwork?.image ?? activeTPDBArtwork?.image,
+                                startFromBeginning: onlineResume.startFromBeginning)
+                .id(plan.id)
+        }
+        .overlay(alignment: .top) { onlineResumeBanner }
+        .onDisappear { onlineResume.cancel() }
         .fullScreenCover(isPresented: $showTrailer) {
             if let url = vm.movie?.previewVideoURL.flatMap(URL.init) {
                 TrailerPlayerView(url: url, onClose: { showTrailer = false })
@@ -457,12 +477,79 @@ struct MovieDetailView: View {
         // the selected branch and replaces the play button's stable AX identity.
     }
 
+    /// Build 280: the detail play button offers 续播 when 观看历史 has a resumable position on 115 / online.
+    private var historyResume: (launch: PlaybackAutoLaunch, title: String)? {
+        guard let movie = vm.movie, let item = historyStore.items.first(where: { $0.movieID == movie.id }) else { return nil }
+        let route = PlaybackHistoryRoute.route(source: item.source, isTangxin: false)
+        switch route {
+        case .pan115: break
+        case .online: guard movie.type != "2", OnlineIdentity.key(movie.displayNumber) != nil else { return nil }
+        default: return nil
+        }
+        let key = PlaybackResumeKey.make(number: movie.displayNumber, source: item.source)
+        let entry = key.flatMap { PlaybackResumeStore.shared.entry($0, scope: historyStore.scope) }
+        guard let title = PlaybackResumePolicy.buttonTitle(position: entry?.position ?? item.position,
+                                                           length: entry?.length ?? item.length, source: item.source) else { return nil }
+        return (PlaybackAutoLaunch(route: route, fromBeginning: false, position: item.position, length: item.length), title)
+    }
+
+    private func playPrimary() {
+        if let resume = historyResume, let movie = vm.movie { launchResume(resume.launch, movie: movie) }
+        else { play115 = true }
+    }
+
+    private func launchResume(_ launch: PlaybackAutoLaunch, movie: Movie) {
+        // Older (≤279) history entries only have the history position: seed the 番号+来源 book once.
+        if case .online(let label) = launch.route, let key = PlaybackResumeKey.make(number: movie.displayNumber, source: label) {
+            PlaybackResumeStore.shared.seed(key, position: launch.position, length: launch.length, scope: historyStore.scope)
+        }
+        switch launch.route {
+        case .pan115:
+            if let key = PlaybackResumeKey.make(number: movie.displayNumber, source: "115") {
+                PlaybackResumeStore.shared.seed(key, position: launch.position, length: launch.length, scope: historyStore.scope)
+            }
+            pan115FromStart = launch.fromBeginning
+            play115 = true
+        case .online(let label):
+            guard let source = OnlineSource.allCases.first(where: { $0.label == label }) else { showOnlinePlayback = true; return }
+            onlineResume.start(source, number: movie.displayNumber, fromBeginning: launch.fromBeginning)
+        case .javdb, .tangxin, .detailsOnly:
+            break // stay on the detail page
+        }
+    }
+
+    @ViewBuilder private var onlineResumeBanner: some View {
+        switch onlineResume.phase {
+        case .idle: EmptyView()
+        case .working(let text):
+            HStack(spacing: 10) {
+                ProgressView().tint(.white)
+                Text(text).font(.footnote.weight(.semibold)).lineLimit(2)
+                Button("取消") { onlineResume.cancel() }.font(.footnote.weight(.bold))
+            }
+            .foregroundStyle(.white).padding(.horizontal, 14).padding(.vertical, 10)
+            .background(.black.opacity(0.75), in: Capsule())
+            .padding(.top, 60)
+            .accessibilityIdentifier("detail.resume.online")
+        case .failed(let text):
+            HStack(spacing: 10) {
+                Text(text).font(.footnote).lineLimit(3)
+                Button("手动选择") { onlineResume.cancel(); showOnlinePlayback = true }.font(.footnote.weight(.bold))
+                Button { onlineResume.cancel() } label: { Image(systemName: "xmark") }
+            }
+            .foregroundStyle(.white).padding(.horizontal, 14).padding(.vertical, 10)
+            .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 14))
+            .padding(.top, 60).padding(.horizontal, 16)
+            .accessibilityIdentifier("detail.resume.failed")
+        }
+    }
+
     private var portraitPlayButton: some View {
         Button {
             GlassHaptic.tap()
-            play115 = true
+            playPrimary()
         } label: {
-            Label("播放", systemImage: "play.fill")
+            Label(historyResume?.title ?? "播放", systemImage: historyResume == nil ? "play.fill" : "clock.arrow.circlepath")
                 .font(.headline)
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.65), radius: 2, y: 1)
@@ -474,7 +561,19 @@ struct MovieDetailView: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .contextMenu { playMenu }
         .accessibilityIdentifier("portrait-hero-play")
+    }
+
+    @ViewBuilder private var playMenu: some View {
+        if let resume = historyResume, let movie = vm.movie {
+            Button { launchResume(resume.launch, movie: movie) } label: { Label(resume.title, systemImage: "clock.arrow.circlepath") }
+            Button {
+                var fromStart = resume.launch; fromStart.fromBeginning = true
+                launchResume(fromStart, movie: movie)
+            } label: { Label("从头播放", systemImage: "backward.end") }
+        }
+        Button { play115 = true } label: { Label("播放 115 原画", systemImage: "play.fill") }
     }
 
     private func portraitActionGroup(_ movie: Movie) -> some View {
@@ -562,9 +661,9 @@ struct MovieDetailView: View {
 
                 Button {
                     GlassHaptic.tap()
-                    play115 = true
+                    playPrimary()
                 } label: {
-                    Image(systemName: "play.fill")
+                    Image(systemName: historyResume == nil ? "play.fill" : "clock.arrow.circlepath")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.96))
                         .frame(width: 56, height: 56)
@@ -572,7 +671,8 @@ struct MovieDetailView: View {
                 }
                 .pressableGlass(scale: 0.9)
                 .padding(12)
-                .accessibilityLabel("播放")
+                .contextMenu { playMenu }
+                .accessibilityLabel(historyResume?.title ?? "播放")
                 .accessibilityIdentifier("landscape-hero-play")
             }
             .liquidCover(cornerRadius: 16)

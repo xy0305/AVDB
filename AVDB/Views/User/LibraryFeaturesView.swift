@@ -115,15 +115,72 @@ struct PlaybackHistoryProgressBar: View {
 /// or the Tangxin detail for 糖心 entries.
 struct PlaybackHistoryDestination: View {
     let item: PlaybackHistoryItem
+    /// Build 280: a plain tap resumes on the recorded source; the long-press menu picks 从头 / 详情.
+    var launch: PlaybackHistoryLaunch = .resume
     @AppStorage("tangxin.systemProxyCompatibility") private var tangxinCompatibility = false
+    private var autoLaunch: PlaybackAutoLaunch {
+        PlaybackAutoLaunch(route: PlaybackHistoryRoute.route(source: item.source, isTangxin: item.isTangxin),
+                           fromBeginning: launch == .fromStart, position: item.position, length: item.length)
+    }
     var body: some View {
         if item.isTangxin, let page = item.pageURL.flatMap { URL(string: $0) } {
             TangxinDetailView(video: TangxinVideo(url: page, title: item.title,
                                                   poster: item.posterURL.flatMap { URL(string: $0) }, author: nil),
                               client: TangxinClient().withDNSMode(tangxinCompatibility ? .systemProxy : .strict))
-        } else {
+        } else if launch == .details {
             MovieDetailView(movieID: item.movieID, seed: item.movie)
+        } else {
+            MovieDetailView(movieID: item.movieID, seed: item.movie, autoLaunch: autoLaunch)
         }
+    }
+}
+
+/// One long-press choice from 观看历史 (navigated programmatically).
+struct PlaybackHistoryMenuTarget: Hashable, Identifiable {
+    let item: PlaybackHistoryItem
+    let launch: PlaybackHistoryLaunch
+    var id: String { item.id + "|" + launch.rawValue }
+}
+
+/// Build 280 long-press menu: 续播 / 从头播放 / 查看详情 / 删除.
+struct PlaybackHistoryMenu: View {
+    let item: PlaybackHistoryItem
+    @Binding var target: PlaybackHistoryMenuTarget?
+    var body: some View {
+        let resume = PlaybackResumePolicy.startPosition(position: item.position, length: item.length, fromBeginning: false)
+        Button { target = PlaybackHistoryMenuTarget(item: item, launch: .resume) } label: {
+            Label(resume.map { "续播 " + PlaybackResumePolicy.clock($0) } ?? "续播", systemImage: "play.fill")
+        }
+        Button { target = PlaybackHistoryMenuTarget(item: item, launch: .fromStart) } label: {
+            Label("从头播放", systemImage: "backward.end")
+        }
+        Button { target = PlaybackHistoryMenuTarget(item: item, launch: .details) } label: {
+            Label("查看详情", systemImage: "info.circle")
+        }
+        Button(role: .destructive) { PlaybackHistoryActions.delete(item) } label: { Label("删除", systemImage: "trash") }
+    }
+}
+
+@MainActor
+final class PlaybackHistoryNavigator: ObservableObject {
+    static let shared = PlaybackHistoryNavigator()
+    @Published var target: PlaybackHistoryMenuTarget?
+}
+
+/// Attached to 我的's NavigationStack root, outside the List.
+struct PlaybackHistoryMenuDestinations: ViewModifier {
+    @ObservedObject private var navigator = PlaybackHistoryNavigator.shared
+    func body(content: Content) -> some View {
+        content.navigationDestination(item: $navigator.target) { PlaybackHistoryDestination(item: $0.item, launch: $0.launch) }
+    }
+}
+
+@MainActor
+enum PlaybackHistoryActions {
+    static func delete(_ item: PlaybackHistoryItem) {
+        let store = PlaybackHistoryStore.shared
+        if !item.isTangxin { PlaybackResumeStore.shared.clear(number: item.number, scope: store.scope) }
+        store.remove(item.id)
     }
 }
 
@@ -147,6 +204,8 @@ struct TangxinHistoryDestinations: ViewModifier {
 struct PlaybackHistorySection: View {
     @ObservedObject private var store = PlaybackHistoryStore.shared
     @State private var pendingDelete: PlaybackHistoryItem?
+    /// The section lives inside 我的's List (lazy) → the destination is attached outside it (UserView).
+    @ObservedObject private var navigator = PlaybackHistoryNavigator.shared
 
     var body: some View {
         Section {
@@ -167,7 +226,7 @@ struct PlaybackHistorySection: View {
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: 12) {
                         ForEach(Array(store.items.prefix(20))) { item in
-                            NavigationLink { PlaybackHistoryDestination(item: item) } label: {
+                            NavigationLink { PlaybackHistoryDestination(item: item, launch: .resume) } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     PlaybackHistoryCover(item: item, maxPixelSize: 500)
                                         .frame(width: 96)
@@ -181,9 +240,7 @@ struct PlaybackHistorySection: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("me.history.item.\(item.id)")
-                            .contextMenu {
-                                Button(role: .destructive) { store.remove(item.id) } label: { Label("删除这条记录", systemImage: "trash") }
-                            }
+                            .contextMenu { PlaybackHistoryMenu(item: item, target: $navigator.target) }
                         }
                     }
                     .padding(.vertical, 4)
@@ -198,6 +255,7 @@ struct PlaybackHistorySection: View {
 struct PlaybackHistoryView: View {
     @ObservedObject private var store = PlaybackHistoryStore.shared
     @State private var confirmClear = false
+    @State private var menuTarget: PlaybackHistoryMenuTarget?
     @Environment(\.availableLayoutSize) private var layoutSize
     @State private var measuredWidth: CGFloat = 0
 
@@ -211,7 +269,7 @@ struct PlaybackHistoryView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(store.items) { item in
-                    NavigationLink { PlaybackHistoryDestination(item: item) } label: {
+                    NavigationLink { PlaybackHistoryDestination(item: item, launch: .resume) } label: {
                         card(item)
                     }
                     .buttonStyle(.plain)
@@ -219,9 +277,7 @@ struct PlaybackHistoryView: View {
                     .contentShape(Rectangle())
                     .clipped()
                     .accessibilityIdentifier("history.item.\(item.id)")
-                    .contextMenu {
-                        Button(role: .destructive) { store.remove(item.id) } label: { Label("删除这条记录", systemImage: "trash") }
-                    }
+                    .contextMenu { PlaybackHistoryMenu(item: item, target: $menuTarget) }
                 }
             }
             .padding(.horizontal, AdaptiveLayout.gridPadding)
@@ -233,12 +289,13 @@ struct PlaybackHistoryView: View {
                 }
             }
             if !store.items.isEmpty {
-                Text("长按封面可删除单条 · 仅保存在本机，不含视频链接")
+                Text("点按续播 · 长按可从头播放 / 查看详情 / 删除 · 仅保存在本机，不含视频链接")
                     .font(.caption2).foregroundStyle(.secondary)
                     .padding(.bottom, 16)
             }
         }
         .navigationTitle("观看历史")
+        .navigationDestination(item: $menuTarget) { PlaybackHistoryDestination(item: $0.item, launch: $0.launch) }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("清空", role: .destructive) { confirmClear = true }

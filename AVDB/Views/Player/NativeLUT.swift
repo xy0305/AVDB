@@ -9,6 +9,29 @@ import UIKit
 import JavaScriptCore
 import KSPlayer
 
+/// Build 280 LUT 风格. Every style keeps the 279 per-frame safety gate (no crush / lifted blacks /
+/// grey whites / magenta / blow-out); the JS engine (`OriginalLUT.setPreset`) only scales the 6.7.8
+/// params (自然 ×0.75) or relaxes purely aesthetic limits (增强). 关 = LUT off. Persisted on device.
+enum LUTPreset: String, CaseIterable, Identifiable {
+    case off, natural, standard, enhanced
+    var id: String { rawValue }
+    var label: String {
+        switch self { case .off: return "关"; case .natural: return "自然"; case .standard: return "标准"; case .enhanced: return "增强" }
+    }
+    /// Engine preset name; `off` analyses as standard if ever asked.
+    var engineName: String { self == .off ? "standard" : rawValue }
+    static let storageKey = "avdb.lut.preset.v1"
+    /// Last non-off style, restored by the 开启 LUT button.
+    static let styleKey = "avdb.lut.style.v1"
+    static func stored(_ defaults: UserDefaults = .standard) -> LUTPreset {
+        defaults.string(forKey: storageKey).flatMap(LUTPreset.init(rawValue:)) ?? .off
+    }
+    static func lastStyle(_ defaults: UserDefaults = .standard) -> LUTPreset {
+        let style = defaults.string(forKey: styleKey).flatMap(LUTPreset.init(rawValue:)) ?? .standard
+        return style == .off ? .standard : style
+    }
+}
+
 struct LUTParameters: Equatable {
     // temperature, tint, saturation, brightness, contrast, highlights, shadows
     var values: [Double] = [0, 0, 0, 0, 0, 0, 0]
@@ -18,16 +41,20 @@ struct LUTParameters: Equatable {
 // Each invocation owns an isolated JavaScriptCore VM; no DOM, network or WebGL.
 // Analysis is called only from the detached worker. Cube generation uses its own VM.
 enum NativeLUT {
-    private static func engine() -> JSContext? {
+    private static func engine(preset: String = "standard") -> JSContext? {
         guard let url = Bundle.main.url(forResource: "OriginalLUT", withExtension: "js"),
               let source = try? String(contentsOf: url, encoding: .utf8),
               let context = JSContext() else { return nil }
         context.evaluateScript(source)
         guard context.exception == nil else { return nil }
+        if preset != "standard" {
+            _ = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("setPreset")?.call(withArguments: [preset])
+            guard context.exception == nil else { return nil }
+        }
         return context
     }
-    static func analyze(bytes: [UInt8], width: Int, height: Int, box: [String: Int]?) -> (LUTParameters, String)? {
-        guard let context = engine(),
+    static func analyze(bytes: [UInt8], width: Int, height: Int, box: [String: Int]?, preset: String = "standard") -> (LUTParameters, String)? {
+        guard let context = engine(preset: preset),
               let result = context.objectForKeyedSubscript("OriginalLUT")?.objectForKeyedSubscript("analyzeFrame")?.call(withArguments: [bytes, width, height, box as Any? ?? NSNull()]),
               context.exception == nil, !result.isNull, !result.isUndefined,
               let dict = result.toDictionary(), let params = dict["params"] as? [String: Any] else { return nil }
@@ -38,8 +65,8 @@ enum NativeLUT {
     }
     /// Userscript multi-frame path: prefer face frames, median skin stats, merge pixels.
     /// `frames` entries are `{bytes,width,height,box}` dictionaries (box may be NSNull).
-    static func analyzeMulti(_ frames: [[String: Any]]) -> (LUTParameters, String, Int, Bool)? {
-        guard !frames.isEmpty, let context = engine() else { return nil }
+    static func analyzeMulti(_ frames: [[String: Any]], preset: String = "standard") -> (LUTParameters, String, Int, Bool)? {
+        guard !frames.isEmpty, let context = engine(preset: preset) else { return nil }
         let result: JSValue?
         if frames.count == 1, let only = frames.first,
            let bytes = only["bytes"] as? [UInt8],
@@ -77,7 +104,10 @@ final class LUTRevealState: @unchecked Sendable {
     private var active = false
     private var reduceMotion = false
     private var split: Double?
+    private var hold = false
     func setSplit(_ value: Double?) { lock.lock(); split = value; lock.unlock() }
+    /// Build 280 按住看原图: full-frame original while held, independent of the split comparison.
+    func setHold(_ value: Bool) { lock.lock(); hold = value; lock.unlock() }
     func begin(reduceMotion: Bool) {
         lock.lock(); defer { lock.unlock() }
         self.reduceMotion = reduceMotion; active = true
@@ -95,6 +125,7 @@ final class LUTRevealState: @unchecked Sendable {
     /// Left original initially occupies half the frame, then shrinks to zero.
     func originalFraction(now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Double {
         lock.lock(); defer { lock.unlock() }
+        if hold { return 1 }
         if let split { return split }
         guard active, !reduceMotion else { return 0 }
         guard let start else { return 0.5 }
@@ -123,6 +154,10 @@ final class NativeLUTController: ObservableObject {
     @Published var comparison = false
     @Published var divider = 0.5
     @Published var safePerformance = true
+    /// Build 280 style (persisted). Not `off` → LUT turns on automatically once the next video is ready.
+    @Published private(set) var preset: LUTPreset = LUTPreset.stored()
+    @Published private(set) var holdingOriginal = false
+    private var autoEnablePending = LUTPreset.stored() != .off
     private var buildTask: Task<Void, Never>?
     private var buildGeneration = 0
     private var cachedCube: Data?
@@ -182,6 +217,7 @@ final class NativeLUTController: ObservableObject {
             self.supported = safe
             self.status = safe ? "在线 SDR 就绪：开启后自动分析当前帧" : message
             if safe && self.enabled { self.apply() }
+            if safe { self.autoEnableIfPreferred() }
         }
         runtime.onStatus = { [weak self, weak runtime] message in
             guard let self, self.generation == token, self.surface === runtime else { return }
@@ -230,6 +266,7 @@ final class NativeLUTController: ObservableObject {
         if ready {
             let out = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
             next.add(out); output = out
+            autoEnableIfPreferred()
         }
     }
 
@@ -316,6 +353,8 @@ final class NativeLUTController: ObservableObject {
         buildGeneration += 1; buildTask?.cancel(); cachedCube = nil
         pendingCubeCrossfade = false; crossfadeFromCube = nil; crossfadeStartUptime = nil; needsEnableDelay = false
         sharpen = false; deband = false; comparison = false; reveal.setSplit(nil)
+        holdingOriginal = false; reveal.setHold(false)
+        autoEnablePending = preset != .off
         analysisGeneration += 1
         reveal.cancel()
         formatTask?.cancel(); formatTask = nil
@@ -331,6 +370,39 @@ final class NativeLUTController: ObservableObject {
         pendingCubeCrossfade = false; crossfadeFromCube = nil; crossfadeStartUptime = nil
         if onlineMode { onlineFilter = nil; surface?.setFilter(nil) }
         else { item?.videoComposition = original }
+    }
+    /// Build 280: choose 关 / 自然 / 标准 / 增强. A new style re-analyses the current frame with that
+    /// engine preset (same 279 safety gate); 关 restores the original picture.
+    func selectPreset(_ next: LUTPreset, defaults: UserDefaults = .standard) {
+        defaults.set(next.rawValue, forKey: LUTPreset.storageKey)
+        if next != .off { defaults.set(next.rawValue, forKey: LUTPreset.styleKey) }
+        let changed = next != preset
+        preset = next
+        autoEnablePending = false
+        guard supported else { autoEnablePending = next != .off; return }
+        if next == .off { if enabled { toggle() }; return }
+        if !enabled { toggle(); return }
+        if changed { reanalyze() }
+    }
+    /// 开启 / 关闭 LUT button: same persisted state as the style picker (关 ↔ last style).
+    func userToggle(defaults: UserDefaults = .standard) {
+        guard supported else { return }
+        selectPreset(enabled ? .off : LUTPreset.lastStyle(defaults), defaults: defaults)
+    }
+    private func autoEnableIfPreferred() {
+        guard autoEnablePending, preset != .off, supported, !enabled else { return }
+        autoEnablePending = false
+        toggle()
+    }
+    /// Build 280 按住看原图. Online Metal redraws immediately (also while paused); file composition
+    /// swaps back to the untouched composition while held.
+    func holdOriginal(_ on: Bool) {
+        let active = on && enabled && supported
+        guard holdingOriginal != active else { return }
+        holdingOriginal = active
+        reveal.setHold(active)
+        if onlineMode { if let onlineFilter { surface?.setFilter(onlineFilter) } }
+        else if let item, let composition { item.videoComposition = active ? original : composition }
     }
     func toggle() {
         guard supported else { return }
@@ -525,6 +597,8 @@ final class NativeLUTController: ObservableObject {
             guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
             guard !prepared.isEmpty else { busy = false; requested = true; return }
             let images = prepared
+            let enginePreset = preset.engineName
+            let presetLabel = preset == .off ? LUTPreset.standard.label : preset.label
             let result = await Task.detached(priority: .userInitiated) { () -> (LUTParameters, String)? in
                 var frames: [[String: Any]] = []
                 var descriptions: [String] = []
@@ -541,11 +615,11 @@ final class NativeLUTController: ObservableObject {
                     frames.append(entry)
                     descriptions.append(detection.description)
                 }
-                guard let analysis = NativeLUT.analyzeMulti(frames) else { return nil }
+                guard let analysis = NativeLUT.analyzeMulti(frames, preset: enginePreset) else { return nil }
                 let faceNote = analysis.3 ? "人脸优先" : "中央50%"
                 let multiNote = analysis.2 > 1 ? "多帧\(analysis.2)·中位" : "单帧"
                 let desc = descriptions.last ?? "中央50%"
-                return (analysis.0, "原版6.7.8 · \(analysis.1) · \(multiNote) · \(faceNote) · \(desc)")
+                return (analysis.0, "原版6.7.8 · \(presetLabel) · \(analysis.1) · \(multiNote) · \(faceNote) · \(desc)")
             }.value
             guard generation == token, analysisGeneration == analysisToken, self.item === item else { return }
             busy = false
@@ -666,8 +740,17 @@ struct NativeLUTPanel: View {
         NavigationStack {
         Form {
             Text(model.status).font(.footnote)
+            Section {
+                Picker("LUT 风格", selection: Binding(get: { model.preset }, set: { model.selectPreset($0) })) {
+                    ForEach(LUTPreset.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("lut.preset")
+                Text("自然≈轻量增强 · 标准=默认（279 安全闸） · 增强≈接近 6.7.8 强度；三种风格都不抬黑、不灰白、不偏品红。选择会记住，下次播放自动开启。播放界面长按右上角滤镜按钮可临时看原图。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Group {
-            Button(model.enabled ? "关闭 LUT（恢复原画）" : "开启 LUT（自动分析）") { model.toggle() }
+            Button(model.enabled ? "关闭 LUT（恢复原画）" : "开启 LUT（自动分析）") { model.userToggle() }
                 .accessibilityHint("对应桌面参考 R 自动分析 / F 关闭")
             Button("重新分析当前帧") { model.reanalyze() }
                 .accessibilityHint("强制抓取当前解码帧并重新跑 6.7.8 搜索")
