@@ -25,7 +25,9 @@ if manifest.exists():
         for att in test.get('attachments', []):
             src = raw / att['exportedFileName']
             name = (att.get('suggestedHumanReadableName') or att['exportedFileName'])
-            base = name.split('_0_')[0].split('_')[0] if name[:2].isdigit() else name
+            if not name[:2].isdigit() or src.suffix.lower() not in ('.png', '.jpg', '.jpeg'):
+                continue          # debug descriptions / recordings stay out of the artifact
+            base = name.split('_0_')[0]
             dst = shots / (base + src.suffix)
             shutil.copy(src, dst); named.append(dst.name)
 (out / 'status.json').write_text(json.dumps({'offline': True, 'device': device, 'exit': code, 'shots': sorted(named),

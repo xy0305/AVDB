@@ -152,6 +152,7 @@ enum RecommendationSourceRegistry {
         let args = ProcessInfo.processInfo.arguments
         screen = args.firstIndex(of: "--screen").map { args[$0 + 1] } ?? "feed"
         dark = args.contains("--dark")
+        RecFeedbackPresenter.toastSeconds = 30
         // Fresh state per launch: screenshots never depend on a previous test.
         for key in [RecommendationStore.feedbackKey, RecommendationStore.rankerKey, RecommendationStore.resetKey] { UserDefaults.standard.removeObject(forKey: key) }
         if let url = RecommendationStore.defaultFileURL() { try? FileManager.default.removeItem(at: url) }

@@ -371,6 +371,8 @@ struct RecToast: View {
 /// Feedback → haptic + store update + toast text.
 @MainActor
 enum RecFeedbackPresenter {
+    /// How long the confirmation toast stays (the screenshot host lengthens it).
+    static var toastSeconds: Double = 2.4
     static func apply(_ action: RecFeedbackAction, _ r: RecResult, store: RecommendationStore) -> String {
         switch action { case .like: RecHaptics.success(); default: RecHaptics.light() }
         store.feedback(action, on: r)
@@ -431,7 +433,7 @@ struct RecommendationFeedView: View {
         withAnimation(.spring(duration: 0.35)) { toast = text }
         toastTask?.cancel()
         toastTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(RecFeedbackPresenter.toastSeconds * 1_000_000_000))
             guard !Task.isCancelled else { return }
             withAnimation { toast = nil }
         }
@@ -472,6 +474,7 @@ struct RecommendationSection: View {
                     .padding(.vertical, 6)
                 }
                 .scrollTargetBehavior(.viewAligned)
+                .accessibilityIdentifier("me.rec.section")
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
                 .listRowBackground(Color.clear)
             } else if store.isRefreshing {
@@ -489,7 +492,6 @@ struct RecommendationSection: View {
             }
         }
         .onAppear { store.refresh(manual: false) }
-        .accessibilityIdentifier("me.rec.section")
     }
     private func apply(_ action: RecFeedbackAction, _ r: RecResult) { _ = RecFeedbackPresenter.apply(action, r, store: store) }
 }
