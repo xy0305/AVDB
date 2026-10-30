@@ -20,35 +20,55 @@ enum LiveSubtitleMode: String, CaseIterable, Identifiable, Codable, Sendable {
     var needsChinese: Bool { self == .chinese || self == .bilingual }
 }
 
-/// Whisper tiers (argmaxinc/whisperkit-coreml, MIT). Turbo = large-v3 encoder + 4-layer decoder (quantized);
-/// small is the degrade tier (thermal / Low Power / < 6 GB RAM).
+/// Live recognizers (build 289). SenseVoice-Small (FunAudioLLM, non-autoregressive CTC, int8 ONNX via sherpa-onnx)
+/// is the default; Apple on-device recognition is the light fallback (thermal / falling behind); Whisper
+/// (argmaxinc/whisperkit-coreml, MIT) is manual only — small is bundled, turbo is downloaded on demand.
 enum LiveASRTier: String, CaseIterable, Identifiable, Codable, Sendable {
-    case turbo, small
+    case senseVoice = "sensevoice", apple, turbo, small
     var id: String { rawValue }
     var folder: String {
         switch self {
+        case .senseVoice: "sensevoice-small-int8"
+        case .apple: "apple-on-device"
         case .turbo: "openai_whisper-large-v3-v20240930_turbo_632MB"
         case .small: "openai_whisper-small_216MB"
         }
     }
+    var isWhisper: Bool { self == .turbo || self == .small }
     var tokenizer: String { self == .turbo ? "tokenizer-large-v3" : "tokenizer-small" }
-    var title: String { self == .turbo ? "large-v3-turbo" : "small" }
-}
-
-enum LiveTierPreference: String, CaseIterable, Identifiable, Sendable {
-    case automatic, turbo, small
-    var id: String { rawValue }
-    var title: String { switch self { case .automatic: "自动"; case .turbo: "高精度 turbo"; case .small: "省电 small" } }
-    static let defaultsKey = "live.subtitle.tier"
-    static var current: LiveTierPreference { LiveTierPreference(rawValue: UserDefaults.standard.string(forKey: defaultsKey) ?? "") ?? .automatic }
-    /// Automatic: turbo on ≥ 6 GB devices (A16+/A17 Pro class), small otherwise.
-    func resolve(physicalMemory: UInt64) -> LiveASRTier {
+    var title: String {
         switch self {
-        case .turbo: return .turbo
-        case .small: return .small
-        case .automatic: return physicalMemory >= 5_500_000_000 ? .turbo : .small
+        case .senseVoice: "SenseVoice"
+        case .apple: "苹果系统识别"
+        case .turbo: "Whisper large-v3-turbo"
+        case .small: "Whisper small"
         }
     }
+}
+
+/// User-facing recognizer choice. New defaults key in 289 so every install starts on SenseVoice.
+enum LiveTierPreference: String, CaseIterable, Identifiable, Sendable {
+    case senseVoice = "sensevoice", apple, small, turbo
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .senseVoice: "SenseVoice（默认）"
+        case .apple: "苹果系统识别"
+        case .small: "Whisper small"
+        case .turbo: "Whisper turbo"
+        }
+    }
+    static let defaultsKey = "live.subtitle.recognizer289"
+    static var current: LiveTierPreference { LiveTierPreference(rawValue: UserDefaults.standard.string(forKey: defaultsKey) ?? "") ?? .senseVoice }
+    var tier: LiveASRTier {
+        switch self {
+        case .senseVoice: .senseVoice
+        case .apple: .apple
+        case .small: .small
+        case .turbo: .turbo
+        }
+    }
+    func resolve(physicalMemory: UInt64) -> LiveASRTier { tier }
 }
 
 // MARK: - Guard (thermal / battery)
@@ -66,14 +86,24 @@ enum LiveSubtitleGuard {
         }
     }
     /// thermal: 0 nominal, 1 fair, 2 serious, 3 critical (ProcessInfo.ThermalState.rawValue).
+    /// 289: under pressure every recognizer hands over to Apple on-device recognition (system model, lightest);
+    /// the engine stays on SenseVoice with a throttled read-ahead when Apple's Japanese model is unavailable.
     static func verdict(preferred: LiveASRTier, thermal: Int, lowPower: Bool, battery: Float, charging: Bool) -> Verdict {
-        if thermal >= 3 { return .pause("设备过热，AI 字幕已暂停") }
         if !charging, battery >= 0, battery < 0.10 { return .pause("电量低于 10%，AI 字幕已暂停") }
-        guard preferred == .turbo else { return .run(.small) }
-        if thermal == 2 { return .degrade(.small, "设备发热，已切换到 small 模型") }
-        if lowPower { return .degrade(.small, "低电量模式：已切换到 small 模型") }
-        if !charging, battery >= 0, battery < 0.20 { return .degrade(.small, "电量较低：已切换到 small 模型") }
-        return .run(.turbo)
+        if preferred == .apple { return .run(.apple) }
+        if thermal >= 2 { return .degrade(.apple, "设备发热，已切换苹果系统识别") }
+        if lowPower { return .degrade(.apple, "低电量模式：已切换苹果系统识别") }
+        if !charging, battery >= 0, battery < 0.20 { return .degrade(.apple, "电量较低：已切换苹果系统识别") }
+        return .run(preferred)
+    }
+
+    /// Read-ahead under thermal pressure: fewer seconds decoded ahead = less CPU/network competing with playback.
+    static func throttledLead(_ lead: Double, thermal: Int) -> Double {
+        switch thermal {
+        case 0: lead
+        case 1: max(6, lead * 0.75)
+        default: min(lead, 8)
+        }
     }
 }
 

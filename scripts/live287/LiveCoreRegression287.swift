@@ -84,13 +84,15 @@ check(cache.load("k0") == nil && cache.load("k3") != nil, "LRU trim")
 cache.clear(); check(cache.totalBytes() == 0, "clear")
 
 // ---- guard + tier
-check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 0, lowPower: false, battery: 0.8, charging: false) == .run(.turbo), "nominal turbo")
-check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 2, lowPower: false, battery: 0.8, charging: false).tier == .small, "serious → small")
-check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 3, lowPower: false, battery: 0.8, charging: true).tier == nil, "critical → pause")
-check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 0, lowPower: true, battery: 0.8, charging: false).tier == .small, "low power → small")
-check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 0, lowPower: false, battery: 0.05, charging: false).tier == nil, "battery < 10 % → pause")
+check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 0, lowPower: false, battery: 0.8, charging: false) == .run(.senseVoice), "nominal SenseVoice")
+check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 2, lowPower: false, battery: 0.8, charging: false).tier == .apple, "serious → Apple")
+check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 3, lowPower: false, battery: 0.8, charging: true).tier == .apple, "critical → Apple")
+check(LiveSubtitleGuard.verdict(preferred: .small, thermal: 0, lowPower: true, battery: 0.8, charging: false).tier == .apple, "low power → Apple")
+check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 0, lowPower: false, battery: 0.05, charging: false).tier == nil, "battery < 10 % → pause")
 check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 0, lowPower: false, battery: 0.05, charging: true) == .run(.turbo), "charging ignores battery")
-check(LiveTierPreference.automatic.resolve(physicalMemory: 8 << 30) == .turbo && LiveTierPreference.automatic.resolve(physicalMemory: 4 << 30) == .small, "auto tier by RAM")
+check(LiveSubtitleGuard.verdict(preferred: .apple, thermal: 3, lowPower: true, battery: 0.5, charging: false) == .run(.apple), "Apple stays Apple")
+check(LiveTierPreference.current == .senseVoice || UserDefaults.standard.string(forKey: LiveTierPreference.defaultsKey) != nil, "SenseVoice default")
+check(LiveSubtitleGuard.throttledLead(20, thermal: 0) == 20 && LiveSubtitleGuard.throttledLead(20, thermal: 1) == 15 && LiveSubtitleGuard.throttledLead(20, thermal: 2) == 8, "thermal lead throttle")
 
 // ---- scheduler
 check(LiveScheduler.next(finals: [5, 3], openStart: nil, openLength: 0, playhead: 0, sinceLastPartial: 9) == .final(1), "earliest final first")
