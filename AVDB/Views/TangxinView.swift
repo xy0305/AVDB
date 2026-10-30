@@ -255,17 +255,40 @@ struct TangxinImage: View {
     let url: URL?
     let client: TangxinClient
     @State private var image: UIImage?
+    /// Build 283: a failed cover is visible (not a silent placeholder) and retried once.
+    @State private var failure: String?
     var body: some View {
         ZStack {
             Rectangle().fill(.quaternary)
             if let image { Image(uiImage:image).resizable().scaledToFill() }
+            else if let failure {
+                VStack(spacing:4) {
+                    Image(systemName:"photo.badge.exclamationmark").foregroundStyle(.secondary)
+                    Text(failure).font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center).lineLimit(3)
+                }.padding(6).accessibilityIdentifier("tangxin.image.failure")
+            }
             else { Image(systemName:"film").foregroundStyle(.secondary) }
         }.clipped().allowsHitTesting(false).accessibilityHidden(true)
             .task(id:url) {
-                image = nil
+                image = nil; failure = nil
                 guard let url else { return }
-                do { let data = try await client.image(url); try Task.checkCancellation(); image = UIImage(data:data) } catch { }
+                for attempt in 0..<2 {
+                    do {
+                        let data = try await client.image(url); try Task.checkCancellation()
+                        guard let decoded = UIImage(data:data) else { failure = "封面格式无法解码"; return }
+                        image = decoded; return
+                    } catch is CancellationError { return }
+                    catch {
+                        if Task.isCancelled { return }
+                        if attempt == 0 { try? await Task.sleep(nanoseconds: 400_000_000); continue }
+                        failure = Self.reason(error)
+                    }
+                }
             }
+    }
+    static func reason(_ error: Error) -> String {
+        let text = OnlineFailure.classify(error).presentation(at:.image).display
+        return text.contains("DNS") ? "封面 DNS 被拒（Loon/Surge/Clash Fake-IP？）" : "封面加载失败"
     }
 }
 

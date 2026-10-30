@@ -86,6 +86,7 @@ struct SearchView: View {
         .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
         .task { await suggest.loadHotKeywords() }
         .onAppear { isSearchFocused = submitted.isEmpty }
+        .modifier(HidesFloatingTabBar())
     }
 
     /// 钉在顶部，不随列表滚动、不走系统 searchable。

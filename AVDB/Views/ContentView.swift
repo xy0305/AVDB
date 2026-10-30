@@ -8,32 +8,7 @@
 
 import SwiftUI
 
-enum AppTab: Int, CaseIterable, Identifiable, Hashable {
-    case home, rankings, categories, actors, tangxin, me
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .home: return "首頁"
-        case .rankings: return "排行"
-        case .categories: return "類別"
-        case .actors: return "演員"
-        case .tangxin: return "糖心"
-        case .me: return "我的"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .home: return "house"
-        case .rankings: return "trophy"
-        case .categories: return "square.grid.2x2"
-        case .actors: return "person.2"
-        case .tangxin: return "play.rectangle"
-        case .me: return "person.crop.circle"
-        }
-    }
-}
+// AppTab lives in TabBarChrome.swift (shared with the tab-bar UI test host).
 
 struct ContentView: View {
     var tangxinClient: TangxinClient = TangxinClient()
@@ -76,21 +51,20 @@ struct ContentView: View {
     }
 
     private var mainTabs: some View {
-        ZStack {
-            ForEach(AppTab.allCases) { tab in
-                if visitedTabs.contains(tab) {
-                    tabContent(tab)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .opacity(selectedTab == tab ? 1 : 0)
-                        .allowsHitTesting(selectedTab == tab)
-                        .accessibilityHidden(selectedTab != tab)
-                        .zIndex(selectedTab == tab ? 1 : 0)
+        FloatingTabContainer(selection: $selectedTab) {
+            ZStack {
+                ForEach(AppTab.allCases) { tab in
+                    if visitedTabs.contains(tab) {
+                        tabContent(tab)
+                            .environment(\.appTab, tab)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .opacity(selectedTab == tab ? 1 : 0)
+                            .allowsHitTesting(selectedTab == tab)
+                            .accessibilityHidden(selectedTab != tab)
+                            .zIndex(selectedTab == tab ? 1 : 0)
+                    }
                 }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            AVDBNativeTabBar(selection: $selectedTab)
         }
         .onChange(of: selectedTab) { _, tab in visitedTabs.insert(tab) }
         .modifier(SceneLayoutReader())

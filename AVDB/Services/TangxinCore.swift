@@ -85,8 +85,15 @@ enum TangxinPolicy {
         let p = url.path.split(separator: "/")
         return OnlinePolicy.secure(url) && url.host == origin.host && url.query == nil && url.fragment == nil && p.count == 2 && p[0] == "v" && p[1].count <= 64 && p[1].utf8.allSatisfy { (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 || $0 == 95 }
     }
-    static func image(_ url: URL) -> Bool { OnlinePolicy.secure(url) && [origin.host!, cdn].contains(url.host ?? "") && url.fragment == nil }
-    static func stream(_ url: URL) -> Bool { OnlinePolicy.secure(url) && url.host == cdn && url.path.hasPrefix("/videos/") && url.path.hasSuffix(".m3u8") && url.fragment == nil }
+    /// Build 283: the page/API issues covers and HLS on t.5gcdn.xyz; accept the same CDN apex
+    /// (edge rotation such as v2.5gcdn.xyz) so fake-ip DNS checks and admission agree.
+    static let cdnApex = "5gcdn.xyz"
+    static func cdnHost(_ host: String?) -> Bool {
+        guard let h = host?.lowercased(), OnlineMediaScope.publicHost(h) else { return false }
+        return h == cdn || h.hasSuffix("." + cdnApex)
+    }
+    static func image(_ url: URL) -> Bool { OnlinePolicy.secure(url) && (url.host == origin.host || cdnHost(url.host)) && url.fragment == nil }
+    static func stream(_ url: URL) -> Bool { OnlinePolicy.secure(url) && cdnHost(url.host) && url.path.hasPrefix("/videos/") && url.path.hasSuffix(".m3u8") && url.fragment == nil }
     static func resolve(_ raw: String, at page: URL) -> URL? {
         guard !raw.contains("\\"), !raw.contains(where: { $0.isWhitespace || $0.asciiValue.map { $0 < 32 } == true }), let u = URL(string: raw, relativeTo: page)?.absoluteURL, OnlinePolicy.secure(u) else { return nil }
         return u

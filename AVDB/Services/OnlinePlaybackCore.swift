@@ -324,17 +324,24 @@ struct OnlineMediaScope: Sendable {
               [a,b,c,d].allSatisfy({ (0...255).contains($0) }) else { return false }
         return a == 198 && (b == 18 || b == 19)
     }
-    static func validateAddresses(_ addresses: [String], root: URL, mode: OnlineDNSMode = .strict, approvedOrigin: Bool = false) throws {
-        let summary = "public=\(addresses.filter { publicAddress($0) }.count) synthetic=\(addresses.filter { syntheticAddress($0) }.count) private=\(addresses.filter { !publicAddress($0) && !syntheticAddress($0) }.count) empty=\(addresses.isEmpty ? 1 : 0)"
+    static func validateAddresses(_ addresses: [String], root: URL, mode: OnlineDNSMode = .strict, approvedOrigin: Bool = false, tunnelActive: Bool? = nil) throws {
+        // Build 283: proxy-aware policy (Loon/Surge/Clash fake-ip 198.18/15, NAT64, proxy ULA,
+        // virtual-interface LAN answers for pinned source hosts). Loopback / link-local /
+        // multicast / unspecified are always refused; page-issued origins never accept LAN.
+        let tunnel = tunnelActive ?? OnlineDNSPolicy.tunnelProbe()
+        let summary = OnlineDNSPolicy.summary(addresses, tunnelActive: tunnel)
         func reject(_ detail: PlaybackDiagnostic.Detail, _ category: PlaybackDiagnostic.Category = .unsafe) -> OnlineFailure {
             .safe(PlaybackDiagnostic(stage: .dns, category: category, host: root.host, dnsContext: true, detail: detail, addressSummary: summary))
         }
         guard OnlinePolicy.secure(root) else { throw reject(.dnsInvalid) }
-        guard !addresses.isEmpty else { throw reject(.dnsEmpty, .dns) }
-        guard addresses.count <= 32 else { throw reject(.dnsLimit) }
-        for address in addresses {
-            if mode == .systemProxy && approvedOrigin && syntheticAddress(address) { continue }
-            if !publicAddress(address) { throw reject(syntheticAddress(address) ? .dnsSynthetic : .dnsPrivate) }
+        // Page-issued (non-fixed) origins keep the historical approval requirement for synthetic answers.
+        let effectiveMode: OnlineDNSMode = approvedOrigin ? mode : .strict
+        switch OnlineDNSPolicy.evaluate(addresses, host: root.host, mode: effectiveMode, tunnelActive: tunnel && approvedOrigin) {
+        case .allow: return
+        case .empty: throw reject(.dnsEmpty, .dns)
+        case .tooMany: throw reject(.dnsLimit)
+        case .synthetic: throw reject(.dnsSynthetic)
+        case .privateTarget: throw reject(.dnsPrivate)
         }
     }
     static func diagnostic(_ url: URL, stage: String, reason: String) -> OnlineFailure {

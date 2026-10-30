@@ -24,7 +24,7 @@ assert 'DMMProbePolicy.retries' in detail and 'DMMProbePolicy.shouldRetry' in de
 assert 'DMMLabelPrefixes.shared.allows' in tenhow, 'learned namespaces admitted by CID identity'
 for name in ('DMMCoverResolver.swift', 'DMMLabelSeed.swift'):
     assert pbx.count(f'/* {name} in Sources */') == 2 and pbx.count(f'path = {name};') == 1, name
-assert plist['CFBundleVersion'] == '282' and pbx.count('CURRENT_PROJECT_VERSION = 282;') == 2
+assert int(plist['CFBundleVersion']) >= 282 and pbx.count(f"CURRENT_PROJECT_VERSION = {plist['CFBundleVersion']};") == 2
 
 swiftc = shutil.which('swiftc')
 if not swiftc:

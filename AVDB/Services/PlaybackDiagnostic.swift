@@ -15,8 +15,8 @@ struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
     }
     enum Detail: String, Sendable {
         case dnsEmpty = "解析无结果（空地址集）"
-        case dnsSynthetic = "严格模式拒绝合成/基准测试地址；仅信任当前系统代理时可手动启用兼容"
-        case dnsPrivate = "DNS 返回非公网、私网或保留地址；请求已停止"
+        case dnsSynthetic = "DNS 返回代理/Fake-IP 合成地址（Loon/Surge/Clash Fake-IP 或 NAT64），但未检测到系统代理/VPN；请确认代理已连接，或在 糖心 › 网络 开启“系统代理/Fake-IP兼容”"
+        case dnsPrivate = "DNS 返回非公网地址（回环/链路本地/局域网/保留）；请求已停止。若使用 Loon/Surge/Clash Fake-IP，请确认代理已连接、该域名走代理规则（非 DIRECT 到局域网）后重试"
         case dnsLookup = "系统域名解析失败"
         case dnsInvalid = "域名或解析结果格式不允许"
         case dnsLimit = "解析地址数量超限"
@@ -38,7 +38,7 @@ struct PlaybackDiagnostic: Error, LocalizedError, Equatable, Sendable {
         self.systemCode = systemCode; self.host = host.flatMap(Self.safeHost)
         self.dnsContext = dnsContext; self.detail = detail
         self.errorDomain = errorDomain.flatMap { $0.range(of: #"^[A-Za-z][A-Za-z0-9_.-]{0,79}$"#, options: .regularExpression) != nil ? $0 : nil }
-        self.addressSummary = addressSummary.flatMap { $0.range(of: #"^public=\d+ synthetic=\d+ private=\d+ empty=[01]$"#, options: .regularExpression) != nil ? $0 : nil }
+        self.addressSummary = addressSummary.flatMap { $0.range(of: #"^public=\d+ synthetic=\d+ private=\d+ empty=[01](?: local=\d+ tunnel=[01])?$"#, options: .regularExpression) != nil ? $0 : nil }
     }
     static func safeHost(_ value: String) -> String? {
         guard value.utf8.count <= 253, value.range(of: #"^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"#, options: .regularExpression) != nil,

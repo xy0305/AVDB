@@ -13,6 +13,7 @@
 		7EEA0D8E71C4E74DA6994F0E /* DMMRankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4031D23F39AF24C4C02AD8D /* DMMRankingView.swift */; };
 		A3EC3F1685CEB8B8FF962DBD /* DMMRankingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */; };
 		69597798619FBE0B45B47025 /* DMMRankingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 204221DE191DC1FDA176767F /* DMMRankingCore.swift */; };
+		TABCHROME28300000000001B /* TabBarChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = TABCHROME28300000000001F /* TabBarChrome.swift */; };
 		B26100000000000000000003 /* AVDBNativeTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000003 /* AVDBNativeTabBar.swift */; };
 		B26100000000000000000002 /* TangxinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000002 /* TangxinView.swift */; };
 		B26100000000000000000001 /* TangxinCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000001 /* TangxinCore.swift */; };
@@ -101,6 +102,7 @@
 		RECSTORE281000000000001B /* RecommendationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECSTORE281000000000001F /* RecommendationStore.swift */; };
 		RECJAVDB281000000000001B /* RecommendationJavDBSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */; };
 		RECVIEW2810000000000001B /* RecommendationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECVIEW2810000000000001F /* RecommendationsView.swift */; };
+		ONLINEDNS28300000000001B /* OnlineDNSPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = ONLINEDNS28300000000001F /* OnlineDNSPolicy.swift */; };
 		DMMCOVER282000000000001B /* DMMCoverResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = DMMCOVER282000000000001F /* DMMCoverResolver.swift */; };
 		DMMSEED2820000000000001B /* DMMLabelSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = DMMSEED2820000000000001F /* DMMLabelSeed.swift */; };
 		FEATSTORE000000000000001 /* FeatureStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEATSTORE000000000000002 /* FeatureStores.swift */; };
@@ -117,6 +119,7 @@
 		F4031D23F39AF24C4C02AD8D /* DMMRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingView.swift; sourceTree = "<group>"; };
 		08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingStore.swift; sourceTree = "<group>"; };
 		204221DE191DC1FDA176767F /* DMMRankingCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingCore.swift; sourceTree = "<group>"; };
+		TABCHROME28300000000001F /* TabBarChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarChrome.swift; sourceTree = "<group>"; };
 		C26100000000000000000003 /* AVDBNativeTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVDBNativeTabBar.swift; sourceTree = "<group>"; };
 		C26100000000000000000002 /* TangxinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TangxinView.swift; sourceTree = "<group>"; };
 		C26100000000000000000001 /* TangxinCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TangxinCore.swift; sourceTree = "<group>"; };
@@ -205,6 +208,7 @@
 		RECSTORE281000000000001F /* RecommendationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationStore.swift; sourceTree = "<group>"; };
 		RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationJavDBSource.swift; sourceTree = "<group>"; };
 		RECVIEW2810000000000001F /* RecommendationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationsView.swift; sourceTree = "<group>"; };
+		ONLINEDNS28300000000001F /* OnlineDNSPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlineDNSPolicy.swift; sourceTree = "<group>"; };
 		DMMCOVER282000000000001F /* DMMCoverResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMCoverResolver.swift; sourceTree = "<group>"; };
 		DMMSEED2820000000000001F /* DMMLabelSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMLabelSeed.swift; sourceTree = "<group>"; };
 		FEATSTORE000000000000002 /* FeatureStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureStores.swift; sourceTree = "<group>"; };
@@ -368,6 +372,7 @@
 				RECCORE2810000000000001F /* Recommender.swift */,
 				RECSTORE281000000000001F /* RecommendationStore.swift */,
 				RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */,
+				ONLINEDNS28300000000001F /* OnlineDNSPolicy.swift */,
 				DMMCOVER282000000000001F /* DMMCoverResolver.swift */,
 				DMMSEED2820000000000001F /* DMMLabelSeed.swift */,
 				FEATSTORE000000000000002 /* FeatureStores.swift */,
@@ -458,6 +463,7 @@
 				B17400000000000000000002 /* MissAVRankingView.swift */,
 				B17900000000000000000002 /* JAVLibraryRankingView.swift */,
 				E21E8365384D35AB1B1B4C52 /* ContentView.swift */,
+				TABCHROME28300000000001F /* TabBarChrome.swift */,
 				C26100000000000000000003 /* AVDBNativeTabBar.swift */,
 				C26100000000000000000002 /* TangxinView.swift */,
 				90AF03F73ECC44EEA75E592E /* ListsView.swift */,
@@ -563,6 +569,7 @@
 				7EEA0D8E71C4E74DA6994F0E /* DMMRankingView.swift in Sources */,
 				A3EC3F1685CEB8B8FF962DBD /* DMMRankingStore.swift in Sources */,
 				69597798619FBE0B45B47025 /* DMMRankingCore.swift in Sources */,
+				TABCHROME28300000000001B /* TabBarChrome.swift in Sources */,
 				B26100000000000000000003 /* AVDBNativeTabBar.swift in Sources */,
 				B26100000000000000000002 /* TangxinView.swift in Sources */,
 				B26100000000000000000001 /* TangxinCore.swift in Sources */,
@@ -614,6 +621,7 @@
 				RECSTORE281000000000001B /* RecommendationStore.swift in Sources */,
 				RECJAVDB281000000000001B /* RecommendationJavDBSource.swift in Sources */,
 				RECVIEW2810000000000001B /* RecommendationsView.swift in Sources */,
+				ONLINEDNS28300000000001B /* OnlineDNSPolicy.swift in Sources */,
 				DMMCOVER282000000000001B /* DMMCoverResolver.swift in Sources */,
 				DMMSEED2820000000000001B /* DMMLabelSeed.swift in Sources */,
 				FEATSTORE000000000000001 /* FeatureStores.swift in Sources */,
@@ -663,7 +671,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 282;
+				CURRENT_PROJECT_VERSION = 283;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -686,7 +694,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 282;
+				CURRENT_PROJECT_VERSION = 283;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
