@@ -1,4 +1,5 @@
 require 'xcodeproj'
+require 'fileutils'
 r = ENV.fetch('GITHUB_WORKSPACE', Dir.pwd)
 d = File.join(r, 'evidence-live287', 'ui')
 FileUtils.mkdir_p(d)

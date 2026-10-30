@@ -16,6 +16,10 @@ jobs:
         with:
           path: AVDB/Resources/LiveModels
           key: live287-models-v1-${{ hashFiles('scripts/live287/fetch_models287.py', 'scripts/live287/convert_nllb287.py') }}
+      - uses: actions/setup-python@v5
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          python-version: '3.11'
       - name: Fetch Whisper models + tokenizers, convert NLLB-200 600M → Core ML int8, compile mlmodelc
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
