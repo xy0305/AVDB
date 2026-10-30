@@ -69,6 +69,16 @@ enum PlaybackResumePolicy {
         let label = (source?.isEmpty == false) ? " · " + source! : ""
         return "续播 " + clock(start) + label
     }
+    /// Build 288: compact pill title (same footprint as 「播放」); the source goes to the caption / menu.
+    static func compactTitle(position: Double?, length: Double?) -> String? {
+        guard let start = startPosition(position: position, length: length, fromBeginning: false) else { return nil }
+        return "续播 " + clock(start)
+    }
+    /// 0…1 watched fraction for the pill's progress underline (nil without a usable length).
+    static func progress(position: Double?, length: Double?) -> Double? {
+        guard let p = position, let l = length, p.isFinite, l.isFinite, l > 1 else { return nil }
+        return min(1, max(0, p / l))
+    }
 }
 
 /// Keyed position book with throttle + cap. Pure value type so CI executes it with plain swiftc.

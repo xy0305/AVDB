@@ -491,7 +491,7 @@ struct MovieDetailView: View {
     private func portraitControls(_ movie: Movie) -> some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
-                portraitPlayButton.frame(maxWidth: .infinity)
+                portraitPlayButton.frame(minWidth: 112, maxWidth: .infinity)
                 portraitActionGroup(movie)
             }
             // Large Dynamic Type can need a full-width play label. Never shrink
@@ -506,7 +506,7 @@ struct MovieDetailView: View {
     }
 
     /// Build 280: the detail play button offers 续播 when 观看历史 has a resumable position on 115 / online.
-    private var historyResume: (launch: PlaybackAutoLaunch, title: String)? {
+    private var historyResume: (launch: PlaybackAutoLaunch, title: String, compact: String, source: String, progress: Double?)? {
         guard let movie = vm.movie, let item = historyStore.items.first(where: { $0.movieID == movie.id }) else { return nil }
         let route = PlaybackHistoryRoute.route(source: item.source, isTangxin: false)
         switch route {
@@ -516,9 +516,11 @@ struct MovieDetailView: View {
         }
         let key = PlaybackResumeKey.make(number: movie.displayNumber, source: item.source)
         let entry = key.flatMap { PlaybackResumeStore.shared.entry($0, scope: historyStore.scope) }
-        guard let title = PlaybackResumePolicy.buttonTitle(position: entry?.position ?? item.position,
-                                                           length: entry?.length ?? item.length, source: item.source) else { return nil }
-        return (PlaybackAutoLaunch(route: route, fromBeginning: false, position: item.position, length: item.length), title)
+        let position = entry?.position ?? item.position, length = entry?.length ?? item.length
+        guard let title = PlaybackResumePolicy.buttonTitle(position: position, length: length, source: item.source),
+              let compact = PlaybackResumePolicy.compactTitle(position: position, length: length) else { return nil }
+        return (PlaybackAutoLaunch(route: route, fromBeginning: false, position: item.position, length: item.length), title, compact,
+                item.source ?? "", PlaybackResumePolicy.progress(position: position, length: length))
     }
 
     private func playPrimary() {
@@ -572,24 +574,44 @@ struct MovieDetailView: View {
         }
     }
 
+    /// Build 288: one compact pill for both 「▶ 播放」 and 「▶ 续播 02:25」 (source + 从头播放 in the long-press menu,
+    /// watched fraction as a thin underline), so the icon group always stays on the same row.
     private var portraitPlayButton: some View {
-        Button {
+        let resume = historyResume
+        return Button {
             GlassHaptic.tap()
             playPrimary()
         } label: {
-            Label(historyResume?.title ?? "播放", systemImage: historyResume == nil ? "play.fill" : "clock.arrow.circlepath")
-                .font(.headline)
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.65), radius: 2, y: 1)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                // Intentionally no material, glass or white fill on play.
-                .background(.clear, in: Capsule())
-                .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5).allowsHitTesting(false))
-                .contentShape(Capsule())
+            HStack(spacing: 6) {
+                Image(systemName: "play.fill").font(.system(size: 15, weight: .bold))
+                Text(resume?.compact ?? "播放").monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .font(.headline)
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.65), radius: 2, y: 1)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            // Intentionally no material, glass or white fill on play.
+            .background(.clear, in: Capsule())
+            .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5).allowsHitTesting(false))
+            .overlay(alignment: .bottom) {
+                if let p = resume?.progress {
+                    GeometryReader { g in
+                        Capsule().fill(.white.opacity(0.25)).frame(height: 2)
+                            .overlay(alignment: .leading) { Capsule().fill(.white.opacity(0.9)).frame(width: max(2, g.size.width * p), height: 2) }
+                    }
+                    .frame(height: 2).padding(.horizontal, 22).padding(.bottom, 6)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .contextMenu { playMenu }
+        .accessibilityLabel(resume.map { $0.compact + ($0.source.isEmpty ? "" : "，来源 " + $0.source) } ?? "播放")
+        .accessibilityHint(resume == nil ? "" : "长按可从头播放")
         .accessibilityIdentifier("portrait-hero-play")
     }
 
