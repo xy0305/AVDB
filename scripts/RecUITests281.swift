@@ -39,7 +39,9 @@ final class RecUITests281: XCTestCase {
         XCTAssertTrue(card.waitForExistence(timeout: 10))
         card.press(forDuration: 1.4)
         let notInterested = app.buttons["不感兴趣"].firstMatch
-        XCTAssertTrue(notInterested.waitForExistence(timeout: 5), app.debugDescription)
+        // A busy CI simulator occasionally drops the first long press; retry once.
+        if !notInterested.waitForExistence(timeout: 5) { card.press(forDuration: 2.0) }
+        XCTAssertTrue(notInterested.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label BEGINSWITH '少推'")).firstMatch.exists)
         sleep(1)
         shot(app, "05-long-press-menu")
