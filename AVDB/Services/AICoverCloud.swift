@@ -64,9 +64,9 @@ protocol AICoverCloudTransport: Sendable {
 
 struct AICoverURLSessionTransport: AICoverCloudTransport {
     let session: URLSession
-    init(session: URLSession? = nil) {
-        if let session { self.session = session; return }
-        let c = URLSessionConfiguration.ephemeral          // nothing persisted by URLCache: no long-term copy on disk
+    /// One long-lived ephemeral session (no URLCache → nothing persisted on disk by the HTTP layer).
+    static let sharedSession: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
         c.urlCache = nil
         c.requestCachePolicy = .reloadIgnoringLocalCacheData
         c.timeoutIntervalForRequest = 30
@@ -74,8 +74,9 @@ struct AICoverURLSessionTransport: AICoverCloudTransport {
         c.waitsForConnectivity = false
         #endif
         c.httpMaximumConnectionsPerHost = 2
-        self.session = URLSession(configuration: c)
-    }
+        return URLSession(configuration: c)
+    }()
+    init(session: URLSession? = nil) { self.session = session ?? Self.sharedSession }
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         #if canImport(FoundationNetworking)
         return try await withCheckedThrowingContinuation { cont in
@@ -278,11 +279,16 @@ actor AICoverUploadQueue {
         jobs.append(job)
         guard !running else { return }
         running = true
-        Task.detached(priority: .utility) { [weak self] in await self?.drain() }
+        Task.detached(priority: .utility) { [weak self] in await self?.run() }
     }
 
-    /// Exposed for tests: processes until empty (or blocked) and returns.
+    /// Waits until the queue is idle (processing inline if no worker is running). Used by tests and the diagnostics.
     func drain() async {
+        if !running { running = true; await run() }
+        while running { try? await Task.sleep(nanoseconds: 5_000_000) }
+    }
+
+    private func run() async {
         defer { running = false }
         while let job = jobs.first {
             if settings.quotaFull() { note("507 配额已满，暂停上传"); jobs.removeAll(); return }
