@@ -16,7 +16,8 @@ enum AICoverCloudConfig {
     /// One prefix per (model, params). 4xNomosWebPhoto esrgan x4, tile 128, fp16, v1 → `nomos1`.
     static let prefix = "nomos1"
     static let maxUploadBytes = 3 * 1024 * 1024
-    static let fetchTimeout: TimeInterval = 2.5
+    static let fetchTimeout: TimeInterval = 2.5          // HEAD (hit/miss decision) budget
+    static let downloadTimeout: TimeInterval = 15        // GET body budget after a confirmed hit
     static let infoPlistKey = "AVDBCoversKey"
     /// The app key is injected at build time (GitHub Actions secret → Info.plist `$(AVDB_COVERS_KEY)`); never in git.
     static func appKey(bundle: Bundle = .main) -> String? {
@@ -113,6 +114,7 @@ struct AICoverCloudClient: Sendable {
     let transport: AICoverCloudTransport
     var fetchTimeout: TimeInterval = AICoverCloudConfig.fetchTimeout
     var prefix: String = AICoverCloudConfig.prefix
+    var downloadTimeout: TimeInterval = AICoverCloudConfig.downloadTimeout
 
     init(bases: [URL] = AICoverCloudConfig.bases(), key: String? = AICoverCloudConfig.appKey(),
          transport: AICoverCloudTransport = AICoverURLSessionTransport(), fetchTimeout: TimeInterval = AICoverCloudConfig.fetchTimeout,
@@ -131,7 +133,9 @@ struct AICoverCloudClient: Sendable {
         return r
     }
 
-    /// Short-timeout lookup across the bases (fallback base only on transport / server errors, never on a 404).
+    /// Lookup: `HEAD` with the short budget (2.5 s total across primary → fallback; fallback only on transport / 5xx errors,
+    /// never on a 404) decides hit/miss; only a confirmed hit is then downloaded with `GET`, under a longer body budget
+    /// (`downloadTimeout`), so a slow link doesn't throw away an existing cloud copy halfway through a ~0.5–1 MB body.
     /// One object per name, always under `.jpg`; the body may be JPEG or HEIC (the Worker returns the uploaded type).
     func fetch(name: String) async -> AICoverFetchResult {
         guard configured else { return .unavailable("未配置云端密钥") }
@@ -140,12 +144,18 @@ struct AICoverCloudClient: Sendable {
         for base in bases {
             let left = deadline.timeIntervalSinceNow
             guard left > 0.05 else { return .unavailable("timeout") }
-            guard let req = request(base, AICoverCloudName.path(name, ext: "jpg", prefix: prefix), method: "GET", timeout: left) else { return .unavailable("bad url") }
+            let path = AICoverCloudName.path(name, ext: "jpg", prefix: prefix)
+            guard let head = request(base, path, method: "HEAD", timeout: left) else { return .unavailable("bad url") }
             do {
-                let (data, resp) = try await withTimeout(left) { try await transport.send(req) }
+                let (_, resp) = try await withTimeout(left) { try await transport.send(head) }
                 switch resp.statusCode {
-                case 200 where !data.isEmpty:
-                    return .hit(data, contentType: resp.value(forHTTPHeaderField: "Content-Type") ?? "image/jpeg")
+                case 200:
+                    guard let get = request(base, path, method: "GET", timeout: downloadTimeout) else { return .unavailable("bad url") }
+                    do {
+                        let (data, r2) = try await withTimeout(downloadTimeout) { try await transport.send(get) }
+                        guard r2.statusCode == 200, !data.isEmpty else { return .unavailable("GET HTTP \(r2.statusCode)") }
+                        return .hit(data, contentType: r2.value(forHTTPHeaderField: "Content-Type") ?? "image/jpeg")
+                    } catch { return .unavailable("GET " + Self.describe(error)) }
                 case 404: return .miss
                 case 401, 403: return .unavailable("HTTP \(resp.statusCode)")
                 default: lastError = "HTTP \(resp.statusCode)"          // 5xx → try the fallback base

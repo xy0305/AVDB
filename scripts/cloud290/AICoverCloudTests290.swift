@@ -43,23 +43,23 @@ func unitTests() async {
 
     // fetch: hit
     let hit = MockTransport { r in
-        precondition(r.value(forHTTPHeaderField: "X-AVDB-Key") == "k" && r.httpMethod == "GET")
-        return (200, jpeg, ["Content-Type": "image/jpeg"])
+        precondition(r.value(forHTTPHeaderField: "X-AVDB-Key") == "k" && (r.httpMethod == "GET" || r.httpMethod == "HEAD"))
+        return (200, r.httpMethod == "HEAD" ? Data() : jpeg, ["Content-Type": "image/jpeg"])
     }
     let c1 = AICoverCloudClient(bases: [A, B], key: "k", transport: hit)
-    check(await c1.fetch(name: "IPX-706_378x538") == .hit(jpeg, contentType: "image/jpeg"), "GET 200 → hit (key header sent)")
-    check(hit.count == 1 && hit.hosts == ["primary.test"], "hit needs one request on the primary")
+    check(await c1.fetch(name: "IPX-706_378x538") == .hit(jpeg, contentType: "image/jpeg"), "HEAD 200 → GET → hit (key header sent)")
+    check(hit.count == 2 && hit.hosts == ["primary.test", "primary.test"] && hit.requests.map { $0.httpMethod ?? "" } == ["HEAD", "GET"], "hit = HEAD + GET on the primary")
     // miss
     let miss = MockTransport { _ in (404, Data("{}".utf8), [:]) }
     check(await AICoverCloudClient(bases: [A, B], key: "k", transport: miss).fetch(name: "X_1x1") == .miss, "404 → miss")
-    check(miss.count == 1, "404 does not hit the fallback")
+    check(miss.count == 1 && miss.requests[0].httpMethod == "HEAD", "404 on HEAD → no GET, no fallback")
     // 401
     let unauth = MockTransport { _ in (401, Data(), [:]) }
     if case .unavailable(let w) = await AICoverCloudClient(bases: [A, B], key: "bad", transport: unauth).fetch(name: "X_1x1") { check(w == "HTTP 401" && unauth.count == 1, "401 → unavailable (silent local fallback)") } else { check(false, "401") }
     // offline primary → fallback
     let flaky = MockTransport { r in
         if r.url!.host == "primary.test" { throw URLError(.notConnectedToInternet) }
-        return (200, jpeg, ["Content-Type": "image/heic"])
+        return (200, r.httpMethod == "HEAD" ? Data() : jpeg, ["Content-Type": "image/heic"])
     }
     check(await AICoverCloudClient(bases: [A, B], key: "k", transport: flaky).fetch(name: "X_1x1") == .hit(jpeg, contentType: "image/heic"), "primary offline → fallback base hit")
     // fully offline
@@ -74,7 +74,14 @@ func unitTests() async {
     let r = await AICoverCloudClient(bases: [A, B], key: "k", transport: slow, fetchTimeout: 0.4).fetch(name: "X_1x1")
     let dt = Date().timeIntervalSince(t0)
     check(r == .unavailable("timeout") && dt < 1.5, String(format: "hung server → timeout in %.2fs (budget 0.4 s total, both bases)", dt))
-    check(AICoverCloudConfig.fetchTimeout == 2.5, "production fetch timeout 2.5 s")
+    check(AICoverCloudConfig.fetchTimeout == 2.5, "production HEAD budget 2.5 s")
+    // slow body after a quick HEAD: still a hit (body budget is separate)
+    let slowBody = MockTransport { r in
+        if r.httpMethod == "GET" { try await Task.sleep(nanoseconds: 900_000_000) }
+        return (200, r.httpMethod == "HEAD" ? Data() : jpeg, ["Content-Type": "image/jpeg"])
+    }
+    check(await AICoverCloudClient(bases: [A], key: "k", transport: slowBody, fetchTimeout: 0.4).fetch(name: "X_1x1") == .hit(jpeg, contentType: "image/jpeg"),
+          "HEAD in time + body slower than the HEAD budget → still a hit")
     // no key
     check(await AICoverCloudClient(bases: [A], key: nil, transport: hit).fetch(name: "X") == .unavailable("未配置云端密钥"), "no build key → local only")
 

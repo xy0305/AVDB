@@ -2,8 +2,10 @@
 
 ## Flow (`AICoverEnhanceModel`)
 1. Local bounded cache first: in-memory NSCache (≤ 12 images / 96 MB) + disk LRU `Caches/AICover` (excluded from backup).
-2. Cloud: `GET https://covers.xy0305.kdns.fr/v1/cover/nomos1/{番号}_{W}x{H}.jpg` with `X-AVDB-Key`, **2.5 s total budget** across
-   primary → fallback `https://avdb-covers.yxu83821.workers.dev` (fallback only on transport/5xx errors, never on 404).
+2. Cloud: `HEAD https://covers.xy0305.kdns.fr/v1/cover/nomos1/{番号}_{W}x{H}.jpg` with `X-AVDB-Key` decides hit/miss within a
+   **2.5 s total budget** across primary → fallback `https://avdb-covers.yxu83821.workers.dev` (fallback only on transport/5xx
+   errors, never on a 404). A confirmed hit is then fetched with `GET` under its own 15 s body budget, so a slow link doesn't
+   discard an existing cloud copy mid-download (found in CI: a 2.5 s budget covering the body timed out under simulator load).
    The original cover is already on screen; the chip shows 「云端加载中」 meanwhile. Hit → decode off-main, show, keep in the LRU.
 3. Miss / offline / 401 / 5xx / timeout / no key → silent local enhancement (unchanged 4xNomosWebPhoto Core ML), show, then
    encode (JPEG q 0.9, HEIC at the same quality if smaller; quality steps down / raster ×0.8 until ≤ 3 MiB), store in the LRU,
