@@ -17,3 +17,10 @@ xcuserdata/
 # Python
 __pycache__/
 *.pyc
+
+# Build 287 live-subtitle models (populated by scripts/live287/fetch_models287.py)
+AVDB/Resources/LiveModels/*
+!AVDB/Resources/LiveModels/README.md
+scripts/live287/bench/Sources/LiveBench287/Live*.swift
+scripts/live287/bench/.build/
+evidence-live287/

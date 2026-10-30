@@ -190,6 +190,11 @@ struct KSChromePlayer: View {
     @State private var appliedQuality: OnlineQualityChoice?
     @State private var observedResolution: CGSize = .zero
     @StateObject private var onlineSubtitles = OnlineSubtitleModel()
+    // Build 287 实时字幕: on-device Whisper + Apple Translation / NLLB, read ahead of the playhead.
+    @StateObject private var live = LiveSubtitleEngine()
+    @State private var showLiveSettings = false
+    @State private var editingLivePosition = false
+    @State private var adjustLiveAfterDismiss = false
     @State private var showOnlineSubtitles = false
     @State private var editingSubtitlePosition = false
     @State private var adjustSubtitleAfterDismiss = false
@@ -283,6 +288,23 @@ struct KSChromePlayer: View {
             startTicker()
             scheduleHide()
         }) { NativeLUTPanel(model: lut) }
+        .sheet(isPresented: $showLiveSettings, onDismiss: {
+            showChrome = true
+            startTicker()
+            scheduleHide()
+            if adjustLiveAfterDismiss {
+                adjustLiveAfterDismiss = false
+                editingLivePosition = true
+                showChrome = false
+                hideTask?.cancel()
+            }
+        }) { LiveSubtitleSettingsSheet(engine: live, adjustPosition: {
+            adjustLiveAfterDismiss = true
+            showLiveSettings = false
+        }) }
+        .onChange(of: showLiveSettings) { _, presented in
+            if presented { cancelPlayerDrag(); hideTask?.cancel(); showChrome = true }
+        }
         .onChange(of: showLUT) { _, presented in
             lut.setPanelCovered(presented)
             if presented { cancelPlayerDrag(); hideTask?.cancel(); showChrome = true }
@@ -301,6 +323,7 @@ struct KSChromePlayer: View {
                 return
             }
             playbackActive = true
+            attachLiveSubtitles()
             coordinator.isMaskShow = false
             // Audio ownership starts in AudioOwnedKSVideoPlayer.makeUIView, before KSPlayer construction.
             wireCoordinator()
@@ -318,6 +341,8 @@ struct KSChromePlayer: View {
             failureReported = false
             editingSubtitlePosition = false
             onlineSubtitles.clear()
+            editingLivePosition = false
+            attachLiveSubtitles()
             seekGeneration += 1
             seekPending = false
             cancelPlayerDrag()
@@ -326,6 +351,7 @@ struct KSChromePlayer: View {
         .onChange(of: headers) { _, _ in
             cancelPlayerDrag()
             configureSeekPreview()
+            attachLiveSubtitles()
         }
         .onChange(of: supportsFramePreview) { _, _ in
             cancelPlayerDrag()
@@ -341,6 +367,7 @@ struct KSChromePlayer: View {
             // They must not tear down playback or force the whole app to portrait.
             guard !showLUT else { return }
             guard !showOnlineSubtitles else { return }
+            guard !showLiveSettings else { return }
             // Visibility is not lifetime: background/PiP/covering presentations must keep playing.
             cancelPlayerDrag()
             hideTask?.cancel()
@@ -352,7 +379,18 @@ struct KSChromePlayer: View {
         seekPreview.configure(url: url, headers: headers, supported: supportsFramePreview)
     }
 
+    /// Live subtitles follow the player's own clock; the reader opens the same URL + headers (115 / online HLS /
+    /// LUT AVPlayer path alike). Cache key: stable 番号/来源 key first, so rewatching a re-resolved stream hits.
+    private func attachLiveSubtitles() {
+        let key = resumeKey ?? progressID ?? url.absoluteString
+        live.attach(url: url, headers: headers, videoKey: key) { [weak coordinator] in
+            guard let p = coordinator?.playerLayer?.player else { return (0, 1, false) }
+            return (p.currentPlaybackTime, Double(p.playbackRate), p.isPlaying)
+        }
+    }
+
     private func stopPlayback() {
+        live.detach()
         onlineSubtitles.clear()
         seekPreview.close()
         playbackActive = false
@@ -382,6 +420,17 @@ struct KSChromePlayer: View {
                     scheduleHide()
                 }
             }.zIndex(editingSubtitlePosition ? 30 : 20) // Captions remain white above the chrome scrim; normal mode is noninteractive.
+            if live.mode != .off || editingLivePosition {
+                LiveSubtitleOverlay(caption: live.caption, mode: live.mode, safeArea: safeArea, chromeVisible: showChrome,
+                                    editing: editingLivePosition) {
+                    editingLivePosition = false
+                    showChrome = true
+                    scheduleHide()
+                }
+                .zIndex(editingLivePosition ? 31 : 21)
+                LiveSubtitleStatusChip(engine: live, safeArea: safeArea).zIndex(22).allowsHitTesting(showChrome)
+            }
+            LiveTranslationHost(engine: live).allowsHitTesting(false)
             if showChrome {
                 chromeOverlay.zIndex(10) // Controls are above the transparent gesture receiver.
                     .padding(.top, safeArea.top)
@@ -394,7 +443,7 @@ struct KSChromePlayer: View {
             PlayerGestureLayer(
                 excludedTop: safeArea.top + 80,
                 excludedBottom: safeArea.bottom + 116,
-                blocked: editingSubtitlePosition || showOnlineSubtitles || showLUT || seekPending || (isSeeking && !horizontalDrag),
+                blocked: editingSubtitlePosition || showOnlineSubtitles || showLUT || seekPending || (isSeeking && !horizontalDrag) || editingLivePosition || showLiveSettings,
                 sourceID: url,
                 onDoubleTap: { x, width in
                     AVDBDoubleTapPolicy.perform(x: x, width: width,
@@ -745,6 +794,9 @@ struct KSChromePlayer: View {
                 .buttonStyle(.plain)
 
                 Spacer()
+
+                LiveSubtitleMenuButton(engine: live) { showLiveSettings = true }
+                    .fixedSize().layoutPriority(3)
 
                 if let onSelectEpisode {
                     Button(action: onSelectEpisode) {
@@ -1147,6 +1199,7 @@ struct KSChromePlayer: View {
         seekGeneration += 1
         let token = seekGeneration
         seekPending = true
+        live.didSeek(to: time)
         if layer.options.isSeekedAutoPlay { audio.begin() }
         layer.seek(time: time, autoPlay: layer.options.isSeekedAutoPlay) { _ in
             Task { @MainActor in

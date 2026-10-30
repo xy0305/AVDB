@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		LIVE2870000000000000009A /* LiveAppleTranslation.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000009F /* LiveAppleTranslation.swift */; };
+		LIVE2870000000000000001A /* LiveSubtitleCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000001F /* LiveSubtitleCore.swift */; };
+		LIVE2870000000000000002A /* LiveAudioReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000002F /* LiveAudioReader.swift */; };
+		LIVE2870000000000000003A /* LiveSpeechEngines.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000003F /* LiveSpeechEngines.swift */; };
+		LIVE2870000000000000004A /* LiveSubtitleEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000004F /* LiveSubtitleEngine.swift */; };
+		LIVE2870000000000000005A /* LiveSubtitleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000005F /* LiveSubtitleViews.swift */; };
+		LIVE2870000000000000006A /* LiveModels in Resources */ = {isa = PBXBuildFile; fileRef = LIVE2870000000000000006F /* LiveModels */; };
 		AICOVER2850000000000004A /* CoverSR.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000004F /* CoverSR.mlpackage */; };
 		AICOVER2850000000000003A /* AICoverViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000003F /* AICoverViews.swift */; };
 		AICOVER2850000000000002A /* AICoverEnhancer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000002F /* AICoverEnhancer.swift */; };
@@ -118,6 +125,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		LIVE2870000000000000009F /* LiveAppleTranslation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAppleTranslation.swift; sourceTree = "<group>"; };
+		LIVE2870000000000000001F /* LiveSubtitleCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSubtitleCore.swift; sourceTree = "<group>"; };
+		LIVE2870000000000000002F /* LiveAudioReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAudioReader.swift; sourceTree = "<group>"; };
+		LIVE2870000000000000003F /* LiveSpeechEngines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSpeechEngines.swift; sourceTree = "<group>"; };
+		LIVE2870000000000000004F /* LiveSubtitleEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSubtitleEngine.swift; sourceTree = "<group>"; };
+		LIVE2870000000000000005F /* LiveSubtitleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSubtitleViews.swift; sourceTree = "<group>"; };
+		LIVE2870000000000000006F /* LiveModels */ = {isa = PBXFileReference; lastKnownFileType = folder; path = LiveModels; sourceTree = "<group>"; };
 		AICOVER2850000000000004F /* CoverSR.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = CoverSR.mlpackage; sourceTree = "<group>"; };
 		AICOVER2850000000000003F /* AICoverViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoverViews.swift; sourceTree = "<group>"; };
 		AICOVER2850000000000002F /* AICoverEnhancer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoverEnhancer.swift; sourceTree = "<group>"; };
@@ -256,6 +270,7 @@
 				A15700000000000000000002 /* Enhancement.metallib */,
 				AICOVER2850000000000004F /* CoverSR.mlpackage */,
 				A15500000000000000000002 /* face_landmarker.task */,
+				LIVE2870000000000000006F /* LiveModels */,
 				A115C11E7A7B115C11E7A108 /* Assets.xcassets */,
 				E052588B357DFB38D46096A4 /* JavVerseSnapshot.json */,
 				A24300000000000000000002 /* ActorAliasIndex.json */,
@@ -386,6 +401,11 @@
 				RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */,
 				ONLINEDNS28300000000001F /* OnlineDNSPolicy.swift */,
 				DMMCOVER282000000000001F /* DMMCoverResolver.swift */,
+				LIVE2870000000000000001F /* LiveSubtitleCore.swift */,
+				LIVE2870000000000000002F /* LiveAudioReader.swift */,
+				LIVE2870000000000000003F /* LiveSpeechEngines.swift */,
+				LIVE2870000000000000009F /* LiveAppleTranslation.swift */,
+				LIVE2870000000000000004F /* LiveSubtitleEngine.swift */,
 				AICOVER2850000000000002F /* AICoverEnhancer.swift */,
 				AICOVER2850000000000001F /* AICoverSREngine.swift */,
 				AICOVER2850000000000000F /* AICoverPolicy.swift */,
@@ -436,6 +456,7 @@
 				D21600000000000000000001 /* SubtitleCatProvider.swift */,
 				D21600000000000000000002 /* OnlineSubtitleModel.swift */,
 				B08C58091094C960D502C7F8 /* PlayerView.swift */,
+				LIVE2870000000000000005F /* LiveSubtitleViews.swift */,
 				C25400000000000000000004 /* OnlinePlaybackPanel.swift */,
 				D21500000000000000000001 /* PlaybackVideoMetrics.swift */,
 				A16600000000000000000002 /* SeekPreview.swift */,
@@ -515,6 +536,7 @@
 			name = AVDB;
 			packageProductDependencies = (
 				A115C11E7A7B115C11E7A109 /* KSPlayer */,
+				LIVE2870000000000000008P /* WhisperKit */,
 			);
 			productName = AVDB;
 			productReference = AVDB00000000000000000000A2 /* AVDB.app */;
@@ -547,6 +569,7 @@
 			mainGroup = AVDB00000000000000000000B0;
 			packageReferences = (
 				A115C11E7A7B115C11E7A301 /* XCRemoteSwiftPackageReference "KSPlayer" */,
+				LIVE2870000000000000007R /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
 			);
 			productRefGroup = AVDB00000000000000000000B1 /* Products */;
 			projectDirPath = "";
@@ -565,6 +588,7 @@
 				A15400000000000000000001 /* OriginalLUT.js in Resources */,
 				A15700000000000000000001 /* Enhancement.metallib in Resources */,
 				A15500000000000000000001 /* face_landmarker.task in Resources */,
+				LIVE2870000000000000006A /* LiveModels in Resources */,
 				A115C11E7A7B115C11E7A008 /* Assets.xcassets in Resources */,
 				F922D9525067B54E6ED5E3C6 /* JavVerseSnapshot.json in Resources */,
 				A24300000000000000000001 /* ActorAliasIndex.json in Resources */,
@@ -640,6 +664,12 @@
 				DMMCOVER282000000000001B /* DMMCoverResolver.swift in Sources */,
 				AICOVER2850000000000004A /* CoverSR.mlpackage in Sources */,
 				AICOVER2850000000000003A /* AICoverViews.swift in Sources */,
+				LIVE2870000000000000001A /* LiveSubtitleCore.swift in Sources */,
+				LIVE2870000000000000002A /* LiveAudioReader.swift in Sources */,
+				LIVE2870000000000000003A /* LiveSpeechEngines.swift in Sources */,
+				LIVE2870000000000000009A /* LiveAppleTranslation.swift in Sources */,
+				LIVE2870000000000000004A /* LiveSubtitleEngine.swift in Sources */,
+				LIVE2870000000000000005A /* LiveSubtitleViews.swift in Sources */,
 				AICOVER2850000000000002A /* AICoverEnhancer.swift in Sources */,
 				AICOVER2850000000000001A /* AICoverSREngine.swift in Sources */,
 				AICOVER2850000000000000A /* AICoverPolicy.swift in Sources */,
@@ -691,7 +721,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 286;
+				CURRENT_PROJECT_VERSION = 287;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -714,7 +744,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 286;
+				CURRENT_PROJECT_VERSION = 287;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -815,6 +845,14 @@
 				minimumVersion = 2.3.4;
 			};
 		};
+		LIVE2870000000000000007R /* XCRemoteSwiftPackageReference "argmax-oss-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/argmax-oss-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -822,6 +860,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A115C11E7A7B115C11E7A301 /* XCRemoteSwiftPackageReference "KSPlayer" */;
 			productName = KSPlayer;
+		};
+		LIVE2870000000000000008P /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = LIVE2870000000000000007R /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
+			productName = WhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
