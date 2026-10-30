@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build 290 simulator screenshots + UI e2e: production AICoverSettingsSection / AICoverEnhanceModel / AICoverCloud client
-against two local mocks of the R2 Worker (fast with the IPX-706 object preloaded, slow = 1.6 s per request). The preloaded
+against two local mocks of the R2 Worker (fast with the IPX-706 object preloaded, slow = 2.1 s per request (under the 2.5 s budget)). The preloaded
 "cloud" image is a plain 4× resize of the fixture (stand-in for a stored enhancement), not model output. Checks that the
 miss path PUTs the local result to the mock. The real app key is not used here."""
 from pathlib import Path
@@ -15,7 +15,7 @@ for l in logs.values(): l.unlink(missing_ok=True)
 pre = f'nomos1/IPX-706_378x538.jpg={stand_in}'
 mw = str(r / 'scripts/cloud290/mock_worker.py')
 servers = [subprocess.Popen([sys.executable, mw, '8791', 'test-key', '--log', str(logs['fast']), '--preload', pre]),
-           subprocess.Popen([sys.executable, mw, '8792', 'test-key', '--delay', '1.6', '--log', str(logs['slow']), '--preload', pre])]
+           subprocess.Popen([sys.executable, mw, '8792', 'test-key', '--delay', '2.1', '--log', str(logs['slow']), '--preload', pre])]
 time.sleep(1)
 try:
     subprocess.run(['ruby', str(r / 'scripts/cloud290/setup-ai-ui290.rb')], check=True, cwd=r)

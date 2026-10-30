@@ -44,9 +44,10 @@ final class AICoverUITests290: XCTestCase {
     }
 
     func test3CloudLoading() {
-        let app = launch(["--mode", "auto", "--clear-ai-cache", "--reset-cloud", "--cloud-base", slow])
+        let app = launch(["--mode", "auto", "--clear-ai-cache", "--reset-cloud", "--defer-prepare", "3", "--cloud-base", slow])
+        XCTAssertTrue(el(app, "portrait-hero-metadata").waitForExistence(timeout: 10))
         let p = el(app, "ai-cover-progress")
-        XCTAssertTrue(p.waitForExistence(timeout: 5), "cloud loading chip")
+        XCTAssertTrue(p.waitForExistence(timeout: 8), "cloud loading chip")
         shot(app, "06-290-detail-cloud-loading")
         XCTAssertTrue(el(app, "ai-cover-badge").waitForExistence(timeout: 10), "slow (2 s) cloud hit still under the 2.5 s budget")
     }
@@ -54,7 +55,7 @@ final class AICoverUITests290: XCTestCase {
     func test4MissLocalUpload() {
         let app = launch(["--mode", "auto", "--clear-ai-cache", "--reset-cloud", "--miss", "--cloud-base", fast])
         let p = el(app, "ai-cover-progress")
-        if p.waitForExistence(timeout: 8) { sleep(4); shot(app, "07-290-detail-miss-local-enhance") }
+        if p.waitForExistence(timeout: 20) { sleep(3); shot(app, "07-290-detail-miss-local-enhance") }
         XCTAssertTrue(el(app, "ai-cover-badge").waitForExistence(timeout: 240), "local enhancement after a cloud miss")
         sleep(8)          // background upload (utility) → the mock server logs the PUT
         shot(app, "08-290-detail-miss-enhanced-uploaded")

@@ -125,6 +125,9 @@ struct HeroFixture: View {
         .background(tint.ignoresSafeArea())
         .onChange(of: model.showingOriginal) { _, now in if now { compareEvents += 1 } }
         .task {
+            if let i = args.firstIndex(of: "--defer-prepare"), i + 1 < args.count, let d = Double(args[i + 1]) {
+                try? await Task.sleep(nanoseconds: UInt64(d * 1e9))      // let XCUITest attach before the cloud fetch starts
+            }
             let hq = args.contains("--hq")
             model.prepare(image: cover, source: "https://pics.dmm.co.jp/digital/video/ipx00706/ipx00706pl.jpg",
                           nativeWidth: hq ? 1032 : 378, nativeHeight: hq ? 1468 : 538, number: args.contains("--miss") ? "IPX-706-MISS" : "IPX-706",
