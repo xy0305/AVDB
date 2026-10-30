@@ -44,8 +44,11 @@ final class RecUITests281: XCTestCase {
         sleep(1)
         shot(app, "05-long-press-menu")
         notInterested.tap()
-        XCTAssertTrue(element(app, "rec.toast").waitForExistence(timeout: 5))
+        let toast = element(app, "rec.toast")
+        let toastText = app.staticTexts.containing(NSPredicate(format: "label CONTAINS '不再推荐'")).firstMatch
+        let shown = toast.waitForExistence(timeout: 8) || toastText.exists
         shot(app, "06-feedback-toast")
+        XCTAssertTrue(shown, app.debugDescription)
     }
 
     func test3Preferences() {

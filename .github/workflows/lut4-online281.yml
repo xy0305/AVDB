@@ -62,7 +62,9 @@ jobs:
       - uses: actions/checkout@v4
       - run: gem install xcodeproj --no-document
       - name: Production recommender UI on simulator (seeded offline fixture) + screenshots
-        run: python3 scripts/test-rec-ui281.py 2>&1 | tee rec-ui281.log
+        run: |
+          set -o pipefail
+          python3 scripts/test-rec-ui281.py 2>&1 | tee rec-ui281.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -190,7 +190,9 @@ final class RecommendationStore: ObservableObject {
         let followKeys = Set(snapshot.follows.map(\.key))
         candidates = candidates.map { c in
             var c = c
-            if c.item.features.contains(where: { followKeys.contains($0.key) }) && (c.source == .actor || c.source == .series || c.source == .maker) { c.source = .follow }
+            if let f = c.item.features.first(where: { followKeys.contains($0.key) }), c.source == .actor || c.source == .series || c.source == .maker {
+                c.source = .follow; c.via = f.key; c.viaName = f.name
+            }
             return c
         }
         items = cache.items

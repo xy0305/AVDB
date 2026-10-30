@@ -140,6 +140,8 @@ check(out.groups.count <= RecommenderPipeline.maxGroups, "group cap")
 // reasons for other sources
 var followCand = cand("c4"); followCand.source = .follow
 check(RecReasoner.reason(followCand, profile: profile).text == "关注的 三上悠亚 新作", "follow reason")
+followCand.viaName = "绝顶系列"
+check(RecReasoner.reason(followCand, profile: profile).text == "关注的 绝顶系列 新作", "follow reason names the followed series")
 let simCand = RecCandidate(item: items["o2"]!, source: .similar, via: "h0", viaName: "ABC-h0")
 check(RecReasoner.reason(simCand, profile: profile).text == "与 ABC-h0 相似", "similar reason")
 let seriesOnly = item("s9", [s1, black])

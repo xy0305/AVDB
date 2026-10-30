@@ -497,8 +497,8 @@ enum RecReasoner {
             item.features(kind).map { ($0, profile.affinity[$0.key] ?? 0) }.filter { $0.1 > 0.3 }.max { $0.1 < $1.1 }
         }
         let tags = item.features(.tag).map { ($0, profile.affinity[$0.key] ?? 0) }.filter { $0.1 > 0.25 }.sorted { $0.1 > $1.1 }
-        if c.source == .follow, let a = item.primaryActor ?? item.primarySeries {
-            return RecReason(kind: .follow, text: "关注的 \(a.name) 新作", symbol: "bell.fill", groupKey: "follow", groupTitle: "关注更新")
+        if c.source == .follow, let name = c.viaName ?? (item.primaryActor ?? item.primarySeries)?.name {
+            return RecReason(kind: .follow, text: "关注的 \(name) 新作", symbol: "bell.fill", groupKey: "follow", groupTitle: "关注更新")
         }
         if c.source == .similar, let seed = c.viaName {
             return RecReason(kind: .similar, text: "与 \(seed) 相似", symbol: "sparkles", groupKey: "similar:" + (c.via ?? seed), groupTitle: "看过 \(seed) 的人也喜欢")

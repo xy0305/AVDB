@@ -54,7 +54,7 @@ struct RecReasonChip: View {
     var body: some View {
         let tint = RecStyle.tint(reason.kind)
         Label {
-            Text(reason.text).lineLimit(1)
+            Text(reason.text).lineLimit(1).minimumScaleFactor(0.85)
         } icon: {
             Image(systemName: reason.symbol).imageScale(.small)
         }
@@ -364,6 +364,7 @@ struct RecToast: View {
             .background(.black.opacity(0.78), in: Capsule())
             .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
             .transition(.move(edge: .bottom).combined(with: .opacity))
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("rec.toast")
     }
 }
