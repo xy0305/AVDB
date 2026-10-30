@@ -49,7 +49,7 @@ final class AICoverUITests290: XCTestCase {
         let p = el(app, "ai-cover-progress")
         XCTAssertTrue(p.waitForExistence(timeout: 8), "cloud loading chip")
         shot(app, "06-290-detail-cloud-loading")
-        XCTAssertTrue(el(app, "ai-cover-badge").waitForExistence(timeout: 10), "slow (2 s) cloud hit still under the 2.5 s budget")
+        XCTAssertTrue(el(app, "ai-cover-badge").waitForExistence(timeout: 10), "slow (1.2 s) cloud hit still under the 2.5 s budget")
     }
 
     func test4MissLocalUpload() {
