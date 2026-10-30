@@ -15,7 +15,7 @@ final class AICoverUITests290: XCTestCase {
     private func el(_ app: XCUIApplication, _ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     func test1Settings() {
-        let s = launch(["--settings", "--mode", "auto", "--reset-cloud", "--seed-stats", "--seed-cache", "--clear-ai-cache"])
+        let s = launch(["--settings", "--mode", "auto", "--reset-cloud", "--seed-stats", "--seed-cache", "--clear-ai-cache", "--cloud-base", fast])
         XCTAssertTrue(el(s, "ai-cover-cloud-toggle").waitForExistence(timeout: 15), "云端增强图 toggle")
         sleep(2)
         XCTAssertTrue(el(s, "ai-cover-cache-cap").exists && el(s, "ai-cover-cloud-wifi").exists && el(s, "ai-cover-cache-clear").exists)
@@ -23,12 +23,12 @@ final class AICoverUITests290: XCTestCase {
         s.swipeUp(); sleep(1)
         shot(s, "02-290-settings-cloud-stats-diagnostics")
         s.terminate()
-        let q = launch(["--settings", "--mode", "auto", "--seed-stats", "--quota"])
+        let q = launch(["--settings", "--mode", "auto", "--reset-cloud", "--seed-stats", "--quota", "--cloud-base", fast])
         XCTAssertTrue(el(q, "ai-cover-cloud-quota").waitForExistence(timeout: 15), "507 note")
         q.swipeUp(); sleep(1)
         shot(q, "03-290-settings-507-note")
         q.terminate()
-        let m = launch(["--settings", "--mode", "auto", "--reset-cloud"])
+        let m = launch(["--settings", "--mode", "auto", "--reset-cloud", "--cloud-base", fast])
         let cap = el(m, "ai-cover-cache-cap")
         XCTAssertTrue(cap.waitForExistence(timeout: 15))
         cap.tap(); sleep(1)
@@ -60,7 +60,7 @@ final class AICoverUITests290: XCTestCase {
         sleep(8)          // background upload (utility) → the mock server logs the PUT
         shot(app, "08-290-detail-miss-enhanced-uploaded")
         app.terminate()
-        let s = launch(["--settings", "--mode", "auto"])
+        let s = launch(["--settings", "--mode", "auto", "--cloud-base", fast])
         XCTAssertTrue(el(s, "ai-cover-cloud-stats").waitForExistence(timeout: 15))
         s.swipeUp(); sleep(1)
         shot(s, "09-290-settings-after-upload")
