@@ -12,6 +12,7 @@ models = r / "AVDB/Resources/LiveModels"
 subprocess.run([sys.executable, str(r / "scripts/live287/prepare_bench287.py"), str(work)], check=True)
 src = r / "scripts/live289/bench/Sources/LiveBench289"
 lib = r / "Vendor/sherpa-onnx-macos.xcframework/macos-arm64_x86_64"
+(r / "scripts/live289/bench/Sources/SherpaOnnxC").mkdir(parents=True, exist_ok=True)
 (r / "scripts/live289/bench/Sources/SherpaOnnxC/module.modulemap").write_text(
     'module SherpaOnnxC {\n  header "%s"\n  link "sherpa-onnx-c-api"\n  export *\n}\n' % (lib / "Headers/sherpa-onnx/c-api/c-api.h"))
 for f in ["LiveSubtitleCore.swift", "LiveAudioReader.swift", "LiveSpeechEngines.swift", "LiveAppleTranslation.swift", "LiveSenseVoice.swift", "LiveSystemRecognizers.swift"]:
