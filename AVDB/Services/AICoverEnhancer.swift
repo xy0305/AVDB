@@ -6,18 +6,11 @@ import CryptoKit
 import ImageIO
 import UniformTypeIdentifiers
 
-/// System-reading half of the thermal / battery guard (the decision itself is pure, in AICoverPolicy.swift).
+/// System-reading half of the battery guard (no thermal gating since build 289) (the decision itself is pure, in AICoverPolicy.swift).
 extension AICoverEnhanceGuard {
     static func check(manual: Bool) -> Verdict {
-        let thermal: Int
-        switch ProcessInfo.processInfo.thermalState {
-        case .nominal: thermal = 0
-        case .fair: thermal = 1
-        case .serious: thermal = 2
-        default: thermal = 3
-        }
         let battery = currentBattery()
-        return verdict(manual: manual, thermalLevel: thermal, lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+        return verdict(manual: manual, lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
                        battery: battery.level, charging: battery.charging)
     }
     private static func currentBattery() -> (level: Float, charging: Bool) {

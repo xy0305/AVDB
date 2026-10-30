@@ -3,8 +3,8 @@ import Foundation
 /// Build 285: pure (Foundation-only) policy for the on-device AI cover enhancer, shared by the
 /// app, the Linux/macOS regression and the screenshot host.
 
-/// 「AI 增强」 setting. 自动 = low-res covers are enhanced automatically (guarded by thermal /
-/// battery); 仅手动 = only via the button; 关 = never (button hidden).
+/// 「AI 增强」 setting. 自动 = low-res covers are enhanced automatically (guarded by low-power /
+/// battery only — never by thermal state, build 289); 仅手动 = only via the button; 关 = never (button hidden).
 enum AICoverEnhanceMode: String, CaseIterable, Identifiable, Sendable {
     case auto, manual, off
     var id: String { rawValue }
@@ -38,14 +38,14 @@ enum AICoverEnhancePolicy {
     }
 }
 
-/// Thermal / battery guard. Automatic runs need a cool (nominal/fair), not-low-power device with
-/// ≥20 % battery (or charging); a manual tap only refuses on serious/critical thermal state.
+/// Battery guard (build 289: NO thermal gating — AI image enhancement is always allowed regardless of
+/// thermal state, in both 自动 and 手动; thermal throttling applies only to live subtitles).
+/// Automatic runs skip Low Power Mode and < 20 % battery (unless charging); a manual tap always runs.
 enum AICoverEnhanceGuard {
-    enum Verdict: Equatable { case ok, hot, lowPower, lowBattery }
-    /// thermalLevel: 0 nominal, 1 fair, 2 serious, 3 critical. battery < 0 = unknown.
-    static func verdict(manual: Bool, thermalLevel: Int, lowPower: Bool, battery: Float, charging: Bool) -> Verdict {
-        if manual { return thermalLevel >= 2 ? .hot : .ok }
-        if thermalLevel >= 2 { return .hot }
+    enum Verdict: Equatable { case ok, lowPower, lowBattery }
+    /// battery < 0 = unknown.
+    static func verdict(manual: Bool, lowPower: Bool, battery: Float, charging: Bool) -> Verdict {
+        if manual { return .ok }
         if lowPower { return .lowPower }
         if battery >= 0, battery < 0.2, !charging { return .lowBattery }
         return .ok
@@ -53,7 +53,6 @@ enum AICoverEnhanceGuard {
     static func message(_ v: Verdict) -> String? {
         switch v {
         case .ok: return nil
-        case .hot: return "设备温度较高，已暂停 AI 增强"
         case .lowPower: return "低电量模式下不自动增强"
         case .lowBattery: return "电量低于 20%，不自动增强"
         }

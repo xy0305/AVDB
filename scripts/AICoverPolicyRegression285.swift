@@ -13,15 +13,15 @@ check(!AICoverEnhancePolicy.eligible(source: "x", nativeWidth: 0, nativeHeight: 
 check(!AICoverEnhancePolicy.eligible(source: "x", nativeWidth: 147, nativeHeight: 200), "thumbnail below minimum")
 
 // Guard
-check(AICoverEnhanceGuard.verdict(manual: false, thermalLevel: 0, lowPower: false, battery: 0.8, charging: false) == .ok, "auto ok")
-check(AICoverEnhanceGuard.verdict(manual: false, thermalLevel: 2, lowPower: false, battery: 0.8, charging: false) == .hot, "auto hot")
-check(AICoverEnhanceGuard.verdict(manual: false, thermalLevel: 0, lowPower: true, battery: 0.8, charging: false) == .lowPower, "auto low power")
-check(AICoverEnhanceGuard.verdict(manual: false, thermalLevel: 1, lowPower: false, battery: 0.1, charging: false) == .lowBattery, "auto low battery")
-check(AICoverEnhanceGuard.verdict(manual: false, thermalLevel: 1, lowPower: false, battery: 0.1, charging: true) == .ok, "charging ok")
-check(AICoverEnhanceGuard.verdict(manual: false, thermalLevel: 0, lowPower: false, battery: -1, charging: false) == .ok, "unknown battery (simulator) ok")
-check(AICoverEnhanceGuard.verdict(manual: true, thermalLevel: 1, lowPower: true, battery: 0.05, charging: false) == .ok, "manual ignores battery")
-check(AICoverEnhanceGuard.verdict(manual: true, thermalLevel: 3, lowPower: false, battery: 1, charging: true) == .hot, "manual refuses critical")
-check(AICoverEnhanceGuard.message(.hot) != nil && AICoverEnhanceGuard.message(.ok) == nil, "messages")
+check(AICoverEnhanceGuard.verdict(manual: false, lowPower: false, battery: 0.8, charging: false) == .ok, "auto ok")
+check(AICoverEnhanceGuard.verdict(manual: false, lowPower: false, battery: 0.8, charging: false) == .ok, "auto ok when hot (289: no thermal gating)")
+check(AICoverEnhanceGuard.verdict(manual: false, lowPower: true, battery: 0.8, charging: false) == .lowPower, "auto low power")
+check(AICoverEnhanceGuard.verdict(manual: false, lowPower: false, battery: 0.1, charging: false) == .lowBattery, "auto low battery")
+check(AICoverEnhanceGuard.verdict(manual: false, lowPower: false, battery: 0.1, charging: true) == .ok, "charging ok")
+check(AICoverEnhanceGuard.verdict(manual: false, lowPower: false, battery: -1, charging: false) == .ok, "unknown battery (simulator) ok")
+check(AICoverEnhanceGuard.verdict(manual: true, lowPower: true, battery: 0.05, charging: false) == .ok, "manual ignores battery")
+check(AICoverEnhanceGuard.verdict(manual: true, lowPower: false, battery: 1, charging: true) == .ok, "manual ok when critical (289: no thermal gating)")
+check(AICoverEnhanceGuard.message(.lowPower) != nil && AICoverEnhanceGuard.message(.ok) == nil, "messages")
 
 // Modes
 check(AICoverEnhanceMode.allCases.map(\.title) == ["自动", "仅手动", "关"], "mode titles")

@@ -32,6 +32,14 @@ Why sherpa-onnx instead of a Core ML conversion: prebuilt iOS xcframework (devic
 - 288 VAD chunking and read-ahead kept; read-ahead throttled by thermal state (`fair` ×0.75 min 6 s; `serious`+ ≤ 8 s).
 - `LiveHitchMonitor` (CADisplayLink) counts main-thread frame gaps > 50 ms while live subtitles run; summary shown in 模型状态与诊断 (copyable).
 
+## AI 图片增强（封面超分 4xNomosWebPhoto）— 不再受温度限制
+Owner request: AI image enhancement must always be allowed. `AICoverEnhanceGuard` no longer reads `ProcessInfo.thermalState`
+and the `.hot` verdict / 「设备温度较高，已暂停 AI 增强」 message are removed — both 自动 and 手动 run at any thermal state.
+Unchanged: 自动 still skips Low Power Mode and < 20 % battery (unless charging); 手动 always runs; 关 never runs.
+Thermal throttling now exists only in live subtitles. (The video LUT's "safe performance" option in NativeLUT.swift is a
+separate player feature and was not changed.) Test: `scripts/test-ai-cover289.py` (static + compiled Swift check);
+`AICoverPolicyRegression285.swift` updated (auto/manual hot → ok).
+
 ## Evidence / tests
 - `scripts/test-live289.py` (wiring + version) → 288 → 287 regressions incl. `LiveCoreRegression287.swift` guard checks.
 - CI bench `scripts/test-live-bench289.py` (macOS runner): SenseVoice vs Whisper small vs Apple on macOS-TTS (Kyoko) Japanese lines — per-chunk ms, RTF, CER, end-to-end look-ahead/paced/seek; SenseVoice thread/provider variants. Output `evidence-live289/bench/bench289.json`.
