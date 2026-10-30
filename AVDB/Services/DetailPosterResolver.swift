@@ -10,6 +10,11 @@ struct DetailPosterArtwork: @unchecked Sendable {
     let tint: UIColor
     // Travel with the decoded winner through the cache and synchronous snapshot.
     let provenance: PosterProvenance
+    // Build 285: winner URL and NATIVE front size (before the 1800 px display cap) decide
+    // whether the AI enhancer may run; HQ native covers are never enhanced.
+    var sourceURL: String = ""
+    var nativeWidth: Int = 0
+    var nativeHeight: Int = 0
 }
 
 /// A separate cookie-free session is essential: this resolver never sees a 115
@@ -185,7 +190,9 @@ enum DetailPosterResolver {
             ListHQCoverCache.store(number: movie.number, source: winner.source)
             // No intermediate publication. The winner cache, not ImageLoader's
             // independently downsampled source cache, is the only warm fast path.
-            return await artwork(image: selected.image, source: winner.source, derive: false)
+            guard var art = await artwork(image: selected.image, source: winner.source, derive: false) else { return nil }
+            art.sourceURL = winner.source; art.nativeWidth = winner.width; art.nativeHeight = winner.height
+            return art
         }
     }
 
@@ -332,7 +339,10 @@ enum DetailPosterResolver {
               ] as CFDictionary) else { return nil }
         // DMM NOW PRINTING placeholders (147×200 ps, portrait 590×800 pl, 2,732-byte body).
         if let host = URL(string: sourceURL)?.host, host.hasSuffix("dmm.co.jp"),
-           DMMImageValidation.classify(width: rawWidth, height: rawHeight, bytes: data.count, source: sourceURL) == .placeholder { return nil }
+           DMMImageValidation.classify(width: rawWidth, height: rawHeight, bytes: data.count, source: sourceURL) == .placeholder {
+            DMMJacketOnly.shared.observe(source: sourceURL, width: rawWidth, height: rawHeight)
+            return nil
+        }
         var cropped = false
         let javbusJacket = URL(string: sourceURL).map(JavBusPoster.allowedImage) == true
         if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: sourceURL, validatedJacket: javbusJacket) {

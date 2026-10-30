@@ -245,6 +245,13 @@ public enum FrontPosterPolicy {
         return (host == JavDBConstants.imageCDNHost && path.contains("/covers/"))
             || (host == JavDBConstants.webCDNHost && path.contains("/covers/"))
             || (host == "image.mgstage.com" && path.contains("/pb_e_"))
+            || isHQStoreJacket(value)
+    }
+
+    /// Build 285: DUGA 1000 px jacket / MGS Prestige 1125 px package (front = right 0.703·h).
+    public static func isHQStoreJacket(_ value: String) -> Bool {
+        guard let url = URL(string: value) else { return false }
+        return AvbaseHQExtras.isDugaJacket(url) || AvbaseHQExtras.isMGSPrestigePackage(url)
     }
 
     /// API catalog values: 0 censored, 1 Japanese uncensored, 2 Western, 3 FC2.
@@ -283,8 +290,10 @@ public enum FrontPosterPolicy {
         let ratio = Double(width) / Double(height)
         // Standard DVD jacket only; never blindly slice arbitrary landscape photos.
         guard (1.35...1.65).contains(ratio) else { return nil }
-        // DMM jackets: the front is 0.69 of the height wide (745 of 1081), no spine bleed.
-        let frontWidth = Int(Double(height) * (dmmJacket ? 0.69 : 0.7))
+        // Build 285: DMM / DUGA / MGS-Prestige jackets: the front is the right-aligned 0.703·h
+        // (ps↔pl alignment, 15/17 titles); MILK (h_1240) keeps its measured 0.69 (745 of 1081).
+        let measured = dmmJacket || isHQStoreJacket(source)
+        let frontWidth = Int((Double(height) * (measured ? DMMImageValidation.frontRatio(source: source) : 0.7)).rounded())
         guard frontWidth > 0, frontWidth < width else { return nil }
         return CGRect(x: width - frontWidth, y: 0, width: frontWidth, height: height)
     }
@@ -614,8 +623,12 @@ public struct JavDBImage: View {
 /// List reads synchronously; never triggers Tenhow/Amazon discovery itself.
 enum ListHQCoverCache {
     private static let lock = NSLock()
-    private static var urls: [String: String] = [:]
-    private static let capacity = 256
+    // Build 285: verified winners persist across launches (UserDefaults, bounded), so list
+    // cards and history show the HQ cover immediately instead of re-learning it.
+    static let defaultsKey = "list.hq.cover.urls.v1"
+    private static var urls: [String: String] = (UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String]) ?? [:]
+    private static var order: [String] = Array(urls.keys)
+    private static let capacity = 1024
 
     static func key(_ number: String) -> String? {
         let trimmed = number.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
@@ -631,18 +644,23 @@ enum ListHQCoverCache {
     static func store(number: String?, source: String) {
         guard let number, let key = key(number),
               let parsed = URL(string: source), isHQHost(parsed) else { return }
-        lock.lock(); defer { lock.unlock() }
-        if urls[key] == nil, urls.count >= capacity, let oldest = urls.keys.first {
-            urls[oldest] = nil
+        lock.lock()
+        if urls[key] == source { lock.unlock(); return }
+        if urls[key] == nil, urls.count >= capacity, let oldest = order.first {
+            urls[oldest] = nil; order.removeFirst()
         }
+        if urls[key] == nil { order.append(key) }
         urls[key] = source
+        let snapshot = urls
+        lock.unlock()
+        UserDefaults.standard.set(snapshot, forKey: defaultsKey)
     }
 
     static func isHQHost(_ url: URL) -> Bool {
         switch url.host?.lowercased() {
         case "m.media-amazon.com", "images-na.ssl-images-amazon.com",
              "pics.dmm.co.jp", "awsimgsrc.dmm.co.jp",
-             "image.mgstage.com", "www.tenhow.net":
+             "image.mgstage.com", "www.tenhow.net", "pic.duga.jp":
             return true
         default:
             return false
@@ -652,7 +670,8 @@ enum ListHQCoverCache {
     #if DEBUG
     static func resetForTests() {
         lock.lock(); defer { lock.unlock() }
-        urls.removeAll()
+        urls.removeAll(); order.removeAll()
+        UserDefaults.standard.removeObject(forKey: defaultsKey)
     }
     #endif
 }

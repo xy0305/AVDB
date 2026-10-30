@@ -729,6 +729,7 @@ struct CoverTitleSettingsSection: View {
     @AppStorage("javdb.cover.enhance.enabled") private var coverEnhance = false
 
     var body: some View {
+        AICoverSettingsSection()
         Section {
             Toggle("显示封面标题", isOn: $showCoverTitle)
                 .accessibilityIdentifier("detail-cover-title-setting")

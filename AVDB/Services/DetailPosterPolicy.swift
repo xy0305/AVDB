@@ -13,6 +13,7 @@ struct PosterProvenance: Equatable, Sendable {
         case "www.tenhow.net": label = "Tenhow"
         case "www.javbus.com": label = "JavBus"
         case "image.mgstage.com": label = "MGS"
+        case "pic.duga.jp": label = "DUGA"
         default: label = "原始封面/未知来源"
         }
     }
@@ -32,7 +33,7 @@ struct DetailPosterQuality: Sendable {
     /// 0 = publisher / store original (DMM, MGS, Amazon, Tenhow), 1 = other, 2 = JavDB re-host.
     var officialRank: Int {
         switch PosterProvenance(source: source).label {
-        case "DMM", "MGS", "Amazon", "Tenhow": return 0
+        case "DMM", "MGS", "Amazon", "Tenhow", "DUGA": return 0
         case "JavDB": return 2
         default: return 1
         }
@@ -175,7 +176,8 @@ enum DetailPosterPolicy {
         // (pics.dmm.co.jp ps is only a 147×200 thumbnail and can never win.)
         _ = lower
         guard let cid = DMMCID.candidates(number: raw).first else { return [] }
-        return DMMCoverURLs.digital(cid)
+        // Build 285: skip the 147×200 ps probe for CIDs already learned as jacket-only.
+        return DMMJacketOnly.shared.filter(DMMCoverURLs.digital(cid))
     }
 
     /// Portrait geometry is NOT a single-person or semantic classification.

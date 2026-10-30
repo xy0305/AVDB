@@ -26,6 +26,14 @@ struct MovieDetailView: View {
     @StateObject private var onlinePlaybackModel = OnlinePlaybackModel()
     @State private var showTrailer = false
     @State private var posterPresentation: DetailPosterPresentation<DetailPosterArtwork>?
+    // Build 285: on-device AI enhancement of a low-resolution hero cover.
+    @StateObject private var aiCover = AICoverEnhanceModel()
+    @State private var showCoverViewer = false
+    @AppStorage(AICoverEnhanceMode.defaultsKey) private var aiCoverMode = AICoverEnhanceMode.auto.rawValue
+    private var aiCoverKey: String {
+        guard let art = posterArtwork, !usesLandscapeLayout else { return "none#" + aiCoverMode }
+        return art.sourceURL + "#\(art.nativeWidth)x\(art.nativeHeight)#" + aiCoverMode
+    }
     private let posterSeed: Movie?
     private var posterMovie: Movie? { posterSeed ?? vm.posterMovie ?? vm.movie }
 
@@ -255,6 +263,14 @@ struct MovieDetailView: View {
         }
         .overlay(alignment: .top) { onlineResumeBanner }
         .onDisappear { onlineResume.cancel() }
+        .task(id: aiCoverKey) {
+            let art = usesLandscapeLayout ? nil : posterArtwork
+            aiCover.prepare(image: art?.image, source: art?.sourceURL ?? "", nativeWidth: art?.nativeWidth ?? 0,
+                            nativeHeight: art?.nativeHeight ?? 0, mode: AICoverEnhanceMode(rawValue: aiCoverMode) ?? .auto)
+        }
+        .fullScreenCover(isPresented: $showCoverViewer) {
+            if let art = posterArtwork { AICoverViewer(image: art.image, model: aiCover) }
+        }
         .fullScreenCover(isPresented: $showTrailer) {
             if let url = vm.movie?.previewVideoURL.flatMap(URL.init) {
                 TrailerPlayerView(url: url, onClose: { showTrailer = false })
@@ -271,6 +287,11 @@ struct MovieDetailView: View {
         HStack {
             chromeButton("chevron.left") { dismiss() }
             Spacer(minLength: 0)
+            if !usesLandscapeLayout, posterArtwork != nil {
+                AICoverHeroControl(model: aiCover) { showCoverViewer = true }
+                    .padding(.trailing, 8)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
             chromeButton("magnifyingglass") { showSearch = true }
         }
         .padding(.horizontal, 16)
@@ -380,7 +401,7 @@ struct MovieDetailView: View {
         return ZStack(alignment: .top) {
             Group {
                 if let art {
-                    Image(uiImage: art.image).resizable().scaledToFill()
+                    Image(uiImage: aiCover.display(art.image)).resizable().scaledToFill()
                 } else {
                     Color(tint).overlay(alignment: .top) {
                         ProgressView().tint(.white.opacity(0.65)).padding(.top, 120)
@@ -389,6 +410,8 @@ struct MovieDetailView: View {
             }
             .frame(width: width, height: imageHeight, alignment: .top)
             .clipped()
+            .contentShape(Rectangle())
+            .onTapGesture { if art != nil { showCoverViewer = true } }
             .accessibilityHidden(true)
             .accessibilityIdentifier("detail-hero-artwork")
             LinearGradient(stops: [

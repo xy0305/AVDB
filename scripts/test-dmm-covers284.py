@@ -13,7 +13,7 @@ assert 'ttl?(value) ??' in cachef
 assert 'for hq in DMMCoverURLs.upgrade(image) { append(hq) }' in loader and 'DetailPosterPolicy.candidates(number: movie.number).prefix(2)' in loader, 'list cards try DMM pl (front-cropped)'
 assert 'let hq = result.prefix(2)' in loader, 'JavDB stays within the three list attempts'
 assert 'officialRank' in policy
-assert plist['CFBundleVersion'] == '284' and pbx.count('CURRENT_PROJECT_VERSION = 284;') == 2
+assert int(plist['CFBundleVersion']) >= 284 and pbx.count(f"CURRENT_PROJECT_VERSION = {plist['CFBundleVersion']};") == 2
 swiftc = shutil.which('swiftc')
 if not swiftc:
     if os.environ.get('CI'): sys.exit('swiftc missing')

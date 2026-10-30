@@ -19,8 +19,9 @@ check(DMMCoverURLs.fallbacks(for: ipx[1]).allSatisfy { DMMCoverURLs.cid($0)?.has
 // placeholders: IPX-706 ps is the 147×200 NOW-size thumb; pl 800×538 is a real jacket
 check(DMMImageValidation.classify(width: 147, height: 200, bytes: 16939, source: ipx[0]) == .placeholder, "147×200 ps rejected")
 check(DMMImageValidation.classify(width: 800, height: 538, bytes: 190075, source: ipx[1]) == .jacket, "800×538 pl is a jacket")
-let crop = DMMImageValidation.frontCrop(width: 800, height: 538)!
-check(crop.width == 371 && crop.x == 429, "front crop \(crop)")
+let crop = DMMImageValidation.frontCrop(width: 800, height: 538, source: ipx[1])!
+// Build 285: measured 0.703·h front (was 0.69 → 371 px, trimming the left edge).
+check(crop.width == 378 && crop.x == 422, "front crop \(crop)")
 // the race/tie that showed 封面来源：JavDB: DMM crop 371×538 vs JavDB 800×538 crop 376×538
 let dmm = DetailPosterQuality(source: ipx[1], width: 371, height: 538, originalPortrait: false)
 let javdb = DetailPosterQuality(source: "https://c0.jdbstatic.com/covers/pr/pRX45.jpg", width: 376, height: 538, originalPortrait: false)

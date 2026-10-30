@@ -52,8 +52,11 @@ struct ScrapedMetadata: Sendable, Hashable {
     var poster: String?
     var cover: String?
     var digitalCID: String?
+    /// Build 285: same-work HQ jackets from other stores (DUGA 1000 px jacket, MGS Prestige
+    /// 1125 px package, MGS pf_e portrait). Tried after the DMM pair, never instead of it.
+    var extras: [String] = []
     // HQ-first: large cover (pl / package large) before package thumb (ps).
-    var images: [String] { var seen = Set<String>(); return [cover, poster].compactMap { $0 }.filter { seen.insert($0).inserted } }
+    var images: [String] { var seen = Set<String>(); return ([cover, poster].compactMap { $0 } + extras).filter { seen.insert($0).inserted } }
 }
 
 enum AvbaseMetadata {
@@ -137,6 +140,7 @@ enum AvbaseMetadata {
                 result.cover = cover ?? poster
             }
         }
+        result.extras = AvbaseHQExtras.extras(products: products, number: number)
         return result
     }
     /// Higher is better: pl large jacket > jp amateur package > ps thumb.
@@ -178,6 +182,7 @@ enum AvbaseMetadata {
         guard directories.count >= 2 else { return false }
         let pid = String(directories[directories.count - 2])
         if image(url.absoluteString, productID: pid, dmm: true) != nil { return true }
+        if AvbaseHQExtras.isDugaJacket(url) || AvbaseHQExtras.isMGSPrestigePackage(url) { return true }
         // MGS admission is used only after the exact-record product parser returned this URL.
         return cleanImageURL(url) && url.host == "image.mgstage.com" && url.path.hasPrefix("/images/")
             && url.path.hasSuffix(".jpg") && url.path.count < 300
@@ -294,6 +299,64 @@ enum DMMAmateurMetadata {
     }
 }
 
+/// Build 285: extra HQ jackets that avbase lists for the SAME work (measured on the box):
+/// - DUGA `pic.duga.jp/unsecure/{label}/{id}/noauth/jacket.jpg`: native 1000×663–676 full jacket,
+///   front = right-aligned 0.703·h (same geometry as DMM pl). Public, no login, works outside JP.
+///   A work can list a DUGA re-release with a DIFFERENT jacket (ABF-087 eiten-2295), so DUGA is
+///   used only when it is the sole DUGA product or its label equals the MGS maker directory.
+/// - MGS `images/prestige/…/pake-03_sp-{id}.jpg`: native 1125×758 (Prestige family only;
+///   SIRO/FCT 1348 px packages are upscales and are never admitted).
+/// - MGS `pf_e_` portrait (422×600) derived from the listed `pb_e_` jacket in the same folder.
+enum AvbaseHQExtras {
+    static func isDugaJacket(_ url: URL) -> Bool {
+        AvbaseMetadata.cleanImageURL(url) && url.host == "pic.duga.jp"
+            && url.path.range(of: #"^/unsecure/[a-z0-9_-]{2,40}/[0-9]{1,8}/noauth/jacket\.jpg$"#, options: .regularExpression) != nil
+    }
+    static func isMGSPrestigePackage(_ url: URL) -> Bool {
+        AvbaseMetadata.cleanImageURL(url) && url.host == "image.mgstage.com"
+            && url.path.range(of: #"^/images/prestige/[a-z0-9_-]{1,40}/[a-z0-9]{1,20}/[0-9a-z]{1,12}/pake-03_sp-[a-z0-9]{1,20}-[0-9a-z]{1,12}\.jpg$"#, options: .regularExpression) != nil
+    }
+    static func dugaLabel(_ url: URL) -> String? {
+        let parts = url.path.split(separator: "/"); return parts.count > 2 ? String(parts[1]) : nil
+    }
+    static func mgsMaker(_ url: URL) -> String? {
+        let parts = url.path.split(separator: "/"); return parts.count > 2 ? String(parts[1]) : nil
+    }
+    static func extras(products: [[String: Any]], number: String) -> [String] {
+        var dugas: [URL] = []
+        var mgs: [URL] = []
+        for product in products {
+            guard let pid = AvbaseMetadata.string(product["product_id"]) else { continue }
+            let link = URL(string: AvbaseMetadata.string(product["url"]) ?? "")
+            guard let raw = AvbaseMetadata.string(product["image_url"]), let image = URL(string: raw) else { continue }
+            if link?.host == "click.duga.jp", isDugaJacket(image) { dugas.append(image) }
+            if link?.host == "www.mgstage.com", image.host == "image.mgstage.com",
+               CatalogueIdentity.matches(pid, wanted: number), AvbaseMetadata.cleanImageURL(image),
+               let parts = CatalogueIdentity.parts(pid) {
+                let suffix = parts.prefix.lowercased() + "-" + parts.serial.lowercased() + ".jpg"
+                guard image.lastPathComponent.lowercased().hasSuffix(suffix) else { continue }
+                mgs.append(image)
+            }
+        }
+        var out: [String] = []
+        for image in mgs {
+            if isMGSPrestigePackage(image) { out.append(image.absoluteString) }
+            if image.lastPathComponent.hasPrefix("pb_e_") {
+                let pf = image.deletingLastPathComponent().appendingPathComponent("pf_e_" + image.lastPathComponent.dropFirst(5))
+                if AvbaseMetadata.cleanImageURL(pf) { out.append(pf.absoluteString) }
+            }
+        }
+        let makers = Set(mgs.compactMap(mgsMaker))
+        let duga: URL? = dugas.count == 1 ? dugas[0] : {
+            let matched = dugas.filter { dugaLabel($0).map(makers.contains) == true }
+            return matched.count == 1 ? matched[0] : nil
+        }()
+        if let duga { out.insert(duga.absoluteString, at: 0) }
+        var seen = Set<String>()
+        return out.filter { seen.insert($0).inserted }
+    }
+}
+
 private final class CatalogueRedirectBlocker: NSObject, URLSessionTaskDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
@@ -403,3 +466,4 @@ actor AvbasePortraitService {
         return nil
     }
 }
+

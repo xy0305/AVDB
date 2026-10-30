@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AICOVER2850000000000004A /* CoverSR.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000004F /* CoverSR.mlpackage */; };
+		AICOVER2850000000000003A /* AICoverViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000003F /* AICoverViews.swift */; };
+		AICOVER2850000000000002A /* AICoverEnhancer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000002F /* AICoverEnhancer.swift */; };
+		AICOVER2850000000000001A /* AICoverSREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000001F /* AICoverSREngine.swift */; };
+		AICOVER2850000000000000A /* AICoverPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AICOVER2850000000000000F /* AICoverPolicy.swift */; };
  D66000000000000000000001 /* DMMTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D66000000000000000000002; };
 		D26700000000000000000002 /* DMMRankingGraphQL.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26700000000000000000001 /* DMMRankingGraphQL.swift */; };
 		D26700000000000000000004 /* DMMRankingHydrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26700000000000000000003 /* DMMRankingHydrator.swift */; };
@@ -113,6 +118,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AICOVER2850000000000004F /* CoverSR.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = CoverSR.mlpackage; sourceTree = "<group>"; };
+		AICOVER2850000000000003F /* AICoverViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoverViews.swift; sourceTree = "<group>"; };
+		AICOVER2850000000000002F /* AICoverEnhancer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoverEnhancer.swift; sourceTree = "<group>"; };
+		AICOVER2850000000000001F /* AICoverSREngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoverSREngine.swift; sourceTree = "<group>"; };
+		AICOVER2850000000000000F /* AICoverPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoverPolicy.swift; sourceTree = "<group>"; };
  D66000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMTransport.swift; sourceTree = "<group>"; };
 		D26700000000000000000001 /* DMMRankingGraphQL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingGraphQL.swift; sourceTree = "<group>"; };
 		D26700000000000000000003 /* DMMRankingHydrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMMRankingHydrator.swift; sourceTree = "<group>"; };
@@ -244,6 +254,7 @@
 			children = (
 				A15400000000000000000002 /* OriginalLUT.js */,
 				A15700000000000000000002 /* Enhancement.metallib */,
+				AICOVER2850000000000004F /* CoverSR.mlpackage */,
 				A15500000000000000000002 /* face_landmarker.task */,
 				A115C11E7A7B115C11E7A108 /* Assets.xcassets */,
 				E052588B357DFB38D46096A4 /* JavVerseSnapshot.json */,
@@ -291,6 +302,7 @@
 			children = (
 				14321A82C49C1554A3104999 /* MovieDetailView.swift */,
 				B26000000000000000000002 /* PlaybackResourceCards.swift */,
+				AICOVER2850000000000003F /* AICoverViews.swift */,
 			);
 			name = Detail;
 			path = Detail;
@@ -374,6 +386,9 @@
 				RECJAVDB281000000000001F /* RecommendationJavDBSource.swift */,
 				ONLINEDNS28300000000001F /* OnlineDNSPolicy.swift */,
 				DMMCOVER282000000000001F /* DMMCoverResolver.swift */,
+				AICOVER2850000000000002F /* AICoverEnhancer.swift */,
+				AICOVER2850000000000001F /* AICoverSREngine.swift */,
+				AICOVER2850000000000000F /* AICoverPolicy.swift */,
 				DMMSEED2820000000000001F /* DMMLabelSeed.swift */,
 				FEATSTORE000000000000002 /* FeatureStores.swift */,
 				B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */,
@@ -623,6 +638,11 @@
 				RECVIEW2810000000000001B /* RecommendationsView.swift in Sources */,
 				ONLINEDNS28300000000001B /* OnlineDNSPolicy.swift in Sources */,
 				DMMCOVER282000000000001B /* DMMCoverResolver.swift in Sources */,
+				AICOVER2850000000000004A /* CoverSR.mlpackage in Sources */,
+				AICOVER2850000000000003A /* AICoverViews.swift in Sources */,
+				AICOVER2850000000000002A /* AICoverEnhancer.swift in Sources */,
+				AICOVER2850000000000001A /* AICoverSREngine.swift in Sources */,
+				AICOVER2850000000000000A /* AICoverPolicy.swift in Sources */,
 				DMMSEED2820000000000001B /* DMMLabelSeed.swift in Sources */,
 				FEATSTORE000000000000001 /* FeatureStores.swift in Sources */,
 				BC9852482E251643D9E18203 /* ListsView.swift in Sources */,
@@ -671,7 +691,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 284;
+				CURRENT_PROJECT_VERSION = 285;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -694,7 +714,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 284;
+				CURRENT_PROJECT_VERSION = 285;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

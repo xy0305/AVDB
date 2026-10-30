@@ -202,12 +202,68 @@ enum DMMImageValidation {
         }
         return width >= 360 && height >= 500 && (0.5...0.82).contains(ratio) ? .portrait : .tooSmall
     }
-    /// Right-hand front of a DMM jacket (measured 745/1081 = 0.69 of the height on MILK-311).
-    static func frontCrop(width: Int, height: Int) -> (x: Int, width: Int)? {
+    /// Build 285: front width / jacket height. Matching ps against pl on 2184×1468 jackets puts
+    /// the true front at the right-aligned 0.703·h (15/17 titles, mean error 0.5 px); MILK
+    /// (h_1240milk, 745/1081) is 0.689. The old 0.69 trimmed ~2% off the left of every front.
+    static let standardFrontRatio = 0.703
+    static let milkFrontRatio = 0.69
+    static func frontRatio(source: String) -> Double {
+        let cid = DMMCoverURLs.cid(source) ?? URL(string: source)?.lastPathComponent.lowercased() ?? ""
+        return cid.hasPrefix("h_1240") ? milkFrontRatio : standardFrontRatio
+    }
+    /// Right-hand front of a DMM jacket.
+    static func frontCrop(width: Int, height: Int, source: String = "") -> (x: Int, width: Int)? {
         let ratio = Double(width) / Double(max(1, height))
         guard (1.35...1.65).contains(ratio) else { return nil }
-        let w = Int((Double(height) * 0.69).rounded())
+        let w = Int((Double(height) * frontRatio(source: source)).rounded())
         return w < width ? (width - w, w) : nil
+    }
+}
+
+/// Build 285: CIDs whose digital ps is only the 147×200 thumbnail (IPX-706-era jacket-only titles).
+/// Persisted (UserDefaults, 14-day TTL so a late real portrait is picked up again) so the
+/// ps probe no longer wastes one of the two concurrent / six total selection slots.
+final class DMMJacketOnly: @unchecked Sendable {
+    static let shared = DMMJacketOnly()
+    static let defaultsKey = "dmm.jacketOnly.v1"
+    static let ttl: TimeInterval = 14 * 86400
+    static let capacity = 2000
+    private let lock = NSLock()
+    private var entries: [String: Double]
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        entries = (defaults.dictionary(forKey: Self.defaultsKey) as? [String: Double]) ?? [:]
+    }
+    func contains(_ cid: String, now: Date = Date()) -> Bool {
+        lock.locked {
+            guard let t = entries[cid.lowercased()] else { return false }
+            return now.timeIntervalSince1970 - t < Self.ttl
+        }
+    }
+    func learn(_ cid: String, now: Date = Date()) {
+        let snapshot: [String: Double] = lock.locked {
+            entries[cid.lowercased()] = now.timeIntervalSince1970
+            if entries.count > Self.capacity {
+                for (k, _) in entries.sorted(by: { $0.value < $1.value }).prefix(entries.count - Self.capacity) { entries[k] = nil }
+            }
+            return entries
+        }
+        defaults.set(snapshot, forKey: Self.defaultsKey)
+    }
+    /// A 147×200 digital ps from awsimgsrc / pics marks the CID as jacket-only.
+    func observe(source: String, width: Int, height: Int) {
+        guard width == 147, height == 200, source.hasSuffix("ps.jpg"), source.contains("/digital/video/"),
+              let cid = DMMCoverURLs.cid(source) else { return }
+        learn(cid)
+    }
+    /// Drop the known-tiny ps from a candidate list (the pl jacket stays).
+    func filter(_ urls: [String]) -> [String] {
+        urls.filter { url in
+            guard url.hasSuffix("ps.jpg"), let cid = DMMCoverURLs.cid(url) else { return true }
+            return !contains(cid)
+        }
     }
 }
 

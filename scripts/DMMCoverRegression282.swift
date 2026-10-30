@@ -62,7 +62,7 @@ check(DMMImageValidation.classify(width: 590, height: 800, bytes: 40000, source:
 check(DMMImageValidation.classify(width: 800, height: 800, bytes: 2732, source: "x/abcps.jpg") == .placeholder, "2,732-byte body")
 check(DMMImageValidation.classify(width: 800, height: 600, bytes: 9000, source: "x/abcps.jpg", finalURL: URL(string: "https://pics.dmm.com/mono/noimage/now_printing.jpg")) == .placeholder, "now_printing redirect")
 check(DMMImageValidation.classify(width: 300, height: 400, bytes: 20000, source: "x/abcps.jpg") == .tooSmall, "small ps")
-let crop = DMMImageValidation.frontCrop(width: 1600, height: 1081)!
+let crop = DMMImageValidation.frontCrop(width: 1600, height: 1081, source: "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/h_1240milk00311/h_1240milk00311pl.jpg")!
 check(abs(crop.x - 855) <= 2 && abs(crop.width - 745) <= 2, "jacket front crop matches the ps (\(crop))")
 check(DMMImageValidation.frontCrop(width: 745, height: 1081) == nil, "portrait not cropped")
 
