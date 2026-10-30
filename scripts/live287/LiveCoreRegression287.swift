@@ -43,6 +43,8 @@ check(LiveText.collapseRepeats("ありがとうありがとうありがとうあ
 check(LiveText.collapseRepeats("はい") == "はい" && LiveText.collapseRepeats("あああああああ") == "ああ", "collapse short")
 check(LiveText.isNoise("ご視聴ありがとうございました。") && LiveText.isNoise("♪〜") && !LiveText.isNoise("ありがとう"), "hallucination / noise filter")
 check(LiveText.clean("(拍手) 本当に？ <|ja|>") == "本当に？", "clean brackets + special tokens: \(LiveText.clean("(拍手) 本当に？ <|ja|>"))")
+check(LiveText.clean("私はずっと君 のこ とが 好き だっ た。") == "私はずっと君のことが好きだった。", "289 SenseVoice CJK spaces")
+check(LiveText.clean("OK Google です") == "OK Google です", "289 keeps ASCII-adjacent spaces")
 check(LiveText.chinesePunctuation("待一点,你去哪儿?") == "待一点，你去哪儿？", "zh punctuation")
 check(LiveText.chinesePunctuation("现在 3.5 点, 好!") == "现在3.5点，好！", "zh punctuation numbers/spaces: \(LiveText.chinesePunctuation("现在 3.5 点, 好!"))")
 check(LiveText.similarity("明日の朝、駅で", "明日の朝駅で") > 0.8 && LiveText.similarity("こんにちは", "さようなら") < 0.2, "similarity")

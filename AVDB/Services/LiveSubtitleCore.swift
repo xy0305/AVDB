@@ -271,6 +271,7 @@ enum LiveText {
     static func clean(_ raw: String) -> String {
         var s = raw.replacingOccurrences(of: #"<\|[^|]*\|>"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"[\(（\[［][^\)）\]］]{0,12}[\)）\]］]"#, with: "", options: .regularExpression)   // (拍手) [音楽]
+            .replacingOccurrences(of: #"(?<=[^\x00-\x7F])[ \t\u3000]+(?=[^\x00-\x7F])"#, with: "", options: .regularExpression)   // 289: SenseVoice BPE spaces "君 のこ とが"
             .trimmingCharacters(in: .whitespacesAndNewlines)
         s = collapseRepeats(s)
         return s

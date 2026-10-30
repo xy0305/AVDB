@@ -25,6 +25,7 @@ Why sherpa-onnx instead of a Core ML conversion: prebuilt iOS xcframework (devic
 - SenseVoice falling behind (RTF > 0.7, or ≥ 3 of the last 5 lines with > 2 s latency) → session override to Apple.
 - Memory warning while on Whisper → SenseVoice.
 - Load failure walks the candidate list (SenseVoice → Apple; Whisper → SenseVoice → Apple).
+- SenseVoice BPE output spaces between Japanese characters ("君 のこ とが") are stripped in `LiveText.clean` (ASCII-adjacent spaces kept).
 - Toast is a small capsule, auto-hides after 5 s, not over the subtitle line or video centre.
 
 ## Anti-stutter
