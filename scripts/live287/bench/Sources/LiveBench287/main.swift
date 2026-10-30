@@ -40,34 +40,6 @@ func pcm(_ name: String) throws -> [Float] {
 }
 func fmt(_ v: Double?) -> String { v.map { String(format: "%.2f", $0) } ?? "-" }
 
-// MARK: 1. ASR per tier
-var recognizers: [LiveASRTier: LiveWhisperRecognizer] = [:]
-var asrReport: [[String: Any]] = []
-for tier in [LiveASRTier.small, .turbo] {
-    guard FileManager.default.fileExists(atPath: modelsRoot.appendingPathComponent(tier.folder).path) else { print("ASR \(tier): model missing"); continue }
-    do {
-        let r = try await LiveWhisperRecognizer.load(tier)
-        recognizers[tier] = r
-        _ = try await r.transcribe(try pcm(lines[0].raw), prompt: nil)          // warm-up
-        var rows: [[String: Any]] = [], total = 0.0, cerSum = 0.0, audio = 0.0
-        for l in lines {
-            let s = try pcm(l.raw)
-            let t0 = now()
-            let text = LiveText.clean(try await r.transcribe(s, prompt: nil))
-            let ms = (now() - t0) * 1000
-            let c = cer(text, l.ja)
-            total += ms; cerSum += c; audio += Double(s.count) / 16000
-            rows.append(["ref": l.ja, "hyp": text, "ms": ms, "cer": c, "audio_s": Double(s.count) / 16000])
-            print(String(format: "ASR %@  %6.0f ms  CER %.2f  %@ | %@", tier.title, ms, c, text, l.ja))
-        }
-        let avg = total / Double(lines.count)
-        asrReport.append(["tier": tier.rawValue, "folder": tier.folder, "load_s": r.loadSeconds, "avg_ms": avg,
-                          "rtf": total / 1000 / audio, "mean_cer": cerSum / Double(lines.count), "lines": rows])
-        print(String(format: "ASR %@ load %.1fs  avg %.0f ms/line  RTF %.3f  mean CER %.3f", tier.title, r.loadSeconds, avg, total / 1000 / audio, cerSum / Double(lines.count)))
-    } catch { print("ASR \(tier) failed: \(error)"); asrReport.append(["tier": tier.rawValue, "error": "\(error)"]) }
-}
-report["asr"] = asrReport
-
 // MARK: 2. NLLB
 var nllb: NLLBCoreMLTranslator?
 do {
@@ -160,28 +132,53 @@ func e2e(name: String, asr: LiveSpeechRecognizer, mt: LiveTranslating?, lead: Do
     let sorted = zh.sorted()
     let summary: [String: Any] = [
         "name": name, "lead": lead, "from": from, "lines": recs.count, "inSync": recs.filter(\.inSync).count,
-        "zhLatency_mean": zh.isEmpty ? -1 : zh.reduce(0, +) / Double(zh.count),
-        "zhLatency_p90": sorted.isEmpty ? -1 : sorted[min(sorted.count - 1, Int(Double(sorted.count) * 0.9))],
-        "jaLatency_mean": recs.isEmpty ? -1 : recs.map(\.jaLatency).reduce(0, +) / Double(recs.count),
-        "firstCaptionAfterStart": (firstAny ?? -1) - from, "rows": rows,
-        "asr_ms_mean": recs.isEmpty ? -1 : recs.map(\.asrMs).reduce(0, +) / Double(recs.count),
-        "mt_ms_mean": recs.compactMap(\.mtMs).isEmpty ? -1 : recs.compactMap(\.mtMs).reduce(0, +) / Double(recs.compactMap(\.mtMs).count),
-        "queue_ms_mean": recs.isEmpty ? -1 : recs.map(\.queueMs).reduce(0, +) / Double(recs.count),
+        "zhLatency_mean": zh.isEmpty ? -1.0 : zh.reduce(0, +) / Double(zh.count),
+        "zhLatency_p90": sorted.isEmpty ? -1.0 : sorted[min(sorted.count - 1, Int(Double(sorted.count) * 0.9))],
+        "jaLatency_mean": recs.isEmpty ? -1.0 : recs.map(\.jaLatency).reduce(0, +) / Double(recs.count),
+        "firstCaptionAfterStart": (firstAny ?? -1.0) - from, "rows": rows,
+        "asr_rtf": pipeline.snapshotStats.rtfAvg, "partials_allowed_at_end": pipeline.snapshotStats.asrMsAvg < 1000,
+        "asr_ms_mean": recs.isEmpty ? -1.0 : recs.map(\.asrMs).reduce(0, +) / Double(recs.count),
+        "mt_ms_mean": recs.compactMap(\.mtMs).isEmpty ? -1.0 : recs.compactMap(\.mtMs).reduce(0, +) / Double(recs.compactMap(\.mtMs).count),
+        "queue_ms_mean": recs.isEmpty ? -1.0 : recs.map(\.queueMs).reduce(0, +) / Double(recs.count),
     ]
     print(String(format: "  ⇒ in sync %d/%d · zh latency mean %.2fs p90 %.2fs · ja mean %.2fs · first caption %.2fs after start",
                  recs.filter(\.inSync).count, recs.count, summary["zhLatency_mean"] as! Double, summary["zhLatency_p90"] as! Double,
-                 summary["jaLatency_mean"] as! Double, (firstAny ?? -1) - from))
+                 summary["jaLatency_mean"] as! Double, (firstAny ?? -1.0) - from))
     return summary
 }
 
 var e2eReport: [[String: Any]] = []
 let mid = lines[lines.count / 2].start - 0.5
-for tier in [LiveASRTier.turbo, .small] {
-    guard let r = recognizers[tier] else { continue }
-    e2eReport.append(await e2e(name: "\(tier.rawValue)-lookahead", asr: r, mt: nllb, lead: 20, from: 0))
-    e2eReport.append(await e2e(name: "\(tier.rawValue)-paced", asr: r, mt: nllb, lead: 0.25, from: 0))
-    e2eReport.append(await e2e(name: "\(tier.rawValue)-seek-mid", asr: r, mt: nllb, lead: 20, from: mid))
+// MARK: 1. ASR per tier
+var asrReport: [[String: Any]] = []
+for tier in [LiveASRTier.small, .turbo] {
+    guard FileManager.default.fileExists(atPath: modelsRoot.appendingPathComponent(tier.folder).path) else { print("ASR \(tier): model missing"); continue }
+    do {
+        let r = try await LiveWhisperRecognizer.load(tier)
+        _ = try await r.transcribe(try pcm(lines[0].raw), prompt: nil)          // warm-up
+        var rows: [[String: Any]] = [], total = 0.0, cerSum = 0.0, audio = 0.0
+        for l in lines {
+            let s = try pcm(l.raw)
+            let t0 = now()
+            let text = LiveText.clean(try await r.transcribe(s, prompt: nil))
+            let ms = (now() - t0) * 1000
+            let c = cer(text, l.ja)
+            total += ms; cerSum += c; audio += Double(s.count) / 16000
+            rows.append(["ref": l.ja, "hyp": text, "ms": ms, "cer": c, "audio_s": Double(s.count) / 16000])
+            print(String(format: "ASR %@  %6.0f ms  CER %.2f  %@ | %@", tier.title, ms, c, text, l.ja))
+        }
+        let avg = total / Double(lines.count)
+        asrReport.append(["tier": tier.rawValue, "folder": tier.folder, "load_s": r.loadSeconds, "avg_ms": avg,
+                          "rtf": total / 1000 / audio, "mean_cer": cerSum / Double(lines.count), "lines": rows])
+        print(String(format: "ASR %@ load %.1fs  avg %.0f ms/line  RTF %.3f  mean CER %.3f", tier.title, r.loadSeconds, avg, total / 1000 / audio, cerSum / Double(lines.count)))
+        // One tier resident at a time (as on device): end-to-end runs with this tier, then it is released.
+        e2eReport.append(await e2e(name: "\(tier.rawValue)-lookahead", asr: r, mt: nllb, lead: 20, from: 0))
+        e2eReport.append(await e2e(name: "\(tier.rawValue)-paced", asr: r, mt: nllb, lead: 0.25, from: 0))
+        e2eReport.append(await e2e(name: "\(tier.rawValue)-seek-mid", asr: r, mt: nllb, lead: 20, from: mid))
+    } catch { print("ASR \(tier) failed: \(error)"); asrReport.append(["tier": tier.rawValue, "error": "\(error)"]) }
 }
+report["asr"] = asrReport
+
 report["e2e"] = e2eReport
 report["host"] = ProcessInfo.processInfo.hostName
 report["note"] = "GitHub macOS runner = virtualised Apple M1: Core ML runs CPU-only (no ANE/GPU). iPhone Neural Engine timings are NOT measured here."

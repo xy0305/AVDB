@@ -60,6 +60,8 @@ final class LiveSubtitleEngine: ObservableObject {
     private var lastTick: (wall: Double, media: Double, rate: Double)?
     private var lastSavedCount = 0
     private var guardTier: LiveASRTier?
+    /// Set when the measured real-time factor shows turbo cannot keep up on this device (session-wide).
+    private var perfDegraded = false
     /// State the reader thread reads without hopping to the main actor.
     private final class Shared: @unchecked Sendable {
         private let lock = NSLock()
@@ -141,7 +143,7 @@ final class LiveSubtitleEngine: ObservableObject {
         stopRunning()
         let verdict = currentVerdict()
         if case .pause(let why) = verdict { phase = .paused(why); notice = why; startTicker(); return }
-        var tier = preferredTier
+        var tier = perfDegraded ? .small : preferredTier
         if case .degrade(let t, let why) = verdict { tier = t; notice = why }
         guardTier = tier
         phase = .loading(LiveModels.whisperAvailable(tier) ? "正在加载语音模型 \(tier.title)…" : "模型未打包")
@@ -321,12 +323,13 @@ final class LiveSubtitleEngine: ObservableObject {
 
     private func updateLatencyText() {
         let recs = pipeline.latency.filter { $0.segment >= 0 }.suffix(20)
+        let rtf = pipeline.snapshotStats.rtfAvg
         guard !recs.isEmpty else { latencyText = ""; return }
         let sync = recs.filter(\.inSync).count
         let zh = recs.compactMap(\.zhLatency)
         let avg = zh.isEmpty ? 0 : zh.reduce(0, +) / Double(zh.count)
         let asrMs = recs.map(\.asrMs).reduce(0, +) / Double(recs.count)
-        latencyText = String(format: "同步 %d/%d · 平均滞后 %.2fs · ASR %.0fms", sync, recs.count, avg, asrMs)
+        latencyText = String(format: "同步 %d/%d · 平均滞后 %.2fs · ASR %.0fms (%.2f× 实时)", sync, recs.count, avg, asrMs, rtf)
     }
 
     // MARK: guard
@@ -363,8 +366,24 @@ final class LiveSubtitleEngine: ObservableObject {
             if guardTier != t { notice = why; Self.sharedASR = nil; start() }
         case .run(let t):
             if case .paused = phase { notice = nil; start(); return }
-            if guardTier != t, phase == .running { notice = nil; Self.sharedASR = nil; start() }
+            let want = perfDegraded ? .small : t
+            if guardTier != want, phase == .running { notice = nil; Self.sharedASR = nil; start() }
         }
+        checkPerformance()
+    }
+
+    /// Realtime first: if turbo's measured compute time exceeds 0.8 s per second of speech (it would fall
+    /// behind the look-ahead window), drop to small for this session — unless the user pinned turbo.
+    private func checkPerformance() {
+        guard phase == .running, activeTier == .turbo, !perfDegraded, tierPreference == .automatic,
+              LiveModels.whisperAvailable(.small) else { return }
+        let st = pipeline.snapshotStats
+        guard st.finalsMeasured >= 3, st.rtfAvg > 0.8 else { return }
+        perfDegraded = true
+        notice = String(format: "turbo 在本机无法实时（%.1f× 实时），已切换 small 模型", st.rtfAvg)
+        saveCache(force: true)
+        Self.sharedASR = nil
+        start()
     }
 
     // MARK: cache

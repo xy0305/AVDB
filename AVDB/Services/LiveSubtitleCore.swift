@@ -439,11 +439,18 @@ enum LiveScheduler {
     enum Job: Equatable { case final(Int), partial, idle }
     /// - finals: start times of queued final utterances (in arrival order).
     /// - openStart: start of the utterance still being spoken (decoder side), if any.
-    static func next(finals: [Double], openStart: Double?, openLength: Double, playhead: Double,
-                     sinceLastPartial: Double, partialHop: Double = 0.8) -> Job {
-        if let k = finals.indices.min(by: { finals[$0] < finals[$1] }) { return .final(k) }
-        // Streaming partials only when the reader is NOT ahead (the playhead is inside the open utterance).
-        if let s = openStart, s <= playhead + 0.4, openLength >= 0.7, sinceLastPartial >= partialHop { return .partial }
+    static func next(finals: [Double], ends: [Double]? = nil, openStart: Double?, openLength: Double, playhead: Double,
+                     sinceLastPartial: Double, partialHop: Double = 0.8, allowPartial: Bool = true) -> Job {
+        if !finals.isEmpty {
+            // Lines still on screen (or ahead) first, earliest first; lines the playhead already left are backfill.
+            let ends = ends ?? finals
+            let live = finals.indices.filter { ends[$0] >= playhead - 1.0 }
+            let pool = live.isEmpty ? Array(finals.indices) : live
+            return .final(pool.min(by: { finals[$0] < finals[$1] })!)
+        }
+        // Streaming partials only when the reader is NOT ahead (the playhead is inside the open utterance) and the
+        // recogniser is fast enough that a partial cannot delay the next final.
+        if allowPartial, let s = openStart, s <= playhead + 0.4, openLength >= 0.7, sinceLastPartial >= partialHop { return .partial }
         return .idle
     }
     /// Reader pacing: keep decoding until `lead` seconds of audio exist beyond the playhead.
@@ -562,7 +569,11 @@ protocol LiveTranslating: AnyObject, Sendable {
 /// Thread-safe pipeline state; the decoder thread feeds PCM, a single worker task runs ASR → MT in
 /// playhead order. All media times are seconds. Observers read `snapshot` on the main thread.
 final class LivePipeline: @unchecked Sendable {
-    struct Stats: Equatable, Sendable { var decodedEnd = 0.0; var queued = 0; var lastASRms = 0.0; var lastMTms = 0.0; var behind = false }
+    struct Stats: Equatable, Sendable {
+        var decodedEnd = 0.0; var queued = 0; var lastASRms = 0.0; var lastMTms = 0.0; var behind = false
+        /// EWMA of ASR milliseconds per final and of the real-time factor (compute seconds / audio seconds).
+        var asrMsAvg = 0.0; var rtfAvg = 0.0; var finalsMeasured = 0; var asrMeasured = 0
+    }
     private let lock = NSLock()
     private var vad = LiveVAD()
     private var finals: [(u: LiveUtterance, wall: Double, playhead: Double)] = []   // queued finals
@@ -622,8 +633,9 @@ final class LivePipeline: @unchecked Sendable {
     func work(asr: LiveSpeechRecognizer, mt: LiveTranslating?) async -> Bool {
         let picked: (g: Int, u: LiveUtterance?, queuedAt: Double, readyAt: Double, prompt: String?) = locked {
             let g = generation
-            let job = LiveScheduler.next(finals: finals.map { $0.u.start }, openStart: vad.openStart, openLength: vad.openLength,
-                                         playhead: playhead, sinceLastPartial: now() - lastPartialWall)
+            let job = LiveScheduler.next(finals: finals.map { $0.u.start }, ends: finals.map { $0.u.end }, openStart: vad.openStart,
+                                         openLength: vad.openLength, playhead: playhead, sinceLastPartial: now() - lastPartialWall,
+                                         allowPartial: stats.asrMeasured == 0 || stats.asrMsAvg < 1000)
             var utterance: LiveUtterance?, queuedAt = now(), readyAt = playhead
             switch job {
             case .final(let k): let f = finals.remove(at: k); utterance = f.u; queuedAt = f.wall; readyAt = f.playhead
@@ -647,7 +659,12 @@ final class LivePipeline: @unchecked Sendable {
         let inserted: LiveSegment? = locked {
             guard g == generation else { return nil }
             stats.lastASRms = asrMs
+            stats.asrMsAvg += (stats.asrMeasured == 0 ? 1.0 : 0.3) * (asrMs - stats.asrMsAvg)
+            stats.asrMeasured += 1
             if u.final {
+                let dur = max(0.3, u.end - u.start)
+                stats.rtfAvg += (stats.finalsMeasured == 0 ? 1.0 : 0.3) * (asrMs / 1000 / dur - stats.rtfAvg)
+                stats.finalsMeasured += 1
                 let s = store.insert(start: u.start, end: u.end, ja: raw, tier: asr.tier.rawValue)
                 if let s {
                     lastPrompt = (u.end, s.ja)

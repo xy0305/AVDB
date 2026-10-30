@@ -97,6 +97,9 @@ check(LiveScheduler.next(finals: [5, 3], openStart: nil, openLength: 0, playhead
 check(LiveScheduler.next(finals: [], openStart: 10, openLength: 2, playhead: 2, sinceLastPartial: 9) == .idle, "no partials while the reader is ahead")
 check(LiveScheduler.next(finals: [], openStart: 10, openLength: 1, playhead: 10.5, sinceLastPartial: 0.9) == .partial, "partials when the playhead is inside open speech")
 check(LiveScheduler.next(finals: [], openStart: 10, openLength: 1, playhead: 10.5, sinceLastPartial: 0.3) == .idle, "partial hop 0.8 s")
+check(LiveScheduler.next(finals: [1, 8], ends: [3, 10], openStart: nil, openLength: 0, playhead: 7, sinceLastPartial: 9) == .final(1), "on-screen line before backfill")
+check(LiveScheduler.next(finals: [1], ends: [3], openStart: nil, openLength: 0, playhead: 7, sinceLastPartial: 9) == .final(0), "backfill when nothing is live")
+check(LiveScheduler.next(finals: [], openStart: 10, openLength: 1, playhead: 10.5, sinceLastPartial: 0.9, allowPartial: false) == .idle, "no partials when ASR is slow")
 check(LiveScheduler.readerShouldRun(decodedEnd: 25, playhead: 10, lead: 20, rate: 1) && !LiveScheduler.readerShouldRun(decodedEnd: 31, playhead: 10, lead: 20, rate: 1), "reader lead")
 check(LiveScheduler.readerShouldRun(decodedEnd: 45, playhead: 10, lead: 20, rate: 2), "rate scales lead")
 
