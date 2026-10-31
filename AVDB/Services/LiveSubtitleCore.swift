@@ -121,6 +121,13 @@ enum LiveSubtitleGuard {
         if preferred.isWhisper, thermal >= 2 || lowPower { return .degrade(.senseVoice, "设备发热，已切换 SenseVoice") }
         return .run(preferred)
     }
+    /// 292: the optional LLM translator only runs cool, off Low Power, and above 20 % battery (or charging).
+    static func llmAllowed(thermal: Int, lowPower: Bool, battery: Float, charging: Bool) -> (ok: Bool, why: String) {
+        if thermal >= 2 { return (false, "设备发热") }
+        if lowPower { return (false, "低电量模式") }
+        if !charging, battery >= 0, battery < 0.20 { return (false, "电量低于 20%") }
+        return (true, "")
+    }
     /// 291 hysteresis: after a heat step-down, return to the preferred recognizer only once the device has stayed
     /// below the trigger level for this long (thermal state flaps between neighbouring levels).
     static let recoverSeconds = 120.0
@@ -279,6 +286,8 @@ struct LiveSegment: Codable, Equatable, Identifiable, Sendable {
     /// 291: playhead (media s) when the line became displayable. A line that arrives after its own time window
     /// is shown from `arrival` for a short hold instead of being silently skipped (late-but-valid lines).
     var arrival: Double? = nil
+    /// 292: which translator produced `zh` ("llm" = on-device LLM → the overlay shows 机翻; "table", "mt").
+    var mt: String? = nil
 }
 
 struct LiveCaption: Equatable, Sendable {
@@ -286,6 +295,8 @@ struct LiveCaption: Equatable, Sendable {
     var zh: String?
     var partial: Bool
     var pendingChinese: Bool
+    /// 292: the Chinese line is LLM machine translation (Sakura licence: label 机翻).
+    var machine = false
     static let empty = LiveCaption(ja: nil, zh: nil, partial: false, pendingChinese: false)
     var isEmpty: Bool { (ja ?? "").isEmpty && (zh ?? "").isEmpty }
 }
@@ -402,8 +413,14 @@ struct LiveSegmentStore: Codable, Equatable {
         return seg
     }
 
-    mutating func setChinese(id: Int, _ zh: String) {
-        if let k = segments.firstIndex(where: { $0.id == id }) { segments[k].zh = zh }
+    mutating func setChinese(id: Int, _ zh: String, engine: String? = nil) {
+        if let k = segments.firstIndex(where: { $0.id == id }) { segments[k].zh = zh; segments[k].mt = engine }
+    }
+    /// 292: translation context — the ≤ `n` previous lines with Chinese, within `window` s before `s`.
+    func history(before s: LiveSegment, n: Int = 3, window: Double = 15) -> [(ja: String, zh: String)] {
+        let prev = segments.filter { $0.id != s.id && $0.start < s.start && s.start - $0.end <= window && !($0.zh ?? "").isEmpty
+            && $0.zh != "（翻译失败）" }
+        return prev.suffix(n).map { ($0.ja, $0.zh ?? "") }
     }
 
     mutating func cover(_ start: Double, _ end: Double) {
@@ -460,7 +477,9 @@ struct LiveSegmentStore: Codable, Equatable {
     func caption(at t: Double, mode: LiveSubtitleMode) -> LiveCaption {
         guard mode != .off else { return .empty }
         if let s = currentSegment(at: t) {
-            return compose(ja: s.ja, zh: s.zh, partial: false, mode: mode)
+            var c = compose(ja: s.ja, zh: s.zh, partial: false, mode: mode)
+            c.machine = s.mt == "llm" && !(c.zh ?? "").isEmpty
+            return c
         }
         if let p = partial, t >= p.start - 0.05, t < p.end + 1.5 {
             return compose(ja: p.ja, zh: p.zh, partial: true, mode: mode)
@@ -674,6 +693,9 @@ final class LivePipeline: @unchecked Sendable {
         var merged = 0, inserted = 0, translated = 0, translateFailed = 0, displayed = 0, droppedLate = 0
         var discardedReset = 0, staleResults = 0, lateArrivals = 0, sourceLate = 0, computeLate = 0
         var sourceLagAvg = 0.0, computeMsAvg = 0.0
+        /// 292 translation routing: table answers, skipped moans, LLM lines, Apple/NLLB lines.
+        var mtTable = 0, mtSkip = 0, mtLLM = 0, mtClassic = 0
+        var mtLine: String { "译 表\(mtTable) 略\(mtSkip) LLM\(mtLLM) 常规\(mtClassic)" }
         var stageLine: String {
             String(format: "分段 块%d 音频%.0fs 语句%d 过短%d · 识别空%d 过滤%d 合并%d 失败%d · 入库%d 翻译%d/失败%d · 显示%d 迟到%d(源%d/算%d) 过期丢弃%d · 重置丢弃%d 过时结果%d · 源滞后%.2fs 计算%.0fms",
                    chunks, audioSec, utterances, vadShort, recognizedEmpty, filtered, merged, asrErrors, inserted, translated,
@@ -693,6 +715,9 @@ final class LivePipeline: @unchecked Sendable {
     private var lastPrompt: (end: Double, text: String)?
     private var _mode: LiveSubtitleMode = .bilingual
     private var shownIDs = Set<Int>()
+    /// 292: title glossary (actress names from metadata) for the translators.
+    private var _glossary: [LiveGlossaryEntry] = []
+    var glossary: [LiveGlossaryEntry] { get { locked { _glossary } } set { locked { _glossary = newValue } } }
     var mode: LiveSubtitleMode { get { locked { _mode } } set { locked { _mode = newValue } } }
     var now: () -> Double = { Date().timeIntervalSinceReferenceDate }
     var onChange: (() -> Void)?
@@ -821,11 +846,28 @@ final class LivePipeline: @unchecked Sendable {
 
     private func translate(_ s: LiveSegment, mt: LiveTranslating, generation g: Int) async {
         let t0 = now()
-        let zh = (try? await mt.translate(s.ja)).map { LiveText.chinesePunctuation($0) } ?? ""
+        // 292: tables / moan filter / sentence split / glossary / post-fixes; LLM (when routed) gets the context.
+        let context: LiveMTContext = locked {
+            LiveMTContext(history: store.history(before: s), glossary: _glossary, budget: max(0, s.start - playhead))
+        }
+        let plan = LiveMTPrep.plan(s.ja)
+        var failed = false, contextual = false
+        let zh: String
+        do {
+            let r = try await LiveMTRunner.runDetailed(s.ja, mt: mt, context: context)
+            zh = LiveText.chinesePunctuation(r.zh); contextual = r.contextual
+        } catch { zh = ""; failed = true }
+        let engine: String
+        switch plan {
+        case .skip: engine = "skip"
+        case .direct: engine = "table"
+        case .translate: engine = contextual ? "llm" : "mt"
+        }
         let ms = (now() - t0) * 1000
         locked {
-            store.setChinese(id: s.id, zh.isEmpty ? "（翻译失败）" : zh)
-            if zh.isEmpty { stats.translateFailed += 1 } else { stats.translated += 1 }
+            store.setChinese(id: s.id, failed ? "（翻译失败）" : zh, engine: engine)
+            switch engine { case "skip": stats.mtSkip += 1; case "table": stats.mtTable += 1; case "llm": stats.mtLLM += 1; default: stats.mtClassic += 1 }
+            if failed { stats.translateFailed += 1 } else { stats.translated += 1 }
             stats.lastMTms = ms
             if var r = records[s.id] { r.zhReady = playhead; r.mtMs = ms; records[s.id] = r }
         }

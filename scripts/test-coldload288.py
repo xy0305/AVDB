@@ -23,7 +23,7 @@ mode = sys.argv[1] if len(sys.argv) > 1 else 'all'
 summary = []
 if mode in ('all', 'mac'):
     pkg = r / 'scripts/live288/coldload'; src = pkg / 'Sources/ColdLoad288'
-    for f in ['AVDB/Services/LiveSubtitleCore.swift', 'AVDB/Services/LiveSpeechEngines.swift', 'AVDB/Services/LiveAppleTranslation.swift',
+    for f in ['AVDB/Services/LiveSubtitleCore.swift', 'AVDB/Services/LiveTranslationPrep.swift', 'AVDB/Services/LiveSpeechEngines.swift', 'AVDB/Services/LiveAppleTranslation.swift',
               'scripts/live288/ColdLoadCore288.swift']:
         shutil.copy(r / f, src)
     subprocess.run(['swift', 'build', '-c', 'release', '--package-path', str(pkg)], check=True)

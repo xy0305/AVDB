@@ -6,7 +6,7 @@ d = File.join(r, 'evidence-live289', 'coldload-sim')
 FileUtils.mkdir_p(d)
 p = Xcodeproj::Project.new(File.join(d, 'Cold289.xcodeproj'))
 a = p.new_target(:application, 'Cold289', :ios, '17.0')
-['AVDB/Services/LiveSubtitleCore.swift', 'AVDB/Services/LiveAppleTranslation.swift', 'AVDB/Services/LiveSpeechEngines.swift',
+['AVDB/Services/LiveSubtitleCore.swift', 'AVDB/Services/LiveTranslationPrep.swift', 'AVDB/Services/LiveAppleTranslation.swift', 'AVDB/Services/LiveSpeechEngines.swift',
  'AVDB/Services/LiveSenseVoice.swift', 'AVDB/Services/LiveSystemRecognizers.swift',
  'scripts/live289/ColdLoadCore289.swift', 'scripts/live289/ColdLoadApp289.swift'].each { |f| a.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, f))) }
 models = p.main_group.new_file(File.join(r, 'AVDB/Resources/LiveModels'))

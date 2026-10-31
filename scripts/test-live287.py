@@ -50,8 +50,9 @@ for s in ['fetch_models287.py', 'test-live-bench289.py', 'test-live-ui287.py', '
 swiftc = os.environ.get('SWIFTC') or shutil.which('swiftc') or '/workspace/swift/usr/bin/swiftc'
 with tempfile.TemporaryDirectory() as d:
     shutil.copy(r / 'AVDB/Services/LiveSubtitleCore.swift', d)
+    shutil.copy(r / 'AVDB/Services/LiveTranslationPrep.swift', d)
     shutil.copy(r / 'scripts/live287/LiveCoreRegression287.swift', Path(d) / 'main.swift')
-    cmd = [swiftc, '-O', '-swift-version', '5', 'LiveSubtitleCore.swift', 'main.swift', '-o', 't']
+    cmd = [swiftc, '-O', '-swift-version', '5', 'LiveSubtitleCore.swift', 'LiveTranslationPrep.swift', 'main.swift', '-o', 't']
     if sys.platform == 'darwin': cmd = ['xcrun'] + cmd if swiftc == 'swiftc' else cmd
     subprocess.run(cmd, cwd=d, check=True)
     subprocess.run([str(Path(d) / 't'), str(r / 'scripts/live287')], check=True)

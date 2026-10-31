@@ -10,7 +10,7 @@ work = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "live287-bench"; work.mkdir
 models = r / "AVDB/Resources/LiveModels"
 subprocess.run([sys.executable, str(r / "scripts/live287/prepare_bench287.py"), str(work)], check=True)
 src = r / "scripts/live287/bench/Sources/LiveBench287"
-for f in ["LiveSubtitleCore.swift", "LiveAudioReader.swift", "LiveSpeechEngines.swift", "LiveAppleTranslation.swift"]:
+for f in ["LiveSubtitleCore.swift", "LiveTranslationPrep.swift", "LiveAudioReader.swift", "LiveSpeechEngines.swift", "LiveAppleTranslation.swift"]:
     shutil.copy(r / "AVDB/Services" / f, src / f)
 t0 = time.time()
 subprocess.run(["swift", "build", "-c", "release", "--package-path", str(r / "scripts/live287/bench")], check=True)

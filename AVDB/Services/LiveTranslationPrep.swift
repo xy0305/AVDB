@@ -14,14 +14,17 @@ struct LiveGlossaryEntry: Codable, Equatable, Sendable { var ja: String; var zh:
 struct LiveMTContext: Sendable, Equatable {
     var history: [(ja: String, zh: String)] = []
     var glossary: [LiveGlossaryEntry] = []
+    /// Seconds until the line is due on screen (LLM is only used when it can answer in time).
+    var budget: Double = 3.0
     static func == (a: Self, b: Self) -> Bool {
         a.glossary == b.glossary && a.history.map(\.ja) == b.history.map(\.ja) && a.history.map(\.zh) == b.history.map(\.zh)
     }
 }
 
-/// Translators that can use previous lines + glossary (292: the optional on-device LLM).
+/// Translators that can use previous lines + glossary (292: the optional on-device LLM, or the chain routing to it).
+/// `nil` = not now (disabled / guard / not enough time) → the caller uses the per-piece Apple/NLLB path.
 protocol LiveContextTranslating: LiveTranslating {
-    func translate(_ japanese: String, context: LiveMTContext) async throws -> String
+    func contextTranslate(_ japanese: String, context: LiveMTContext) async throws -> String?
 }
 
 enum LiveMTPrep {
@@ -271,14 +274,18 @@ enum LiveMTPrep {
 /// Runs plan → (protect → translate → restore → post) per piece. Context goes to LiveContextTranslating only.
 enum LiveMTRunner {
     static func run(_ ja: String, mt: LiveTranslating, context: LiveMTContext) async throws -> String {
+        try await runDetailed(ja, mt: mt, context: context).zh
+    }
+    /// `contextual` = the line was answered by a LiveContextTranslating (LLM) rather than the per-piece path.
+    static func runDetailed(_ ja: String, mt: LiveTranslating, context: LiveMTContext) async throws -> (zh: String, contextual: Bool) {
         switch LiveMTPrep.plan(ja) {
-        case .skip: return ""
-        case .direct(let z): return z
+        case .skip: return ("", false)
+        case .direct(let z): return (z, false)
         case .translate(let pieces):
-            if let ctx = mt as? LiveContextTranslating {
+            if let ctx = mt as? LiveContextTranslating, let z = try? await ctx.contextTranslate(ja, context: context) {
                 // the LLM gets the whole line (it handles clauses itself) + history + glossary
-                let z = try await ctx.translate(ja, context: context)
-                return LiveMTPrep.post(z, source: ja)
+                let p = LiveMTPrep.post(z, source: ja)
+                if !p.isEmpty || z.isEmpty { return (p, true) }
             }
             var out: [String] = []
             for p in pieces {
@@ -290,7 +297,7 @@ enum LiveMTRunner {
                     out.append(LiveMTPrep.post(z, source: src))
                 }
             }
-            return LiveMTPrep.join(out)
+            return (LiveMTPrep.join(out), false)
         }
     }
 }

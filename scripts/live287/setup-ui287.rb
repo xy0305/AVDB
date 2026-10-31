@@ -5,7 +5,7 @@ d = File.join(r, 'evidence-live287', 'ui')
 FileUtils.mkdir_p(d)
 p = Xcodeproj::Project.new(File.join(d, 'Live287.xcodeproj'))
 a = p.new_target(:application, 'Live287', :ios, '17.0')
-['AVDB/Services/LiveSubtitleCore.swift', 'AVDB/Services/LiveAppleTranslation.swift', 'AVDB/Views/Player/LiveSubtitleViews.swift',
+['AVDB/Services/LiveSubtitleCore.swift', 'AVDB/Services/LiveTranslationPrep.swift', 'AVDB/Services/LiveAppleTranslation.swift', 'AVDB/Views/Player/LiveSubtitleViews.swift',
  'scripts/live287/LiveUIHost287.swift'].each { |f| a.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, f))) }
 t = p.new_target(:ui_test_bundle, 'Live287UITests', :ios, '17.0'); t.add_dependency(a)
 t.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, 'scripts/live287/LiveUITests287.swift')))

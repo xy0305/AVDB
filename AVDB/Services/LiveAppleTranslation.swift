@@ -117,17 +117,68 @@ final class AppleTranslationBridge: LiveTranslating, ObservableObject, @unchecke
 #endif
 
 /// Apple first (when installed / reachable), NLLB on any Apple failure. Timeouts keep a hung session from
-/// stalling the subtitle queue.
-final class LiveTranslatorChain: LiveTranslating, @unchecked Sendable {
+/// stalling the subtitle queue. 292: optional on-device LLM in front for whole lines with context — only when the
+/// guard allows it (cool, not Low Power, battery ≥ 20 %), the line is due later than the LLM's recent latency,
+/// and it has not failed 3× in a row (then 120 s cool-down); otherwise the classic per-piece path runs.
+final class LiveTranslatorChain: LiveContextTranslating, @unchecked Sendable {
     let primary: LiveTranslating?
     let fallback: LiveTranslating?
     private let lock = NSLock()
     private var primaryFailures = 0
-    var name: String { [primary?.name, fallback?.name].compactMap { $0 }.joined(separator: " → ") }
+    private var _llm: LiveContextTranslating?
+    private var llmAllowed = true
+    private var llmWhy = ""
+    private var llmMsAvg = 0.0, llmCount = 0, llmFailures = 0
+    private var llmPausedUntil = Date.distantPast
+    private(set) var llmLines = 0, llmSkippedLate = 0, llmSkippedGuard = 0
+    private var llmLastError = ""
+    var name: String { [locked { _llm }?.name, primary?.name, fallback?.name].compactMap { $0 }.joined(separator: " → ") }
     private(set) var lastEngine = ""
 
-    init(primary: LiveTranslating?, fallback: LiveTranslating?) { self.primary = primary; self.fallback = fallback }
+    init(primary: LiveTranslating?, fallback: LiveTranslating?, llm: LiveContextTranslating? = nil) {
+        self.primary = primary; self.fallback = fallback; _llm = llm
+    }
     private func locked<T>(_ f: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return f() }
+
+    var llm: LiveContextTranslating? { get { locked { _llm } } set { locked { _llm = newValue; llmCount = 0; llmMsAvg = 0; llmFailures = 0 } } }
+    func setLLMAllowed(_ ok: Bool, why: String) { locked { llmAllowed = ok; llmWhy = why } }
+    var llmStatus: String {
+        locked {
+            guard _llm != nil else { return "" }
+            let state = !llmAllowed ? "暂停（\(llmWhy)）" : Date() < llmPausedUntil ? "冷却中（连续失败）" : "启用"
+            return String(format: "LLM %@ · %d 行 · 平均 %.0fms · 来不及→常规 %d · 守护→常规 %d", state, llmLines, llmMsAvg, llmSkippedLate, llmSkippedGuard)
+                + (llmLastError.isEmpty ? "" : " · 上次错误 \(llmLastError)")
+        }
+    }
+
+    func contextTranslate(_ japanese: String, context: LiveMTContext) async throws -> String? {
+        let gate: (llm: LiveContextTranslating?, budget: Double) = locked {
+            guard let l = _llm else { return (nil, 0) }
+            guard llmAllowed, Date() >= llmPausedUntil else { llmSkippedGuard += 1; return (nil, 0) }
+            let expect = llmCount == 0 ? 1.2 : llmMsAvg / 1000
+            guard context.budget >= expect + 0.3 else { llmSkippedLate += 1; return (nil, 0) }
+            return (l, min(context.budget, 4.0))
+        }
+        guard let llm = gate.llm else { return nil }
+        let ctx: LiveMTContext = { var c = context; c.budget = gate.budget; return c }()
+        let t0 = Date()
+        do {
+            let r = try await Self.withTimeout(gate.budget + 0.5) { try await llm.contextTranslate(japanese, context: ctx) }
+            let ms = Date().timeIntervalSince(t0) * 1000
+            locked {
+                llmMsAvg += (llmCount == 0 ? 1.0 : 0.25) * (ms - llmMsAvg); llmCount += 1
+                llmFailures = 0; llmLines += 1; lastEngine = llm.name
+            }
+            return r
+        } catch {
+            locked {
+                llmFailures += 1
+                if llmFailures >= 3 { llmFailures = 0; llmPausedUntil = Date().addingTimeInterval(120) }
+            }
+            locked { llmLastError = error.localizedDescription }
+            return nil
+        }
+    }
 
     func translate(_ japanese: String) async throws -> String {
         let usePrimary = locked { primaryFailures < 3 }

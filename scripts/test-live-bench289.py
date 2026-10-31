@@ -15,7 +15,7 @@ lib = r / "Vendor/sherpa-onnx-macos.xcframework/macos-arm64_x86_64"
 (r / "scripts/live289/bench/Sources/SherpaOnnxC").mkdir(parents=True, exist_ok=True)
 (r / "scripts/live289/bench/Sources/SherpaOnnxC/module.modulemap").write_text(
     'module SherpaOnnxC {\n  header "%s"\n  link "sherpa-onnx-c-api"\n  export *\n}\n' % (lib / "Headers/sherpa-onnx/c-api/c-api.h"))
-for f in ["LiveSubtitleCore.swift", "LiveAudioReader.swift", "LiveSpeechEngines.swift", "LiveAppleTranslation.swift", "LiveSenseVoice.swift", "LiveSystemRecognizers.swift"]:
+for f in ["LiveSubtitleCore.swift", "LiveTranslationPrep.swift", "LiveAudioReader.swift", "LiveSpeechEngines.swift", "LiveAppleTranslation.swift", "LiveSenseVoice.swift", "LiveSystemRecognizers.swift"]:
     shutil.copy(r / "AVDB/Services" / f, src / f)
 t0 = time.time()
 flags = ["-Xlinker", "-L" + str(lib), "-Xlinker", "-rpath", "-Xlinker", str(lib)]

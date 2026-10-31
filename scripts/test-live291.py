@@ -42,8 +42,9 @@ assert 'push:' not in (r / '.github/workflows/lut4-online290.yml').read_text().s
 swiftc = os.environ.get('SWIFTC') or shutil.which('swiftc') or '/workspace/swift/usr/bin/swiftc'
 with tempfile.TemporaryDirectory() as d:
     shutil.copy(r / 'AVDB/Services/LiveSubtitleCore.swift', d)
+    shutil.copy(r / 'AVDB/Services/LiveTranslationPrep.swift', d)
     shutil.copy(r / 'scripts/live291/LiveCoreRegression291.swift', Path(d) / 'main.swift')
-    cmd = [swiftc, '-O', '-swift-version', '5', 'LiveSubtitleCore.swift', 'main.swift', '-o', 't']
+    cmd = [swiftc, '-O', '-swift-version', '5', 'LiveSubtitleCore.swift', 'LiveTranslationPrep.swift', 'main.swift', '-o', 't']
     if sys.platform == 'darwin' and swiftc == 'swiftc': cmd = ['xcrun'] + cmd
     subprocess.run(cmd, cwd=d, check=True)
     subprocess.run([str(Path(d) / 't')], check=True)
