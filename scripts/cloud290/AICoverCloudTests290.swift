@@ -150,7 +150,11 @@ func unitTests() async {
 func serverTests(_ base: URL) async {
     let client = AICoverCloudClient(bases: [base], key: "test-key", transport: AICoverURLSessionTransport(), prefix: "ci")
     let name = "MOCK-001_378x538"
-    check(await client.fetch(name: name) == .miss, "mock server: GET before upload → 404 miss")
+    // 291: cold URLSession + freshly started Python server can exceed the 2.5 s HEAD budget on a loaded runner
+    // (flaked once in CI run 41162861939); one retry keeps the assertion about the 404 → miss mapping.
+    var first = await client.fetch(name: name)
+    if case .unavailable = first { first = await client.fetch(name: name) }
+    check(first == .miss, "mock server: GET before upload → 404 miss")
     check(await client.upload(name: name, data: jpeg, contentType: "image/jpeg") == .ok, "mock server: PUT → 201")
     check(await client.fetch(name: name) == .hit(jpeg, contentType: "image/jpeg"), "mock server: GET after upload → identical bytes")
     let bad = AICoverCloudClient(bases: [base], key: "wrong", transport: AICoverURLSessionTransport(), prefix: "ci")

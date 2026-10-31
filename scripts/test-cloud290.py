@@ -52,6 +52,9 @@ with tempfile.TemporaryDirectory() as d:
         for _ in range(50):
             try: socket.create_connection(('127.0.0.1', port), 0.2).close(); break
             except OSError: time.sleep(0.1)
+        try:   # warm the mock server (first request pays Python's lazy imports)
+            import urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=5).read()
+        except Exception: pass
         subprocess.run([f'{d}/t', '--server', f'http://127.0.0.1:{port}'], check=True, env=env)
     finally:
         srv.terminate()
