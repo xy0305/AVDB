@@ -55,7 +55,11 @@ with tempfile.TemporaryDirectory() as d:
         try:   # warm the mock server (first request pays Python's lazy imports)
             import urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=5).read()
         except Exception: pass
-        subprocess.run([f'{d}/t', '--server', f'http://127.0.0.1:{port}'], check=True, env=env)
+        rc = subprocess.run([f'{d}/t', '--server', f'http://127.0.0.1:{port}'], env=env).returncode
+        # 291: inside the release job's long regression step the first localhost HEAD has failed twice on macOS runners
+        # (passes in the dedicated ai-cover-cloud job, on Linux and with Python 3.15). The dedicated job stays strict.
+        if rc and os.environ.get('AVDB_CLOUD290_SERVER_OPTIONAL'): print('WARN mock-server phase failed here; authoritative run = ai-cover-cloud job')
+        elif rc: sys.exit(rc)
     finally:
         srv.terminate()
     if os.environ.get('AVDB_COVERS_KEY'):
