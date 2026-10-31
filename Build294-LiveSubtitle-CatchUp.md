@@ -25,4 +25,8 @@
 - 可选 Sakura 下载不变；`AVDB_COVERS_KEY` 注入保留。
 
 ## CI / IPA
-- （push 后回填）
+- CI: https://github.com/xy0305/AVDB/actions/runs/41186730494 （release=success；全绿）
+- IPA artifact: https://github.com/xy0305/AVDB/actions/runs/41186730494/artifacts/13037272675
+- IPA: `AVDB-unsigned-1.0.2-294-livesub-lut4-online-from269.ipa`
+- size 770532502 · sha256 `fb35f2b98330c59116532ee04af2625948787aaf2e51a7b024cf8e9144e9599c` · CFBundleVersion 294 · covers key present (fp `5cc2a6c8`) · llama.framework embedded · no `.gguf` in IPA
+- sourceCommit `615dfa45c34aa358dc31aef8ffbe9c29eac26dfe` · tip `f1fb0e3` (catch-up) + `615dfa4` (live287 assert)
