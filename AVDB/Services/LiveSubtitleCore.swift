@@ -385,10 +385,13 @@ struct LiveSegmentStore: Codable, Equatable {
     enum CodingKeys: String, CodingKey { case segments, covered, nextID }
     init() {}
 
-    /// 293: stitch adjacent finals that VAD closed at a short pause (often the 。 between two clauses of one
-    /// spoken utterance). Gap ≤ 0.85 s and combined body ≤ 64 → one segment / one Chinese line covering the full span.
+    /// 293/296: stitch adjacent SenseVoice finals across a short VAD pause (often 。 within one utterance).
+    /// 296: body ≤ 28 and ≤ 2 clause-final marks — stops short dialogue turns piling into one on-screen line.
     static let adjacentMergeGap = 0.85
-    static let adjacentMergeMaxBody = 64
+    static let adjacentMergeMaxBody = 28
+    static let adjacentMergeMaxClauses = 2
+    /// 296: on-screen Chinese/JA longer than this with ≥2 sentence endings is sliced by time (MT may stay whole).
+    static let displayMaxBody = 28
 
     @discardableResult
     mutating func insert(start: Double, end: Double, ja raw: String, tier: String, arrival: Double? = nil) -> LiveSegment? {
@@ -413,21 +416,24 @@ struct LiveSegmentStore: Codable, Equatable {
         // SenseVoice does not hallucinate repeats, and real repeated short lines (「気持ちいい」×2) were being dropped.
         if tier == LiveASRTier.small.rawValue || tier == LiveASRTier.turbo.rawValue,
            let last = segments.last(where: { $0.end <= start + 0.05 }), start - last.end < 1.5, LiveText.similarity(last.ja, ja) > 0.9 { return nil }
-        // 293: merge a clause that follows the previous final within ~0.85 s (VAD pause at 。) into one utterance.
-        // Previous must end with 。？！ (clause boundary) or the gap must be ≤ 0.85 s — so two dialogue turns
-        // ~1 s apart without a final (e.g. 「一行目です」「二行目です」) stay separate.
-        // SenseVoice only: Whisper/Apple harnesses and the 287 paced pipeline expect one segment per VAD cut.
+        // 293/296: merge a clause that follows the previous final within ~0.85 s (VAD pause at 。) into one utterance.
+        // 296: refuse a 3rd clause / body > 28 so 「来。」「还有…吗？」「温柔的老师…」 stay separate lines.
+        // Dialogue turns ~1 s apart stay separate (gap > adjacentMergeGap). SenseVoice only.
         if tier == LiveASRTier.senseVoice.rawValue,
            let k = segments.indices.last(where: { segments[$0].end <= start + 0.05 }) {
             let gap = start - segments[k].end
             let prev = segments[k]
             let prevFinal = prev.ja.last.map { "。？！?!".contains($0) } ?? false
-            if gap <= Self.adjacentMergeGap, prevFinal || gap <= 0.85 {
+            if gap <= Self.adjacentMergeGap {
                 let combinedBody = LiveText.clean(prev.ja + ja).filter { !$0.isWhitespace && !"。、，,.！!？?…・♪〜~「」『』（）()　".contains($0) }
-                if combinedBody.count <= Self.adjacentMergeMaxBody, LiveText.similarity(prev.ja, ja) < 0.9 {
+                let needDot = !prevFinal
+                let combinedJa = prev.ja + (needDot ? "。" : "") + ja
+                let clauses = combinedJa.filter { "。？！?!".contains($0) }.count
+                if combinedBody.count <= Self.adjacentMergeMaxBody,
+                   clauses <= Self.adjacentMergeMaxClauses,
+                   LiveText.similarity(prev.ja, ja) < 0.9 {
                     var m = prev
-                    let needDot = !prevFinal
-                    m.ja = prev.ja + (needDot ? "。" : "") + ja
+                    m.ja = combinedJa
                     m.end = max(prev.end, end)
                     m.zh = nil; m.mt = nil
                     if let arrival { m.arrival = arrival }
@@ -504,12 +510,66 @@ struct LiveSegmentStore: Codable, Equatable {
         }
         return best.map { segments[$0.k] }
     }
+    /// 296: split on 。！？； for on-screen timing. MT may still keep a multi-clause utterance as one segment.
+    static func sentencePieces(_ text: String) -> [String] {
+        var pieces: [String] = [], cur = ""
+        for ch in text {
+            cur.append(ch)
+            if "。！？；!?".contains(ch) {
+                let t = cur.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !t.isEmpty { pieces.append(t) }
+                cur = ""
+            }
+        }
+        let tail = cur.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !tail.isEmpty { pieces.append(tail) }
+        return pieces
+    }
+    static func bodyCount(_ s: String) -> Int {
+        s.filter { !$0.isWhitespace && !"。、，,.！!？?…・♪〜~「」『』（）()　；;".contains($0) }.count
+    }
+    static func pickPiece(_ pieces: [String], start: Double, end: Double, t: Double) -> String {
+        guard pieces.count > 1 else { return pieces.first ?? "" }
+        let weights = pieces.map { max(1, bodyCount($0)) }
+        let total = Double(weights.reduce(0, +))
+        let span = max(0.35, end - start)
+        var acc = start
+        for (i, w) in weights.enumerated() {
+            let next = i == weights.count - 1 ? Double.infinity : acc + span * Double(w) / total
+            if t < next { return pieces[i] }
+            acc = next
+        }
+        return pieces.last!
+    }
+    /// Prefer one short sentence on screen; keep the full strings when under the body cap.
+    static func displaySlice(ja: String, zh: String?, start: Double, end: Double, t: Double) -> (ja: String, zh: String?) {
+        let zhP = zh.map(sentencePieces) ?? []
+        let jaP = sentencePieces(ja)
+        if let zh, zhP.count > 1, bodyCount(zh) > displayMaxBody {
+            let z = pickPiece(zhP, start: start, end: end, t: t)
+            let j: String
+            if jaP.count == zhP.count {
+                j = pickPiece(jaP, start: start, end: end, t: t)
+            } else if jaP.count > 1, bodyCount(ja) > displayMaxBody {
+                j = pickPiece(jaP, start: start, end: end, t: t)
+            } else {
+                j = ja
+            }
+            return (j, z)
+        }
+        if zh == nil, jaP.count > 1, bodyCount(ja) > displayMaxBody {
+            return (pickPiece(jaP, start: start, end: end, t: t), nil)
+        }
+        return (ja, zh)
+    }
     /// What to draw at media time `t`. A final line stays at least 1.2 s and holds until the next line
     /// (max +0.8 s past its end) so short lines stay readable; late lines are clamped to their arrival.
+    /// 296: multi-sentence Chinese is sliced so only ~1 short sentence shows at a time.
     func caption(at t: Double, mode: LiveSubtitleMode) -> LiveCaption {
         guard mode != .off else { return .empty }
         if let s = currentSegment(at: t) {
-            var c = compose(ja: s.ja, zh: s.zh, partial: false, mode: mode)
+            let sliced = Self.displaySlice(ja: s.ja, zh: s.zh, start: s.start, end: s.end, t: t)
+            var c = compose(ja: sliced.ja, zh: sliced.zh, partial: false, mode: mode)
             c.machine = s.mt == "llm" && !(c.zh ?? "").isEmpty
             return c
         }

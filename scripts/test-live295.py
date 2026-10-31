@@ -12,7 +12,8 @@ lut = (r / 'AVDB/Views/Player/NativeLUT.swift').read_text()
 surf = (r / 'AVDB/Views/Player/NativeHLSLUTSurface.swift').read_text()
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
 pl = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
-assert pl['CFBundleVersion'] == '295' and pbx.count('CURRENT_PROJECT_VERSION = 295;') == 2
+ver = int(pl['CFBundleVersion'])
+assert ver >= 295 and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
 for s in ['enum LiveSeekPolicy', 'coalesceNanoseconds', 'mayReopen(playerReady:', 'mayFirstOpen(playing:']:
     assert s in core, s
 for s in ['seekSettled', 'ensureReader', 'readerSuspended', 'firstOpenGate', 'LiveSeekPolicy.coalesceNanoseconds',
@@ -32,7 +33,7 @@ assert '解码停滞，已回原画' in surf
 wf = (r / '.github/workflows/lut4-online295.yml').read_text()
 for s in ['test-live295.py', 'package-lut295.py', 'AVDB-295-release', 'fetch_llama292.py']:
     assert s in wf, s
-assert 'push:' in wf.split('jobs:')[0]
+assert 'push:' not in wf.split('jobs:')[0], '295 must be dispatch-only under 296'
 assert 'push:' not in (r / '.github/workflows/lut4-online294.yml').read_text().split('jobs:')[0], '294 dispatch-only'
 assert 'push:' not in (r / '.github/workflows/lut4-online293.yml').read_text().split('jobs:')[0]
 assert (r / 'Build295-Seek-BlackScreen.md').exists()

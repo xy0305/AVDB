@@ -12,7 +12,7 @@ pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
 pl = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
 assert int(pl['CFBundleVersion']) >= 293 and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
 assert 'return .translate([.mt(s)])' in prep
-for s in ['adjacentMergeGap', 'adjacentMergeMaxBody', 'grew ? segments[k]', 'LiveASRTier.senseVoice.rawValue']:
+for s in ['adjacentMergeGap', 'adjacentMergeMaxBody', 'adjacentMergeMaxClauses', 'displaySlice', 'grew ? segments[k]', 'LiveASRTier.senseVoice.rawValue']:
     assert s in core, s
 blob = reader + eng + core
 for s in ['holdForSeek', 'abortIO', 'seekDebounce', '450_000_000', 'interrupted || r.abortIO', 'hasPendingSeek || hold']:

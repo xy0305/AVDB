@@ -43,4 +43,25 @@ _ = s3.insert(start: 1, end: 2, ja: "一行目です", tier: "sensevoice")
 _ = s3.insert(start: 3, end: 4, ja: "二行目です", tier: "sensevoice")
 check(s3.segments.count == 2, "dialogue turns stay separate")
 
+
+// 296: third short clause within 0.85 s must NOT glue onto a 2-clause merge (monster-line guard).
+var s4 = LiveSegmentStore()
+_ = s4.insert(start: 10, end: 10.4, ja: "来。", tier: "sensevoice")
+_ = s4.insert(start: 10.7, end: 12.0, ja: "まだ塾も家庭教師もいないから、調査中ですか？", tier: "sensevoice")
+check(s4.segments.count == 1, "two short clauses still merge")
+_ = s4.insert(start: 12.3, end: 13.2, ja: "優しい先生はいいですね。", tier: "sensevoice")
+check(s4.segments.count == 2, "3rd clause stays separate: \(s4.segments.count) ja=\(s4.segments.map(\.ja))")
+check(LiveSegmentStore.adjacentMergeMaxBody <= 28, "max body ≤ 28")
+check(LiveSegmentStore.adjacentMergeMaxClauses == 2, "max clauses == 2")
+
+// 296: display slice — multi-sentence ZH shows one piece at a time
+let monster = "来。还有，没有补习班和固定提供师，所以在调查吗？温柔的老师真好啊。我不认为不严格。"
+let early = LiveSegmentStore.displaySlice(ja: "来。まだ。優しい。厳しくない。", zh: monster, start: 10, end: 18, t: 10.2)
+check((early.zh ?? "").hasPrefix("来。") && !(early.zh ?? "").contains("温柔"), "early shows first ZH sentence: \(early.zh ?? "")")
+let mid = LiveSegmentStore.displaySlice(ja: "来。まだ。優しい。厳しくない。", zh: monster, start: 10, end: 18, t: 14.0)
+check((mid.zh ?? "").contains("温柔") || (mid.zh ?? "").contains("调查"), "mid shows a later sentence: \(mid.zh ?? "")")
+check(LiveSegmentStore.bodyCount(mid.zh ?? "") <= LiveSegmentStore.bodyCount(monster), "slice not longer than full")
+let shortOk = LiveSegmentStore.displaySlice(ja: "うん。", zh: "嗯。好的。", start: 1, end: 2, t: 1.2)
+check(shortOk.zh == "嗯。好的。", "short multi stays whole under body cap")
+
 print(fails == 0 ? "ALL PASS 293 translation" : "FAILURES \(fails)")
