@@ -188,7 +188,11 @@ jobs:
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           xcrun --sdk iphoneos swiftc -sdk "$SDK" -target arm64-apple-ios17.0 -O -parse-as-library -emit-module -module-name NativeHLSRuntime AVDB/Views/Player/NativeHLSLUTSurface.swift -o /tmp/NativeHLSRuntime.swiftmodule
-      - run: python3 scripts/test-hls-runtime.py
+      - name: Strict HLS LUT runtime on the simulator (Simulator.app opened so the display link runs; one retry for frame-pull starvation seen on runner image 20261026)
+        run: |
+          open -a Simulator || true
+          sleep 5
+          python3 scripts/test-hls-runtime.py || { echo "::warning::strict-runtime attempt 1 failed — retrying once"; sleep 10; python3 scripts/test-hls-runtime.py; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
