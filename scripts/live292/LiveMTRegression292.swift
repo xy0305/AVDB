@@ -11,8 +11,10 @@ check(P.plan("The.") == .skip, "ASCII slip skipped")
 check(P.plan("いらっしゃいませ。") == .direct("欢迎光临"), "set phrase いらっしゃいませ")
 check(P.plan("じゃあ、よろしくお願いしますよ。") == .direct("拜托了"), "set phrase with lead + tail")
 check(P.plan("失礼します。") == .direct("打扰了"), "set phrase 失礼します")
-if case .translate(let ps) = P.plan("そろそろ行くよ夜ご飯どうする？") { check(ps.count == 2, "final-particle split \(ps)") } else { check(false, "split plan") }
-if case .translate(let ps) = P.plan("すみません、遅れちゃって。今日は混んでて。") { check(ps.count >= 2, "sentence split \(ps)") } else { check(false, "split plan 2") }
+// 293: whole utterance kept as one MT unit (split removed — it dropped the first Chinese half on device).
+if case .translate(let ps) = P.plan("そろそろ行くよ夜ご飯どうする？") { check(ps.count == 1, "keep whole \(ps)") } else { check(false, "plan") }
+if case .translate(let ps) = P.plan("すみません、遅れちゃって。今日は混んでて。") { check(ps.count == 1, "keep multi-clause \(ps)") } else { check(false, "plan 2") }
+if case .translate(let ps) = P.plan("いいかい、石川くん。君ももう3年目だろ。") { check(ps.count == 1, "石川くん whole \(ps)") } else { check(false, "ishi") }
 check(P.post("现在,我知道.", source: "ももせロ。") == "", "filler on garbled source dropped")
 check(P.post("现在,我很高兴.", source: "嬉しい") == "我很高兴。", "unsupported leading 现在 stripped")
 check(P.post("现在我们要去.", source: "今行くよ") .hasPrefix("现在"), "supported 现在 kept")
@@ -42,7 +44,7 @@ Task {
     let r1 = try await LiveMTRunner.runDetailed("うん。", mt: mt, context: .init())
     check(r1.zh == "嗯" && mt.calls.isEmpty, "table answer makes no MT call")
     let r2 = try await LiveMTRunner.runDetailed("そろそろ行くよ夜ご飯どうする？", mt: mt, context: .init())
-    check(mt.calls.count == 2 && !r2.contextual, "classic path translates each piece (\(mt.calls))")
+    check(mt.calls.count == 1 && !r2.contextual, "classic path one MT call for whole line (\(mt.calls))")
     let llm = MockLLM()
     let chain = LiveTranslatorChain(primary: nil, fallback: mt, llm: llm)
     var ctx = LiveMTContext(history: [("前の行", "上一行")], glossary: [], budget: 6)

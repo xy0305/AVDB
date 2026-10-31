@@ -3,7 +3,7 @@ import Foundation
 // Build 292 — translation quality layer (Foundation-only; shared by the app, the replay harness and the Linux
 // regression). Sits between the recognizer and any translator (Apple Translation / NLLB / optional LLM):
 //   pre:  pure moans/breaths are dropped, ≤ 3-kana interjections and common set phrases are answered from a
-//         table (no MT call), lines are split at sentence boundaries so NLLB does not drop halves, title names
+//         table (no MT call), the whole ASR utterance is kept as one MT unit (293), title names
 //         are protected and restored from the glossary.
 //   post: unsupported leading 「现在」 is stripped, NLLB filler hallucinations on garbled fragments are dropped,
 //         repetition loops are cut, punctuation normalised.
@@ -114,25 +114,14 @@ enum LiveMTPrep {
         return nil
     }
 
-    /// Sentence pieces: SenseVoice punctuates 、。？！ — split there when both sides carry ≥ 3 content chars
-    /// (NLLB otherwise translates the first clause and drops the rest).
+    /// 293: keep the full ASR utterance as ONE translation unit. Build 292 split on 。？！ / final particles so
+    /// NLLB would not drop the second clause, but that path (and VAD pauses at 。) left only the *last* clause's
+    /// Chinese on screen while the Japanese still showed the whole line (e.g. 「いいかい、石川くん。君ももう3年目だろ。」
+    /// → overlay 「你也是第3年吧。」). Apple / Sakura handle multi-clause lines; prefer one MT call over losing a half.
+    /// `pieces` still exists for diagnostics / optional callers; `plan` no longer routes through it for MT.
     static func pieces(_ s: String) -> [String] {
-        var out: [String] = [], cur = ""
-        for ch in s {
-            cur.append(ch)
-            if "。？！?!".contains(ch) { out.append(cur); cur = "" }
-        }
-        if !body(cur).isEmpty { out.append(cur) } else if !cur.isEmpty, !out.isEmpty { out[out.count - 1] += cur }
-        out = out.flatMap(splitAtFinalParticle)
-        // merge too-short pieces into the neighbour
-        var merged: [String] = []
-        for p in out {
-            if let last = merged.last, body(last).count < 3 || body(p).count < 3, phrase(last) == nil || phrase(p) == nil,
-               !(phrase(last) != nil && body(p).count >= 3) {
-                merged[merged.count - 1] = last + p
-            } else { merged.append(p) }
-        }
-        return merged
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        return body(t).isEmpty ? [] : [t]
     }
 
     /// SenseVoice often runs two sentences together without punctuation: 「そろそろ行くよ夜ご飯どうする？」.
@@ -160,13 +149,8 @@ enum LiveMTPrep {
         }
         if isMoan(s) { return .skip }
         if let p = phrase(s) { return .direct(p) }
-        let ps = pieces(s)
-        return .translate(ps.map { p in
-            if let d = interjections[norm(p)] { return .fixed(d + (isQuestion(p) ? "？" : "，")) }
-            if let ph = phrase(p) { return .fixed(ph + (isQuestion(p) ? "" : "，")) }
-            if isMoan(p) { return .fixed("") }
-            return .mt(p)
-        })
+        // 293: one `.mt` for the whole line (no per-clause split that could leave only the last Chinese on screen).
+        return .translate([.mt(s)])
     }
 
     // MARK: glossary (title metadata: actress names)

@@ -183,6 +183,9 @@ final class LiveSubtitleEngine: ObservableObject {
     private var guardTier: LiveASRTier?
     /// 291 diagnostics + hysteresis.
     private var restarts = 0, hotSwaps = 0, readerCatchUps = 0
+    /// 293: coalesce scrub seeks — hold the 2nd HLS reader, apply one restart after settle.
+    private var seekDebounce: Task<Void, Never>?
+    private var seekTarget: Double?
     private var degradedAt: Date?
     private var lastCatchUp = Date.distantPast
     private var swapTask: Task<Void, Never>?
@@ -276,9 +279,25 @@ final class LiveSubtitleEngine: ObservableObject {
     }
 
     /// Explicit seek from the player chrome (jumps found by the ticker are handled the same way).
+    /// 293: debounced. Immediate `restartReader` on every scrub tick used to `av_seek_frame` / reopen the subtitle
+    /// HLS session beside the player mid-seek → video freeze. Hold the reader (no read), update playhead for cached
+    /// captions, then one restart ~0.45 s after the last seek.
     func didSeek(to t: Double) {
-        guard phase == .running else { return }
-        restartReader(at: t)
+        guard phase == .running, t.isFinite else { return }
+        seekTarget = t
+        pipeline.setPlayhead(t)
+        setPace(t, shared.pace.rate)
+        reader.holdForSeek(true)
+        lastTick = (Date().timeIntervalSinceReferenceDate, t, shared.pace.rate)
+        refreshCaption()
+        seekDebounce?.cancel()
+        seekDebounce = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            guard let self, !Task.isCancelled, let target = self.seekTarget else { return }
+            self.seekTarget = nil
+            self.reader.holdForSeek(false)
+            self.restartReader(at: target)
+        }
     }
 
     private func modeChanged(from old: LiveSubtitleMode) {
@@ -651,6 +670,7 @@ final class LiveSubtitleEngine: ObservableObject {
         loadTask?.cancel(); loadTask = nil
         swapTask?.cancel(); swapTask = nil
         worker?.cancel(); worker = nil
+        seekDebounce?.cancel(); seekDebounce = nil; seekTarget = nil
         reader.stop()
         ticker?.cancel(); ticker = nil
         lastTick = nil
@@ -727,9 +747,17 @@ final class LiveSubtitleEngine: ObservableObject {
         guard c.time.isFinite else { return }
         let wall = Date().timeIntervalSinceReferenceDate
         // Seek / jump detection: any discontinuity of > 1.5 s vs the extrapolated clock.
-        if let last = lastTick {
+        // 293: route through didSeek (debounced hold) instead of restartReader on every tick.
+        if seekTarget == nil, let last = lastTick {
             let expected = last.media + (wall - last.wall) * (c.playing ? max(0.25, c.rate) : 0)
-            if abs(c.time - expected) > 1.5 { restartReader(at: c.time) }
+            if abs(c.time - expected) > 1.5 { didSeek(to: c.time); return }
+        }
+        if seekTarget != nil {
+            // Still scrubbing / settling — keep pace at the target, do not catch-up-restart.
+            lastTick = (wall, seekTarget!, c.rate)
+            setPace(seekTarget!, c.playing ? max(1, c.rate) : 1, playing: c.playing)
+            refreshCaption()
+            return
         }
         lastTick = (wall, c.time, c.rate)
         pipeline.setPlayhead(c.time)

@@ -385,6 +385,11 @@ struct LiveSegmentStore: Codable, Equatable {
     enum CodingKeys: String, CodingKey { case segments, covered, nextID }
     init() {}
 
+    /// 293: stitch adjacent finals that VAD closed at a short pause (often the 。 between two clauses of one
+    /// spoken utterance). Gap ≤ 1.5 s and combined body ≤ 64 → one segment / one Chinese line covering the full span.
+    static let adjacentMergeGap = 1.5
+    static let adjacentMergeMaxBody = 64
+
     @discardableResult
     mutating func insert(start: Double, end: Double, ja raw: String, tier: String, arrival: Double? = nil) -> LiveSegment? {
         let ja = LiveText.clean(raw)
@@ -395,17 +400,42 @@ struct LiveSegmentStore: Codable, Equatable {
             let frac = overlap / max(0.01, min(s.end - s.start, end - start))
             if frac > 0.5, LiveText.similarity(s.ja, ja) > 0.55 || s.ja.contains(ja) || ja.contains(s.ja) {
                 // Same line: keep the longer text (more context), widen the timing.
-                if ja.count > s.ja.count { segments[k].ja = ja; segments[k].zh = nil }
+                // 293: when JA grows we clear zh and RETURN the segment so translate() re-runs on the full string
+                // (previously returned nil → Chinese could stay on the short first recognition until a later tick).
+                var grew = false
+                if ja.count > s.ja.count { segments[k].ja = ja; segments[k].zh = nil; segments[k].mt = nil; grew = true }
                 segments[k].start = min(s.start, start); segments[k].end = max(s.end, end)
                 if partial.map({ $0.start < end }) == true { partial = nil }
-                return nil
+                return grew ? segments[k] : nil
             }
         }
         // Consecutive duplicates (Whisper repeating the previous line on a silent tail). 291: Whisper only —
         // SenseVoice does not hallucinate repeats, and real repeated short lines (「気持ちいい」×2) were being dropped.
         if tier == LiveASRTier.small.rawValue || tier == LiveASRTier.turbo.rawValue,
            let last = segments.last(where: { $0.end <= start + 0.05 }), start - last.end < 1.5, LiveText.similarity(last.ja, ja) > 0.9 { return nil }
-        let seg = LiveSegment(id: nextID, start: start, end: end, ja: ja, zh: nil, final: true, tier: tier, arrival: arrival)
+        // 293: merge a clause that follows the previous final within ~1.5 s (VAD pause at 。) into one utterance.
+        // Previous must end with 。？！ (clause boundary) or the gap must be ≤ 0.85 s — so two dialogue turns
+        // ~1 s apart without a final (e.g. 「一行目です」「二行目です」) stay separate.
+        if let k = segments.indices.last(where: { segments[$0].end <= start + 0.05 }) {
+            let gap = start - segments[k].end
+            let prev = segments[k]
+            let prevFinal = prev.ja.last.map { "。？！?!".contains($0) } ?? false
+            if gap <= Self.adjacentMergeGap, prevFinal || gap <= 0.85 {
+                let combinedBody = LiveText.clean(prev.ja + ja).filter { !$0.isWhitespace && !"。、，,.！!？?…・♪〜~「」『』（）()　".contains($0) }
+                if combinedBody.count <= Self.adjacentMergeMaxBody, LiveText.similarity(prev.ja, ja) < 0.9 {
+                    var m = prev
+                    let needDot = !prevFinal
+                    m.ja = prev.ja + (needDot ? "。" : "") + ja
+                    m.end = max(prev.end, end)
+                    m.zh = nil; m.mt = nil
+                    if let arrival { m.arrival = arrival }
+                    segments[k] = m
+                    if partial.map({ $0.start < end }) == true { partial = nil }
+                    return segments[k]
+                }
+            }
+        }
+                let seg = LiveSegment(id: nextID, start: start, end: end, ja: ja, zh: nil, final: true, tier: tier, arrival: arrival)
         nextID += 1
         let idx = segments.firstIndex { $0.start > start } ?? segments.count
         segments.insert(seg, at: idx)

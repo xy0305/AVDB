@@ -1,4 +1,6 @@
 // Build 287 — look-ahead audio reader for live subtitles.
+// Build 293 — seek must abort in-flight FFmpeg I/O (interrupt on pending seek / hold) and coalesce;
+// otherwise scrubbing opens a second HLS storm next to the player and playback freezes.
 //
 // A second, audio-only FFmpeg demux/decode context that runs *ahead of the playhead* on its own thread.
 // It works for every source the player can open (115 / online HLS / AVPlayer + Metal LUT path / local files),
@@ -34,6 +36,12 @@ final class LiveAudioReader: @unchecked Sendable {
     private var stopped = true
     private var token = 0                 // each start() gets a fresh worker; stale threads exit on their own
     fileprivate var interrupted = false   // read by the FFmpeg interrupt callback
+    /// 293: set while a seek is pending or the engine is holding the reader during scrub — interrupt callback
+    /// returns 1 so av_read_frame / open_input abort instead of blocking up to rw_timeout (15 s) and starving the
+    /// player's own HLS connection.
+    fileprivate var abortIO = false
+    /// 293: while true the session loop does not read (bandwidth reserved for the player during seek settle).
+    private var hold = false
     private(set) var duration: Double = 0
 
     static let chunkSamples = 4000        // 0.25 s @ 16 kHz
@@ -45,6 +53,8 @@ final class LiveAudioReader: @unchecked Sendable {
         pendingSeek = (max(0, time), generation)
         stopped = false
         interrupted = false
+        abortIO = false
+        hold = false
         token += 1
         let tok = token
         let t = Thread { [weak self] in self?.run(tok) }
@@ -58,6 +68,18 @@ final class LiveAudioReader: @unchecked Sendable {
     func seek(to time: Double, generation: Int) {
         cond.lock()
         pendingSeek = (max(0, time), generation)
+        abortIO = true          // 293: break any in-flight av_read_frame / open
+        hold = false
+        cond.broadcast()
+        cond.unlock()
+    }
+
+    /// 293: during player scrub — stop reading (free bandwidth) and abort I/O; latest target is applied by seek().
+    func holdForSeek(_ on: Bool) {
+        cond.lock()
+        hold = on
+        if on { abortIO = true }
+        else if pendingSeek == nil { abortIO = false }
         cond.broadcast()
         cond.unlock()
     }
@@ -69,6 +91,8 @@ final class LiveAudioReader: @unchecked Sendable {
         cond.lock()
         stopped = true
         interrupted = true
+        abortIO = true
+        hold = false
         thread = nil
         cond.broadcast()
         cond.unlock()
@@ -169,7 +193,9 @@ final class LiveAudioReader: @unchecked Sendable {
         cb.opaque = Unmanaged.passUnretained(self).toOpaque()
         cb.callback = { ctx -> Int32 in
             guard let ctx else { return 0 }
-            return Unmanaged<LiveAudioReader>.fromOpaque(ctx).takeUnretainedValue().interrupted ? 1 : 0
+            // 293: no lock — FFmpeg may call this while the reader holds `cond`; only read the flags.
+            let r = Unmanaged<LiveAudioReader>.fromOpaque(ctx).takeUnretainedValue()
+            return (r.interrupted || r.abortIO) ? 1 : 0
         }
         fmt?.pointee.interrupt_callback = cb
 
@@ -256,14 +282,18 @@ final class LiveAudioReader: @unchecked Sendable {
             if let swr { swr_init(swr) }
             cursor = nil
             dropUntil = t
+            cond.lock(); if pendingSeek == nil { abortIO = false }; cond.unlock()
         }
 
         while true {
             if dead(tok) { return .stopped }
             if let s = takeSeek(tok) { doSeek(s.time, s.generation) }
             // Pacing — stay ~lead seconds ahead of the playhead, never further.
+            // 293: also wait while `hold` (player scrubbing) so the 2nd HLS connection stops competing.
             cond.lock()
-            while !stopped, tok == token, pendingSeek == nil, !(shouldRun?() ?? true) { _ = cond.wait(until: Date().addingTimeInterval(0.1)) }
+            while !stopped, tok == token, pendingSeek == nil, hold || !(shouldRun?() ?? true) {
+                _ = cond.wait(until: Date().addingTimeInterval(0.1))
+            }
             cond.unlock()
             if dead(tok) { return .stopped }
             if hasPendingSeek { continue }
@@ -274,6 +304,8 @@ final class LiveAudioReader: @unchecked Sendable {
             let r = av_read_frame(ctx, pkt)
             if r < 0 {
                 if dead(tok) { return .stopped }
+                // 293: interrupt from pending seek / hold — do not tear down the session (that re-opens HLS).
+                if hasPendingSeek || hold { continue }
                 if r == Self.errEOF || ctx.pointee.pb?.pointee.eof_reached == 1 {
                     avcodec_send_packet(codec, nil)
                     flush()

@@ -1,7 +1,6 @@
 name: LUT4 online App 292 (实时字幕翻译质量：断句/短语表/去「现在」/复读截断 + 可选本机 Sakura LLM + 291)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

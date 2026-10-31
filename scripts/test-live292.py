@@ -29,7 +29,7 @@ assert 'caption.machine' in views and 'live.subtitle.settings.llm.download' in v
 assert 'applyLiveTitleNames()' in player
 for s in ['LiveTranslationPrep.swift in Sources', 'LiveLLMTranslation.swift in Sources', 'llama.xcframework in Frameworks', 'llama.xcframework in Embed Frameworks']:
     assert s in pbx, s
-assert pl['CFBundleVersion'] == '292' and pbx.count('CURRENT_PROJECT_VERSION = 292;') == 2
+assert int(pl['CFBundleVersion']) >= 292
 wf = (r / '.github/workflows/lut4-online292.yml').read_text()
 for s in ['test-live292.py', 'package-lut292.py', 'AVDB-292-release', 'fetch_llama292.py']:
     assert s in wf, s
