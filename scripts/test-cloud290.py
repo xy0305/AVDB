@@ -23,8 +23,8 @@ for s in ['云端增强图', '本地缓存上限', '仅 Wi‑Fi 上传', '清除
     assert s in views, s
 assert '不上传图片' not in views, 'footer must disclose cloud upload'
 assert 'number: vm.movie?.displayNumber' in detail and 'AICoverCloudRuntime.start()' in app
-assert 'AICoverCloud.swift in Sources' in pbx and pbx.count('CURRENT_PROJECT_VERSION = 290;') == 2
-assert pl['CFBundleVersion'] == '290' and pl['AVDBCoversKey'] == '$(AVDB_COVERS_KEY)', 'key slot is a build setting, not a value'
+assert 'AICoverCloud.swift in Sources' in pbx and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
+assert int(pl['CFBundleVersion']) >= 290 and pl['AVDBCoversKey'] == '$(AVDB_COVERS_KEY)', 'key slot is a build setting, not a value'
 # The key must never be in the repository.
 keyfile = Path('/workspace/r2cover/.app_key')
 secret = os.environ.get('AVDB_COVERS_KEY') or (keyfile.read_text().strip() if keyfile.exists() else '')

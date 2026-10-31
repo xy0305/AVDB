@@ -59,6 +59,21 @@ final class AICoverDiskCache: @unchecked Sendable {
         memory.setObject(image, forKey: key as NSString, cost: cost)
     }
 
+    func memoryImage(key: String) -> UIImage? { memory.object(forKey: key as NSString) }
+    func hasFile(key: String) -> Bool { FileManager.default.fileExists(atPath: url(key).path) }
+    /// 291: disk hits are read + decoded (preparingForDisplay) off the main thread; 290 decoded a 2–4K
+    /// enhanced cover lazily on the main thread at first draw (tens to hundreds of ms per cover).
+    func imageOffMain(key: String) async -> UIImage? {
+        if let hit = memoryImage(key: key) { return hit }
+        let path = url(key)
+        guard let img = await Task.detached(priority: .userInitiated, operation: { () -> UIImage? in
+            guard let data = try? Data(contentsOf: path), let image = UIImage(data: data) else { return nil }
+            try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: path.path)
+            return image.preparingForDisplay() ?? image
+        }).value else { return nil }
+        remember(img, key: key)
+        return img
+    }
     func image(key: String) -> UIImage? {
         if let hit = memory.object(forKey: key as NSString) { return hit }
         let path = url(key)
@@ -267,9 +282,18 @@ final class AICoverEnhanceModel: ObservableObject {
         guard mode != .off, AICoverEnhancePolicy.eligible(source: source, nativeWidth: nativeWidth, nativeHeight: nativeHeight) else {
             phase = .ineligible; return
         }
-        if let cached = cache.image(key: newKey) {
+        if let cached = cache.memoryImage(key: newKey) {
             enhanced = cached; phase = .done; origin = .cache
             uploadLocalIfNeeded(key: newKey)          // 290 migration: pre-290 / not-yet-uploaded files go up opportunistically
+            return
+        }
+        if cache.hasFile(key: newKey) {
+            phase = .idle
+            task = Task { [weak self] in
+                guard let self, let img = await self.cache.imageOffMain(key: newKey), !Task.isCancelled, self.key == newKey else { return }
+                self.enhanced = img; self.phase = .done; self.origin = .cache
+                self.uploadLocalIfNeeded(key: newKey)
+            }
             return
         }
         phase = .idle

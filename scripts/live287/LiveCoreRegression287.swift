@@ -87,9 +87,11 @@ cache.clear(); check(cache.totalBytes() == 0, "clear")
 
 // ---- guard + tier
 check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 0, lowPower: false, battery: 0.8, charging: false) == .run(.senseVoice), "nominal SenseVoice")
-check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 2, lowPower: false, battery: 0.8, charging: false).tier == .apple, "serious → Apple")
+check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 2, lowPower: false, battery: 0.8, charging: false) == .run(.senseVoice), "291: serious keeps SenseVoice (no restart loop)")
+check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 0, lowPower: true, battery: 0.15, charging: false) == .run(.senseVoice), "291: low power / low battery keep SenseVoice")
+check(LiveSubtitleGuard.verdict(preferred: .small, thermal: 2, lowPower: false, battery: 0.8, charging: false).tier == .senseVoice, "291: hot Whisper → SenseVoice")
 check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 3, lowPower: false, battery: 0.8, charging: true).tier == .apple, "critical → Apple")
-check(LiveSubtitleGuard.verdict(preferred: .small, thermal: 0, lowPower: true, battery: 0.8, charging: false).tier == .apple, "low power → Apple")
+check(LiveSubtitleGuard.verdict(preferred: .small, thermal: 0, lowPower: true, battery: 0.8, charging: false).tier == .senseVoice, "low power Whisper → SenseVoice")
 check(LiveSubtitleGuard.verdict(preferred: .senseVoice, thermal: 0, lowPower: false, battery: 0.05, charging: false).tier == nil, "battery < 10 % → pause")
 check(LiveSubtitleGuard.verdict(preferred: .turbo, thermal: 0, lowPower: false, battery: 0.05, charging: true) == .run(.turbo), "charging ignores battery")
 check(LiveSubtitleGuard.verdict(preferred: .apple, thermal: 3, lowPower: true, battery: 0.5, charging: false) == .run(.apple), "Apple stays Apple")

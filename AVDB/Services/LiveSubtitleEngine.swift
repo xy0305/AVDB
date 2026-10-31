@@ -169,19 +169,35 @@ final class LiveSubtitleEngine: ObservableObject {
     private var lastTick: (wall: Double, media: Double, rate: Double)?
     private var lastSavedCount = 0
     private var guardTier: LiveASRTier?
+    /// 291 diagnostics + hysteresis.
+    private var restarts = 0, hotSwaps = 0, readerCatchUps = 0
+    private var degradedAt: Date?
+    private var lastCatchUp = Date.distantPast
+    private var swapTask: Task<Void, Never>?
+    private var activeObservers: [NSObjectProtocol] = []
     /// State the reader thread reads without hopping to the main actor.
     private final class Shared: @unchecked Sendable {
         private let lock = NSLock()
         private var _pipeline = LivePipeline(), _playhead = 0.0, _rate = 1.0, _lead = 20.0
-        func set(pipeline: LivePipeline? = nil, playhead: Double? = nil, rate: Double? = nil, lead: Double? = nil) {
+        private var _wall = Date().timeIntervalSinceReferenceDate, _playing = false
+        func set(pipeline: LivePipeline? = nil, playhead: Double? = nil, rate: Double? = nil, lead: Double? = nil, playing: Bool? = nil) {
             lock.lock(); defer { lock.unlock() }
             if let pipeline { _pipeline = pipeline }
-            if let playhead { _playhead = playhead }
+            if let playhead { _playhead = playhead; _wall = Date().timeIntervalSinceReferenceDate }
             if let rate { _rate = rate }
             if let lead { _lead = lead }
+            if let playing { _playing = playing }
         }
         var pipeline: LivePipeline { lock.lock(); defer { lock.unlock() }; return _pipeline }
-        var pace: (playhead: Double, rate: Double, lead: Double) { lock.lock(); defer { lock.unlock() }; return (_playhead, _rate, _lead) }
+        /// 291: the reader paces against an extrapolated playhead. Before, the playhead only moved when the main
+        /// actor ticked, so a multi-second main-thread hang froze the reader at `stale playhead + lead`; when the
+        /// hang ended the reader was behind real playback and every line arrived late (→ the bogus Apple switch).
+        var pace: (playhead: Double, rate: Double, lead: Double) {
+            lock.lock(); defer { lock.unlock() }
+            let dt = _playing ? min(30, max(0, Date().timeIntervalSinceReferenceDate - _wall)) : 0
+            return (_playhead + dt * _rate, _rate, _lead)
+        }
+        var rawPlayhead: Double { lock.lock(); defer { lock.unlock() }; return _playhead }
     }
     private let shared = Shared()
 
@@ -196,6 +212,11 @@ final class LiveSubtitleEngine: ObservableObject {
         pipeline.mode = mode
         UIDevice.current.isBatteryMonitoringEnabled = true
         wireReader()
+        hitches.context = { [weak self] in
+            guard let self else { return "" }
+            let st = self.pipeline.snapshotStats
+            return String(format: "· %@ %@ 队列%d 读取%+.1fs", self.activeTier?.rawValue ?? "-", self.phaseText, st.queued, st.decodedEnd - self.shared.rawPlayhead)
+        }
         Task { appleStatus = await AppleTranslation.status() }
         Task { appleASRStatus = await AppleSpeechRecognizer.status() }
         memoryObserver = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
@@ -212,17 +233,29 @@ final class LiveSubtitleEngine: ObservableObject {
                 clock: @escaping @MainActor () -> (time: Double, rate: Double, playing: Bool)) {
         let newSource = LiveAudioReader.Source(url: url, headers: headers)
         if source == newSource, self.videoKey == videoKey { self.clock = clock; return }
+        // 291: same title, re-resolved URL / refreshed headers (quality switch, token refresh): keep the models,
+        // pipeline and queued lines; only the reader reopens on the new source at the playhead.
+        if self.videoKey == videoKey, !videoKey.isEmpty, source != nil, phase == .running {
+            source = newSource; self.clock = clock
+            let t = clock().time
+            let start = pipeline.resumePoint(after: max(0, t - 1.5)) ?? max(0, t - 1.5)
+            pipeline.reset(at: start); pipeline.setPlayhead(t)
+            reader.start(newSource, at: start, generation: pipeline.currentGeneration)
+            LiveDiagnostics.shared.log(String(format: "换源（同一视频）读取从 %.1fs 继续，不重启识别", start))
+            return
+        }
         detach()
         source = newSource
         self.videoKey = videoKey
         self.clock = clock
         guard mode != .off else { return }
-        start()
+        start(reason: "打开视频")
     }
 
     func detach() {
         saveCache(force: true)
         stopRunning()
+        hitches.stop()
         source = nil
         videoKey = ""
         caption = LiveCaption(ja: nil, zh: nil, partial: false, pendingChinese: false)
@@ -236,8 +269,8 @@ final class LiveSubtitleEngine: ObservableObject {
     }
 
     private func modeChanged(from old: LiveSubtitleMode) {
-        if mode == .off { saveCache(force: true); stopRunning(); phase = .off; caption = .init(ja: nil, zh: nil, partial: false, pendingChinese: false); return }
-        if old == .off { start(); return }
+        if mode == .off { saveCache(force: true); stopRunning(); hitches.stop(); phase = .off; caption = .init(ja: nil, zh: nil, partial: false, pendingChinese: false); return }
+        if old == .off { start(reason: "开启字幕"); return }
         if mode.needsChinese, mt == nil { loadTranslatorInBackground() }
         refreshCaption()
     }
@@ -247,7 +280,7 @@ final class LiveSubtitleEngine: ObservableObject {
         guard mode != .off, source != nil else { return }
         saveCache(force: true)
         stopRunning()
-        start()
+        start(reason: "切换识别器（用户）")
     }
 
     /// 重试: clears failed states (an in-flight compile is awaited again, never restarted) and starts over.
@@ -255,13 +288,16 @@ final class LiveSubtitleEngine: ObservableObject {
         LiveDiagnostics.shared.log("用户点击重试")
         loader.resetFailures()
         if mode == .off { mode = .bilingual; return }
-        start()
+        start(reason: "重试")
     }
 
     func diagnosticReport() -> String {
         LiveDiagnostics.shared.report(extra: ["模式 \(mode.rawValue) · 偏好 \(tierPreference.rawValue) · 当前 \(activeTier?.rawValue ?? "-") · 阶段 \(phaseText)",
                                               "可用内存 \(LiveMemory.availableMB) MB · 翻译 \(translatorName) · Apple 翻译 \(appleStatus) · Apple 识别 \(appleASRStatus.rawValue)",
-                                              "热状态 \(ProcessInfo.processInfo.thermalState.rawValue) · 预读 \(Int(effectiveLead))s · \(latencyText) · \(hitchText)"] + modelStatus)
+                                              "热状态 \(ProcessInfo.processInfo.thermalState.rawValue) · 预读 \(Int(effectiveLead))s · \(latencyText) · \(hitchText)",
+                                              pipeline.snapshotStats.stageLine,
+                                              "重启 \(restarts) · 热切换识别器 \(hotSwaps) · 读取追帧 \(readerCatchUps) · 读取重连 \(reader.failureCount) · 读取进度 \(String(format: "%.1f", pipeline.snapshotStats.decodedEnd - shared.rawPlayhead))s"]
+                                              + hitches.worst.map { "卡顿 \($0)" } + modelStatus)
     }
 
     var phaseText: String {
@@ -280,8 +316,7 @@ final class LiveSubtitleEngine: ObservableObject {
         sessionOverride = .senseVoice
         toast("内存不足，已切换 SenseVoice")
         saveCache(force: true)
-        loader.release(t)
-        start()
+        hotSwap(to: .senseVoice, why: "内存警告") { [weak self] in self?.loader.release(t) }
     }
 
     /// Small non-blocking notice in the top-left chip (never over subtitles or the centre); auto-hides.
@@ -310,8 +345,9 @@ final class LiveSubtitleEngine: ObservableObject {
         }
     }
 
-    private func start() {
+    private func start(reason: String) {
         guard source != nil, clock != nil, mode != .off else { return }
+        restarts += 1
         stopRunning()
         let verdict = currentVerdict()
         if case .pause(let why) = verdict { phase = .paused(why); toast(why); startTicker(); return }
@@ -334,7 +370,8 @@ final class LiveSubtitleEngine: ObservableObject {
         if first != target { toast("\(target.title) 不可用，改用 \(first.title)") }
         setLoading(first == .turbo && UserDefaults.standard.object(forKey: "live.load.turbo") == nil
                    ? "正在编译 \(first.title)（首次较慢）" : "正在加载 \(first.title)")
-        LiveDiagnostics.shared.log("start target=\(target.rawValue) candidates=\(list.map(\.rawValue))")
+        LiveDiagnostics.shared.log("start target=\(target.rawValue) candidates=\(list.map(\.rawValue)) reason=\(reason) #\(restarts)")
+        let key = cacheKey, cache = self.cache
         loadTask = Task { [weak self] in
             guard let self else { return }
             var lastError: Error?
@@ -347,7 +384,10 @@ final class LiveSubtitleEngine: ObservableObject {
                     self.activeTier = asr.tier
                     if t != first { self.toast("\(first.title) 加载失败，已改用 \(t.title)") }
                     LiveDiagnostics.shared.log("运行 \(asr.tier.rawValue)")
-                    self.beginRunning()
+                    // 291: the per-video cache is decoded off the main thread.
+                    let stored = key.isEmpty ? nil : await Task.detached(priority: .userInitiated) { cache.load(key) }.value
+                    guard !Task.isCancelled, self.mode != .off else { return }
+                    self.beginRunning(store: stored)
                     self.loadTranslatorInBackground()
                     return
                 } catch {
@@ -453,21 +493,23 @@ final class LiveSubtitleEngine: ObservableObject {
         }
     }
 
-    private func beginRunning() {
+    private func beginRunning(store: LiveSegmentStore?) {
         guard let source, let clock, let asr else { return }
         let now = clock()
-        pipeline = LivePipeline(store: cache.load(cacheKey) ?? LiveSegmentStore())
+        pipeline = LivePipeline(store: store ?? LiveSegmentStore())
         pipeline.mode = mode
         shared.set(pipeline: pipeline)
         lastSavedCount = pipeline.snapshotStore.segments.count
         pipeline.setPlayhead(now.time)
         setPace(now.time, now.rate)
-        let start = pipeline.resumePoint(after: now.time) ?? now.time
+        // 291: open 1.5 s before the playhead so the sentence already in progress is captured whole.
+        let from = max(0, now.time - 1.5)
+        let start = pipeline.resumePoint(after: from) ?? from
         pipeline.reset(at: start)
         pipeline.setPlayhead(now.time)
         reader.start(source, at: start, generation: pipeline.currentGeneration)
         phase = .running
-        hitches.start()
+        if !hitches.running { hitches.start() }
         startWorker()
         refreshCaption()
     }
@@ -486,10 +528,38 @@ final class LiveSubtitleEngine: ObservableObject {
         }
     }
 
+    /// 291: recognizer change while running (heat step-down, compute-bound fallback, memory warning): the reader,
+    /// VAD, queued utterances and lines on screen stay; only the worker restarts with the new recognizer. Before,
+    /// every change went through start(): stop reader → reload → reopen the HLS stream, dropping the queue.
+    private func hotSwap(to t: LiveASRTier, why: String, after: (() -> Void)? = nil) {
+        guard phase == .running, asr != nil else { start(reason: why); return }
+        guard activeTier != t else { return }
+        guard LiveModels.available(t), t != .apple || appleASRStatus == .installed else {
+            LiveDiagnostics.shared.log("热切换跳过 \(t.rawValue)（不可用）· \(why)"); return
+        }
+        swapTask?.cancel()
+        let from = activeTier?.rawValue ?? "-"
+        swapTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let next = try await self.loader.get(t, timeout: Self.timeout(t))
+                guard !Task.isCancelled, self.phase == .running else { return }
+                self.asr = next
+                self.activeTier = next.tier
+                self.hotSwaps += 1
+                self.startWorker()
+                after?()
+                LiveDiagnostics.shared.log("热切换 \(from) → \(next.tier.rawValue)（不重启读取/队列）· \(why)")
+            } catch {
+                LiveDiagnostics.shared.log("热切换失败 \(t.rawValue) \(error.localizedDescription)，保持 \(from)")
+            }
+        }
+    }
+
     private func stopRunning() {
         loadTask?.cancel(); loadTask = nil
+        swapTask?.cancel(); swapTask = nil
         worker?.cancel(); worker = nil
-        hitches.stop()
         reader.stop()
         ticker?.cancel(); ticker = nil
         lastTick = nil
@@ -497,7 +567,8 @@ final class LiveSubtitleEngine: ObservableObject {
 
     private func restartReader(at t: Double) {
         guard source != nil else { return }
-        let start = pipeline.resumePoint(after: t) ?? t
+        let from = max(0, t - 0.5)
+        let start = pipeline.resumePoint(after: from) ?? from
         pipeline.reset(at: start)
         pipeline.setPlayhead(t)
         setPace(t, shared.pace.rate)
@@ -508,7 +579,7 @@ final class LiveSubtitleEngine: ObservableObject {
 
     // MARK: reader wiring (reader thread)
 
-    private func setPace(_ t: Double, _ r: Double) { shared.set(playhead: t, rate: r, lead: effectiveLead) }
+    private func setPace(_ t: Double, _ r: Double, playing: Bool? = nil) { shared.set(playhead: t, rate: r, lead: effectiveLead, playing: playing) }
 
     private var thermalLevel: Int {
         switch ProcessInfo.processInfo.thermalState {
@@ -526,6 +597,7 @@ final class LiveSubtitleEngine: ObservableObject {
         let shared = self.shared
         reader.onPCM = { pcm, start, g in shared.pipeline.feed(pcm, start: start, generation: g) }
         reader.onEnd = { g in shared.pipeline.finishStream(generation: g) }
+        reader.onInfo = { LiveDiagnostics.shared.log($0) }
         reader.onError = { [weak self] msg in
             Task { @MainActor in self?.notice = "字幕音频读取失败（\(msg)），拖动进度可重试" }
         }
@@ -570,7 +642,15 @@ final class LiveSubtitleEngine: ObservableObject {
         }
         lastTick = (wall, c.time, c.rate)
         pipeline.setPlayhead(c.time)
-        setPace(c.time, c.playing ? max(1, c.rate) : 1)
+        setPace(c.time, c.playing ? max(1, c.rate) : 1, playing: c.playing)
+        // 291: reader behind the playhead (stalled connection, slow 2nd HLS session): jump to now instead of
+        // transcribing a backlog nobody will see live (≤ once per 10 s; the skipped span stays uncovered).
+        let decoded = pipeline.snapshotStats.decodedEnd
+        if c.playing, decoded < c.time - 6, Date().timeIntervalSince(lastCatchUp) > 10 {
+            lastCatchUp = Date(); readerCatchUps += 1
+            LiveDiagnostics.shared.log(String(format: "读取落后 %.1fs → 跳到播放点 %.1fs", c.time - decoded, c.time))
+            restartReader(at: c.time)
+        }
         reader.poke()
         refreshCaption()
         saveCache(force: false)
@@ -653,31 +733,38 @@ final class LiveSubtitleEngine: ObservableObject {
             phase = .paused(why)
             toast(why)
             startTicker()
-        case .degrade(let t, _):
-            if case .paused = phase { start(); return }
-            if guardTier != t { start() }
+        case .degrade(let t, let why):
+            if case .paused = phase { start(reason: "恢复（\(why)）"); return }
+            degradedAt = Date()
+            if guardTier != t {
+                guardTier = t
+                toast(why)
+                hotSwap(to: t, why: why)
+            }
         case .run(let t):
-            if case .paused = phase { start(); return }
-            if guardTier != t, phase == .running { start() }
+            if case .paused = phase { start(reason: "恢复"); return }
+            guard guardTier != t, phase == .running else { break }
+            // Hysteresis: stay stepped-down until the device has been cool for `recoverSeconds`.
+            if let d = degradedAt, Date().timeIntervalSince(d) < LiveSubtitleGuard.recoverSeconds { break }
+            guardTier = t
+            hotSwap(to: t, why: "温度恢复")
         }
         checkPerformance()
     }
 
-    /// Realtime first: when the active recognizer falls behind the playhead (compute > 0.7 s per second of
-    /// speech, or ≥ 3 of the last 5 lines shown > 2 s late) hand over to Apple on-device recognition for this
-    /// session (when installed), unless the user explicitly chose a Whisper model.
+    /// Realtime first: only when the active recognizer is compute-bound (RTF > 0.7, or ≥ 3 of the last 5 lines
+    /// waited > 2 s in queue + recognition with a backlog ≥ 3) hand over to Apple for this session. 291: lines that
+    /// were late because the AUDIO arrived late (reader behind playback, restarts, main-thread stalls) no longer
+    /// count — 290 switched SenseVoice at RTF 0.05 with "late 5/5" for exactly that reason.
     private func checkPerformance() {
         guard phase == .running, let t = activeTier, t != .apple, sessionOverride == nil, !preferredTier.isWhisper,
               appleASRStatus == .installed else { return }
-        let st = pipeline.snapshotStats
-        let recent = pipeline.latency.filter { $0.segment >= 0 }.suffix(5)
-        let late = recent.filter { $0.jaLatency > 2.0 }.count
-        guard st.finalsMeasured >= 3, st.rtfAvg > 0.7 || (recent.count >= 5 && late >= 3) else { return }
+        let v = pipeline.computeBound()
+        guard v.bound else { return }
         sessionOverride = .apple
-        toast(String(format: "%@ 跟不上播放（%.2f× 实时），已切换苹果系统识别", t.title, st.rtfAvg))
-        saveCache(force: true)
-        LiveDiagnostics.shared.log(String(format: "%@ RTF %.2f late %d/5 → apple", t.rawValue, st.rtfAvg, late))
-        start()
+        toast(String(format: "%@ 跟不上播放（%.2f× 实时），已切换苹果系统识别", t.title, pipeline.snapshotStats.rtfAvg))
+        LiveDiagnostics.shared.log("\(t.rawValue) \(v.why) → apple")
+        hotSwap(to: .apple, why: "计算跟不上")
     }
 
     // MARK: cache
@@ -702,7 +789,10 @@ final class LiveSubtitleEngine: ObservableObject {
 }
 
 /// Main-thread hitch counter while live subtitles run: CADisplayLink frame gaps > 50 ms (≥ 3 frames at 60 Hz).
-/// Measures UI/main-thread stalls only (AVPlayer decodes off the main thread).
+/// Measures UI/main-thread stalls only (AVPlayer decodes off the main thread). 291: gaps while the app is not
+/// active (lock screen, Control Center, app switcher, PiP) are not hitches — 290 counted them (the "8351 ms"
+/// worst case is consistent with a screen lock / notification shade, not compute); big hitches are logged with
+/// their wall time and the live pipeline state so a report can be matched to what ran.
 @MainActor
 final class LiveHitchMonitor: NSObject {
     private var link: CADisplayLink?
@@ -710,21 +800,41 @@ final class LiveHitchMonitor: NSObject {
     private var started: CFTimeInterval = 0
     private(set) var hitches = 0
     private(set) var worstMs = 0.0
+    private(set) var worst: [String] = []
+    private var observers: [NSObjectProtocol] = []
+    var running: Bool { link != nil }
+    var context: (() -> String)?
 
     func start() {
         stop()
-        hitches = 0; worstMs = 0; last = 0; started = CACurrentMediaTime()
+        hitches = 0; worstMs = 0; last = 0; worst = []; started = CACurrentMediaTime()
         let l = CADisplayLink(target: self, selector: #selector(frame(_:)))
         l.add(to: .main, forMode: .common)
         link = l
+        let nc = NotificationCenter.default
+        for name in [UIApplication.willResignActiveNotification, UIApplication.didBecomeActiveNotification] {
+            observers.append(nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.last = 0 }       // restart the gap measurement
+            })
+        }
     }
-    func stop() { link?.invalidate(); link = nil }
+    func stop() {
+        link?.invalidate(); link = nil
+        observers.forEach(NotificationCenter.default.removeObserver); observers = []
+    }
 
     @objc private func frame(_ l: CADisplayLink) {
         defer { last = l.timestamp }
-        guard last > 0 else { return }
+        guard last > 0, UIApplication.shared.applicationState == .active else { last = 0; return }
         let gap = (l.timestamp - last) * 1000
-        if gap > 50 { hitches += 1; worstMs = max(worstMs, gap) }
+        guard gap > 50 else { return }
+        hitches += 1; worstMs = max(worstMs, gap)
+        if gap > 400 {
+            let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
+            let line = String(format: "%@ %.0f ms %@", f.string(from: Date()), gap, context?() ?? "")
+            worst.append(line); if worst.count > 5 { worst.removeFirst() }
+            LiveDiagnostics.shared.log("主线程卡顿 " + line)
+        }
     }
 
     var summary: String {

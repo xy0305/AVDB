@@ -27,12 +27,19 @@ final class LiveDiagnostics: @unchecked Sendable {
         let f = DateFormatter(); f.dateFormat = "MM-dd HH:mm:ss"
         let line = "\(f.string(from: Date())) +\(String(format: "%.1f", Date().timeIntervalSince(t0)))s \(s)"
         lock.lock(); lines.append(line); if lines.count > 300 { lines.removeFirst(lines.count - 300) }
-        let text = lines.joined(separator: "\n"); lock.unlock()
-        if let fileURL {
+        let schedule = !writePending; writePending = true; lock.unlock()
+        // 291: the file write (whole log, atomic) used to run on the caller — often the main actor. Now it is
+        // coalesced on a background queue.
+        guard schedule, let fileURL else { return }
+        writer.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self else { return }
+            self.lock.lock(); let text = self.lines.joined(separator: "\n"); self.writePending = false; self.lock.unlock()
             try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? text.write(to: fileURL, atomically: true, encoding: .utf8)
         }
     }
+    private var writePending = false
+    private let writer = DispatchQueue(label: "avdb.live.diagnostics", qos: .utility)
 
     var recent: [String] { lock.lock(); defer { lock.unlock() }; return Array(lines.suffix(8)) }
 

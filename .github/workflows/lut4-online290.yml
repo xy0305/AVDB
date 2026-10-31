@@ -1,7 +1,6 @@
 name: LUT4 online App 290 (AI 增强封面云端读取/上传 R2 + 本地 LRU + 289)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

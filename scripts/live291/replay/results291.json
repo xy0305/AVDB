@@ -1,0 +1,130 @@
+{
+ "CAWB-044 290 device": {
+  "refs": 78,
+  "coverage": 0.8076923076923077,
+  "stages": {
+   "covered": 63,
+   "reader_gap": 0,
+   "vad_rejected": 5,
+   "queue_dropped": 2,
+   "recognized_empty_or_filtered": 1,
+   "lost_on_restart_or_merged": 2,
+   "not_displayed_late": 5
+  },
+  "onset_median": -0.222912695669379,
+  "onset_p90": 3.027032260797853,
+  "after_end_median": -3.1001885677154633,
+  "text_sim": 0.5578866632978149,
+  "restarts": 15,
+  "catchUps": 0,
+  "stageLine": null
+ },
+ "CAWB-044 290 clean": {
+  "refs": 78,
+  "coverage": 0.8717948717948718,
+  "stages": {
+   "covered": 68,
+   "reader_gap": 0,
+   "vad_rejected": 5,
+   "queue_dropped": 0,
+   "recognized_empty_or_filtered": 2,
+   "lost_on_restart_or_merged": 3,
+   "not_displayed_late": 0
+  },
+  "onset_median": -0.2552751446061876,
+  "onset_p90": -0.08464668040164725,
+  "after_end_median": -2.991591389198586,
+  "text_sim": 0.5953863919098393,
+  "restarts": 0,
+  "catchUps": 0,
+  "stageLine": null
+ },
+ "CAWB-044 291 device": {
+  "refs": 78,
+  "coverage": 0.8974358974358975,
+  "stages": {
+   "covered": 70,
+   "reader_gap": 0,
+   "vad_rejected": 5,
+   "queue_dropped": 0,
+   "recognized_empty_or_filtered": 2,
+   "lost_on_restart_or_merged": 0,
+   "not_displayed_late": 1
+  },
+  "onset_median": -0.24756304160322884,
+  "onset_p90": 1.6031835341427296,
+  "after_end_median": -3.0894790578287434,
+  "text_sim": 0.5937852707237127,
+  "restarts": 0,
+  "catchUps": 0,
+  "stageLine": "分段 块2400 音频600s 语句206 过短90 · 识别空0 过滤23 合并0 失败0 · 入库183 翻译0/失败0 · 显示179 迟到3(源3/算0) 过期丢弃0 · 重置丢弃0 过时结果0 · 源滞后0.00s 计算137ms"
+ },
+ "CAWB-044 291 clean": {
+  "refs": 78,
+  "coverage": 0.9102564102564102,
+  "stages": {
+   "covered": 71,
+   "reader_gap": 0,
+   "vad_rejected": 5,
+   "queue_dropped": 0,
+   "recognized_empty_or_filtered": 2,
+   "lost_on_restart_or_merged": 0,
+   "not_displayed_late": 0
+  },
+  "onset_median": -0.27699862007676757,
+  "onset_p90": -0.10637924675813792,
+  "after_end_median": -3.0536567903329797,
+  "text_sim": 0.5948117692581205,
+  "restarts": 0,
+  "catchUps": 0,
+  "stageLine": "分段 块2400 音频600s 语句206 过短90 · 识别空0 过滤23 合并0 失败0 · 入库183 翻译0/失败0 · 显示183 迟到0(源0/算0) 过期丢弃0 · 重置丢弃0 过时结果0 · 源滞后0.00s 计算121ms"
+ },
+ "IPZZ-961 290 device": {
+  "cues": 32,
+  "coverage": 0.8125,
+  "timing_offset_median": -0.03326535716843182,
+  "display_minus_cue_start_median": -0.5909437622393909,
+  "display_p90": 0.40102351886940824,
+  "zh_char_f1_mean": 0.27577038411207,
+  "zh_char_f1_random_baseline": 0.08993150946275946,
+  "restarts": 15,
+  "matched_coverage_f1>=0.3": 0.5625,
+  "lines_displayed": 81
+ },
+ "IPZZ-961 290 clean": {
+  "cues": 32,
+  "coverage": 1.0,
+  "timing_offset_median": -0.07999999999998408,
+  "display_minus_cue_start_median": -1.3070044173704503,
+  "display_p90": -0.036079576044357964,
+  "zh_char_f1_mean": 0.26578234316006055,
+  "zh_char_f1_random_baseline": 0.11258852973007384,
+  "restarts": 0,
+  "matched_coverage_f1>=0.3": 0.625,
+  "lines_displayed": 92
+ },
+ "IPZZ-961 291 device": {
+  "cues": 32,
+  "coverage": 1.0,
+  "timing_offset_median": -0.12999999999999545,
+  "display_minus_cue_start_median": -1.266181880438495,
+  "display_p90": 0.06903604493783178,
+  "zh_char_f1_mean": 0.25205058754651144,
+  "zh_char_f1_random_baseline": 0.11412495286576169,
+  "restarts": 0,
+  "matched_coverage_f1>=0.3": 0.59375,
+  "lines_displayed": 94
+ },
+ "IPZZ-961 291 clean": {
+  "cues": 32,
+  "coverage": 1.0,
+  "timing_offset_median": -0.2249999999999801,
+  "display_minus_cue_start_median": -1.2758194876719244,
+  "display_p90": -0.006776738195810594,
+  "zh_char_f1_mean": 0.2684997344644084,
+  "zh_char_f1_random_baseline": 0.09673653552330022,
+  "restarts": 0,
+  "matched_coverage_f1>=0.3": 0.625,
+  "lines_displayed": 93
+ }
+}

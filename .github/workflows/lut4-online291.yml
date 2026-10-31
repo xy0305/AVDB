@@ -1,0 +1,204 @@
+name: LUT4 online App 291 (实时字幕漏字修复：迟到行显示/热切换/读取追帧 + 290)
+on:
+  push:
+    branches: [feat/lut4-online-from269]
+permissions:
+  contents: read
+jobs:
+  models:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache live-subtitle models (Whisper turbo/small Core ML + converted NLLB)
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: AVDB/Resources/LiveModels
+          key: live287-models-v1-${{ hashFiles('scripts/live287/fetch_models287.py', 'scripts/live287/convert_nllb287.py') }}
+      - uses: actions/setup-python@v5
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          python-version: '3.11'
+      - name: Fetch Whisper models + tokenizers, convert NLLB-200 600M → Core ML int8, compile mlmodelc
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/venv" && source "$RUNNER_TEMP/venv/bin/activate"
+          pip install -q torch==2.7.0 coremltools==9.0 transformers==4.46.3 sentencepiece==0.2.0 "huggingface_hub<1.0" "numpy<2.3"
+          python scripts/live287/fetch_models287.py AVDB/Resources/LiveModels 2>&1 | tee fetch-models287.log
+      - run: du -sh AVDB/Resources/LiveModels/* && cat AVDB/Resources/LiveModels/MODELS287.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live287-models
+          path: AVDB/Resources/LiveModels
+          compression-level: 0
+          retention-days: 3
+  release:
+    needs: models
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: live287-models
+          path: AVDB/Resources/LiveModels
+      - name: Fetch sherpa-onnx iOS/macOS xcframeworks + SenseVoice-Small int8 (sha256-pinned); drop bundled turbo (on-demand in 289)
+        run: |
+          set -euo pipefail
+          python3 scripts/live289/fetch_live289.py . AVDB/Resources/LiveModels 2>&1 | tee fetch-live289.log
+          du -sh AVDB/Resources/LiveModels/* Vendor/*
+      - run: xcodebuild -version
+      - name: Neutral preserved gesture, seek, LUT and recommender regressions
+        run: |
+          set -euo pipefail
+          mkdir -p evidence-release
+          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; } 2>&1 | tee evidence-release/regressions.log
+      - name: Install actual pinned MediaPipe SDK
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod install --repo-update
+      - name: Compile production enhancement Metal
+        run: |
+          xcrun -sdk iphoneos metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphoneos metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Build full production App Release arm64 iOS17 (R2 app key from the AVDB_COVERS_KEY secret → $(AVDB_COVERS_KEY))
+        env:
+          AVDB_COVERS_KEY: ${{ secrets.AVDB_COVERS_KEY }}
+        run: |
+          if [ -z "$AVDB_COVERS_KEY" ]; then echo "::warning::AVDB_COVERS_KEY secret missing — IPA will be local-only (no cloud covers)"; fi
+          set -euo pipefail
+          xcodebuild -workspace AVDB.xcworkspace -scheme AVDB -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES clean build 2>&1 | tee evidence-release/xcodebuild.log
+      - name: Package actual unsigned App and manifest
+        env:
+          AVDB_COVERS_KEY: ${{ secrets.AVDB_COVERS_KEY }}
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/AVDB.app"
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceCommit string $GITHUB_SHA" "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app/Info.plist"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          ditto "$app" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
+          python3 scripts/package-lut291.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
+          file "$app/AVDB" | tee evidence-release/macho.txt
+          xcrun vtool -show-build "$app/AVDB" | tee -a evidence-release/macho.txt
+          codesign -dv "$app" 2> evidence-release/codesign.txt || true
+      - name: Preserve resolved production dependencies
+        if: always()
+        run: |
+          mkdir -p evidence-release
+          cp Podfile.lock evidence-release/Podfile.lock 2>/dev/null || true
+          cp "$RUNNER_TEMP/DerivedData/SourcePackages/workspace-state.json" evidence-release/workspace-state.json 2>/dev/null || true
+          cp AVDB.xcworkspace/xcshareddata/swiftpm/Package.resolved evidence-release/Package.resolved 2>/dev/null || cp AVDB.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved evidence-release/Package.resolved 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AVDB-291-release
+          path: |
+            AVDB-unsigned-1.0.2-291-livesub-lut4-online-from269.ipa
+            evidence-release/*
+            fetch-live289.log
+          if-no-files-found: warn
+  ai-cover-cloud:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      AVDB_COVERS_KEY: ${{ secrets.AVDB_COVERS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cloud covers — unit (mock transport), mock Worker over URLSession, real Worker e2e under ci/ (skips without the secret)
+        run: |
+          set -o pipefail
+          mkdir -p evidence-cloud290
+          python3 scripts/test-cloud290.py 2>&1 | grep -v -i "warning:" | tee evidence-cloud290/cloud290.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AVDB-291-cloud-tests
+          path: evidence-cloud290/*
+          if-no-files-found: warn
+  ai-cover-settings-screenshots:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: gem install xcodeproj --no-document
+      - name: Production AICoverSettingsSection + hero (cloud hit from a local mock Worker / cloud-loading / 507 note) on simulator
+        run: |
+          set -o pipefail
+          python3 scripts/test-ai-ui290.py 2>&1 | tee ai-ui290.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AVDB-291-ai-cover-cloud-screenshots
+          path: |
+            evidence-ai290ui/shots/*
+            evidence-ai290ui/status.json
+            ai-ui290.log
+          if-no-files-found: warn
+  live-ui-screenshots:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: gem install xcodeproj --no-document
+      - name: Production live subtitle overlay / menu / settings / notices on simulator (portrait + landscape, neutral fixture)
+        run: |
+          set -o pipefail
+          python3 scripts/test-live-ui287.py 2>&1 | tee live-ui287.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AVDB-291-live-subtitle-screenshots
+          path: |
+            evidence-live287/ui/shots/*
+            evidence-live287/ui/status.json
+            live-ui287.log
+          if-no-files-found: warn
+  app-integration:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: gem install cocoapods -v 1.16.2 --no-document
+      - name: Compile production enhancement for real controller host
+        run: |
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Actual NativeLUTController + KSAVPlayer + production cube on HTTP HLS
+        run: python3 scripts/test-hls-app270.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LUT4-291-production-controller-HLS
+          path: |
+            evidence-hls-app/*.json
+            evidence-hls-app/*.log
+            evidence-hls-app/*.png
+            evidence-hls-app/resolved-*
+          if-no-files-found: warn
+  strict-runtime:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: gem install xcodeproj --no-document
+      - name: Compile same production runtime without DEBUG hooks
+        run: |
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun --sdk iphoneos swiftc -sdk "$SDK" -target arm64-apple-ios17.0 -O -parse-as-library -emit-module -module-name NativeHLSRuntime AVDB/Views/Player/NativeHLSLUTSurface.swift -o /tmp/NativeHLSRuntime.swiftmodule
+      - name: Strict HLS LUT runtime on the simulator (Simulator.app opened so the display link runs; one retry for frame-pull starvation seen on runner image 20261026)
+        run: |
+          open -a Simulator || true
+          sleep 5
+          python3 scripts/test-hls-runtime.py || { echo "::warning::strict-runtime attempt 1 failed — retrying once"; sleep 10; python3 scripts/test-hls-runtime.py; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LUT4-291-strict-runtime
+          path: |
+            evidence-hls-runtime/*.json
+            evidence-hls-runtime/*.log
+            evidence-hls-runtime/*.png
+          if-no-files-found: warn

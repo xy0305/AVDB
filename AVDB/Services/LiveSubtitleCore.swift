@@ -58,8 +58,18 @@ enum LiveTierPreference: String, CaseIterable, Identifiable, Sendable {
         case .turbo: "Whisper turbo"
         }
     }
-    static let defaultsKey = "live.subtitle.recognizer289"
-    static var current: LiveTierPreference { LiveTierPreference(rawValue: UserDefaults.standard.string(forKey: defaultsKey) ?? "") ?? .senseVoice }
+    static let defaultsKey = "live.subtitle.recognizer291"
+    static let legacyKeys = ["live.subtitle.recognizer289", "live.subtitle.tier"]
+    /// 291: a fresh key. Legacy values (288 `small` defaults, 289 picks) migrate once; a stale Whisper choice is
+    /// never carried over (it loaded Whisper small for 27.8 s on old sessions) — SenseVoice unless re-picked.
+    static var current: LiveTierPreference { current(UserDefaults.standard) }
+    static func current(_ d: UserDefaults) -> LiveTierPreference {
+        if let v = d.string(forKey: defaultsKey), let p = LiveTierPreference(rawValue: v) { return p }
+        let legacy = legacyKeys.lazy.compactMap { d.string(forKey: $0) }.first.flatMap(LiveTierPreference.init(rawValue:))
+        let migrated: LiveTierPreference = legacy == .apple ? .apple : .senseVoice
+        d.set(migrated.rawValue, forKey: defaultsKey)
+        return migrated
+    }
     var tier: LiveASRTier {
         switch self {
         case .senseVoice: .senseVoice
@@ -100,16 +110,20 @@ enum LiveSubtitleGuard {
         }
     }
     /// thermal: 0 nominal, 1 fair, 2 serious, 3 critical (ProcessInfo.ThermalState.rawValue).
-    /// 289: under pressure every recognizer hands over to Apple on-device recognition (system model, lightest);
-    /// the engine stays on SenseVoice with a throttled read-ahead when Apple's Japanese model is unavailable.
+    /// 291: SenseVoice runs at ~0.05× realtime, so heat / Low Power / low battery only throttle the read-ahead —
+    /// they no longer swap recognizers. (289 handed over to Apple at thermal ≥ serious; on a phone hovering
+    /// between fair and serious that restarted the engine every 20–60 s and each restart dropped queued audio.)
+    /// Whisper (manual) still steps down to SenseVoice when hot; only `critical` hands over to Apple.
     static func verdict(preferred: LiveASRTier, thermal: Int, lowPower: Bool, battery: Float, charging: Bool) -> Verdict {
         if !charging, battery >= 0, battery < 0.10 { return .pause("电量低于 10%，AI 字幕已暂停") }
         if preferred == .apple { return .run(.apple) }
-        if thermal >= 2 { return .degrade(.apple, "设备发热，已切换苹果系统识别") }
-        if lowPower { return .degrade(.apple, "低电量模式：已切换苹果系统识别") }
-        if !charging, battery >= 0, battery < 0.20 { return .degrade(.apple, "电量较低：已切换苹果系统识别") }
+        if thermal >= 3 { return .degrade(.apple, "设备过热，已切换苹果系统识别") }
+        if preferred.isWhisper, thermal >= 2 || lowPower { return .degrade(.senseVoice, "设备发热，已切换 SenseVoice") }
         return .run(preferred)
     }
+    /// 291 hysteresis: after a heat step-down, return to the preferred recognizer only once the device has stayed
+    /// below the trigger level for this long (thermal state flaps between neighbouring levels).
+    static let recoverSeconds = 120.0
 
     /// Read-ahead under thermal pressure: fewer seconds decoded ahead = less CPU/network competing with playback.
     static func throttledLead(_ lead: Double, thermal: Int) -> Double {
@@ -139,6 +153,11 @@ final class LiveVAD {
     let frame = 320
     var endSilence = 0.32, minSpeech = 0.22, maxLength = 5.0, preRoll = 0.20, tail = 0.12
     private(set) var floorDB: Float = -60
+    /// 291: utterances discarded as too short (< minSpeech voiced) — diagnostics only.
+    private(set) var rejectedShort = 0
+    /// 291: the adaptive floor may not climb above this (continuous BGM used to lift it until speech over the music
+    /// no longer cleared floor+10 dB — the CAWB-044 ~1 min gap); the voiced threshold is capped likewise.
+    static let floorCeiling: Float = -46, thresholdCeiling: Float = -36
     private var pending: [Float] = []
     private var pendingStart: Double?
     private var buffer: [Float] = []       // current utterance incl. pre-roll
@@ -199,8 +218,8 @@ final class LiveVAD {
         for s in f { e += s * s }
         let db = 10 * log10(max(e / Float(f.count), 1e-10))
         // Floor follows quiet frames quickly and loud frames very slowly.
-        floorDB = db < floorDB ? floorDB * 0.9 + db * 0.1 : min(floorDB + 0.02, -20)
-        let voiced = db > max(floorDB + 10, -48)
+        floorDB = db < floorDB ? floorDB * 0.9 + db * 0.1 : min(floorDB + 0.02, Self.floorCeiling)
+        let voiced = db > min(max(floorDB + 10, -48), Self.thresholdCeiling)
         let t1 = t0 + 0.02
         if !inSpeech {
             ring += f; ringEnd = t1
@@ -219,11 +238,15 @@ final class LiveVAD {
         if Double(silentFrames) * 0.02 >= endSilence {
             inSpeech = false
             let tailSamples = Int(tail * Double(Self.rate))
-            let keep = min(buffer.count, Int((lastVoicedEnd - bufferStart) * Double(Self.rate)) + tailSamples)
+            // 291 crash fix: after a max-length split the carried remainder can start AFTER the last voiced frame
+            // (cut at the quietest frame past it); `keep` went negative and `prefix(-n)` trapped the reader thread.
+            let keep = max(0, min(buffer.count, Int((lastVoicedEnd - bufferStart) * Double(Self.rate)) + tailSamples))
             let u = LiveUtterance(start: bufferStart, end: bufferStart + Double(keep) / Double(Self.rate),
                                   speechEnd: lastVoicedEnd, samples: Array(buffer.prefix(keep)), final: true)
             ring = Array(buffer.suffix(Int(preRoll * Double(Self.rate)))); buffer = []; frameDB = []
-            return Double(voicedFrames) * 0.02 >= minSpeech ? u : nil
+            if keep < frame { return nil }
+            if Double(voicedFrames) * 0.02 >= minSpeech { return u }
+            rejectedShort += 1; return nil
         }
         if length >= maxLength {
             // Split at the quietest frame in the last 30 % (keeps words whole), carry the rest over.
@@ -253,6 +276,9 @@ struct LiveSegment: Codable, Equatable, Identifiable, Sendable {
     var zh: String?
     var final: Bool
     var tier: String
+    /// 291: playhead (media s) when the line became displayable. A line that arrives after its own time window
+    /// is shown from `arrival` for a short hold instead of being silently skipped (late-but-valid lines).
+    var arrival: Double? = nil
 }
 
 struct LiveCaption: Equatable, Sendable {
@@ -349,7 +375,7 @@ struct LiveSegmentStore: Codable, Equatable {
     init() {}
 
     @discardableResult
-    mutating func insert(start: Double, end: Double, ja raw: String, tier: String) -> LiveSegment? {
+    mutating func insert(start: Double, end: Double, ja raw: String, tier: String, arrival: Double? = nil) -> LiveSegment? {
         let ja = LiveText.clean(raw)
         guard !ja.isEmpty, !LiveText.isNoise(ja), end > start else { return nil }
         for (k, s) in segments.enumerated() {
@@ -364,9 +390,11 @@ struct LiveSegmentStore: Codable, Equatable {
                 return nil
             }
         }
-        // Consecutive duplicates (Whisper repeating the previous line on a silent tail).
-        if let last = segments.last(where: { $0.end <= start + 0.05 }), start - last.end < 1.5, LiveText.similarity(last.ja, ja) > 0.9 { return nil }
-        let seg = LiveSegment(id: nextID, start: start, end: end, ja: ja, zh: nil, final: true, tier: tier)
+        // Consecutive duplicates (Whisper repeating the previous line on a silent tail). 291: Whisper only —
+        // SenseVoice does not hallucinate repeats, and real repeated short lines (「気持ちいい」×2) were being dropped.
+        if tier == LiveASRTier.small.rawValue || tier == LiveASRTier.turbo.rawValue,
+           let last = segments.last(where: { $0.end <= start + 0.05 }), start - last.end < 1.5, LiveText.similarity(last.ja, ja) > 0.9 { return nil }
+        let seg = LiveSegment(id: nextID, start: start, end: end, ja: ja, zh: nil, final: true, tier: tier, arrival: arrival)
         nextID += 1
         let idx = segments.firstIndex { $0.start > start } ?? segments.count
         segments.insert(seg, at: idx)
@@ -403,18 +431,35 @@ struct LiveSegmentStore: Codable, Equatable {
 
     func needsChinese() -> [LiveSegment] { segments.filter { $0.zh == nil } }
 
+    /// 291: a line that becomes ready after its own window is still shown, from its arrival, unless it is more
+    /// than `lateLimit` seconds stale (then it is counted as dropped-late and only appears on rewatch).
+    static let lateLimit = 8.0
+    static func lateHold(_ s: LiveSegment) -> Double { min(3.5, max(1.5, (s.end - s.start) * 0.5 + 1.0)) }
+    /// Display window(s) for segment `k`: the normal on-time window and, for a late arrival, the clamped one.
+    func windows(_ k: Int) -> [(Double, Double)] {
+        let s = segments[k]
+        let nextStart = k + 1 < segments.count ? segments[k + 1].start : .infinity
+        let hold = min(nextStart, max(s.end + 0.8, s.start + 1.2))
+        var w = [(s.start - 0.05, hold)]
+        if let a = s.arrival, a > hold - 0.3, a - s.end <= Self.lateLimit { w.append((a, a + Self.lateHold(s))) }
+        return w
+    }
+    /// The segment to show at `t` (newest window start wins, so a fresh line replaces a late one).
+    func currentSegment(at t: Double) -> LiveSegment? {
+        var best: (start: Double, k: Int)?
+        for k in segments.indices {
+            if segments[k].start > t + 0.05 { break }
+            for (a, b) in windows(k) where t >= a && t < b {
+                if best == nil || a >= best!.start { best = (a, k) }
+            }
+        }
+        return best.map { segments[$0.k] }
+    }
     /// What to draw at media time `t`. A final line stays at least 1.2 s and holds until the next line
-    /// (max +0.8 s past its end) so short lines stay readable.
+    /// (max +0.8 s past its end) so short lines stay readable; late lines are clamped to their arrival.
     func caption(at t: Double, mode: LiveSubtitleMode) -> LiveCaption {
         guard mode != .off else { return .empty }
-        var current: LiveSegment?
-        for (k, s) in segments.enumerated() {
-            let nextStart = k + 1 < segments.count ? segments[k + 1].start : .infinity
-            let hold = min(nextStart, max(s.end + 0.8, s.start + 1.2))
-            if t >= s.start - 0.05 && t < hold { current = s }
-            if s.start > t { break }
-        }
-        if let s = current {
+        if let s = currentSegment(at: t) {
             return compose(ja: s.ja, zh: s.zh, partial: false, mode: mode)
         }
         if let p = partial, t >= p.start - 0.05, t < p.end + 1.5 {
@@ -514,6 +559,12 @@ struct LiveLatencyRecord: Codable, Equatable, Sendable {
     var firstPartial: Double?                       // playhead when the first partial showed
     var asrMs: Double, mtMs: Double?, queueMs: Double
     var split = false
+    /// 291: lateness split. `sourceLag` = the audio itself reached the pipeline late (reader behind the playhead:
+    /// slow 2nd HLS connection, restart, stalled pacing) — a faster recognizer cannot fix that. `computeMs` = queue
+    /// wait + recognition, the only part a recognizer switch can improve.
+    var sourceLag: Double { max(0, audioReady - speechEnd) }
+    var computeMs: Double { queueMs + asrMs }
+    var computeLate: Bool { computeMs > 2000 }
     /// End of speech → shown (0 = the line was ready before the speaker finished, i.e. in sync).
     var jaLatency: Double { max(0, jaReady - speechEnd) }
     var zhLatency: Double? { zhReady.map { max(0, $0 - speechEnd) } }
@@ -618,6 +669,17 @@ final class LivePipeline: @unchecked Sendable {
         var decodedEnd = 0.0; var queued = 0; var lastASRms = 0.0; var lastMTms = 0.0; var behind = false
         /// EWMA of ASR milliseconds per final and of the real-time factor (compute seconds / audio seconds).
         var asrMsAvg = 0.0; var rtfAvg = 0.0; var finalsMeasured = 0; var asrMeasured = 0
+        /// 291 per-stage counters (whole session; survive seeks and recognizer hot swaps).
+        var chunks = 0, audioSec = 0.0, utterances = 0, vadShort = 0, asrErrors = 0, recognizedEmpty = 0, filtered = 0
+        var merged = 0, inserted = 0, translated = 0, translateFailed = 0, displayed = 0, droppedLate = 0
+        var discardedReset = 0, staleResults = 0, lateArrivals = 0, sourceLate = 0, computeLate = 0
+        var sourceLagAvg = 0.0, computeMsAvg = 0.0
+        var stageLine: String {
+            String(format: "分段 块%d 音频%.0fs 语句%d 过短%d · 识别空%d 过滤%d 合并%d 失败%d · 入库%d 翻译%d/失败%d · 显示%d 迟到%d(源%d/算%d) 过期丢弃%d · 重置丢弃%d 过时结果%d · 源滞后%.2fs 计算%.0fms",
+                   chunks, audioSec, utterances, vadShort, recognizedEmpty, filtered, merged, asrErrors, inserted, translated,
+                   translateFailed, displayed, lateArrivals, sourceLate, computeLate, droppedLate, discardedReset, staleResults,
+                   sourceLagAvg, computeMsAvg)
+        }
     }
     private let lock = NSLock()
     private var vad = LiveVAD()
@@ -630,6 +692,7 @@ final class LivePipeline: @unchecked Sendable {
     private var records: [Int: LiveLatencyRecord] = [:]
     private var lastPrompt: (end: Double, text: String)?
     private var _mode: LiveSubtitleMode = .bilingual
+    private var shownIDs = Set<Int>()
     var mode: LiveSubtitleMode { get { locked { _mode } } set { locked { _mode = newValue } } }
     var now: () -> Double = { Date().timeIntervalSinceReferenceDate }
     var onChange: (() -> Void)?
@@ -647,6 +710,7 @@ final class LivePipeline: @unchecked Sendable {
     func reset(at t: Double) {
         locked {
             generation += 1
+            stats.discardedReset += finals.count
             for f in finals { store.uncover(f.u.start, f.u.end) }       // dropped before transcription
             if let open = vad.openStart { store.uncover(open, vad.position) }
             finals = []; vad.reset(at: t); store.partial = nil; stats.decodedEnd = t; records[-1] = nil
@@ -663,6 +727,8 @@ final class LivePipeline: @unchecked Sendable {
         let done = vad.feed(pcm, start: start)
         let end = start + Double(pcm.count) / Double(LiveVAD.rate)
         stats.decodedEnd = end
+        stats.chunks += 1; stats.audioSec += Double(pcm.count) / Double(LiveVAD.rate)
+        stats.utterances += done.count; stats.vadShort = vad.rejectedShort
         for u in done { finals.append((u, now(), playhead)); store.cover(u.start, u.end) }
         if vad.openStart == nil { store.cover(start, end) }
         stats.queued = finals.count
@@ -671,6 +737,7 @@ final class LivePipeline: @unchecked Sendable {
     func finishStream(generation g: Int) {
         lock.lock(); defer { lock.unlock() }
         guard g == generation, let u = vad.finish() else { return }
+        stats.utterances += 1
         finals.append((u, now(), playhead)); store.cover(u.start, u.end)
     }
 
@@ -699,10 +766,14 @@ final class LivePipeline: @unchecked Sendable {
             return false
         }
         let t0 = now()
-        guard let raw = try? await asr.transcribe(u.samples, prompt: u.final ? picked.prompt : nil) else { return true }
+        guard let raw = try? await asr.transcribe(u.samples, prompt: u.final ? picked.prompt : nil) else {
+            // 291: a failed final is no longer silently "covered" — reopen its range so a rewatch / retry decodes it.
+            locked { if u.final { stats.asrErrors += 1; if g == generation { store.uncover(u.start, u.end) } } }
+            return true
+        }
         let asrMs = (now() - t0) * 1000
         let inserted: LiveSegment? = locked {
-            guard g == generation else { return nil }
+            guard g == generation else { if u.final { stats.staleResults += 1 }; return nil }
             stats.lastASRms = asrMs
             stats.asrMsAvg += (stats.asrMeasured == 0 ? 1.0 : 0.3) * (asrMs - stats.asrMsAvg)
             stats.asrMeasured += 1
@@ -710,13 +781,26 @@ final class LivePipeline: @unchecked Sendable {
                 let dur = max(0.3, u.end - u.start)
                 stats.rtfAvg += (stats.finalsMeasured == 0 ? 1.0 : 0.3) * (asrMs / 1000 / dur - stats.rtfAvg)
                 stats.finalsMeasured += 1
-                let s = store.insert(start: u.start, end: u.end, ja: raw, tier: asr.tier.rawValue)
+                let cleaned = LiveText.clean(raw)
+                if cleaned.isEmpty { stats.recognizedEmpty += 1 } else if LiveText.isNoise(cleaned) { stats.filtered += 1 }
+                let s = store.insert(start: u.start, end: u.end, ja: raw, tier: asr.tier.rawValue, arrival: playhead)
                 if let s {
                     lastPrompt = (u.end, s.ja)
-                    records[s.id] = LiveLatencyRecord(segment: s.id, start: s.start, speechEnd: u.speechEnd, audioReady: picked.readyAt,
-                                                      jaReady: playhead, zhReady: nil, firstPartial: records[-1]?.firstPartial,
-                                                      asrMs: asrMs, mtMs: nil, queueMs: (t0 - picked.queuedAt) * 1000, split: u.split)
-                }
+                    stats.inserted += 1
+                    let r = LiveLatencyRecord(segment: s.id, start: s.start, speechEnd: u.speechEnd, audioReady: picked.readyAt,
+                                              jaReady: playhead, zhReady: nil, firstPartial: records[-1]?.firstPartial,
+                                              asrMs: asrMs, mtMs: nil, queueMs: (t0 - picked.queuedAt) * 1000, split: u.split)
+                    records[s.id] = r
+                    if records.count > 300, let k = records.keys.filter({ $0 >= 0 }).min() { records[k] = nil }   // 291: bounded ledger (sorted on main 10×/s)
+                    let w = stats.inserted == 1 ? 1.0 : 0.2
+                    stats.sourceLagAvg += w * (r.sourceLag - stats.sourceLagAvg)
+                    stats.computeMsAvg += w * (r.computeMs - stats.computeMsAvg)
+                    if r.jaLatency > 2.0 {
+                        stats.lateArrivals += 1
+                        if r.computeLate { stats.computeLate += 1 } else { stats.sourceLate += 1 }
+                    }
+                    if playhead - s.end > LiveSegmentStore.lateLimit { stats.droppedLate += 1 }
+                } else if !cleaned.isEmpty, !LiveText.isNoise(cleaned) { stats.merged += 1 }
                 records[-1] = nil
                 return s
             }
@@ -741,12 +825,28 @@ final class LivePipeline: @unchecked Sendable {
         let ms = (now() - t0) * 1000
         locked {
             store.setChinese(id: s.id, zh.isEmpty ? "（翻译失败）" : zh)
+            if zh.isEmpty { stats.translateFailed += 1 } else { stats.translated += 1 }
             stats.lastMTms = ms
             if var r = records[s.id] { r.zhReady = playhead; r.mtMs = ms; records[s.id] = r }
         }
         onChange?()
     }
 
-    func caption(at t: Double) -> LiveCaption { locked { store.caption(at: t, mode: _mode) } }
+    func caption(at t: Double) -> LiveCaption {
+        locked {
+            if _mode != .off, let s = store.currentSegment(at: t), shownIDs.insert(s.id).inserted { stats.displayed += 1 }
+            return store.caption(at: t, mode: _mode)
+        }
+    }
+    /// 291: performance verdict for the auto-switch — compute-bound only (RTF or a growing queue whose wait is
+    /// the problem), never "the line was late" when the audio itself arrived late.
+    func computeBound(recent n: Int = 5) -> (bound: Bool, why: String) {
+        locked {
+            let recs = records.values.filter { $0.segment >= 0 }.sorted { $0.start < $1.start }.suffix(n)
+            let slow = recs.filter(\.computeLate).count
+            let bound = stats.finalsMeasured >= 3 && (stats.rtfAvg > 0.7 || (recs.count >= n && slow >= 3 && finals.count >= 3))
+            return (bound, String(format: "RTF %.2f 计算迟到 %d/%d 队列 %d 源滞后 %.2fs", stats.rtfAvg, slow, recs.count, finals.count, stats.sourceLagAvg))
+        }
+    }
 }
 

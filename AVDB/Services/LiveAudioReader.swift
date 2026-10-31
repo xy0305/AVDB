@@ -96,23 +96,65 @@ final class LiveAudioReader: @unchecked Sendable {
             if let r = resumeAt, pendingSeek == nil { pendingSeek = (r, generation) }
             cond.unlock()
             guard let source else { return }
+            let before = resumeAt
             let result = session(source, tok: tok, generation: &generation, lastTime: &resumeAt)
+            if let r = resumeAt, r > (before ?? -1) + 1 { attempts = 0 }        // it decoded audio: a fresh failure streak
             switch result {
             case .stopped: return
             case .ended: onEnd?(generation); waitForSeekOrStop(tok); attempts = 0; resumeAt = nil
             case .failed(let msg):
+                // 291: never park until a manual seek (that silently ended subtitles for the rest of the video after
+                // one network hiccup). Back off 1, 2, 4, 8, 15, 15 … s, interruptible by seek/stop; resumes at the
+                // last decoded time (or the pending seek). The notice shows once, on the 4th failure.
                 attempts += 1
-                if attempts > 3 { onError?(msg); waitForSeekOrStop(tok); attempts = 0 }
-                else { Thread.sleep(forTimeInterval: Double(attempts)) }
+                cond.lock(); failures += 1; cond.unlock()
+                if attempts == 4 { onError?(msg) }
+                waitForSeekOrStop(tok, timeout: min(15, pow(2, Double(attempts - 1))))
             }
         }
     }
 
-    private func waitForSeekOrStop(_ tok: Int) {
+    private func waitForSeekOrStop(_ tok: Int, timeout: Double? = nil) {
         cond.lock()
-        while !stopped, tok == token, pendingSeek == nil { cond.wait() }
+        let deadline = timeout.map { Date().addingTimeInterval($0) }
+        while !stopped, tok == token, pendingSeek == nil {
+            if let deadline { if !cond.wait(until: deadline) { break } } else { cond.wait() }
+        }
         cond.unlock()
     }
+    /// Diagnostics line (reader thread).
+    var onInfo: ((String) -> Void)?
+    private var variantLogged = false
+
+    /// First stream of the HLS variant (program) with the lowest `variant_bitrate`, or -1 (single variant / not HLS).
+    static func lowestVariantStream(_ ctx: UnsafeMutablePointer<AVFormatContext>) -> Int32 {
+        let n = Int(ctx.pointee.nb_programs)
+        guard n > 1, let programs = ctx.pointee.programs else { return -1 }
+        var best: (rate: Int, stream: Int32)?
+        for i in 0 ..< n {
+            guard let prog = programs[i], prog.pointee.nb_stream_indexes > 0, let idx = prog.pointee.stream_index else { continue }
+            let rate = av_dict_get(prog.pointee.metadata, "variant_bitrate", nil, 0).flatMap { Int(String(cString: $0.pointee.value)) } ?? Int.max
+            var audio: Int32?
+            for k in 0 ..< Int(prog.pointee.nb_stream_indexes) {
+                let si = Int(idx[k])
+                if let st = ctx.pointee.streams[si], st.pointee.codecpar.pointee.codec_type == AVMEDIA_TYPE_AUDIO { audio = Int32(si); break }
+            }
+            guard let audio else { continue }
+            if best == nil || rate < best!.rate { best = (rate, audio) }
+        }
+        return best?.stream ?? -1
+    }
+    static func variantSummary(_ ctx: UnsafeMutablePointer<AVFormatContext>) -> String {
+        let n = Int(ctx.pointee.nb_programs)
+        guard let programs = ctx.pointee.programs else { return "" }
+        return (0 ..< n).compactMap { i -> Int? in
+            programs[i].flatMap { av_dict_get($0.pointee.metadata, "variant_bitrate", nil, 0) }.flatMap { Int(String(cString: $0.pointee.value)) }
+        }.sorted().map { String(format: "%.1f", Double($0) / 1e6) }.joined(separator: " / ") + " Mb/s"
+    }
+
+    /// 291 diagnostics: failed sessions (each followed by an automatic retry).
+    private var failures = 0
+    var failureCount: Int { cond.lock(); defer { cond.unlock() }; return failures }
 
     private enum Outcome { case stopped, ended, failed(String) }
 
@@ -144,6 +186,10 @@ final class LiveAudioReader: @unchecked Sendable {
         av_dict_set(&opts, "reconnect_streamed", "1", 0)
         av_dict_set(&opts, "reconnect_delay_max", "4", 0)
         av_dict_set(&opts, "rw_timeout", "15000000", 0)
+        // 291: HLS mirrors that disguise TS segments as .jpeg/.png (MissAV surrit) are rejected by FFmpeg ≥ 6.1.2's
+        // segment-extension check; the player's own demuxer accepts them, so the subtitle reader must too.
+        av_dict_set(&opts, "extension_picky", "0", 0)
+        av_dict_set(&opts, "allowed_extensions", "ALL", 0)
         av_dict_set(&opts, "probesize", "2000000", 0)
         av_dict_set(&opts, "analyzeduration", "2000000", 0)
         let urlString = source.url.isFileURL ? source.url.path : source.url.absoluteString
@@ -158,7 +204,13 @@ final class LiveAudioReader: @unchecked Sendable {
         guard avformat_find_stream_info(ctx, nil) >= 0 else { return dead(tok) ? .stopped : .failed("stream info") }
 
         var decoder: UnsafePointer<AVCodec>?
-        let index = av_find_best_stream(ctx, AVMEDIA_TYPE_AUDIO, -1, -1, &decoder, 0)
+        // 291: master playlists open every variant as a program; the audio track is the same AAC in all of them,
+        // so read it from the LOWEST-bandwidth variant (e.g. 360p ≈ 1.1 Mb/s instead of 720p ≈ 2.8 Mb/s). The
+        // subtitle reader is a 2nd HLS connection next to the player's: less bandwidth = it keeps its read-ahead
+        // instead of falling behind the playhead (the "late 5/5" lines) and competes less with playback.
+        let related = Self.lowestVariantStream(ctx)
+        let index = av_find_best_stream(ctx, AVMEDIA_TYPE_AUDIO, -1, related, &decoder, 0)
+        if related >= 0, !variantLogged { variantLogged = true; onInfo?("字幕音频读取最低码率变体（\(Self.variantSummary(ctx))）") }
         guard index >= 0, let decoder else { return .failed("no audio stream") }
         for i in 0 ..< Int(ctx.pointee.nb_streams) where i != Int(index) {
             ctx.pointee.streams[i]?.pointee.discard = AVDISCARD_ALL
