@@ -14,7 +14,7 @@
 
 ## 修复
 1. **整句 MT**：`plan` 对整句只产一个 `.mt(s)`，不再按句拆译。
-2. **相邻合并**：VAD 在 `。` 后 ≤1.5s（或间隙 ≤0.85s）的下一段拼进同一 `LiveSegment`，清空 zh 并 **返回该段** 触发重译；overlap 日文变长时同样返回以便重译。对话轮次（无句末标点、约 1s 间隔）不合并。
+2. **相邻合并（仅 SenseVoice）**：VAD 在 `。` 后 ≤1.5s（或间隙 ≤0.85s）的下一段拼进同一 `LiveSegment`，清空 zh 并 **返回该段** 触发重译；overlap 日文变长时同样返回以便重译。对话轮次（无句末标点、约 1s 间隔）不合并。
 3. **Seek**：`abortIO` / `holdForSeek` —— interrupt 在 pending seek / hold 时中止 I/O；读失败且正在 seek/hold 时不拆 session；`didSeek` 防抖 0.45s（先 hold 停读，playhead 更新用缓存字幕，落地一次 `restartReader`）。
 
 ## 回归

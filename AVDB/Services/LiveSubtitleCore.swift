@@ -416,7 +416,9 @@ struct LiveSegmentStore: Codable, Equatable {
         // 293: merge a clause that follows the previous final within ~0.85 s (VAD pause at 。) into one utterance.
         // Previous must end with 。？！ (clause boundary) or the gap must be ≤ 0.85 s — so two dialogue turns
         // ~1 s apart without a final (e.g. 「一行目です」「二行目です」) stay separate.
-        if let k = segments.indices.last(where: { segments[$0].end <= start + 0.05 }) {
+        // SenseVoice only: Whisper/Apple harnesses and the 287 paced pipeline expect one segment per VAD cut.
+        if tier == LiveASRTier.senseVoice.rawValue,
+           let k = segments.indices.last(where: { segments[$0].end <= start + 0.05 }) {
             let gap = start - segments[k].end
             let prev = segments[k]
             let prevFinal = prev.ja.last.map { "。？！?!".contains($0) } ?? false
