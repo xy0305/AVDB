@@ -34,7 +34,7 @@ assert (model / 'Manifest.json').exists(), 'bundled Core ML model'
 weights = sum(p.stat().st_size for p in model.rglob('*') if p.is_file())
 assert 10e6 < weights < 95e6, f'model size {weights}'
 assert 'AvbaseHQExtras.extras(products: products, number: number)' in meta and 'isHQStoreJacket(source)' in loader and 'DMMJacketOnly.shared.observe' in resolver
-assert plist['CFBundleVersion'] == '294' and pbx.count('CURRENT_PROJECT_VERSION = 294;') == 2
+assert plist['CFBundleVersion'] == '295' and pbx.count('CURRENT_PROJECT_VERSION = 295;') == 2
 swiftc = shutil.which('swiftc')
 if not swiftc:
     if os.environ.get('CI'): sys.exit('swiftc missing')
