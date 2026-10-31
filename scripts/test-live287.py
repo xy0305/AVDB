@@ -24,7 +24,7 @@ for s in ['"关"', '"日文"', '"中文"', '"双语"']: assert s in (r / 'AVDB/S
 for s in ['chromeReserve', 'LiveOutlinedText', 'live.subtitle.zh.pending', 'live.subtitle.partial', 'player.live.subtitle.menu',
           'LiveSubtitleStyle.fontKey', 'LiveSubtitleStyle.positionKey', '.translationTask(bridge.configuration)']:
     assert s in views, s
-for s in ['ProcessInfo.processInfo.thermalState', 'isLowPowerModeEnabled', 'batteryLevel', 'LiveSubtitleCache.key(video:', 'abs(c.time - expected) > 1.5',
+for s in ['ProcessInfo.processInfo.thermalState', 'isLowPowerModeEnabled', 'batteryLevel', 'LiveSubtitleCache.key(video:', 'LiveCatchUpPolicy.isMediaJump',
           'readerShouldRun', 'max(1, c.rate)']:
     assert s in engine, s
 # Reader: audio-only, other streams discarded, headers / UA / referer, interrupt, seek trim, 16 kHz mono float.
