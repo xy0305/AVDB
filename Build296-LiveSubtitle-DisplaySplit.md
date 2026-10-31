@@ -20,3 +20,9 @@ Build 293 为提高日→中整句质量，对 SenseVoice 相邻 final（间隙 
 
 ## 产物
 - CFBundleVersion **296**；`lut4-online296.yml` push；295 → `workflow_dispatch` only。
+
+## CI / IPA
+- CI: https://github.com/xy0305/AVDB/actions/runs/41194832499 （release=success）
+- IPA artifact: https://github.com/xy0305/AVDB/actions/runs/41194832499/artifacts/13041340765
+- file `AVDB-unsigned-1.0.2-296-livesub-lut4-online-from269.ipa`
+- size 770541137 · sha256 `9e3ed6dffa48d12511ba30a6da8d6f4a8f087866906c1a5c0968ff48b72819b1` · CFBundleVersion 296 · covers key present (fp `5cc2a6c8`)
