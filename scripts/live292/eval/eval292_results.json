@@ -1,0 +1,134 @@
+{
+ "IPZZ-961": {
+  "291 NLLB": {
+   "cues": 32,
+   "matched_f1>=0.3": 0.625,
+   "zh_f1_mean": 0.381,
+   "lines": 93,
+   "shown_zh": 93,
+   "xianzai_rate": 0.409,
+   "xianzai_zhidao": 33,
+   "repetition": 0
+  },
+  "292 NLLB+fixes": {
+   "cues": 32,
+   "matched_f1>=0.3": 0.656,
+   "zh_f1_mean": 0.382,
+   "lines": 93,
+   "shown_zh": 87,
+   "xianzai_rate": 0.011,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  }
+ },
+ "JUR-857": {
+  "291 NLLB": {
+   "cues": 96,
+   "matched_f1>=0.3": 0.417,
+   "zh_f1_mean": 0.276,
+   "lines": 146,
+   "shown_zh": 146,
+   "xianzai_rate": 0.267,
+   "xianzai_zhidao": 20,
+   "repetition": 0
+  },
+  "292 NLLB+fixes": {
+   "cues": 96,
+   "matched_f1>=0.3": 0.5,
+   "zh_f1_mean": 0.315,
+   "lines": 146,
+   "shown_zh": 126,
+   "xianzai_rate": 0.024,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  }
+ },
+ "ADN-801": {
+  "291 NLLB": {
+   "cues": 112,
+   "matched_f1>=0.3": 0.375,
+   "zh_f1_mean": 0.252,
+   "lines": 123,
+   "shown_zh": 123,
+   "xianzai_rate": 0.276,
+   "xianzai_zhidao": 11,
+   "repetition": 2
+  },
+  "292 NLLB+fixes": {
+   "cues": 112,
+   "matched_f1>=0.3": 0.464,
+   "zh_f1_mean": 0.308,
+   "lines": 123,
+   "shown_zh": 117,
+   "xianzai_rate": 0.009,
+   "xianzai_zhidao": 1,
+   "repetition": 0
+  }
+ },
+ "HMN-898": {
+  "291 NLLB": {
+   "cues": 125,
+   "matched_f1>=0.3": 0.288,
+   "zh_f1_mean": 0.198,
+   "lines": 166,
+   "shown_zh": 166,
+   "xianzai_rate": 0.259,
+   "xianzai_zhidao": 19,
+   "repetition": 2
+  },
+  "292 NLLB+fixes": {
+   "cues": 125,
+   "matched_f1>=0.3": 0.328,
+   "zh_f1_mean": 0.243,
+   "lines": 166,
+   "shown_zh": 143,
+   "xianzai_rate": 0.007,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  }
+ },
+ "IPZZ-912": {
+  "291 NLLB": {
+   "cues": 100,
+   "matched_f1>=0.3": 0.39,
+   "zh_f1_mean": 0.23,
+   "lines": 183,
+   "shown_zh": 183,
+   "xianzai_rate": 0.361,
+   "xianzai_zhidao": 42,
+   "repetition": 1
+  },
+  "292 NLLB+fixes": {
+   "cues": 100,
+   "matched_f1>=0.3": 0.43,
+   "zh_f1_mean": 0.255,
+   "lines": 183,
+   "shown_zh": 158,
+   "xianzai_rate": 0.025,
+   "xianzai_zhidao": 1,
+   "repetition": 0
+  }
+ },
+ "CAWD-989": {
+  "291 NLLB": {
+   "cues": 111,
+   "matched_f1>=0.3": 0.324,
+   "zh_f1_mean": 0.214,
+   "lines": 203,
+   "shown_zh": 203,
+   "xianzai_rate": 0.202,
+   "xianzai_zhidao": 17,
+   "repetition": 1
+  },
+  "292 NLLB+fixes": {
+   "cues": 111,
+   "matched_f1>=0.3": 0.387,
+   "zh_f1_mean": 0.227,
+   "lines": 203,
+   "shown_zh": 183,
+   "xianzai_rate": 0.016,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  }
+ }
+}
