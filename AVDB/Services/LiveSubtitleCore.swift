@@ -386,8 +386,8 @@ struct LiveSegmentStore: Codable, Equatable {
     init() {}
 
     /// 293: stitch adjacent finals that VAD closed at a short pause (often the 。 between two clauses of one
-    /// spoken utterance). Gap ≤ 1.5 s and combined body ≤ 64 → one segment / one Chinese line covering the full span.
-    static let adjacentMergeGap = 1.5
+    /// spoken utterance). Gap ≤ 0.85 s and combined body ≤ 64 → one segment / one Chinese line covering the full span.
+    static let adjacentMergeGap = 0.85
     static let adjacentMergeMaxBody = 64
 
     @discardableResult
@@ -413,7 +413,7 @@ struct LiveSegmentStore: Codable, Equatable {
         // SenseVoice does not hallucinate repeats, and real repeated short lines (「気持ちいい」×2) were being dropped.
         if tier == LiveASRTier.small.rawValue || tier == LiveASRTier.turbo.rawValue,
            let last = segments.last(where: { $0.end <= start + 0.05 }), start - last.end < 1.5, LiveText.similarity(last.ja, ja) > 0.9 { return nil }
-        // 293: merge a clause that follows the previous final within ~1.5 s (VAD pause at 。) into one utterance.
+        // 293: merge a clause that follows the previous final within ~0.85 s (VAD pause at 。) into one utterance.
         // Previous must end with 。？！ (clause boundary) or the gap must be ≤ 0.85 s — so two dialogue turns
         // ~1 s apart without a final (e.g. 「一行目です」「二行目です」) stay separate.
         if let k = segments.indices.last(where: { segments[$0].end <= start + 0.05 }) {
