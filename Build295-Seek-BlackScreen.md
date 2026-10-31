@@ -27,3 +27,11 @@
 ## 产物
 - CFBundleVersion **295**；`lut4-online295.yml` push；294 → `workflow_dispatch` only。
 - 可选 Sakura 不变；`AVDB_COVERS_KEY` 注入保留。
+
+## CI / IPA
+- CI: https://github.com/xy0305/AVDB/actions/runs/41190805828 （全绿；首个 run 41190174281 因历史/封面回归脚本版本号仍写 294 失败，`c4a50f2` 已修）
+- IPA artifact: https://github.com/xy0305/AVDB/actions/runs/41190805828/artifacts/13039670138
+- IPA: `AVDB-unsigned-1.0.2-295-livesub-lut4-online-from269.ipa`
+- size 770538905 · sha256 `27996f29c0440e4b8f59754c724353932056861ca6479183b06da8feefa9ad1f` · CFBundleVersion 295 · covers key present (fp `5cc2a6c8`)
+- sourceCommit `c4a50f2c283bb81a09d967e5def6af0d17a77972` · 主改动 `a301063`
+- `NativeHLSLUTSurface.swift` 安全哈希已重锁（`test-hls-safety273.py`），strict-runtime 模拟器测试通过。
