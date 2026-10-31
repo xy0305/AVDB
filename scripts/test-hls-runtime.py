@@ -29,11 +29,31 @@ end
 p.save;s=Xcodeproj::XCScheme.new;s.add_build_target(a);s.set_launch_target(a);s.save_as(p.path,'HLSRuntime',true)
 '''
 (d/'setup.rb').write_text(ruby);subprocess.run(['ruby',str(d/'setup.rb')],check=True)
+# 291: pick a Booted iPhone when one exists; otherwise boot the newest available iPhone runtime.
+# Destination by name (not a stale UDID) — run 41165243517 failed both attempts with
+# "Unable to find a device matching … id=0183276C-…" after simctl listed that UDID.
 devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
-device=next(v for k,rows in devices.items() if 'iOS' in k for v in rows if 'iPhone' in v['name'])
-if device['state']!='Booted':subprocess.run(['xcrun','simctl','boot',device['udid']],check=True)
-subprocess.run(['xcrun','simctl','bootstatus',device['udid'],'-b'],check=True)
-subprocess.run(['xcodebuild','build','-project',str(d/'HLSRuntime.xcodeproj'),'-scheme','HLSRuntime','-destination','platform=iOS Simulator,id='+device['udid'],'-derivedDataPath',str(d/'Derived'),'CODE_SIGNING_ALLOWED=NO'],check=True)
+iphones=[(k,v) for k,rows in devices.items() if 'iOS' in k for v in rows if 'iPhone' in v['name'] and v.get('isAvailable',True)]
+assert iphones, 'no available iPhone simulator'
+booted=[(k,v) for k,v in iphones if v['state']=='Booted']
+runtime,device=(booted or iphones)[-1]          # newest runtime when none booted
+if device['state']!='Booted':
+    subprocess.run(['xcrun','simctl','boot',device['udid']],check=False)
+    subprocess.run(['xcrun','simctl','bootstatus',device['udid'],'-b'],check=True)
+# Re-read after boot so the UDID matches what CoreSimulator currently exposes to xcodebuild.
+devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
+device=next(v for rows in devices.values() for v in rows if v.get('udid')==device['udid'])
+dest=f"platform=iOS Simulator,name={device['name']}"
+print(f"strict-runtime destination: {dest} udid={device['udid']} state={device['state']} runtime={runtime}")
+def xcodebuild():
+    return subprocess.run(['xcodebuild','build','-project',str(d/'HLSRuntime.xcodeproj'),'-scheme','HLSRuntime',
+                           '-destination',dest,'-derivedDataPath',str(d/'Derived'),'CODE_SIGNING_ALLOWED=NO'])
+r=xcodebuild()
+if r.returncode:
+    # One more try after opening Simulator.app (display / device registry lag on macos-26 runners).
+    subprocess.run(['open','-a','Simulator'],check=False); time.sleep(8)
+    subprocess.run(['xcrun','simctl','bootstatus',device['udid'],'-b'],check=False)
+    r=xcodebuild(); r.check_returncode()
 app=d/'Derived/Build/Products/Debug-iphonesimulator/HLSRuntime.app'
 # Test-only ATS allowance lives solely in this generated host bundle, never in AVDB.
 import plistlib

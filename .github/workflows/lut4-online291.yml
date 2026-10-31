@@ -192,7 +192,10 @@ jobs:
         run: |
           open -a Simulator || true
           sleep 5
-          python3 scripts/test-hls-runtime.py || { echo "::warning::strict-runtime attempt 1 failed — retrying once"; sleep 10; python3 scripts/test-hls-runtime.py; }
+          # 291: destination by simulator name (not UDID); open Simulator + bootstatus before each attempt.
+          open -a Simulator || true
+          xcrun simctl list devices available | head -40 || true
+          python3 scripts/test-hls-runtime.py || { echo "::warning::strict-runtime attempt 1 failed — retrying once"; sleep 15; open -a Simulator || true; python3 scripts/test-hls-runtime.py; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
