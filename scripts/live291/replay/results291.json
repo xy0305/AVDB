@@ -206,5 +206,416 @@
   "restarts": 0,
   "catchUps": 0,
   "stageLine": "分段 块2400 音频600s 语句173 过短90 · 识别空0 过滤81 合并0 失败0 · 入库92 翻译0/失败0 · 显示92 迟到0(源0/算0) 过期丢弃0 · 重置丢弃0 过时结果0 · 源滞后0.00s 计算73ms"
+ },
+ "missav_batch5": {
+  "results": {
+   "JUR-857 290 device": {
+    "cues": 96,
+    "coverage": 0.854,
+    "matched_f1>=0.3": 0.312,
+    "zh_f1_mean": 0.25,
+    "random_baseline": 0.044,
+    "onset_median_s": -1.23,
+    "onset_p90_s": 0.33,
+    "restarts": 16,
+    "lines_displayed": 129
+   },
+   "JUR-857 290 clean": {
+    "cues": 96,
+    "coverage": 1.0,
+    "matched_f1>=0.3": 0.438,
+    "zh_f1_mean": 0.278,
+    "random_baseline": 0.049,
+    "onset_median_s": -1.76,
+    "onset_p90_s": -0.14,
+    "restarts": 1,
+    "lines_displayed": 146
+   },
+   "JUR-857 291 device": {
+    "cues": 96,
+    "coverage": 0.979,
+    "matched_f1>=0.3": 0.375,
+    "zh_f1_mean": 0.261,
+    "random_baseline": 0.054,
+    "onset_median_s": -1.66,
+    "onset_p90_s": -0.09,
+    "restarts": 0,
+    "lines_displayed": 143
+   },
+   "JUR-857 291 clean": {
+    "cues": 96,
+    "coverage": 1.0,
+    "matched_f1>=0.3": 0.417,
+    "zh_f1_mean": 0.276,
+    "random_baseline": 0.06,
+    "onset_median_s": -1.82,
+    "onset_p90_s": -0.14,
+    "restarts": 0,
+    "lines_displayed": 146
+   },
+   "ADN-801 290 device": {
+    "cues": 112,
+    "coverage": 0.884,
+    "matched_f1>=0.3": 0.268,
+    "zh_f1_mean": 0.241,
+    "random_baseline": 0.045,
+    "onset_median_s": -1.92,
+    "onset_p90_s": 0.82,
+    "restarts": 16,
+    "lines_displayed": 118
+   },
+   "ADN-801 290 clean": {
+    "cues": 112,
+    "coverage": 0.964,
+    "matched_f1>=0.3": 0.339,
+    "zh_f1_mean": 0.252,
+    "random_baseline": 0.046,
+    "onset_median_s": -2.08,
+    "onset_p90_s": -0.46,
+    "restarts": 1,
+    "lines_displayed": 149
+   },
+   "ADN-801 291 device": {
+    "cues": 112,
+    "coverage": 0.982,
+    "matched_f1>=0.3": 0.375,
+    "zh_f1_mean": 0.249,
+    "random_baseline": 0.056,
+    "onset_median_s": -2.34,
+    "onset_p90_s": -1.2,
+    "restarts": 0,
+    "lines_displayed": 126
+   },
+   "ADN-801 291 clean": {
+    "cues": 112,
+    "coverage": 0.982,
+    "matched_f1>=0.3": 0.375,
+    "zh_f1_mean": 0.252,
+    "random_baseline": 0.046,
+    "onset_median_s": -2.46,
+    "onset_p90_s": -1.2,
+    "restarts": 0,
+    "lines_displayed": 123
+   },
+   "HMN-898 290 device": {
+    "cues": 125,
+    "coverage": 0.824,
+    "matched_f1>=0.3": 0.232,
+    "zh_f1_mean": 0.206,
+    "random_baseline": 0.05,
+    "onset_median_s": -1.48,
+    "onset_p90_s": 1.2,
+    "restarts": 16,
+    "lines_displayed": 139
+   },
+   "HMN-898 290 clean": {
+    "cues": 125,
+    "coverage": 0.984,
+    "matched_f1>=0.3": 0.264,
+    "zh_f1_mean": 0.204,
+    "random_baseline": 0.035,
+    "onset_median_s": -1.8,
+    "onset_p90_s": -0.0,
+    "restarts": 1,
+    "lines_displayed": 165
+   },
+   "HMN-898 291 device": {
+    "cues": 125,
+    "coverage": 0.976,
+    "matched_f1>=0.3": 0.264,
+    "zh_f1_mean": 0.185,
+    "random_baseline": 0.047,
+    "onset_median_s": -2.21,
+    "onset_p90_s": -0.42,
+    "restarts": 0,
+    "lines_displayed": 161
+   },
+   "HMN-898 291 clean": {
+    "cues": 125,
+    "coverage": 1.0,
+    "matched_f1>=0.3": 0.288,
+    "zh_f1_mean": 0.198,
+    "random_baseline": 0.045,
+    "onset_median_s": -2.3,
+    "onset_p90_s": -0.68,
+    "restarts": 0,
+    "lines_displayed": 166
+   },
+   "IPZZ-912 290 device": {
+    "cues": 100,
+    "coverage": 0.92,
+    "matched_f1>=0.3": 0.31,
+    "zh_f1_mean": 0.212,
+    "random_baseline": 0.05,
+    "onset_median_s": -1.26,
+    "onset_p90_s": 0.15,
+    "restarts": 16,
+    "lines_displayed": 165
+   },
+   "IPZZ-912 290 clean": {
+    "cues": 100,
+    "coverage": 0.99,
+    "matched_f1>=0.3": 0.38,
+    "zh_f1_mean": 0.225,
+    "random_baseline": 0.052,
+    "onset_median_s": -1.56,
+    "onset_p90_s": -0.3,
+    "restarts": 1,
+    "lines_displayed": 179
+   },
+   "IPZZ-912 291 device": {
+    "cues": 100,
+    "coverage": 0.99,
+    "matched_f1>=0.3": 0.38,
+    "zh_f1_mean": 0.225,
+    "random_baseline": 0.055,
+    "onset_median_s": -1.58,
+    "onset_p90_s": -0.22,
+    "restarts": 0,
+    "lines_displayed": 183
+   },
+   "IPZZ-912 291 clean": {
+    "cues": 100,
+    "coverage": 0.99,
+    "matched_f1>=0.3": 0.39,
+    "zh_f1_mean": 0.23,
+    "random_baseline": 0.056,
+    "onset_median_s": -1.54,
+    "onset_p90_s": -0.26,
+    "restarts": 0,
+    "lines_displayed": 183
+   },
+   "CAWD-989 290 device": {
+    "cues": 111,
+    "coverage": 0.856,
+    "matched_f1>=0.3": 0.279,
+    "zh_f1_mean": 0.207,
+    "random_baseline": 0.046,
+    "onset_median_s": -1.73,
+    "onset_p90_s": 0.42,
+    "restarts": 16,
+    "lines_displayed": 172
+   },
+   "CAWD-989 290 clean": {
+    "cues": 111,
+    "coverage": 0.955,
+    "matched_f1>=0.3": 0.297,
+    "zh_f1_mean": 0.206,
+    "random_baseline": 0.048,
+    "onset_median_s": -1.76,
+    "onset_p90_s": 0.13,
+    "restarts": 1,
+    "lines_displayed": 204
+   },
+   "CAWD-989 291 device": {
+    "cues": 111,
+    "coverage": 0.964,
+    "matched_f1>=0.3": 0.324,
+    "zh_f1_mean": 0.215,
+    "random_baseline": 0.048,
+    "onset_median_s": -1.84,
+    "onset_p90_s": 0.19,
+    "restarts": 0,
+    "lines_displayed": 199
+   },
+   "CAWD-989 291 clean": {
+    "cues": 111,
+    "coverage": 0.964,
+    "matched_f1>=0.3": 0.324,
+    "zh_f1_mean": 0.214,
+    "random_baseline": 0.048,
+    "onset_median_s": -1.91,
+    "onset_p90_s": -0.01,
+    "restarts": 0,
+    "lines_displayed": 203
+   }
+  },
+  "unnatural_examples": {
+   "JUR-857": [
+    {
+     "t": 49.0,
+     "ja": "そろそろお行くよ夜ご飯どうする？",
+     "ours_zh": "现在我们要去.",
+     "ref_zh": "晚饭怎么办？",
+     "f1": 0.0
+    },
+    {
+     "t": 162.0,
+     "ja": "もためだ。",
+     "ours_zh": "我也很喜欢.",
+     "ref_zh": "（自那件事之后丈夫就彻底变了）",
+     "f1": 0.0
+    },
+    {
+     "t": 199.0,
+     "ja": "いげえちごめん。",
+     "ours_zh": "我很抱歉.",
+     "ref_zh": "一花 对不起",
+     "f1": 0.0
+    },
+    {
+     "t": 238.0,
+     "ja": "ごんそれ。",
+     "ours_zh": "现在,我知道.",
+     "ref_zh": "人带来了",
+     "f1": 0.0
+    },
+    {
+     "t": 434.0,
+     "ja": "あんたが働けば。",
+     "ours_zh": "你必须工作.",
+     "ref_zh": "那家伙的债务就能减轻",
+     "f1": 0.0
+    }
+   ],
+   "ADN-801": [
+    {
+     "t": 23.0,
+     "ja": "おでうござ、います、すみません遅れちゃって。",
+     "ours_zh": "谢谢你,对不起,我迟到了.",
+     "ref_zh": "彩月七猪彩月小姐",
+     "f1": 0.0
+    },
+    {
+     "t": 37.0,
+     "ja": "怖い顔してまょ。",
+     "ours_zh": "我很害怕,我很害怕.",
+     "ref_zh": "这个月营业额着实有点··",
+     "f1": 0.0
+    },
+    {
+     "t": 96.0,
+     "ja": "いらっしゃいませ。",
+     "ours_zh": "现在你来了.",
+     "ref_zh": "一欢迎光临一欢迎光临",
+     "f1": 0.0
+    },
+    {
+     "t": 112.0,
+     "ja": "さいませんねん君ん？",
+     "ours_zh": "没有什么,你?",
+     "ref_zh": "一欢迎光临误~莲君？一读彩月同学？",
+     "f1": 0.0
+    },
+    {
+     "t": 117.0,
+     "ja": "さつ木さんえらしゃいえここでバイトしてんのうだそう。",
+     "ours_zh": "木先生,我在这里工作.",
+     "ref_zh": "一怎么回事？一欢迎光临",
+     "f1": 0.0
+    }
+   ],
+   "HMN-898": [
+    {
+     "t": 21.0,
+     "ja": "箱根ねいいねなんか巻いたとかもすごい良かっ。",
+     "ours_zh": "子,子,子,子,子,子,子,子,子,子,子,子,子,子,子,子,子,子,子,子,子",
+     "ref_zh": "箱根啊真不错呢",
+     "f1": 0.0
+    },
+    {
+     "t": 54.0,
+     "ja": "うちは全然気にしないけど。",
+     "ours_zh": "我不太关心.",
+     "ref_zh": "嗯 知道了",
+     "f1": 0.0
+    },
+    {
+     "t": 59.0,
+     "ja": "、わかった気をつけてね。",
+     "ours_zh": "现在,你必须要小心.",
+     "ref_zh": "{怎么了？",
+     "f1": 0.0
+    },
+    {
+     "t": 82.0,
+     "ja": "た違いで予約できてなかったみたいで。",
+     "ours_zh": "现在,我觉得我没有预订.",
+     "ref_zh": "！大文夫餐の？（误！不要紧吧？",
+     "f1": 0.0
+    },
+    {
+     "t": 121.0,
+     "ja": "突然ごめんね。",
+     "ours_zh": "我突然道歉.",
+     "ref_zh": "院全没关系",
+     "f1": 0.0
+    }
+   ],
+   "IPZZ-912": [
+    {
+     "t": 120.0,
+     "ja": "活躍の場の環境づくりにも力を注いでいますよ。",
+     "ours_zh": "我们也在努力创造工作场所的环境.",
+     "ref_zh": "原来如此",
+     "f1": 0.0
+    },
+    {
+     "t": 197.0,
+     "ja": "今いいできるからねたら困るね。",
+     "ours_zh": "我知道你现在可以做得很好.",
+     "ref_zh": "事业正顺的时候要是被拥出去就麻烦了吧",
+     "f1": 0.0
+    },
+    {
+     "t": 278.0,
+     "ja": "前の頑張り次第の味。",
+     "ours_zh": "根据你之前的努力.",
+     "ref_zh": "好好表现",
+     "f1": 0.0
+    },
+    {
+     "t": 292.0,
+     "ja": "ももせロ。",
+     "ours_zh": "现在,我知道.",
+     "ref_zh": "看着镜头",
+     "f1": 0.0
+    },
+    {
+     "t": 303.0,
+     "ja": "こいまそれを。",
+     "ours_zh": "现在就把它拿到来.",
+     "ref_zh": "那你该怎么做？",
+     "f1": 0.0
+    }
+   ],
+   "CAWD-989": [
+    {
+     "t": 87.0,
+     "ja": "じゃひよろしくお願いしますよ。",
+     "ours_zh": "我可以这样做.",
+     "ref_zh": "那就拜托您了哦",
+     "f1": 0.0
+    },
+    {
+     "t": 107.0,
+     "ja": "失礼てしはいね。",
+     "ours_zh": "我很抱歉.",
+     "ref_zh": "-慢走慢走一是",
+     "f1": 0.0
+    },
+    {
+     "t": 115.0,
+     "ja": "うんうん。",
+     "ours_zh": "现在,我知道.",
+     "ref_zh": "游泳部吗？",
+     "f1": 0.0
+    },
+    {
+     "t": 140.0,
+     "ja": "はい次き出しねけめよ。",
+     "ours_zh": "现在,我可以去.",
+     "ref_zh": "一接下来要冲刺了哦准备好了吗？一是",
+     "f1": 0.0
+    },
+    {
+     "t": 148.0,
+     "ja": "いつがプ力が上がってくれる。",
+     "ours_zh": "什么时候会有更多的力?",
+     "ref_zh": "长家能从泳池里先出来下吗？",
+     "f1": 0.0
+    }
+   ]
+  }
  }
 }
