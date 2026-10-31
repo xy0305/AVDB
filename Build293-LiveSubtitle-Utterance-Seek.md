@@ -26,3 +26,8 @@
 - CFBundleVersion **293**；`lut4-online293.yml` push；292 → `workflow_dispatch` only。
 - 可选 Sakura 下载不变；不改最高画质；`AVDB_COVERS_KEY` 注入保留。
 - IPA：`/workspace/avdb-ipa/out293a/`（CI 完成后）。
+
+## CI / IPA
+- CI: https://github.com/xy0305/AVDB/actions/runs/41181544022 （release=success；ai-cover-settings-screenshots 偶发失败与本改无关）
+- IPA: `/workspace/avdb-ipa/out293a/AVDB-unsigned-1.0.2-293-livesub-lut4-online-from269.ipa`
+- 可选 Sakura 仍约 1.26 GB 下载，不随包。
