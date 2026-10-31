@@ -14,7 +14,7 @@
 
 ## 修复
 1. **整句 MT**：`plan` 对整句只产一个 `.mt(s)`，不再按句拆译。
-2. **相邻合并（仅 SenseVoice）**：VAD 在 `。` 后 ≤1.5s（或间隙 ≤0.85s）的下一段拼进同一 `LiveSegment`，清空 zh 并 **返回该段** 触发重译；overlap 日文变长时同样返回以便重译。对话轮次（无句末标点、约 1s 间隔）不合并。
+2. **相邻合并（仅 SenseVoice）**：VAD 在 `。` 后间隙 ≤0.85s（或无句末但间隙 ≤0.85s）的下一段拼进同一 `LiveSegment`，清空 zh 并 **返回该段** 触发重译；overlap 日文变长时同样返回以便重译。对话轮次（无句末标点、约 1s 间隔）不合并。
 3. **Seek**：`abortIO` / `holdForSeek` —— interrupt 在 pending seek / hold 时中止 I/O；读失败且正在 seek/hold 时不拆 session；`didSeek` 防抖 0.45s（先 hold 停读，playhead 更新用缓存字幕，落地一次 `restartReader`）。
 
 ## 回归
@@ -25,9 +25,11 @@
 ## 产物
 - CFBundleVersion **293**；`lut4-online293.yml` push；292 → `workflow_dispatch` only。
 - 可选 Sakura 下载不变；不改最高画质；`AVDB_COVERS_KEY` 注入保留。
-- IPA：`/workspace/avdb-ipa/out293a/`（CI 完成后）。
 
 ## CI / IPA
 - CI: https://github.com/xy0305/AVDB/actions/runs/41181544022 （release=success；ai-cover-settings-screenshots 偶发失败与本改无关）
 - IPA: `/workspace/avdb-ipa/out293a/AVDB-unsigned-1.0.2-293-livesub-lut4-online-from269.ipa`
 - 可选 Sakura 仍约 1.26 GB 下载，不随包。
+
+- size 770528750 · sha256 `9e4ca9cd72442ffad2c9954b3358e625db2b1d7672c75f681eb5813139eb9aad` · CFBundleVersion 293 · covers key present (fp `5cc2a6c80b01`) · llama.framework embedded · no `.gguf` in IPA
+- Multi-clause ASR lines kept whole after 293: ADN-801 5/5, HMN-898 9/9, IPZZ-912 1/1, CAWD-989 6/6 (21/21); IPZZ-961/JUR-857 had 0 multi-`。` lines in the eval list.
