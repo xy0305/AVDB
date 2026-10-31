@@ -648,6 +648,31 @@ enum LiveCatchUpPolicy {
     }
 }
 
+/// Build 295 — when to tear down / reopen the subtitle 2nd HLS around player scrub & first open.
+/// 293 held the reader 0.45s then `seek`ed in-place (session stayed open). That still competed with the
+/// player's own HLS rebuffer → freeze. 295: stop the session on scrub; reopen only after coalesce +
+/// player seek settled / playing (or timeout). Also gate the first open so reopen-after-exit does not
+/// starve the first video frames (black picture + audio).
+enum LiveSeekPolicy {
+    /// 293 coalesce floor (ns) — keep scrub ticks merged before any reopen attempt.
+    static let coalesceNanoseconds: UInt64 = 450_000_000
+    /// Extra wait after coalesce for the player to report seek finished / playing.
+    static let playReadyTimeoutSeconds = 2.0
+    /// First open after attach: do not start the 2nd HLS until the player is playing, or this timeout.
+    static let firstOpenPlayGateSeconds = 1.5
+
+    /// Whether the deferred reopen task may start the reader now.
+    static func mayReopen(playerReady: Bool, playing: Bool, elapsedSinceCoalesce: Double) -> Bool {
+        if playerReady || playing { return true }
+        return elapsedSinceCoalesce >= playReadyTimeoutSeconds
+    }
+
+    /// Whether the first-open gate may start the reader.
+    static func mayFirstOpen(playing: Bool, elapsed: Double) -> Bool {
+        playing || elapsed >= firstOpenPlayGateSeconds
+    }
+}
+
 // MARK: - Latency ledger
 
 struct LiveLatencyRecord: Codable, Equatable, Sendable {

@@ -1,6 +1,8 @@
 // Build 287 — look-ahead audio reader for live subtitles.
 // Build 293 — seek must abort in-flight FFmpeg I/O (interrupt on pending seek / hold) and coalesce;
 // otherwise scrubbing opens a second HLS storm next to the player and playback freezes.
+// Build 295 — engine now `stop()`s this reader for the whole scrub (tears down open_input); reopen via
+// `start` only after the player seek has settled. `holdForSeek` / `abortIO` remain for in-flight cancel.
 //
 // A second, audio-only FFmpeg demux/decode context that runs *ahead of the playhead* on its own thread.
 // It works for every source the player can open (115 / online HLS / AVPlayer + Metal LUT path / local files),
@@ -86,6 +88,12 @@ final class LiveAudioReader: @unchecked Sendable {
 
     /// Wake the pacing wait (the playhead moved / rate changed).
     func poke() { cond.lock(); cond.broadcast(); cond.unlock() }
+
+    /// True while a worker thread owns an open (or opening) session.
+    var isRunning: Bool {
+        cond.lock(); defer { cond.unlock() }
+        return !stopped && thread != nil
+    }
 
     func stop() {
         cond.lock()

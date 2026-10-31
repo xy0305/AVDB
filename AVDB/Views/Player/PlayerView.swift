@@ -1056,10 +1056,14 @@ struct KSChromePlayer: View {
         seekGeneration += 1
         let token = seekGeneration
         seekPending = true
-        coordinator.playerLayer?.seek(time: start, autoPlay: true) { _ in
+        lut.noteSeek()
+        live.didSeek(to: start)
+        coordinator.playerLayer?.seek(time: start, autoPlay: true) { finished in
             Task { @MainActor in
                 guard seekGeneration == token else { return }
                 seekPending = false
+                let playing = coordinator.playerLayer?.player.isPlaying == true
+                live.seekSettled(at: start, playing: playing || finished)
             }
         }
         currentTime = start
@@ -1210,12 +1214,17 @@ struct KSChromePlayer: View {
         seekGeneration += 1
         let token = seekGeneration
         seekPending = true
+        // 295: hide Metal LUT immediately so AVPlayerLayer shows during rebuffer; tear down live 2nd HLS.
+        lut.noteSeek()
         live.didSeek(to: time)
         if layer.options.isSeekedAutoPlay { audio.begin() }
-        layer.seek(time: time, autoPlay: layer.options.isSeekedAutoPlay) { _ in
+        layer.seek(time: time, autoPlay: layer.options.isSeekedAutoPlay) { finished in
             Task { @MainActor in
                 guard seekGeneration == token else { return }
                 seekPending = false
+                let playing = coordinator.playerLayer?.player.isPlaying == true
+                // Reopen subtitle reader only after the player seek finished (or timed out inside the engine).
+                live.seekSettled(at: time, playing: playing || finished)
             }
         }
     }

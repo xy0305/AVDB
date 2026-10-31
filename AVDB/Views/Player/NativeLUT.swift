@@ -344,6 +344,13 @@ final class NativeLUTController: ObservableObject {
         if lastConstrained != constrained { lastConstrained = constrained; apply() }
         if supported && enabled && requested && !busy { analyze() }
     }
+    /// Build 295: player scrub / resume seek — drop the Metal overlay so AVPlayerLayer is visible while
+    /// the item rebuffers. Avoids a black MTKView covering audio-only recovery after exit→replay or seek.
+    func noteSeek() {
+        surface?.noteSeek()
+        status = onlineMode ? "拖动中：原画，等待新帧" : status
+    }
+
     func detach() {
         let wasOnline = onlineMode
         surface?.stop(); surface = nil; onlineMode = false; onlineFilter = nil

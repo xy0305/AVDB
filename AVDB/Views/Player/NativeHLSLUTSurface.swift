@@ -138,6 +138,16 @@ final class NativeHLSLUTSurface: NSObject {
         lastFrameHost = CACurrentMediaTime()
     }
 
+    /// Player scrub: hide Metal immediately and demand a fresh decode after settle.
+    func noteSeek() {
+        generation += 1
+        lastBuffer = nil
+        dirty = true
+        forceCopy = true
+        hide("拖动中：原画")
+        lastFrameHost = CACurrentMediaTime()
+    }
+
     func stop() {
         generation += 1; link?.invalidate(); link = nil
         formatTask?.cancel(); formatTask = nil
@@ -262,8 +272,14 @@ final class NativeHLSLUTSurface: NSObject {
                     if CACurrentMediaTime() - lastFrameHost > stallLimit {
                         hide("无新解码帧，已回原画")
                     }
+                } else if CACurrentMediaTime() - lastFrameHost > stallLimit {
+                    // 295: visible but starved (reopen / seek) — fall back so we never sit on a black MTKView
+                    // while audio keeps playing.
+                    lastBuffer = nil
+                    forceCopy = true
+                    hide("解码停滞，已回原画")
                 }
-                // If still visible, keep last drawable; do not flicker back to AVPlayerLayer.
+                // Otherwise keep last drawable across brief gaps (no flicker).
             }
             return
         }

@@ -1,7 +1,9 @@
 from pathlib import Path
 import subprocess,tempfile,json,re,hashlib,sys
 r=Path(__file__).resolve().parents[1];s=(r/'AVDB/Views/Player/NativeHLSLUTSurface.swift').read_text();c=(r/'AVDB/Views/Player/NativeLUT.swift').read_text();p=(r/'AVDB/Views/Player/PlayerView.swift').read_text()
-assert hashlib.sha256(s.encode()).hexdigest()=='b20c5571c4da80560ca978c951730ab19434886aebfeb7582cca41a2d238cfcb', 'runtime must remain exact verified production file'
+# Build 295: re-locked after noteSeek() + visible-stall fallback (seek / reopen black-with-audio fix).
+assert hashlib.sha256(s.encode()).hexdigest()=='be2152323ede0c693c0991a8ea743937865219a4b6d109814bb9aa6cbd98d2fa', 'runtime must remain exact verified production file'
+assert 'func noteSeek()' in s and '解码停滞，已回原画' in s
 assert 'guard !protected else' in s and '不绕过 DRM' in s
 # Build 279: decoded SDR buffers are tagged sRGB (no BT.709-OETF→sRGB lift) in presentation AND analysis.
 assert 'CIImage(cvPixelBuffer: buffer, options: [.colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])' in s

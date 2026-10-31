@@ -1,4 +1,6 @@
 // Build 294 — reader catch-up grace + soft reopen (stop the 10 s 读取落后 death loop after seek/open).
+// Build 295 — tear down 2nd HLS for the whole scrub; reopen only after player seekSettled / playing.
+//            Gate first reader open so exit→replay does not starve the first video frames.
 // Build 289 — SenseVoice default, Apple on-device fallback (heat / falling behind), Whisper manual only (never
 // compiled unless selected), utility-QoS worker, thermal-throttled read-ahead, main-thread hitch counter.
 // Build 288 — staged model loading (small first, turbo warmed in background), timeouts + retry, diagnostics.
@@ -184,9 +186,14 @@ final class LiveSubtitleEngine: ObservableObject {
     private var guardTier: LiveASRTier?
     /// 291 diagnostics + hysteresis.
     private var restarts = 0, hotSwaps = 0, readerCatchUps = 0
-    /// 293: coalesce scrub seeks — hold the 2nd HLS reader, apply one restart after settle.
+    /// 293/295: coalesce scrub seeks — 295 tears the reader down; one reopen after settle.
     private var seekDebounce: Task<Void, Never>?
     private var seekTarget: Double?
+    /// 295: player chrome finished its seek (or tick fallback timed out) — may reopen 2nd HLS.
+    private var seekPlayerReady = false
+    /// 295: reader was stopped for scrub / first-open gate; next ensure uses `start` not `seek`.
+    private var readerSuspended = false
+    private var firstOpenGate: Task<Void, Never>?
     private var degradedAt: Date?
     private var lastCatchUp = Date.distantPast
     /// 294: suppress catch-up while FFmpeg reopens/seeks the subtitle HLS after scrub / catch-up / open.
@@ -285,31 +292,86 @@ final class LiveSubtitleEngine: ObservableObject {
     }
 
     /// Explicit seek from the player chrome (jumps found by the ticker are handled the same way).
-    /// 293: debounced. Immediate `restartReader` on every scrub tick used to `av_seek_frame` / reopen the subtitle
-    /// HLS session beside the player mid-seek → video freeze. Hold the reader (no read), update playhead for cached
-    /// captions, then one restart ~0.45 s after the last seek.
+    /// 293: debounced hold. 295: **tear down** the 2nd HLS (`stop`) for the whole scrub so open_input / av_read
+    /// cannot compete with the player's rebuffer; coalesce 0.45 s, then reopen only after `seekSettled` (or
+    /// playing / timeout). Cached captions still track the playhead while suspended.
     func didSeek(to t: Double) {
         guard phase == .running, t.isFinite else { return }
         seekTarget = t
+        seekPlayerReady = false
         pipeline.setPlayhead(t)
         setPace(t, shared.pace.rate)
+        // Abort any in-flight I/O, then fully close the session (frees the 2nd HLS connection).
         reader.holdForSeek(true)
+        reader.stop()
+        readerSuspended = true
         lastTick = (Date().timeIntervalSinceReferenceDate, t, shared.pace.rate)
         refreshCaption()
         seekDebounce?.cancel()
         seekDebounce = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 450_000_000)
-            guard let self, !Task.isCancelled, let target = self.seekTarget else { return }
+            // 293 coalesce floor (450 ms) — merge rapid scrub ticks before any reopen.
+            try? await Task.sleep(nanoseconds: LiveSeekPolicy.coalesceNanoseconds)
+            guard let self, !Task.isCancelled else { return }
+            let coalesceAt = Date()
+            // Wait for player seekSettled / playing, or fall back so tick-detected jumps still recover.
+            while !Task.isCancelled {
+                let elapsed = Date().timeIntervalSince(coalesceAt)
+                let playing = self.clock?().playing == true
+                if LiveSeekPolicy.mayReopen(playerReady: self.seekPlayerReady, playing: playing, elapsedSinceCoalesce: elapsed) {
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            guard !Task.isCancelled, self.phase == .running, let target = self.seekTarget else { return }
             self.seekTarget = nil
-            self.reader.holdForSeek(false)
-            // 294: grace while the 2nd HLS session reopens after scrub — do not catch-up-restart every 10 s.
+            self.seekPlayerReady = false
             self.armCatchUpGrace(why: "seek落地")
-            self.restartReader(at: target)
+            self.ensureReader(at: target, soft: false)
+            self.seekDebounce = nil
+            LiveDiagnostics.shared.log(String(format: "seek 字幕读取重开 %.1fs", target))
         }
     }
 
+    /// Player chrome finished `layer.seek` (success or failure). Prefer reopening only once the picture is moving.
+    func seekSettled(at t: Double, playing: Bool) {
+        guard phase == .running else { return }
+        // Only meaningful while the reader is torn down for this scrub; the debounce waiter owns the reopen.
+        guard readerSuspended, seekTarget != nil else { return }
+        if t.isFinite {
+            seekTarget = t
+            pipeline.setPlayhead(t)
+            setPace(t, shared.pace.rate)
+            refreshCaption()
+        }
+        seekPlayerReady = true
+    }
+
+    /// 295: bumps on every mode change so a deferred OFF teardown never stops a session the user re-enabled.
+    private var modeToken = 0
+
     private func modeChanged(from old: LiveSubtitleMode) {
-        if mode == .off { saveCache(force: true); stopRunning(); hitches.stop(); phase = .off; caption = .init(ja: nil, zh: nil, partial: false, pendingChinese: false); return }
+        modeToken += 1
+        if mode == .off {
+            // 295 「关不灵敏」: UI state flips in this same runloop turn (menu label / overlay vanish at once).
+            // Heavy teardown (FFmpeg stop + thread join, cache snapshot/encode, worker cancel) runs on the next
+            // turn; the cache snapshot is taken off the main actor.
+            caption = .init(ja: nil, zh: nil, partial: false, pendingChinese: false)
+            phase = .off
+            notice = nil
+            seekDebounce?.cancel(); seekDebounce = nil; seekTarget = nil
+            firstOpenGate?.cancel(); firstOpenGate = nil
+            reader.stop()          // only flips flags + broadcast; the worker exits on its own
+            let token = modeToken
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self, self.modeToken == token, self.mode == .off else { return }
+                self.saveCacheDetached()
+                self.stopRunning()
+                self.hitches.stop()
+                LiveDiagnostics.shared.log("实时字幕已关闭")
+            }
+            return
+        }
         if old == .off { start(reason: "开启字幕"); return }
         if mode.needsChinese, mt == nil { loadTranslatorInBackground() }
         refreshCaption()
@@ -626,11 +688,30 @@ final class LiveSubtitleEngine: ObservableObject {
         pipeline.reset(at: start)
         pipeline.setPlayhead(now.time)
         armCatchUpGrace(why: "打开/启动")
-        reader.start(source, at: start, generation: pipeline.currentGeneration)
         phase = .running
         if !hitches.running { hitches.start() }
         startWorker()
         refreshCaption()
+        // 295: do not open the 2nd HLS until the player is actually playing (or a short gate), so exit→replay
+        // and cold open keep bandwidth for the first video frames (avoids 黑屏有声).
+        readerSuspended = true
+        firstOpenGate?.cancel()
+        let gateStart = Date()
+        let gatedAt = start
+        firstOpenGate = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                let playing = self?.clock?().playing == true
+                let elapsed = Date().timeIntervalSince(gateStart)
+                if LiveSeekPolicy.mayFirstOpen(playing: playing, elapsed: elapsed) { break }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            guard let self, !Task.isCancelled, self.phase == .running, self.source != nil else { return }
+            // A scrub during the gate already scheduled its own reopen.
+            guard self.seekTarget == nil else { return }
+            self.armCatchUpGrace(why: "打开/启动")
+            self.ensureReader(at: max(0, (self.clock?().time ?? gatedAt)), soft: false)
+            LiveDiagnostics.shared.log("首开字幕读取（播放门控后）")
+        }
     }
 
     /// Single serial worker (concurrency cap = 1 ASR or MT call at a time): ASR and MT run in playhead order at
@@ -680,34 +761,39 @@ final class LiveSubtitleEngine: ObservableObject {
         swapTask?.cancel(); swapTask = nil
         worker?.cancel(); worker = nil
         seekDebounce?.cancel(); seekDebounce = nil; seekTarget = nil
+        seekPlayerReady = false
+        firstOpenGate?.cancel(); firstOpenGate = nil
+        readerSuspended = false
         reader.stop()
         ticker?.cancel(); ticker = nil
         lastTick = nil
     }
 
+
     private func restartReader(at t: Double) {
-        guard source != nil else { return }
-        let from = max(0, t - 0.5)
-        let start = pipeline.resumePoint(after: from) ?? from
-        pipeline.reset(at: start)
-        pipeline.setPlayhead(t)
-        setPace(t, shared.pace.rate)
-        reader.seek(to: start, generation: pipeline.currentGeneration)
-        lastTick = (Date().timeIntervalSinceReferenceDate, t, shared.pace.rate)
-        lastDecodedEndSeen = start
-        lastDecodedProgressAt = Date()
-        refreshCaption()
+        ensureReader(at: t, soft: false)
     }
 
     /// 294: modest behind-ness — seek the reader and clear open VAD only; keep queued finals + committed captions.
     private func softRestartReader(at t: Double) {
-        guard source != nil else { return }
+        ensureReader(at: t, soft: true)
+    }
+
+    /// 295: after `stop()` during scrub / first-open gate the worker is dead — must `start` again.
+    /// While the session is alive, hard catch-up still `seek`s; soft keeps the queue via softReopen.
+    private func ensureReader(at t: Double, soft: Bool) {
+        guard let source else { return }
         let from = max(0, t - 0.5)
         let start = pipeline.resumePoint(after: from) ?? from
-        pipeline.softReopen(at: start)
+        if soft { pipeline.softReopen(at: start) } else { pipeline.reset(at: start) }
         pipeline.setPlayhead(t)
         setPace(t, shared.pace.rate)
-        reader.seek(to: start, generation: pipeline.currentGeneration)
+        if readerSuspended || !reader.isRunning {
+            reader.start(source, at: start, generation: pipeline.currentGeneration)
+            readerSuspended = false
+        } else {
+            reader.seek(to: start, generation: pipeline.currentGeneration)
+        }
         lastTick = (Date().timeIntervalSinceReferenceDate, t, shared.pace.rate)
         lastDecodedEndSeen = start
         lastDecodedProgressAt = Date()
@@ -806,6 +892,14 @@ final class LiveSubtitleEngine: ObservableObject {
         }
         let nowRef = Date().timeIntervalSinceReferenceDate
         let growing = Date().timeIntervalSince(lastDecodedProgressAt) < 3.0 && lastDecodedEndSeen >= 0
+        // 295: while the 2nd HLS is torn down for scrub / first-open gate, do not catch-up-restart.
+        if readerSuspended {
+            reader.poke()
+            refreshCaption()
+            saveCache(force: false)
+            updateLatencyText()
+            return
+        }
         switch LiveCatchUpPolicy.action(playing: c.playing, decodedEnd: decoded, playhead: c.time,
                                         now: nowRef,
                                         lastCatchUp: lastCatchUp.timeIntervalSinceReferenceDate,
@@ -873,15 +967,20 @@ final class LiveSubtitleEngine: ObservableObject {
         if c != caption { caption = c }
     }
 
+    private var latencyCounter = 0
     private func updateLatencyText() {
+        latencyCounter += 1
+        guard latencyCounter % 10 == 1 else { return }     // ~1 Hz
         let recs = pipeline.latency.filter { $0.segment >= 0 }.suffix(20)
         let rtf = pipeline.snapshotStats.rtfAvg
-        guard !recs.isEmpty else { latencyText = ""; return }
+        guard !recs.isEmpty else { if !latencyText.isEmpty { latencyText = "" }; return }
         let sync = recs.filter(\.inSync).count
         let zh = recs.compactMap(\.zhLatency)
         let avg = zh.isEmpty ? 0 : zh.reduce(0, +) / Double(zh.count)
         let asrMs = recs.map(\.asrMs).reduce(0, +) / Double(recs.count)
-        latencyText = String(format: "同步 %d/%d · 平均滞后 %.2fs · ASR %.0fms (%.2f× 实时)", sync, recs.count, avg, asrMs, rtf)
+        let text = String(format: "同步 %d/%d · 平均滞后 %.2fs · ASR %.0fms (%.2f× 实时)", sync, recs.count, avg, asrMs, rtf)
+        // 295: @Published churn at 10 Hz re-rendered the player chrome + live menu every tick (menu taps dropped).
+        if text != latencyText { latencyText = text }
     }
 
     // MARK: guard
@@ -942,6 +1041,17 @@ final class LiveSubtitleEngine: ObservableObject {
     }
 
     // MARK: cache
+
+    /// 295: force-save with the store snapshot taken off the main actor (pipeline lock may be contended by the worker).
+    private func saveCacheDetached() {
+        guard !videoKey.isEmpty, activeTier != nil else { return }
+        let key = cacheKey, cache = self.cache, pipeline = self.pipeline
+        Task.detached(priority: .utility) {
+            let store = pipeline.snapshotStore
+            guard !store.segments.isEmpty else { return }
+            cache.save(store, key: key)
+        }
+    }
 
     private func saveCache(force: Bool) {
         guard !videoKey.isEmpty, activeTier != nil else { return }

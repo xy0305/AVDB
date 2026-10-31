@@ -9,13 +9,15 @@ eng = (S / 'LiveSubtitleEngine.swift').read_text()
 reader = (S / 'LiveAudioReader.swift').read_text()
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
 pl = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
-assert pl['CFBundleVersion'] == '294' and pbx.count('CURRENT_PROJECT_VERSION = 294;') == 2
+ver = int(pl['CFBundleVersion'])
+assert ver >= 294 and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
 for s in ['enum LiveCatchUpPolicy', 'reopenGraceSeconds', 'softGapLimit', 'func softReopen(at',
           'static func action(playing:', 'static func isMediaJump(delta:']:
     assert s in core, s
+blob = eng + core + reader
 for s in ['armCatchUpGrace', 'softRestartReader', '追帧宽限', '软追帧', '硬追帧', 'lastBigHitchAt',
           'LiveCatchUpPolicy.action', 'holdForSeek', 'seekDebounce', '450_000_000']:
-    assert s in eng, s
+    assert s in blob, s
 assert 'if abs(c.time - expected) > 1.5' not in eng, '293 1.5s jump threshold must be gone'
 assert 'decoded < c.time - 6, Date().timeIntervalSince(lastCatchUp) > 10' not in eng, 'bare 10s catch-up loop must be gone'
 for s in ['holdForSeek', 'abortIO']:
@@ -23,7 +25,8 @@ for s in ['holdForSeek', 'abortIO']:
 wf = (r / '.github/workflows/lut4-online294.yml').read_text()
 for s in ['test-live294.py', 'package-lut294.py', 'AVDB-294-release', 'fetch_llama292.py']:
     assert s in wf, s
-assert 'push:' in wf.split('jobs:')[0]
+# Under 295 the push trigger moves to lut4-online295.yml; 294 becomes dispatch-only.
+assert 'push:' not in wf.split('jobs:')[0], '294 must be dispatch-only under 295'
 assert 'push:' not in (r / '.github/workflows/lut4-online293.yml').read_text().split('jobs:')[0], '293 must be dispatch-only'
 assert (r / 'Build294-LiveSubtitle-CatchUp.md').exists()
 assert "=='294'" in (r / 'scripts/package-lut294.py').read_text()

@@ -1,7 +1,6 @@
 name: LUT4 online App 294 (实时字幕读取追帧死循环：seek/open 宽限+软追帧 + 293)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

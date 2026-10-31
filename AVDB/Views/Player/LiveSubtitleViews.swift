@@ -144,8 +144,14 @@ struct LiveSubtitleMenuButton: View {
     var openSettings: () -> Void
     var body: some View {
         Menu {
-            Picker("实时字幕", selection: $engine.mode) {
-                ForEach(LiveSubtitleMode.allCases) { m in Text(m.title).tag(m) }
+            // 295: explicit buttons (not a nested Picker) — one tap commits, reliable while the engine republishes.
+            ForEach(LiveSubtitleMode.allCases) { m in
+                Button {
+                    if engine.mode != m { engine.mode = m }
+                } label: {
+                    if engine.mode == m { Label(m.title, systemImage: "checkmark") } else { Text(m.title) }
+                }
+                .accessibilityIdentifier("player.live.subtitle.mode.\(m.rawValue)")
             }
             Divider()
             Button { openSettings() } label: { Label("实时字幕设置…", systemImage: "slider.horizontal.3") }
