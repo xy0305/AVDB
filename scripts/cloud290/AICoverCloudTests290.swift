@@ -173,7 +173,7 @@ func realTests(_ base: URL) async -> Bool {
     }
     let client = AICoverCloudClient(bases: [base], key: key, transport: AICoverURLSessionTransport(), fetchTimeout: 10, prefix: "ci")
     let run = ProcessInfo.processInfo.environment["GITHUB_RUN_ID"] ?? "local"
-    let name = "e2e-\(run)-\(Int(Date().timeIntervalSince1970))"
+    let name = "e2e-\(run)-\(base.host?.split(separator: ".").first ?? "b")-\(Int(Date().timeIntervalSince1970))"   // 291: unique per base (both bases share one bucket; same-second runs collided)
     let body = (try? Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[3]))) ?? jpeg
     check(await client.fetch(name: name) == .miss, "real Worker: fresh ci/ name → 404 miss")
     let t0 = Date()
