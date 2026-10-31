@@ -114,6 +114,18 @@ final class LiveSubtitleEngine: ObservableObject {
     enum TurboDownload: Equatable { case idle, downloading(Double), failed(String) }
     @Published private(set) var turboDownload: TurboDownload = .idle
     @Published private(set) var hitchText = ""
+    /// 292: optional on-device LLM translator (Sakura-1.5B, downloaded on request; 机翻).
+    @Published private(set) var llmDownload: TurboDownload = .idle
+    @Published private(set) var llmStatus = ""
+    @Published var llmEnabled: Bool = LiveLLMModel.enabled {
+        didSet { LiveLLMModel.enabled = llmEnabled; applyLLMSetting() }
+    }
+    var llmDownloaded: Bool { LiveLLMModel.downloaded }
+    var llmLinked: Bool { LiveLLMModel.linked }
+    /// Title metadata names (actresses) → translation glossary.
+    private var glossary: [LiveGlossaryEntry] = []
+    private var llmLoadTask: Task<Void, Never>?
+    private var llmGuardBadSince: Date?
     @Published var mode: LiveSubtitleMode {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: LiveSubtitleMode.defaultsKey)
@@ -211,6 +223,7 @@ final class LiveSubtitleEngine: ObservableObject {
         tierPreference = LiveTierPreference.current
         pipeline.mode = mode
         UIDevice.current.isBatteryMonitoringEnabled = true
+        LiveLLMModel.log = { LiveDiagnostics.shared.log($0) }
         wireReader()
         hitches.context = { [weak self] in
             guard let self else { return "" }
@@ -295,7 +308,7 @@ final class LiveSubtitleEngine: ObservableObject {
         LiveDiagnostics.shared.report(extra: ["模式 \(mode.rawValue) · 偏好 \(tierPreference.rawValue) · 当前 \(activeTier?.rawValue ?? "-") · 阶段 \(phaseText)",
                                               "可用内存 \(LiveMemory.availableMB) MB · 翻译 \(translatorName) · Apple 翻译 \(appleStatus) · Apple 识别 \(appleASRStatus.rawValue)",
                                               "热状态 \(ProcessInfo.processInfo.thermalState.rawValue) · 预读 \(Int(effectiveLead))s · \(latencyText) · \(hitchText)",
-                                              pipeline.snapshotStats.stageLine,
+                                              pipeline.snapshotStats.stageLine, pipeline.snapshotStats.mtLine,
                                               "重启 \(restarts) · 热切换识别器 \(hotSwaps) · 读取追帧 \(readerCatchUps) · 读取重连 \(reader.failureCount) · 读取进度 \(String(format: "%.1f", pipeline.snapshotStats.decodedEnd - shared.rawPlayhead))s"]
                                               + hitches.worst.map { "卡顿 \($0)" } + modelStatus)
     }
@@ -479,6 +492,83 @@ final class LiveSubtitleEngine: ObservableObject {
         mt = chain
         translatorName = chain.name
         if phase == .running { startWorker() }
+        applyLLMSetting()
+    }
+
+    // MARK: 292 LLM translator (optional download)
+
+    /// Title names from metadata (ja name, optional Chinese form) → glossary for every translator.
+    func setTitleNames(_ names: [(ja: String, zh: String?)]) {
+        glossary = LiveMTPrep.glossary(names: names)
+        pipeline.glossary = glossary
+    }
+
+    /// Loads / unloads the LLM into the shared chain (off-main; ≈ 1–3 s mmap + Metal warm-up). Subtitles keep running
+    /// on Apple/NLLB meanwhile.
+    private func applyLLMSetting() {
+        guard let chain = Self.sharedMT as? LiveTranslatorChain else { return }
+        guard llmEnabled, LiveLLMModel.linked, LiveLLMModel.downloaded else {
+            if chain.llm != nil { chain.llm = nil; translatorName = chain.name; LiveDiagnostics.shared.log("LLM 翻译已关闭") }
+            return
+        }
+        guard chain.llm == nil, llmLoadTask == nil else { return }
+        #if canImport(llama)
+        llmStatus = "LLM 加载中…"
+        llmLoadTask = Task { [weak self] in
+            let t0 = Date()
+            do {
+                let t = try await Task.detached(priority: .utility) { try LiveLLMTranslator.load() }.value
+                guard let self else { return }
+                if self.llmEnabled { chain.llm = t }
+                self.translatorName = chain.name
+                self.llmStatus = String(format: "LLM 就绪 %.1fs", Date().timeIntervalSince(t0))
+            } catch {
+                self?.llmStatus = "LLM 加载失败：\(error.localizedDescription)"
+            }
+            if let s = self?.llmStatus { LiveDiagnostics.shared.log(s) }
+            self?.llmLoadTask = nil
+        }
+        #endif
+    }
+
+    func downloadLLM() {
+        guard llmDownload == .idle || { if case .failed = llmDownload { return true }; return false }() else { return }
+        llmDownload = .downloading(0)
+        Task {
+            do {
+                try await LiveLLMModel.download { f in Task { @MainActor [weak self] in self?.llmDownload = .downloading(f) } }
+                llmDownload = .idle
+                toast("\(LiveLLMModel.displayName) 已下载")
+                if !llmEnabled { llmEnabled = true } else { applyLLMSetting() }
+            } catch {
+                llmDownload = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func deleteLLM() {
+        llmEnabled = false
+        (Self.sharedMT as? LiveTranslatorChain)?.llm = nil
+        LiveLLMModel.delete()
+        if let chain = Self.sharedMT as? LiveTranslatorChain { translatorName = chain.name }
+        llmStatus = ""
+        objectWillChange.send()
+    }
+
+    /// Guard for the LLM (checked with the recognizer guard): hot / Low Power / battery < 20 % → Apple/NLLB;
+    /// back on after 60 s of good conditions.
+    private func checkLLMGuard() {
+        guard let chain = Self.sharedMT as? LiveTranslatorChain, chain.llm != nil else { return }
+        let d = UIDevice.current
+        let battery = d.batteryLevel < 0 ? 1 : d.batteryLevel
+        let charging = d.batteryState == .charging || d.batteryState == .full || d.batteryState == .unknown
+        let v = LiveSubtitleGuard.llmAllowed(thermal: thermalLevel, lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                                             battery: battery, charging: charging)
+        if !v.ok { llmGuardBadSince = Date(); chain.setLLMAllowed(false, why: v.why) }
+        else if let bad = llmGuardBadSince, Date().timeIntervalSince(bad) < 60 { /* hysteresis */ }
+        else { llmGuardBadSince = nil; chain.setLLMAllowed(true, why: "") }
+        let st = chain.llmStatus
+        if st != llmStatus, !(llmLoadTask != nil) { llmStatus = st }
     }
 
     /// iOS 18+: present Apple's language-pack download sheet via the hidden `.translationTask` host.
@@ -498,6 +588,7 @@ final class LiveSubtitleEngine: ObservableObject {
         let now = clock()
         pipeline = LivePipeline(store: store ?? LiveSegmentStore())
         pipeline.mode = mode
+        pipeline.glossary = glossary
         shared.set(pipeline: pipeline)
         lastSavedCount = pipeline.snapshotStore.segments.count
         pipeline.setPlayhead(now.time)
@@ -688,6 +779,7 @@ final class LiveSubtitleEngine: ObservableObject {
         hitchText = hitches.summary
         if !hitchText.isEmpty { out.append(hitchText) }
         if !translatorStatus.isEmpty { out.append(translatorStatus) }
+        if !llmStatus.isEmpty { out.append(llmStatus) }
         if out != modelStatus { modelStatus = out }
     }
 
@@ -750,6 +842,7 @@ final class LiveSubtitleEngine: ObservableObject {
             hotSwap(to: t, why: "温度恢复")
         }
         checkPerformance()
+        checkLLMGuard()
     }
 
     /// Realtime first: only when the active recognizer is compute-bound (RTF > 0.7, or ≥ 3 of the last 5 lines

@@ -5,7 +5,12 @@
 // (Sakura v1.0 术语表 prompt). Falls back to Apple Translation / NLLB when hot / Low Power / low battery, when the line
 // is due sooner than the LLM can answer, or after repeated failures (LiveTranslatorChain).
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+#if canImport(CryptoKit)
 import CryptoKit
+#endif
 #if canImport(llama)
 import llama
 #endif
@@ -18,7 +23,13 @@ enum LiveLLMModel {
     static let displayName = "Sakura-1.5B（机翻）"
     static let license = "Sakura-1.5B-Qwen2.5-v1.0 © SakuraLLM，CC BY-NC-SA 4.0（仅限非商业使用）；GGUF 量化 shing3232；推理 llama.cpp（MIT）。译文为机器翻译（机翻）。"
     static let enabledKey = "live.translator.llm292"
-    static var folder: URL { LiveModels.downloadRoot.appendingPathComponent("llm292", isDirectory: true) }
+    /// Same Application Support root as the Whisper turbo download (LiveModels.downloadRoot), kept self-contained
+    /// so the UI host compiles this file without WhisperKit.
+    static var downloadRoot: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!.appendingPathComponent("LiveModels", isDirectory: true)
+    }
+    static var folder: URL { downloadRoot.appendingPathComponent("llm292", isDirectory: true) }
+    nonisolated(unsafe) static var log: (String) -> Void = { _ in }
     static var fileURL: URL { folder.appendingPathComponent(fileName) }
     static var downloaded: Bool {
         ((try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? NSNumber)?.int64Value ?? 0) == bytes
@@ -40,32 +51,34 @@ enum LiveLLMModel {
     static func download(progress: @escaping @Sendable (Double) -> Void) async throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var values = URLResourceValues(); values.isExcludedFromBackup = true
-        var dir = LiveModels.downloadRoot; try? dir.setResourceValues(values)
+        var dir = downloadRoot; try? dir.setResourceValues(values)
         UserDefaults.standard.set(false, forKey: "live.llm292.verified")
         var lastError: Error = LiveEngineError.modelMissing(fileName)
         for host in ["https://huggingface.co/", "https://hf-mirror.com/"] {
             do {
-                LiveDiagnostics.shared.log("LLM 下载开始 \(host)")
+                log("LLM 下载开始 \(host)")
                 let tmp = try await LiveFileDownloader.fetch(URL(string: host + repoPath)!, expected: bytes, progress: progress)
                 try verify(tmp)
                 try? FileManager.default.removeItem(at: fileURL)
                 try FileManager.default.moveItem(at: tmp, to: fileURL)
                 UserDefaults.standard.set(true, forKey: "live.llm292.verified")
-                LiveDiagnostics.shared.log("LLM 下载完成并校验 sha256")
+                log("LLM 下载完成并校验 sha256")
                 return
             } catch {
                 lastError = error
-                LiveDiagnostics.shared.log("LLM 下载失败 \(host): \(error.localizedDescription)")
+                log("LLM 下载失败 \(host): \(error.localizedDescription)")
             }
         }
         throw lastError
     }
     static func verify(_ url: URL) throws {
+        #if canImport(CryptoKit)
         let h = try FileHandle(forReadingFrom: url); defer { try? h.close() }
         var hasher = SHA256()
         while let chunk = try h.read(upToCount: 8 << 20), !chunk.isEmpty { hasher.update(data: chunk) }
         let hex = hasher.finalize().map { String(format: "%02x", $0) }.joined()
         guard hex == sha256 else { throw LiveEngineError.unavailable("模型校验失败（sha256 不符）") }
+        #endif
     }
     static func delete() {
         try? FileManager.default.removeItem(at: folder)

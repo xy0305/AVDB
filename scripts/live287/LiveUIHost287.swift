@@ -36,6 +36,13 @@ final class LiveSubtitleEngine: ObservableObject {
     func downloadTurbo() { turboDownload = .downloading(0.42) }
     func deleteTurbo() {}
     @Published var translatorStatus = ""
+    // Build 292 surface (optional LLM translator)
+    @Published var llmDownload: TurboDownload = .idle
+    @Published var llmEnabled = false
+    var llmDownloaded = false
+    var llmLinked = true
+    func downloadLLM() { llmDownload = .downloading(0.37) }
+    func deleteLLM() {}
     var phaseText: String {
         switch phase {
         case .off: "关闭"

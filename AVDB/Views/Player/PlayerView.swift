@@ -331,6 +331,7 @@ struct KSChromePlayer: View {
             scheduleHide()
         }
         .onChange(of: progressID) { _, _ in onlineSubtitles.clear() }
+        .onChange(of: historyMovie?.id) { _, _ in applyLiveTitleNames() }
         .onChange(of: publicSubtitleQuery) { _, _ in onlineSubtitles.clear() }
         .onChange(of: url) { _, _ in
             lut.detach()
@@ -381,8 +382,18 @@ struct KSChromePlayer: View {
 
     /// Live subtitles follow the player's own clock; the reader opens the same URL + headers (115 / online HLS /
     /// LUT AVPlayer path alike). Cache key: stable 番号/来源 key first, so rewatching a re-resolved stream hits.
+    /// 292: actress names from the title metadata → live-subtitle translation glossary (kept as written).
+    private func applyLiveTitleNames() {
+        let m = historyMovie
+        var names = (m?.actors ?? []).compactMap { $0.name }
+        names += m?.actorNames ?? []
+        var seen = Set<String>()
+        live.setTitleNames(names.filter { !$0.isEmpty && seen.insert($0).inserted }.map { ($0, nil) })
+    }
+
     private func attachLiveSubtitles() {
         let key = resumeKey ?? progressID ?? url.absoluteString
+        applyLiveTitleNames()
         live.attach(url: url, headers: headers, videoKey: key) { [weak coordinator] in
             guard let p = coordinator?.playerLayer?.player else { return (0, 1, false) }
             return (p.currentPlaybackTime, Double(p.playbackRate), p.isPlaying)

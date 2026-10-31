@@ -87,6 +87,16 @@ struct LiveSubtitleOverlay: View {
                         if let zh = l.zh, !zh.isEmpty {
                             LiveOutlinedText(text: zh, size: size)
                                 .accessibilityIdentifier("live.subtitle.zh")
+                                .overlay(alignment: .topTrailing) {
+                                    // 292: Sakura licence — LLM output is labelled machine translation.
+                                    if caption.machine {
+                                        Text("机翻").font(.system(size: max(9, size * 0.42), weight: .semibold))
+                                            .foregroundStyle(.white.opacity(0.75))
+                                            .padding(.horizontal, 3).background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 3))
+                                            .offset(x: size * 1.4, y: -size * 0.3)
+                                            .accessibilityIdentifier("live.subtitle.machine")
+                                    }
+                                }
                         }
                         if let ja = l.ja, !ja.isEmpty {
                             LiveOutlinedText(text: ja + (caption.partial ? " …" : ""), size: l.zh == nil ? size : size * CGFloat(jaScale),
@@ -209,6 +219,26 @@ struct LiveSubtitleSettingsSheet: View {
     @State private var cacheBytes = 0
     @State private var copied = false
 
+    @ViewBuilder private var llmControls: some View {
+        if engine.llmLinked {
+            switch engine.llmDownload {
+            case .downloading(let f):
+                ProgressView(value: f) { Text(String(format: "下载 %@ %.0f%%", LiveLLMModel.displayName, f * 100)).font(.caption) }
+            case .failed(let why):
+                Button("重试下载 \(LiveLLMModel.displayName)（\(why)）") { engine.downloadLLM() }
+            case .idle:
+                if engine.llmDownloaded {
+                    Toggle("本机 LLM 翻译（\(LiveLLMModel.displayName)）", isOn: $engine.llmEnabled)
+                        .accessibilityIdentifier("live.subtitle.settings.llm.toggle")
+                    Button("删除已下载的 LLM 翻译模型", role: .destructive) { engine.deleteLLM() }
+                } else {
+                    Button("下载本机 LLM 翻译 \(LiveLLMModel.displayName)（约 1.26 GB）") { engine.downloadLLM() }
+                        .accessibilityIdentifier("live.subtitle.settings.llm.download")
+                }
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -270,6 +300,7 @@ struct LiveSubtitleSettingsSheet: View {
                         }
                     }
                     LabeledContent("翻译引擎", value: engine.translatorName.isEmpty ? "未加载" : engine.translatorName)
+                    llmControls
                     LabeledContent("Apple 翻译", value: engine.appleStatus.title)
                     if engine.appleStatus == .needsDownload {
                         Button("下载 Apple 离线语言包（日语 → 简体中文）") { engine.requestApplePackDownload() }
@@ -279,6 +310,11 @@ struct LiveSubtitleSettingsSheet: View {
                     if !engine.latencyText.isEmpty { LabeledContent("延迟", value: engine.latencyText).font(.caption) }
                 } header: { Text("识别与翻译（全部在本机）") } footer: {
                     Text("在播放头前方预读音频并提前识别，字幕通常在台词开始前就已就绪；拖动进度后约 1–2 秒内先显示日文流式结果，中文随后。设备发热时自动减少预读并切换苹果系统识别；识别与翻译以低优先级在后台运行，不抢占视频解码。")
+                }
+                Section {
+                    Text(LiveLLMModel.license).font(.caption2).foregroundStyle(.secondary)
+                } header: { Text("本机 LLM 翻译（可选 · 机翻）") } footer: {
+                    Text("开启后中文由本机 Sakura-1.5B 结合前 3 句上下文与演员名术语表翻译，画面标注「机翻」。设备发热、低电量模式、电量低于 20% 或来不及在台词前译完时，自动改用 Apple 翻译 / NLLB。模型需单独下载，不随 App 打包。")
                 }
                 Section("缓存") {
                     LabeledContent("已缓存字幕", value: ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file))

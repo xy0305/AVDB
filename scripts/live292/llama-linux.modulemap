@@ -1,0 +1,6 @@
+module llama {
+    header "llama.h"
+    header "ggml-backend.h"
+    link "llama"
+    export *
+}
