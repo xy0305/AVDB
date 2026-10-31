@@ -76,5 +76,16 @@ ours = SenseVoice → NLLB-200-distilled-600M (HF, same model family as the app'
 | 291 clean | 100 % | 62.5 % | −1.28 s | 0.268 (0.097) |
 Negative = our line appears before the hard-sub cue (look-ahead; fan subs are timed late).
 
+**MissAV START-617 (中文字幕 page, 0–600 s)** — OCR found no burned-in subtitles in this stream (only the actress
+name card), so the reference is the offline oracle (56 utterances with text):
+
+| | coverage | VAD | queue dropped | empty/filtered | lost restart | onset p90 | restarts |
+|---|---|---|---|---|---|---|---|
+| 290 device | 82.1 % | 3 | 1 | 4 | 2 | +0.86 s | 15 |
+| 291 device | 85.7 % | 1 | 0 | 7 | 0 | −0.20 s | 0 |
+| 290 clean | 83.9 % | 5 | 0 | 4 | 0 | +0.18 s | 0 |
+| 291 clean | 85.7 % | 1 | 0 | 7 | 0 | −0.21 s | 0 |
+(JUR-879 中文字幕 was tried first: its stream has no burned-in subtitles either.)
+
 Caveats: emulation, not a device run; the device-scenario hang/dip/flip schedule is modelled on the diagnostics;
 Apple recognition/translation can't run on Linux; NLLB here is the HF fp32 model (the app ships an int8 Core ML port).

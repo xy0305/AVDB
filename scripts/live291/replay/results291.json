@@ -126,5 +126,85 @@
   "restarts": 0,
   "matched_coverage_f1>=0.3": 0.625,
   "lines_displayed": 93
+ },
+ "START-617 290 device": {
+  "refs": 56,
+  "coverage": 0.8214285714285714,
+  "stages": {
+   "covered": 46,
+   "reader_gap": 0,
+   "vad_rejected": 3,
+   "queue_dropped": 1,
+   "recognized_empty_or_filtered": 4,
+   "lost_on_restart_or_merged": 2,
+   "not_displayed_late": 0
+  },
+  "onset_median": -0.4153304053152169,
+  "onset_p90": 0.8641309475694356,
+  "after_end_median": -2.4463945317896076,
+  "text_sim": 0.6401030255235841,
+  "restarts": 15,
+  "catchUps": 0,
+  "stageLine": null
+ },
+ "START-617 290 clean": {
+  "refs": 56,
+  "coverage": 0.8392857142857143,
+  "stages": {
+   "covered": 47,
+   "reader_gap": 0,
+   "vad_rejected": 5,
+   "queue_dropped": 0,
+   "recognized_empty_or_filtered": 4,
+   "lost_on_restart_or_merged": 0,
+   "not_displayed_late": 0
+  },
+  "onset_median": -0.2181564569782779,
+  "onset_p90": 0.1789802190486398,
+  "after_end_median": -2.3309010625097244,
+  "text_sim": 0.5768035233395399,
+  "restarts": 0,
+  "catchUps": 0,
+  "stageLine": null
+ },
+ "START-617 291 device": {
+  "refs": 56,
+  "coverage": 0.8571428571428571,
+  "stages": {
+   "covered": 48,
+   "reader_gap": 0,
+   "vad_rejected": 1,
+   "queue_dropped": 0,
+   "recognized_empty_or_filtered": 7,
+   "lost_on_restart_or_merged": 0,
+   "not_displayed_late": 0
+  },
+  "onset_median": -0.8706717098441317,
+  "onset_p90": -0.19984633450258116,
+  "after_end_median": -3.0960627032350345,
+  "text_sim": 0.631343347131419,
+  "restarts": 0,
+  "catchUps": 0,
+  "stageLine": "分段 块2400 音频600s 语句173 过短90 · 识别空0 过滤81 合并0 失败0 · 入库92 翻译0/失败0 · 显示90 迟到0(源0/算0) 过期丢弃0 · 重置丢弃0 过时结果0 · 源滞后0.00s 计算84ms"
+ },
+ "START-617 291 clean": {
+  "refs": 56,
+  "coverage": 0.8571428571428571,
+  "stages": {
+   "covered": 48,
+   "reader_gap": 0,
+   "vad_rejected": 1,
+   "queue_dropped": 0,
+   "recognized_empty_or_filtered": 7,
+   "lost_on_restart_or_merged": 0,
+   "not_displayed_late": 0
+  },
+  "onset_median": -0.8703738344235461,
+  "onset_p90": -0.20729861978048802,
+  "after_end_median": -3.0966297328769343,
+  "text_sim": 0.631343347131419,
+  "restarts": 0,
+  "catchUps": 0,
+  "stageLine": "分段 块2400 音频600s 语句173 过短90 · 识别空0 过滤81 合并0 失败0 · 入库92 翻译0/失败0 · 显示92 迟到0(源0/算0) 过期丢弃0 · 重置丢弃0 过时结果0 · 源滞后0.00s 计算73ms"
  }
 }
