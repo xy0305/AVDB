@@ -34,7 +34,7 @@ for s in ['waitForSeekOrStop(tok, timeout:', 'extension_picky', 'allowed_extensi
 assert 'if attempts > 3 { onError?(msg); waitForSeekOrStop(tok); attempts = 0 }' not in reader
 assert 'writer.asyncAfter' in diag
 assert 'func imageOffMain(key:' in enh and 'preparingForDisplay()' in enh and 'cache.memoryImage(key: newKey)' in enh
-assert pl['CFBundleVersion'] == '291' and pbx.count('CURRENT_PROJECT_VERSION = 291;') == 2
+assert int(pl['CFBundleVersion']) >= 291 and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
 wf = (r / '.github/workflows/lut4-online291.yml').read_text()
 for s in ['test-live291.py', 'package-lut291.py', 'AVDB-291-release']:
     assert s in wf, s

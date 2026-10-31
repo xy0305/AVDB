@@ -388,7 +388,7 @@ struct KSChromePlayer: View {
         var names = (m?.actors ?? []).compactMap { $0.name }
         names += m?.actorNames ?? []
         var seen = Set<String>()
-        live.setTitleNames(names.filter { !$0.isEmpty && seen.insert($0).inserted }.map { ($0, nil) })
+        live.setTitleNames(names.filter { !$0.isEmpty && seen.insert($0).inserted }.map { (ja: $0, zh: String?.none) })
     }
 
     private func attachLiveSubtitles() {

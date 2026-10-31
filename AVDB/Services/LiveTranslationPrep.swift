@@ -240,7 +240,11 @@ enum LiveMTPrep {
         var parts = s.components(separatedBy: CharacterSet(charactersIn: "，,、"))
         if parts.count >= 2 {
             var out: [String] = []
-            for p in parts where !(out.last.map { body($0) == body(p) && !body(p).isEmpty } ?? false) { out.append(p) }
+            for p in parts {
+                if let last = out.last, body(last) == body(p), !body(p).isEmpty {
+                    if let end = p.last, "。？！…".contains(end), !(last.last.map { "。？！…".contains($0) } ?? false) { out[out.count - 1] = last + String(end) }
+                } else { out.append(p) }
+            }
             parts = out
         }
         let joined = parts.joined(separator: "，")
