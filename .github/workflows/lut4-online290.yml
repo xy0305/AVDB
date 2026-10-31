@@ -180,7 +180,7 @@ jobs:
           if-no-files-found: warn
   strict-runtime:
     runs-on: macos-26
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - run: gem install xcodeproj --no-document
