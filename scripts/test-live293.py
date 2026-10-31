@@ -10,7 +10,7 @@ eng = (S / 'LiveSubtitleEngine.swift').read_text()
 reader = (S / 'LiveAudioReader.swift').read_text()
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
 pl = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
-assert pl['CFBundleVersion'] == '293' and pbx.count('CURRENT_PROJECT_VERSION = 293;') == 2
+assert int(pl['CFBundleVersion']) >= 293 and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
 assert 'return .translate([.mt(s)])' in prep
 for s in ['adjacentMergeGap', 'adjacentMergeMaxBody', 'grew ? segments[k]', 'LiveASRTier.senseVoice.rawValue']:
     assert s in core, s
@@ -20,7 +20,7 @@ for s in ['holdForSeek', 'abortIO', 'seekDebounce', '450_000_000', 'interrupted 
 wf = (r / '.github/workflows/lut4-online293.yml').read_text()
 for s in ['test-live293.py', 'package-lut293.py', 'AVDB-293-release', 'fetch_llama292.py']:
     assert s in wf, s
-assert 'push:' in wf.split('jobs:')[0]
+assert 'push:' not in wf.split('jobs:')[0], '293 workflow must be dispatch-only under 294'
 assert 'push:' not in (r / '.github/workflows/lut4-online292.yml').read_text().split('jobs:')[0]
 assert (r / 'THIRD_PARTY/LiveTranslation-293.md').exists()
 assert "=='293'" in (r / 'scripts/package-lut293.py').read_text()

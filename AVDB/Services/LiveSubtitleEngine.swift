@@ -1,3 +1,4 @@
+// Build 294 — reader catch-up grace + soft reopen (stop the 10 s 读取落后 death loop after seek/open).
 // Build 289 — SenseVoice default, Apple on-device fallback (heat / falling behind), Whisper manual only (never
 // compiled unless selected), utility-QoS worker, thermal-throttled read-ahead, main-thread hitch counter.
 // Build 288 — staged model loading (small first, turbo warmed in background), timeouts + retry, diagnostics.
@@ -188,6 +189,10 @@ final class LiveSubtitleEngine: ObservableObject {
     private var seekTarget: Double?
     private var degradedAt: Date?
     private var lastCatchUp = Date.distantPast
+    /// 294: suppress catch-up while FFmpeg reopens/seeks the subtitle HLS after scrub / catch-up / open.
+    private var catchUpGraceUntil = Date.distantPast
+    private var lastDecodedEndSeen = -1.0
+    private var lastDecodedProgressAt = Date.distantPast
     private var swapTask: Task<Void, Never>?
     private var activeObservers: [NSObjectProtocol] = []
     /// State the reader thread reads without hopping to the main actor.
@@ -256,6 +261,7 @@ final class LiveSubtitleEngine: ObservableObject {
             let t = clock().time
             let start = pipeline.resumePoint(after: max(0, t - 1.5)) ?? max(0, t - 1.5)
             pipeline.reset(at: start); pipeline.setPlayhead(t)
+            armCatchUpGrace(why: "换源")
             reader.start(newSource, at: start, generation: pipeline.currentGeneration)
             LiveDiagnostics.shared.log(String(format: "换源（同一视频）读取从 %.1fs 继续，不重启识别", start))
             return
@@ -296,6 +302,8 @@ final class LiveSubtitleEngine: ObservableObject {
             guard let self, !Task.isCancelled, let target = self.seekTarget else { return }
             self.seekTarget = nil
             self.reader.holdForSeek(false)
+            // 294: grace while the 2nd HLS session reopens after scrub — do not catch-up-restart every 10 s.
+            self.armCatchUpGrace(why: "seek落地")
             self.restartReader(at: target)
         }
     }
@@ -617,6 +625,7 @@ final class LiveSubtitleEngine: ObservableObject {
         let start = pipeline.resumePoint(after: from) ?? from
         pipeline.reset(at: start)
         pipeline.setPlayhead(now.time)
+        armCatchUpGrace(why: "打开/启动")
         reader.start(source, at: start, generation: pipeline.currentGeneration)
         phase = .running
         if !hitches.running { hitches.start() }
@@ -685,7 +694,29 @@ final class LiveSubtitleEngine: ObservableObject {
         setPace(t, shared.pace.rate)
         reader.seek(to: start, generation: pipeline.currentGeneration)
         lastTick = (Date().timeIntervalSinceReferenceDate, t, shared.pace.rate)
+        lastDecodedEndSeen = start
+        lastDecodedProgressAt = Date()
         refreshCaption()
+    }
+
+    /// 294: modest behind-ness — seek the reader and clear open VAD only; keep queued finals + committed captions.
+    private func softRestartReader(at t: Double) {
+        guard source != nil else { return }
+        let from = max(0, t - 0.5)
+        let start = pipeline.resumePoint(after: from) ?? from
+        pipeline.softReopen(at: start)
+        pipeline.setPlayhead(t)
+        setPace(t, shared.pace.rate)
+        reader.seek(to: start, generation: pipeline.currentGeneration)
+        lastTick = (Date().timeIntervalSinceReferenceDate, t, shared.pace.rate)
+        lastDecodedEndSeen = start
+        lastDecodedProgressAt = Date()
+        refreshCaption()
+    }
+
+    private func armCatchUpGrace(why: String, seconds: Double = LiveCatchUpPolicy.reopenGraceSeconds) {
+        catchUpGraceUntil = Date().addingTimeInterval(seconds)
+        LiveDiagnostics.shared.log(String(format: "追帧宽限 %.0fs（%@）", seconds, why))
     }
 
     // MARK: reader wiring (reader thread)
@@ -746,11 +777,15 @@ final class LiveSubtitleEngine: ObservableObject {
         let c = clock()
         guard c.time.isFinite else { return }
         let wall = Date().timeIntervalSinceReferenceDate
-        // Seek / jump detection: any discontinuity of > 1.5 s vs the extrapolated clock.
+        // Seek / jump detection vs extrapolated clock.
         // 293: route through didSeek (debounced hold) instead of restartReader on every tick.
+        // 294: higher threshold + ignore modest jumps shortly after a main-thread hitch (false scrub).
         if seekTarget == nil, let last = lastTick {
             let expected = last.media + (wall - last.wall) * (c.playing ? max(0.25, c.rate) : 0)
-            if abs(c.time - expected) > 1.5 { didSeek(to: c.time); return }
+            let hitchRecent = Date().timeIntervalSince(hitches.lastBigHitchAt) < LiveCatchUpPolicy.hitchIgnoreSeconds
+            if LiveCatchUpPolicy.isMediaJump(delta: c.time - expected, hitchRecent: hitchRecent) {
+                didSeek(to: c.time); return
+            }
         }
         if seekTarget != nil {
             // Still scrubbing / settling — keep pace at the target, do not catch-up-restart.
@@ -762,13 +797,31 @@ final class LiveSubtitleEngine: ObservableObject {
         lastTick = (wall, c.time, c.rate)
         pipeline.setPlayhead(c.time)
         setPace(c.time, c.playing ? max(1, c.rate) : 1, playing: c.playing)
-        // 291: reader behind the playhead (stalled connection, slow 2nd HLS session): jump to now instead of
-        // transcribing a backlog nobody will see live (≤ once per 10 s; the skipped span stays uncovered).
+        // 291/294: reader behind the playhead. Grace after seek/open/catch-up; soft reopen for modest gaps;
+        // skip while decodedEnd is still advancing (rebuilding lead).
         let decoded = pipeline.snapshotStats.decodedEnd
-        if c.playing, decoded < c.time - 6, Date().timeIntervalSince(lastCatchUp) > 10 {
+        if decoded > lastDecodedEndSeen + 0.05 {
+            lastDecodedEndSeen = decoded
+            lastDecodedProgressAt = Date()
+        }
+        let nowRef = Date().timeIntervalSinceReferenceDate
+        let growing = Date().timeIntervalSince(lastDecodedProgressAt) < 3.0 && lastDecodedEndSeen >= 0
+        switch LiveCatchUpPolicy.action(playing: c.playing, decodedEnd: decoded, playhead: c.time,
+                                        now: nowRef,
+                                        lastCatchUp: lastCatchUp.timeIntervalSinceReferenceDate,
+                                        graceUntil: catchUpGraceUntil.timeIntervalSinceReferenceDate,
+                                        decodedGrowing: growing) {
+        case .none: break
+        case .soft(let gap):
             lastCatchUp = Date(); readerCatchUps += 1
-            LiveDiagnostics.shared.log(String(format: "读取落后 %.1fs → 跳到播放点 %.1fs", c.time - decoded, c.time))
+            LiveDiagnostics.shared.log(String(format: "读取落后 %.1fs → 软追帧 %.1fs（保留队列）", gap, c.time))
+            softRestartReader(at: c.time)
+            armCatchUpGrace(why: "软追帧")
+        case .hard(let gap):
+            lastCatchUp = Date(); readerCatchUps += 1
+            LiveDiagnostics.shared.log(String(format: "读取落后 %.1fs → 跳到播放点 %.1fs", gap, c.time))
             restartReader(at: c.time)
+            armCatchUpGrace(why: "硬追帧")
         }
         reader.poke()
         refreshCaption()
@@ -922,13 +975,15 @@ final class LiveHitchMonitor: NSObject {
     private(set) var hitches = 0
     private(set) var worstMs = 0.0
     private(set) var worst: [String] = []
+    /// 294: wall time of the last ≥400 ms hitch — jump detect ignores modest discontinuities briefly after.
+    private(set) var lastBigHitchAt = Date.distantPast
     private var observers: [NSObjectProtocol] = []
     var running: Bool { link != nil }
     var context: (() -> String)?
 
     func start() {
         stop()
-        hitches = 0; worstMs = 0; last = 0; worst = []; started = CACurrentMediaTime()
+        hitches = 0; worstMs = 0; last = 0; worst = []; started = CACurrentMediaTime(); lastBigHitchAt = .distantPast
         let l = CADisplayLink(target: self, selector: #selector(frame(_:)))
         l.add(to: .main, forMode: .common)
         link = l
@@ -951,6 +1006,7 @@ final class LiveHitchMonitor: NSObject {
         guard gap > 50 else { return }
         hitches += 1; worstMs = max(worstMs, gap)
         if gap > 400 {
+            lastBigHitchAt = Date()
             let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
             let line = String(format: "%@ %.0f ms %@", f.string(from: Date()), gap, context?() ?? "")
             worst.append(line); if worst.count > 5 { worst.removeFirst() }

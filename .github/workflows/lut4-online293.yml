@@ -1,7 +1,6 @@
 name: LUT4 online App 293 (实时字幕整句保留：相邻短句合并/不再按句拆译丢半句 + 292)
 on:
-  push:
-    branches: [feat/lut4-online-from269]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

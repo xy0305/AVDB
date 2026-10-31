@@ -600,6 +600,54 @@ enum LiveScheduler {
     }
 }
 
+// MARK: - Reader catch-up policy (294)
+
+/// Pure policy for the live-subtitle 2nd HLS reader falling behind the playhead.
+/// 293/291 jumped to the playhead with `pipeline.reset` every 10 s whenever decodedEnd < playhead−6; while FFmpeg
+/// was still reopening/seeking after a scrub or open, decodedEnd stayed near the playhead → catch-up every cooldown
+/// → pipeline wiped → almost no captions. 294: reopen grace, soft seek for modest gaps, hitch-aware jump detect.
+enum LiveCatchUpPolicy {
+    static let behindSeconds = 6.0
+    static let cooldownSeconds = 10.0
+    /// After seek settle / catch-up / open: suppress catch-up while the 2nd session reopens (~HLS open+seek).
+    static let reopenGraceSeconds = 22.0
+    /// Gaps below this prefer soft reopen (VAD/open only); larger gaps keep a full `pipeline.reset`.
+    static let softGapLimit = 28.0
+    /// Media-time discontinuity vs extrapolated clock that counts as a seek (was 1.5 s in 293).
+    static let jumpThreshold = 2.75
+    /// After a big main-thread hitch, ignore modest jumps (hitch can look like a scrub).
+    static let hitchIgnoreSeconds = 2.5
+    /// During hitch-ignore, only treat very large jumps as real scrubs.
+    static let hitchJumpThreshold = 8.0
+
+    enum Action: Equatable {
+        case none
+        case soft(gap: Double)
+        case hard(gap: Double)
+    }
+
+    /// Whether / how to catch the reader up. `now` / `lastCatchUp` / `graceUntil` are seconds on the same clock
+    /// (e.g. `Date.timeIntervalSinceReferenceDate`). `decodedGrowing` is true when decodedEnd advanced recently.
+    static func action(playing: Bool, decodedEnd: Double, playhead: Double,
+                       now: Double, lastCatchUp: Double, graceUntil: Double,
+                       decodedGrowing: Bool) -> Action {
+        guard playing, playhead.isFinite, decodedEnd.isFinite else { return .none }
+        let gap = playhead - decodedEnd
+        guard gap > behindSeconds else { return .none }
+        guard now >= graceUntil else { return .none }
+        guard now - lastCatchUp >= cooldownSeconds else { return .none }
+        // Reader is still advancing (rebuilding lead after reopen) — wait instead of wiping again.
+        if decodedGrowing { return .none }
+        return gap < softGapLimit ? .soft(gap: gap) : .hard(gap: gap)
+    }
+
+    /// Seek / jump detection: hitch-recent windows need a much larger discontinuity.
+    static func isMediaJump(delta: Double, hitchRecent: Bool) -> Bool {
+        let limit = hitchRecent ? hitchJumpThreshold : jumpThreshold
+        return abs(delta) > limit
+    }
+}
+
 // MARK: - Latency ledger
 
 struct LiveLatencyRecord: Codable, Equatable, Sendable {
@@ -772,6 +820,21 @@ final class LivePipeline: @unchecked Sendable {
             if let open = vad.openStart { store.uncover(open, vad.position) }
             finals = []; vad.reset(at: t); store.partial = nil; stats.decodedEnd = t; records[-1] = nil
             playhead = t; lastPrompt = nil
+        }
+        onChange?()
+    }
+    /// 294 soft catch-up: bump generation (ignore stale PCM), reset open VAD / partial only; keep the finals queue
+    /// and committed store segments so modest behind-ness does not wipe work already segmented.
+    func softReopen(at t: Double) {
+        locked {
+            generation += 1
+            if let open = vad.openStart { store.uncover(open, vad.position) }
+            vad.reset(at: t)
+            store.partial = nil
+            stats.decodedEnd = t
+            playhead = t
+            lastPrompt = nil
+            records[-1] = nil
         }
         onChange?()
     }

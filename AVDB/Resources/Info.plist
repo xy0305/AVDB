@@ -23,7 +23,7 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>实时字幕在设备发热或识别跟不上时，使用苹果系统的本机日语识别（音频只在本机处理，不上传）。</string>
 	<key>CFBundleVersion</key>
-	<string>293</string>
+	<string>294</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
