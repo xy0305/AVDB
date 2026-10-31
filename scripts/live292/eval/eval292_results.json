@@ -19,6 +19,36 @@
    "xianzai_rate": 0.011,
    "xianzai_zhidao": 0,
    "repetition": 0
+  },
+  "Sakura-1.5B": {
+   "cues": 32,
+   "matched_f1>=0.3": 0.688,
+   "zh_f1_mean": 0.507,
+   "lines": 93,
+   "shown_zh": 93,
+   "xianzai_rate": 0.0,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "HY-MT1.5-1.8B": {
+   "cues": 32,
+   "matched_f1>=0.3": 0.531,
+   "zh_f1_mean": 0.319,
+   "lines": 93,
+   "shown_zh": 93,
+   "xianzai_rate": 0.0,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "HY-MT-abliterated": {
+   "cues": 32,
+   "matched_f1>=0.3": 0.469,
+   "zh_f1_mean": 0.326,
+   "lines": 93,
+   "shown_zh": 93,
+   "xianzai_rate": 0.0,
+   "xianzai_zhidao": 0,
+   "repetition": 0
   }
  },
  "JUR-857": {
@@ -39,6 +69,26 @@
    "lines": 146,
    "shown_zh": 126,
    "xianzai_rate": 0.024,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "Sakura-1.5B": {
+   "cues": 96,
+   "matched_f1>=0.3": 0.646,
+   "zh_f1_mean": 0.426,
+   "lines": 146,
+   "shown_zh": 141,
+   "xianzai_rate": 0.007,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "HY-MT1.5-1.8B": {
+   "cues": 96,
+   "matched_f1>=0.3": 0.573,
+   "zh_f1_mean": 0.376,
+   "lines": 146,
+   "shown_zh": 141,
+   "xianzai_rate": 0.007,
    "xianzai_zhidao": 0,
    "repetition": 0
   }
@@ -63,6 +113,26 @@
    "xianzai_rate": 0.009,
    "xianzai_zhidao": 1,
    "repetition": 0
+  },
+  "Sakura-1.5B": {
+   "cues": 112,
+   "matched_f1>=0.3": 0.634,
+   "zh_f1_mean": 0.412,
+   "lines": 123,
+   "shown_zh": 123,
+   "xianzai_rate": 0.0,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "HY-MT1.5-1.8B": {
+   "cues": 112,
+   "matched_f1>=0.3": 0.518,
+   "zh_f1_mean": 0.343,
+   "lines": 123,
+   "shown_zh": 123,
+   "xianzai_rate": 0.0,
+   "xianzai_zhidao": 0,
+   "repetition": 0
   }
  },
  "HMN-898": {
@@ -83,6 +153,26 @@
    "lines": 166,
    "shown_zh": 143,
    "xianzai_rate": 0.007,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "Sakura-1.5B": {
+   "cues": 125,
+   "matched_f1>=0.3": 0.528,
+   "zh_f1_mean": 0.329,
+   "lines": 166,
+   "shown_zh": 163,
+   "xianzai_rate": 0.0,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "HY-MT1.5-1.8B": {
+   "cues": 125,
+   "matched_f1>=0.3": 0.44,
+   "zh_f1_mean": 0.285,
+   "lines": 166,
+   "shown_zh": 164,
+   "xianzai_rate": 0.0,
    "xianzai_zhidao": 0,
    "repetition": 0
   }
@@ -107,6 +197,26 @@
    "xianzai_rate": 0.025,
    "xianzai_zhidao": 1,
    "repetition": 0
+  },
+  "Sakura-1.5B": {
+   "cues": 100,
+   "matched_f1>=0.3": 0.54,
+   "zh_f1_mean": 0.329,
+   "lines": 183,
+   "shown_zh": 179,
+   "xianzai_rate": 0.011,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "HY-MT1.5-1.8B": {
+   "cues": 100,
+   "matched_f1>=0.3": 0.42,
+   "zh_f1_mean": 0.3,
+   "lines": 183,
+   "shown_zh": 179,
+   "xianzai_rate": 0.006,
+   "xianzai_zhidao": 0,
+   "repetition": 0
   }
  },
  "CAWD-989": {
@@ -127,6 +237,26 @@
    "lines": 203,
    "shown_zh": 183,
    "xianzai_rate": 0.016,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "Sakura-1.5B": {
+   "cues": 111,
+   "matched_f1>=0.3": 0.541,
+   "zh_f1_mean": 0.336,
+   "lines": 203,
+   "shown_zh": 202,
+   "xianzai_rate": 0.0,
+   "xianzai_zhidao": 0,
+   "repetition": 0
+  },
+  "HY-MT1.5-1.8B": {
+   "cues": 111,
+   "matched_f1>=0.3": 0.396,
+   "zh_f1_mean": 0.255,
+   "lines": 203,
+   "shown_zh": 202,
+   "xianzai_rate": 0.0,
    "xianzai_zhidao": 0,
    "repetition": 0
   }
