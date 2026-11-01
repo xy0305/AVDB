@@ -23,7 +23,8 @@
 - 修复：上传路径改为 `AVDB-unsigned-*.ipa`，并在上传前断言 IPA 存在且 >500MB。
 
 ## CI / IPA
-- CI: https://github.com/xy0305/AVDB/actions/runs/41267295821 （release=success）
-- IPA artifact: https://github.com/xy0305/AVDB/actions/runs/41267295821/artifacts/13067364648
+- CI: https://github.com/xy0305/AVDB/actions/runs/41270309905 （release=success；产物 ~770MB）
+- IPA artifact: https://github.com/xy0305/AVDB/actions/runs/41270309905/artifacts/13068799694
 - file `AVDB-unsigned-1.0.2-297-livesub-lut4-online-from269.ipa`
-- size 770541307 · sha256 `c6c49037db1e498e00f701d650d2b22db0c91d00d7ae5f6c4bf5da03ecadbf3f` · CFBundleVersion 297 · covers key present (fp `5cc2a6c8`)
+- size 770541308 · sha256 `67a8434ff133fea1e818ed9574660f7ff922b45bf604f840022ba787ed3eb268` · CFBundleVersion 297
+- 说明：旧链接 run 41267295821 / artifact 13067364648 只有 ~58KB（上传路径写死 296），已作废。
