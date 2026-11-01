@@ -8,7 +8,8 @@ core = (S / 'LiveSubtitleCore.swift').read_text()
 eng = (S / 'LiveSubtitleEngine.swift').read_text()
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
 pl = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
-assert pl['CFBundleVersion'] == '296' and pbx.count('CURRENT_PROJECT_VERSION = 296;') == 2
+ver = int(pl['CFBundleVersion'])
+assert ver >= 296 and pbx.count('CURRENT_PROJECT_VERSION = ' + pl['CFBundleVersion'] + ';') == 2
 for s in ['adjacentMergeMaxBody = 28', 'adjacentMergeMaxClauses = 2', 'displayMaxBody = 28',
           'static func displaySlice', 'static func sentencePieces', 'static func pickPiece']:
     assert s in core, s
@@ -20,7 +21,7 @@ assert 'lead: Double = UserDefaults.standard.object(forKey: "live.subtitle.lead"
 wf = (r / '.github/workflows/lut4-online296.yml').read_text()
 for s in ['test-live296.py', 'package-lut296.py', 'AVDB-296-release', 'fetch_llama292.py']:
     assert s in wf, s
-assert 'push:' in wf.split('jobs:')[0]
+assert 'push:' not in wf.split('jobs:')[0], '296 must be dispatch-only under 297'
 assert 'push:' not in (r / '.github/workflows/lut4-online295.yml').read_text().split('jobs:')[0], '295 dispatch-only'
 assert 'push:' not in (r / '.github/workflows/lut4-online294.yml').read_text().split('jobs:')[0]
 assert (r / 'Build296-LiveSubtitle-DisplaySplit.md').exists()

@@ -137,7 +137,7 @@ final class LiveAudioReader: @unchecked Sendable {
             case .failed(let msg):
                 // 291: never park until a manual seek (that silently ended subtitles for the rest of the video after
                 // one network hiccup). Back off 1, 2, 4, 8, 15, 15 … s, interruptible by seek/stop; resumes at the
-                // last decoded time (or the pending seek). The notice shows once, on the 4th failure.
+                // last decoded time (or the pending seek). 297: onError logs once (4th failure) — no on-video banner.
                 attempts += 1
                 cond.lock(); failures += 1; cond.unlock()
                 if attempts == 4 { onError?(msg) }

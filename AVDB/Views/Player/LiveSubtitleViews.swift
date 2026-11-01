@@ -173,7 +173,7 @@ struct LiveSubtitleMenuButton: View {
     }
 }
 
-/// Small top-left chip: loading / paused-by-guard / reader errors. Never over the bottom controls.
+/// Small top-left chip: loading / paused-by-guard / failed. Transient engine toasts only (never reader EOF banners).
 struct LiveSubtitleStatusChip: View {
     @ObservedObject var engine: LiveSubtitleEngine
     var safeArea: EdgeInsets
@@ -183,7 +183,10 @@ struct LiveSubtitleStatusChip: View {
             case .loading(let m): return m
             case .paused(let why): return why
             case .failed(let m): return "实时字幕不可用：\(m)"
-            default: return engine.mode == .off ? nil : engine.notice
+            default:
+                // 297: audio-read failures must not cover the picture (log/diagnostic only).
+                guard engine.mode != .off, let n = engine.notice, !n.contains("字幕音频读取失败") else { return nil }
+                return n
             }
         }()
         if let text {

@@ -1,4 +1,5 @@
 // Build 294 — reader catch-up grace + soft reopen (stop the 10 s 读取落后 death loop after seek/open).
+// Build 297 — live-subtitle audio-read failures stay in diagnostics only (no on-video banner).
 // Build 295 — tear down 2nd HLS for the whole scrub; reopen only after player seekSettled / playing.
 //            Gate first reader open so exit→replay does not starve the first video frames.
 // Build 289 — SenseVoice default, Apple on-device fallback (heat / falling behind), Whisper manual only (never
@@ -166,6 +167,8 @@ final class LiveSubtitleEngine: ObservableObject {
     private var loadingSince = Date()
     private var memoryObserver: NSObjectProtocol?
     private var toastTask: Task<Void, Never>?
+    /// Last LiveAudioReader failure (diagnostic only; never shown over video after 297).
+    private var lastReaderError: String?
     private let hitches = LiveHitchMonitor()
     /// Session-only override: .apple after SenseVoice/Whisper fell behind, .senseVoice after a memory warning.
     private var sessionOverride: LiveASRTier?
@@ -358,6 +361,7 @@ final class LiveSubtitleEngine: ObservableObject {
             caption = .init(ja: nil, zh: nil, partial: false, pendingChinese: false)
             phase = .off
             notice = nil
+            lastReaderError = nil
             seekDebounce?.cancel(); seekDebounce = nil; seekTarget = nil
             firstOpenGate?.cancel(); firstOpenGate = nil
             reader.stop()          // only flips flags + broadcast; the worker exits on its own
@@ -399,6 +403,7 @@ final class LiveSubtitleEngine: ObservableObject {
                                               "热状态 \(ProcessInfo.processInfo.thermalState.rawValue) · 预读 \(Int(effectiveLead))s · \(latencyText) · \(hitchText)",
                                               pipeline.snapshotStats.stageLine, pipeline.snapshotStats.mtLine,
                                               "重启 \(restarts) · 热切换识别器 \(hotSwaps) · 读取追帧 \(readerCatchUps) · 读取重连 \(reader.failureCount) · 读取进度 \(String(format: "%.1f", pipeline.snapshotStats.decodedEnd - shared.rawPlayhead))s"]
+                                              + (lastReaderError.map { ["最近读取错误 \($0)（仅诊断，不弹提示）"] } ?? [])
                                               + hitches.worst.map { "卡顿 \($0)" } + modelStatus)
     }
 
@@ -826,8 +831,12 @@ final class LiveSubtitleEngine: ObservableObject {
         reader.onPCM = { pcm, start, g in shared.pipeline.feed(pcm, start: start, generation: g) }
         reader.onEnd = { g in shared.pipeline.finishStream(generation: g) }
         reader.onInfo = { LiveDiagnostics.shared.log($0) }
+        // 297: never put reader open/EOF failures on the top-left chip — they covered the picture
+        // (e.g. open -541478725 / AVERROR_EOF) while subtitles often recovered via silent backoff.
+        // LiveAudioReader already retries with interruptible backoff; scrub still reopens via seekSettled.
         reader.onError = { [weak self] msg in
-            Task { @MainActor in self?.notice = "字幕音频读取失败（\(msg)），拖动进度可重试" }
+            LiveDiagnostics.shared.log("字幕音频读取失败（\(msg)），静默自动重试中")
+            Task { @MainActor in self?.lastReaderError = msg }
         }
         reader.shouldRun = {
             let p = shared.pace
