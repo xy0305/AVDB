@@ -17,6 +17,11 @@
 ## 产物
 - CFBundleVersion **297**；`lut4-online297.yml` push；296 → `workflow_dispatch` only。
 
+
+## 产物上传修复（297b）
+- 根因：`lut4-online297.yml` release 的 `upload-artifact` 路径仍写死 **296** IPA 文件名，包步骤已产出 297 IPA（~770MB）但未上传，artifact 只剩 evidence/logs（~58KB）。
+- 修复：上传路径改为 `AVDB-unsigned-*.ipa`，并在上传前断言 IPA 存在且 >500MB。
+
 ## CI / IPA
 - CI: https://github.com/xy0305/AVDB/actions/runs/41267295821 （release=success）
 - IPA artifact: https://github.com/xy0305/AVDB/actions/runs/41267295821/artifacts/13067364648

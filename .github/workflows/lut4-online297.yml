@@ -92,12 +92,28 @@ jobs:
           cp Podfile.lock evidence-release/Podfile.lock 2>/dev/null || true
           cp "$RUNNER_TEMP/DerivedData/SourcePackages/workspace-state.json" evidence-release/workspace-state.json 2>/dev/null || true
           cp AVDB.xcworkspace/xcshareddata/swiftpm/Package.resolved evidence-release/Package.resolved 2>/dev/null || cp AVDB.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved evidence-release/Package.resolved 2>/dev/null || true
+      - name: Assert unsigned IPA exists (prevent empty release artifact)
+        run: |
+          set -euo pipefail
+          ls -lh AVDB-unsigned-*.ipa
+          ipa=$(ls AVDB-unsigned-*.ipa | head -1)
+          bytes=$(stat -f%z "$ipa")
+          echo "ipa=$ipa bytes=$bytes"
+          test "$bytes" -gt 500000000
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: AVDB-297-release
           path: |
-            AVDB-unsigned-1.0.2-296-livesub-lut4-online-from269.ipa
+            AVDB-unsigned-*.ipa
+            evidence-release/*
+            fetch-live289.log
+            fetch-llama292.log
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: AVDB-297-release-logs
+          path: |
             evidence-release/*
             fetch-live289.log
             fetch-llama292.log
