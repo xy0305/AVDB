@@ -18,4 +18,7 @@
 - CFBundleVersion **297**；`lut4-online297.yml` push；296 → `workflow_dispatch` only。
 
 ## CI / IPA
-- （push 后回填）
+- CI: https://github.com/xy0305/AVDB/actions/runs/41267295821 （release=success）
+- IPA artifact: https://github.com/xy0305/AVDB/actions/runs/41267295821/artifacts/13067364648
+- file `AVDB-unsigned-1.0.2-297-livesub-lut4-online-from269.ipa`
+- size 770541307 · sha256 `c6c49037db1e498e00f701d650d2b22db0c91d00d7ae5f6c4bf5da03ecadbf3f` · CFBundleVersion 297 · covers key present (fp `5cc2a6c8`)
