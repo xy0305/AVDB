@@ -718,7 +718,7 @@ enum VisibleHQPosterPolicy {
 actor VisibleHQPosterScheduler {
     static let shared = VisibleHQPosterScheduler()
     private var active = 0
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var waiters: [CheckedContinuation<Bool, Never>] = []
 
     func upgrade(movie: Movie, url: String, maxPixelSize: Int) async -> UIImage? {
         if ProcessInfo.processInfo.isLowPowerModeEnabled { return nil }
@@ -882,6 +882,7 @@ public enum ListCoverPolicy {
     }
 }
 
+#if !HOME_HQ_SIMULATOR
 /// Shared by all movie lists; no gestures or detail fetches.
 public struct MoviePosterImage: View {
     let movie: Movie
@@ -1019,4 +1020,5 @@ struct PosterSizeRegressionGallery: View {
         .padding()
     }
 }
+#endif
 #endif

@@ -25,6 +25,8 @@ public struct Movie: Identifiable, Hashable {
     public static func == (lhs: Movie, rhs: Movie) -> Bool { lhs.id == rhs.id }
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
+enum DMMImageValidation { static func classify(width: Int, height: Int, bytes: Int, source: String) -> String { "ok" } }
+final class APIClient { static let shared = APIClient(); var token: String? = "account-a" }
 enum JavDBConstants { static let imageCDNHost = "tp.spfcas.com"; static let webCDNHost = "c0.jdbstatic.com"; static let baseURL = "https://fixture.invalid" }
 enum JavBusActorRequests { static let version = "fixture" }
 enum JavDBSignature { static func decryptImage(_ data: Data) -> Data { data } }

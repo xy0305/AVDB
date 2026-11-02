@@ -22,7 +22,7 @@ end
     c.build_settings['TARGETED_DEVICE_FAMILY'] = '1'
     c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
     c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
-    c.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'DEBUG'
+    c.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'DEBUG HOME_HQ_SIMULATOR'
   end
 end
 p.save
