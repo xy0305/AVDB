@@ -521,10 +521,10 @@ struct MoviePosterCard: View {
 
 /// 自适应列数海报网格（iPhone 3 列，iPad 4–6 列）
 struct MoviePosterGrid: View {
-    let movies: [Movie]
-    var showRank: Bool = false
     /// Only HomeView passes true. Default false preserves every other list.
     var upgradesVisibleHQ = false
+    let movies: [Movie]
+    var showRank: Bool = false
     var scrollTargets: Bool = false
     var onAppearLast: ((Movie) -> Void)? = nil
 
