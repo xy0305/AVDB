@@ -257,7 +257,7 @@ struct HomeView: View {
             if vm.latest.isEmpty {
                 EmptyStateView(text: "載入最新…")
             } else {
-                MoviePosterGrid(movies: Array(vm.latest.prefix(9)))
+                MoviePosterGrid(upgradesVisibleHQ: true, movies: Array(vm.latest.prefix(9)))
             }
             shufflePill { Task { await vm.shuffleLatest() } }
                 .staggerAppear(index: 4)
@@ -346,7 +346,7 @@ struct HomeView: View {
             if vm.magnets.isEmpty {
                 EmptyStateView(text: "載入磁鏈…")
             } else {
-                MoviePosterGrid(movies: Array(vm.magnets.prefix(9)))
+                MoviePosterGrid(upgradesVisibleHQ: true, movies: Array(vm.magnets.prefix(9)))
             }
             shufflePill { Task { await vm.shuffleMagnets() } }
                 .staggerAppear(index: 7)
@@ -468,7 +468,7 @@ struct HomeView: View {
                         .padding(.horizontal, AdaptiveLayout.horizontalPadding)
                         .padding(.bottom, 12)
                 } else {
-                    MoviePosterGrid(movies: vm.following)
+                    MoviePosterGrid(upgradesVisibleHQ: true, movies: vm.following)
                 }
             }
         }
@@ -854,7 +854,7 @@ struct PeriodMoviesView: View {
 
     var body: some View {
         ScrollView {
-            MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
+            MoviePosterGrid(upgradesVisibleHQ: true, movies: vm.movies, onAppearLast: { movie in
                 vm.loadMoreIfNeeded(current: movie)
             })
             if vm.isLoading { ProgressView().padding() }

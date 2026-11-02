@@ -9,6 +9,7 @@
 import Foundation
 import ImageIO
 import CoreImage
+import CryptoKit
 import SwiftUI
 
 /// 图片加载错误
@@ -317,7 +318,7 @@ public actor ImageLoader {
     }
 
     /// 获取图片（自动判断是否需要解密）
-    public func load(_ urlString: String?, maxPixelSize: Int = 2048) async -> UIImage? {
+    public func load(_ urlString: String?, maxPixelSize: Int = 2048, timeout: TimeInterval = 20) async -> UIImage? {
         guard let urlString = urlString, !urlString.isEmpty,
               let url = URL(string: urlString) else {
             return nil
@@ -335,13 +336,14 @@ public actor ImageLoader {
         }
 
         let task = Task.detached(priority: .utility) { [userAgent] () -> UIImage? in
-            let raw = await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent, maxPixelSize: pixelSize)
+            let raw = await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent, maxPixelSize: pixelSize, timeout: timeout)
             guard let raw else { return nil }
             return JavDBCoverEnhance.maybeApply(raw, source: urlString)
         }
         inFlight[flightKey] = task
         let image = await task.value
         inFlight[flightKey] = nil
+        if Task.isCancelled { return nil }
 
         if let image {
             let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 1
@@ -389,9 +391,26 @@ public actor ImageLoader {
         return urlString.contains(JavDBConstants.imageCDNHost)
     }
 
-    private static func fetchImage(url: URL, urlString: String, userAgent: String, maxPixelSize: Int) async -> UIImage? {
+    #if DEBUG
+    /// Neutral fixture transport. Production leaves this nil. Returning nil is a
+    /// miss, never an enlarged copy of the small list image.
+    static var testTransport: (@Sendable (String, Int) async -> UIImage?)?
+    static var testTransportCalls = 0
+    static let testTransportLock = NSLock()
+    static func resetTestTransport() {
+        testTransportLock.lock(); testTransport = nil; testTransportCalls = 0; testTransportLock.unlock()
+    }
+    #endif
+
+    private static func fetchImage(url: URL, urlString: String, userAgent: String, maxPixelSize: Int, timeout: TimeInterval = 20) async -> UIImage? {
+        #if DEBUG
+        if let testTransport {
+            testTransportLock.lock(); testTransportCalls += 1; testTransportLock.unlock()
+            return await testTransport(urlString, maxPixelSize)
+        }
+        #endif
         do {
-            let downloaded = try await download(url, userAgent: userAgent)
+            let downloaded = try await download(url, userAgent: userAgent, timeout: timeout)
             let imageData = isEncryptedCDN(urlString)
                 ? JavDBSignature.decryptImage(downloaded)
                 : downloaded
@@ -413,11 +432,12 @@ public actor ImageLoader {
         }
     }
 
-    private static func download(_ url: URL, userAgent: String) async throws -> Data {
+    private static func download(_ url: URL, userAgent: String, timeout: TimeInterval = 20) async throws -> Data {
+        try Task.checkCancellation()
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.cachePolicy = .returnCacheDataElseLoad
-        request.timeoutInterval = 20
+        request.timeoutInterval = timeout
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw ImageLoaderError.downloadFailed
@@ -619,6 +639,143 @@ public struct JavDBImage: View {
     }
 }
 
+/// Home / grid cards upgrade only while visible. Immediate thumb/cover stays on
+/// screen; at most two screen-sized HQ fetches run. Off-screen cancels. This is
+/// not an upscale of the small image and never starts AI enhancement.
+enum VisibleHQPosterPolicy {
+    static let concurrency = 2
+    /// A phone card is ~120 pt; iPad can be wider. Cap the fetch so a 3× screen
+    /// never pulls a multi-megapixel original into a list cell.
+    static let maxPixelCap = 900
+    static let minPixelFloor = 360
+    static let negativeTTL: TimeInterval = 10 * 60
+    static let requestTimeout: TimeInterval = 8
+
+    static func targetPixels(displayPoints: CGSize, scale: CGFloat) -> Int {
+        let longest = max(displayPoints.width, displayPoints.height) * max(scale, 1)
+        guard longest.isFinite, longest > 0 else { return minPixelFloor }
+        return min(maxPixelCap, max(minPixelFloor, Int(longest.rounded(.up))))
+    }
+
+    /// One already-admitted HQ URL, or nil. Never discovers Tenhow/Amazon pages
+    /// and never adds a host. Cache hits win; otherwise the first safe public
+    /// candidate ListCoverPolicy already built.
+    static func upgradeURL(movie: Movie) -> String? {
+        guard !FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number) else { return nil }
+        if let cached = ListHQCoverCache.url(for: movie.number),
+           let url = URL(string: cached), isSafeUpgradeHost(url) { return cached }
+        for source in boundedCandidates(movie: movie) {
+            guard let url = URL(string: source), isSafeUpgradeHost(url) else { continue }
+            if isImmediateListSource(source, movie: movie) { continue }
+            return source
+        }
+        return nil
+    }
+
+    /// The same admitted hosts ListCoverPolicy used to splice in synchronously.
+    /// Capped at one URL so a visible card never fans out into nine full-size fetches.
+    static func boundedCandidates(movie: Movie) -> [String] {
+        var result: [String] = []
+        func append(_ value: String) {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !result.contains(trimmed) else { return }
+            result.append(trimmed)
+        }
+        for image in movie.catalogueMetadata?.images ?? [] {
+            guard let url = URL(string: image) else { continue }
+            for hq in DMMCoverURLs.upgrade(image) { append(hq) }
+            if DetailPosterPolicy.allowedPublicImage(url)
+                || AvbaseMetadata.allowedDiscoveredImage(url)
+                || AmazonPoster.allowedImage(url)
+                || TenhowPoster.allowedImage(url) {
+                append(image)
+            }
+            if result.count >= 4 { break }
+        }
+        for guess in DetailPosterPolicy.candidates(number: movie.number).prefix(2) { append(guess) }
+        return Array(result.prefix(4))
+    }
+
+    static func isImmediateListSource(_ source: String, movie: Movie) -> Bool {
+        source == movie.thumbURL || source == movie.coverURL
+    }
+
+    /// Same hosts DetailPosterResolver / ListHQCoverCache already admit. No new host.
+    static func isSafeUpgradeHost(_ url: URL) -> Bool {
+        guard url.scheme == "https", url.user == nil, url.password == nil,
+              url.port == nil, url.query == nil, url.fragment == nil else { return false }
+        if ListHQCoverCache.isHQHost(url) { return true }
+        return DetailPosterPolicy.allowedPublicImage(url)
+            || AmazonPoster.allowedImage(url)
+            || TenhowPoster.allowedImage(url)
+            || AvbaseMetadata.allowedDiscoveredImage(url)
+    }
+}
+
+/// Bounded visible-card upgrades. Account/backend scope follows ListHQCoverCache.
+/// A cancel never writes the negative cache. Low Power Mode skips the upgrade and
+/// leaves the small image. There is no cellular preference to honor.
+actor VisibleHQPosterScheduler {
+    static let shared = VisibleHQPosterScheduler()
+    private var active = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func upgrade(movie: Movie, url: String, maxPixelSize: Int) async -> UIImage? {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled { return nil }
+        guard VisibleHQPosterPolicy.isSafeUpgradeHost(URL(string: url) ?? URL(string: "about:blank")!) else { return nil }
+        if ListHQCoverCache.isNegative(number: movie.number) { return nil }
+        guard await acquire() else { return nil }
+        defer { release() }
+        guard !Task.isCancelled else { return nil }
+        let image = await ImageLoader.shared.load(url, maxPixelSize: maxPixelSize, timeout: VisibleHQPosterPolicy.requestTimeout)
+        if Task.isCancelled { return nil }
+        if let image {
+            ListHQCoverCache.store(number: movie.number, source: url)
+            return image
+        }
+        ListHQCoverCache.storeNegative(number: movie.number)
+        return nil
+    }
+
+    private func acquire() async -> Bool {
+        if active < VisibleHQPosterPolicy.concurrency {
+            active += 1
+            #if DEBUG
+            noteActive()
+            #endif
+            return true
+        }
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            waiters.append(continuation)
+        }
+    }
+
+    private func release() {
+        if !waiters.isEmpty {
+            let next = waiters.removeFirst()
+            next.resume(returning: true)
+            active += 1
+            #if DEBUG
+            noteActive()
+            #endif
+        }
+        active -= 1
+    }
+
+    #if DEBUG
+    static var testPeakActive = 0
+    func resetForTests() {
+        active = 0
+        Self.testPeakActive = 0
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume(returning: false) }
+    }
+    var activeCount: Int { active }
+    private func noteActive() { Self.testPeakActive = max(Self.testPeakActive, active) }
+    #endif
+}
+
 /// Memory-only HQ URL tips learned from detail poster wins.
 /// List reads synchronously; never triggers Tenhow/Amazon discovery itself.
 enum ListHQCoverCache {
@@ -629,16 +786,41 @@ enum ListHQCoverCache {
     private static var urls: [String: String] = (UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String]) ?? [:]
     private static var order: [String] = Array(urls.keys)
     private static let capacity = 1024
+    /// Failures are memory-only and short-lived. A cancelled upgrade must not call this.
+    private static var negatives: [String: TimeInterval] = [:]
 
     static func key(_ number: String) -> String? {
         let trimmed = number.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        return trimmed.isEmpty ? nil : trimmed
+        guard !trimmed.isEmpty else { return nil }
+        // Same account/backend boundary as detail artwork. The token is hashed so a
+        // persisted URL map never stores the credential itself.
+        let account = APIClient.shared.token ?? "guest"
+        let scope = SHA256.hash(data: Data((JavBusActorRequests.version + "|" + JavDBConstants.baseURL + "|" + account).utf8)).map { String(format: "%02x", $0) }.joined()
+        return String(scope.prefix(16)) + "#" + trimmed
     }
 
     static func url(for number: String?) -> String? {
         guard let number, let key = key(number) else { return nil }
         lock.lock(); defer { lock.unlock() }
         return urls[key]
+    }
+
+    static func isNegative(number: String?) -> Bool {
+        guard let number, let key = key(number) else { return false }
+        lock.lock(); defer { lock.unlock() }
+        guard let until = negatives[key] else { return false }
+        if ProcessInfo.processInfo.systemUptime >= until {
+            negatives[key] = nil
+            return false
+        }
+        return true
+    }
+
+    /// Memory-only. Callers must not invoke this after cancellation.
+    static func storeNegative(number: String?, ttl: TimeInterval = VisibleHQPosterPolicy.negativeTTL) {
+        guard let number, let key = key(number), ttl > 0 else { return }
+        lock.lock(); defer { lock.unlock() }
+        negatives[key] = ProcessInfo.processInfo.systemUptime + ttl
     }
 
     static func store(number: String?, source: String) {
@@ -670,7 +852,7 @@ enum ListHQCoverCache {
     #if DEBUG
     static func resetForTests() {
         lock.lock(); defer { lock.unlock() }
-        urls.removeAll(); order.removeAll()
+        urls.removeAll(); order.removeAll(); negatives.removeAll()
         UserDefaults.standard.removeObject(forKey: defaultsKey)
     }
     #endif
@@ -689,28 +871,12 @@ public enum ListCoverPolicy {
             guard !trimmed.isEmpty, !result.contains(trimmed) else { return }
             result.append(trimmed)
         }
-        if !original {
-            append(ListHQCoverCache.url(for: movie.number))
-            // Catalogue-bound avbase / DMM / MGS packages: HQ (pl) already first in images.
-            for image in movie.catalogueMetadata?.images ?? [] {
-                guard let url = URL(string: image) else { continue }
-                // Build 282: pics.dmm.co.jp pl/ps (800 / 147 px) → awsimgsrc ps (full portrait).
-                for hq in DMMCoverURLs.upgrade(image) { append(hq) }
-                if DetailPosterPolicy.allowedPublicImage(url)
-                    || AvbaseMetadata.allowedDiscoveredImage(url)
-                    || AmazonPoster.allowedImage(url)
-                    || TenhowPoster.allowedImage(url) {
-                    append(image)
-                }
-            }
-            // Build 284: guessed DMM portrait, then its jacket (front-cropped) — older titles
-            // (e.g. IPX-706) only have a 147×200 ps and an 800×538 pl.
-            for guess in DetailPosterPolicy.candidates(number: movie.number).prefix(2) { append(guess) }
+        if !original, let learned = ListHQCoverCache.url(for: movie.number) {
+            append(learned)
         }
-        // MoviePosterImage tries three sources: at most two HQ attempts, then JavDB is
-        // always the third, so a DMM miss never leaves a list card empty.
-        let hq = result.prefix(2)
-        result = Array(hq)
+        // Build 298: guessed DMM / catalogue full-size URLs are not fetched for every
+        // cell. VisibleHQPosterUpgrade requests one safe candidate only while the card
+        // is on screen. The existing thumb/cover always paints first.
         for source in javdb { append(source) }
         return result
     }
@@ -720,15 +886,63 @@ public enum ListCoverPolicy {
 public struct MoviePosterImage: View {
     let movie: Movie
     var maxPixelSize: Int = 1200
+    /// Home / grid cards upgrade after they appear. Detail and one-off callers stay off.
+    var upgradesVisibleHQ = false
 
     public var body: some View {
         let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
-        // HQ (Amazon MAIN._SCRM_ / DMM / MGS / detail tip) first; JavDB cover/thumb last.
         let sources = ListCoverPolicy.sources(movie: movie)
         JavDBImage(url: sources.first,
                    fallbackURL: sources.dropFirst().first,
                    secondFallbackURL: sources.dropFirst(2).first,
                    contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original)
+            .overlay {
+                if upgradesVisibleHQ, !original {
+                    VisibleHQPosterUpgrade(movie: movie)
+                }
+            }
+    }
+}
+
+/// Paints nothing until a visible-card upgrade succeeds. Leaving the screen
+/// cancels the task; the small image underneath is never cleared or enlarged.
+struct VisibleHQPosterUpgrade: View {
+    let movie: Movie
+    @State private var upgraded: UIImage?
+    @State private var identity: String?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let pixels = VisibleHQPosterPolicy.targetPixels(displayPoints: geometry.size, scale: UIScreen.main.scale)
+            Color.clear
+                .overlay {
+                    if let upgraded, identity == requestIdentity(pixels) {
+                        Image(uiImage: upgraded)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .clipped()
+                .allowsHitTesting(false)
+                .task(id: requestIdentity(pixels)) {
+                    let current = requestIdentity(pixels)
+                    guard let url = VisibleHQPosterPolicy.upgradeURL(movie: movie) else { return }
+                    let image = await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: pixels)
+                    guard !Task.isCancelled, let image else { return }
+                    var transaction = Transaction(animation: nil)
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        upgraded = image
+                        identity = current
+                    }
+                }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func requestIdentity(_ pixels: Int) -> String {
+        (movie.number ?? movie.id) + "#" + (VisibleHQPosterPolicy.upgradeURL(movie: movie) ?? "") + "#\(pixels)"
     }
 }
 

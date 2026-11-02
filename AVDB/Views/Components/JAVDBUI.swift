@@ -405,7 +405,7 @@ struct MoviePosterCard: View {
             ClippedAspectFill(aspectRatio: 0.7) {
                 Group {
                     if let artwork { artwork }
-                    else { MoviePosterImage(movie: movie) }
+                    else { MoviePosterImage(movie: movie, upgradesVisibleHQ: upgradesVisibleHQ) }
                 }
                     .overlay {
                         LinearGradient(
@@ -545,7 +545,7 @@ struct MoviePosterGrid: View {
                 NavigationLink {
                     posterDestination(movie)
                 } label: {
-                    MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil)
+                    MoviePosterCard(movie: movie, rank: showRank ? idx + 1 : nil, upgradesVisibleHQ: upgradesVisibleHQ)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("poster-\(movie.id)")
