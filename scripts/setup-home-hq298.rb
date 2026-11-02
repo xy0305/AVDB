@@ -23,6 +23,11 @@ end
     c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
     c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
     c.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'DEBUG HOME_HQ_SIMULATOR'
+    next unless x == t
+    # Unit-test bundles do not inherit the app target. Host it so the tests
+    # compile against production ImageLoader instead of failing before launch.
+    c.build_settings['TEST_HOST'] = '$(BUILT_PRODUCTS_DIR)/HomeHQ298.app/HomeHQ298'
+    c.build_settings['BUNDLE_LOADER'] = '$(TEST_HOST)'
   end
 end
 p.save

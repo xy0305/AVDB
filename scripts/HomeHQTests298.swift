@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+@testable import HomeHQ298
 
 // Runs inside the iOS simulator against production ImageLoader / scheduler.
 // Images are generated locally. No adult cover and no remote host.

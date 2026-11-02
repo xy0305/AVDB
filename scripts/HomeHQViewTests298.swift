@@ -1,6 +1,7 @@
 import XCTest
 import SwiftUI
 import UIKit
+@testable import HomeHQ298
 
 // Hosted in the iOS simulator. Exercises production VisibleHQPosterUpgrade inside
 // a real UIWindow: onAppear starts one bounded upgrade, onDisappear cancels it.
