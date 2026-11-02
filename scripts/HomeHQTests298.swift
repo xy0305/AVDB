@@ -59,7 +59,7 @@ final class HomeHQTests298: XCTestCase {
                 group.addTask { await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: i == 3 ? 400 : 513) }
             }
         }
-        XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, 2)
+        XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, VisibleHQPosterPolicy.concurrency)
         XCTAssertTrue(ListHQCoverCache.isNegative(number: "CAP-3"))
         ListHQCoverCache.storeNegative(number: "CAP-3", ttl: 0.01)
         try? await Task.sleep(nanoseconds: 30_000_000)

@@ -20,8 +20,11 @@ final class HomeHQViewTests298: XCTestCase {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             return nil
         }
-        let movie = Movie(id: "view-1", type: "0", number: "NEUTRAL-VIEW",
-                          thumbURL: "fixture://thumb", coverURL: "fixture://cover")
+        // ABP is a known censored label, so the card is eligible. The only HQ URL
+        // is an already-admitted catalogue image, not a guessed full-size URL.
+        let movie = Movie(id: "view-1", type: "0", number: "ABP-1",
+                          thumbURL: "fixture://thumb", coverURL: "fixture://cover",
+                          catalogueMetadata: .init(images: ["https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/fixture/fixtureps.jpg"]))
         let host = UIHostingController(rootView: VisibleHQPosterUpgrade(movie: movie)
             .frame(width: 120, height: 172))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
@@ -33,8 +36,8 @@ final class HomeHQViewTests298: XCTestCase {
         window.isHidden = true
         host.view.removeFromSuperview()
         try await Task.sleep(nanoseconds: 200_000_000)
-        XCTAssertNil(ListHQCoverCache.url(for: "NEUTRAL-VIEW"))
-        XCTAssertFalse(ListHQCoverCache.isNegative(number: "NEUTRAL-VIEW"))
+        XCTAssertNil(ListHQCoverCache.url(for: "ABP-1"))
+        XCTAssertFalse(ListHQCoverCache.isNegative(number: "ABP-1"))
         let pixels = VisibleHQPosterPolicy.targetPixels(displayPoints: host.view.bounds.size, scale: window.screen.scale)
         XCTAssertLessThanOrEqual(pixels, 900)
         XCTAssertGreaterThan(pixels, 360)

@@ -690,10 +690,11 @@ enum VisibleHQPosterPolicy {
                 || TenhowPoster.allowedImage(url) {
                 append(image)
             }
-            if result.count >= 4 { break }
+            if result.count >= 1 { break }
         }
-        for guess in DetailPosterPolicy.candidates(number: movie.number).prefix(2) { append(guess) }
-        return Array(result.prefix(4))
+        // Guessed full-size URLs are not a visible-card candidate. Only an
+        // already-admitted catalogue image (or a learned cache hit above) upgrades.
+        return Array(result.prefix(1))
     }
 
     static func isImmediateListSource(_ source: String, movie: Movie) -> Bool {
@@ -751,15 +752,14 @@ actor VisibleHQPosterScheduler {
     }
 
     private func release() {
-        if !waiters.isEmpty {
-            let next = waiters.removeFirst()
-            next.resume(returning: true)
-            active += 1
-            #if DEBUG
-            noteActive()
-            #endif
-        }
         active -= 1
+        guard !waiters.isEmpty else { return }
+        let next = waiters.removeFirst()
+        active += 1
+        #if DEBUG
+        noteActive()
+        #endif
+        next.resume(returning: true)
     }
 
     #if DEBUG

@@ -12,8 +12,9 @@ public struct Movie: Identifiable, Hashable {
     public var score: Double?
     public var catalogueMetadata: Meta?
     public struct Meta: Hashable { public var images: [String]; public init(images: [String]) { self.images = images } }
-    public init(id: String, type: String? = nil, number: String? = nil, thumbURL: String? = nil, coverURL: String? = nil) {
+    public init(id: String, type: String? = nil, number: String? = nil, thumbURL: String? = nil, coverURL: String? = nil, catalogueMetadata: Meta? = nil) {
         self.id = id; self.type = type; self.number = number; self.thumbURL = thumbURL; self.coverURL = coverURL
+        self.catalogueMetadata = catalogueMetadata
     }
     public var displayNumber: String { number ?? id }
     public var displayTitle: String { number ?? "Neutral" }
@@ -43,7 +44,7 @@ enum CatalogueIdentity { static func parts(_ raw: String) -> (prefix: String, se
 enum DMMCID { static func candidates(number: String) -> [String] { [] } }
 enum DMMCoverURLs {
     static func digital(_ cid: String) -> [String] { [] }
-    static func upgrade(_ source: String) -> [String] { [] }
+    static func upgrade(_ source: String) -> [String] { [source] }
     static func isJacket(_ source: String) -> Bool { false }
 }
 enum DMMPoster { static func allowedImage(_ url: URL) -> Bool { false } }
