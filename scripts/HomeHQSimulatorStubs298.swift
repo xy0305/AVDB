@@ -3,22 +3,27 @@ import UIKit
 
 // Simulator-only stand-ins for types ImageLoader references. They do not fetch,
 // parse, or enlarge artwork. The production app build does not compile this file.
-struct Movie: Identifiable, Hashable {
-    var id: String
-    var type: String?
-    var number: String?
-    var thumbURL: String?
-    var coverURL: String?
-    var score: Double?
-    var catalogueMetadata: Meta?
-    struct Meta { var images: [String] }
-    var displayNumber: String { number ?? id }
-    var displayTitle: String { number ?? "Neutral" }
-    var playBadge: String? { nil }
-    var magnetStatusText: String? { nil }
-    var hasCnsub: Bool? { nil }
-    var isNewMagnet: Bool { false }
-    var releaseDate: String? { nil }
+public struct Movie: Identifiable, Hashable {
+    public var id: String
+    public var type: String?
+    public var number: String?
+    public var thumbURL: String?
+    public var coverURL: String?
+    public var score: Double?
+    public var catalogueMetadata: Meta?
+    public struct Meta: Hashable { public var images: [String]; public init(images: [String]) { self.images = images } }
+    public init(id: String, type: String? = nil, number: String? = nil, thumbURL: String? = nil, coverURL: String? = nil) {
+        self.id = id; self.type = type; self.number = number; self.thumbURL = thumbURL; self.coverURL = coverURL
+    }
+    public var displayNumber: String { number ?? id }
+    public var displayTitle: String { number ?? "Neutral" }
+    public var playBadge: String? { nil }
+    public var magnetStatusText: String? { nil }
+    public var hasCnsub: Bool? { nil }
+    public var isNewMagnet: Bool { false }
+    public var releaseDate: String? { nil }
+    public static func == (lhs: Movie, rhs: Movie) -> Bool { lhs.id == rhs.id }
+    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 enum JavDBConstants { static let imageCDNHost = "tp.spfcas.com"; static let webCDNHost = "c0.jdbstatic.com"; static let baseURL = "https://fixture.invalid" }
 enum JavBusActorRequests { static let version = "fixture" }
