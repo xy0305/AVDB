@@ -727,6 +727,15 @@ struct ExternalLibrarySettingsView: View {
 struct CoverTitleSettingsSection: View {
     @AppStorage("detail.showCoverTitle") private var showCoverTitle = true
     @AppStorage("javdb.cover.enhance.enabled") private var coverEnhance = false
+    @AppStorage(HQPosterDiskCache.limitKey) private var hqCacheLimitMB = HQPosterDiskCache.defaultLimitMB
+    @State private var hqCacheBytes = 0
+    @State private var hqCacheFiles = 0
+
+    private func refreshHQUsage() {
+        let usage = HQPosterDiskCache.usage()
+        hqCacheBytes = usage.bytes
+        hqCacheFiles = usage.files
+    }
 
     var body: some View {
         AICoverSettingsSection()
@@ -744,5 +753,33 @@ struct CoverTitleSettingsSection: View {
         } footer: {
             Text("封面标题仅控制 App 叠加文字。清晰化默认关闭，只对 JavDB 原生封面（tp.spfcas.com / c0.jdbstatic.com 的 covers）做系统 Core Image 轻度锐化并缓存；不处理 DMM / Amazon / JavBus / Tenhow / TPDB / 头像等其它来源。高分辨率封面会自动跳过。")
         }
+        Section {
+            Picker("缓存上限", selection: $hqCacheLimitMB) {
+                ForEach(HQPosterDiskCache.limitChoicesMB, id: \.self) { Text("\($0) MB").tag($0) }
+            }
+            .accessibilityIdentifier("hq-poster-cache-cap")
+            .onChange(of: hqCacheLimitMB) { _, _ in
+                HQPosterDiskCache.trimNow()
+                refreshHQUsage()
+            }
+            HStack {
+                Text("已缓存")
+                Spacer()
+                Text(verbatim: "\(ByteCountFormatter.string(fromByteCount: Int64(hqCacheBytes), countStyle: .file)) / \(hqCacheLimitMB) MB · \(hqCacheFiles) 张")
+                    .foregroundStyle(.secondary).monospacedDigit()
+            }
+            .accessibilityIdentifier("hq-poster-cache-usage")
+            Button("清除高清封面缓存", role: .destructive) {
+                HQPosterDiskCache.removeAll()
+                refreshHQUsage()
+            }
+            .disabled(hqCacheBytes == 0)
+            .accessibilityIdentifier("hq-poster-cache-clear")
+        } header: {
+            Text("高清封面缓存")
+        } footer: {
+            Text("只缓存已验证的高清封面图片（DMM / Amazon 等来源），普通封面不占这个空间。超出上限时自动清除最久未用的；改小上限会立即清理。")
+        }
+        .onAppear { refreshHQUsage() }
     }
 }

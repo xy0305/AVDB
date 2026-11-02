@@ -873,13 +873,45 @@ enum ListHQCoverCache {
 /// instead of re-downloading from an overseas CDN on every cold start.
 /// Scope is exactly the hosts ListHQCoverCache already admits as HQ —
 /// no new host, no JavDB traffic. Bounded LRU in the system Caches
-/// directory (iOS may purge it under storage pressure): at most
-/// `maxFiles` images and `maxTotalBytes` total, least-recently-used first.
+/// directory (iOS may purge it under storage pressure): the byte limit
+/// is user-configurable in Settings (persisted, applied immediately,
+/// least-recently-used evicted first), with a generous file-count
+/// safety cap on top.
 enum HQPosterDiskCache {
-    static let maxFiles = 300
-    static let maxTotalBytes = 150 * 1024 * 1024
+    /// UserDefaults key shared with the Settings picker (@AppStorage).
+    static let limitKey = "hq.poster.disk.cache.limitMB"
+    static let limitChoicesMB = [50, 100, 150, 300, 500, 1000]
+    static let defaultLimitMB = 150
+    private static let safetyMaxFiles = 10000
     private static let lock = NSLock()
     private static var cachedDirectory: URL?
+
+    /// Effective cache size limit in MB. Writing applies the new limit
+    /// immediately (trims to it), mirroring AICoverDiskCache's cap.
+    static var limitMB: Int {
+        get {
+            let stored = UserDefaults.standard.integer(forKey: limitKey)
+            return limitChoicesMB.contains(stored) ? stored : defaultLimitMB
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: limitKey)
+            evictIfNeeded()
+        }
+    }
+
+    static func trimNow() { evictIfNeeded() }
+
+    /// Current on-disk usage for the Settings row.
+    static func usage() -> (bytes: Int, files: Int) {
+        guard let dir = directoryURL(),
+              let files = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: [.fileSizeKey]) else { return (0, 0) }
+        var total = 0
+        for url in files {
+            total += (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        }
+        return (total, files.count)
+    }
 
     static func isCacheable(_ urlString: String) -> Bool {
         guard let url = URL(string: urlString) else { return false }
@@ -932,10 +964,11 @@ enum HQPosterDiskCache {
                   let size = values.fileSize else { return nil }
             return (url, size, values.contentModificationDate ?? .distantPast)
         }
+        let limitBytes = limitMB * 1024 * 1024
         var total = entries.reduce(0) { $0 + $1.size }
-        guard entries.count > maxFiles || total > maxTotalBytes else { return }
+        guard entries.count > safetyMaxFiles || total > limitBytes else { return }
         entries.sort { $0.modified < $1.modified }
-        while entries.count > maxFiles || total > maxTotalBytes, let victim = entries.first {
+        while entries.count > safetyMaxFiles || total > limitBytes, let victim = entries.first {
             entries.removeFirst()
             if (try? FileManager.default.removeItem(at: victim.url)) != nil { total -= victim.size }
         }
