@@ -882,7 +882,6 @@ public enum ListCoverPolicy {
     }
 }
 
-#if !HOME_HQ_SIMULATOR
 /// Shared by all movie lists; no gestures or detail fetches.
 public struct MoviePosterImage: View {
     let movie: Movie
@@ -905,6 +904,7 @@ public struct MoviePosterImage: View {
     }
 }
 
+#if !HOME_HQ_SIMULATOR
 /// Paints nothing until a visible-card upgrade succeeds. Leaving the screen
 /// cancels the task; the small image underneath is never cleared or enlarged.
 struct VisibleHQPosterUpgrade: View {
@@ -946,7 +946,7 @@ struct VisibleHQPosterUpgrade: View {
         (movie.number ?? movie.id) + "#" + (VisibleHQPosterPolicy.upgradeURL(movie: movie) ?? "") + "#\(pixels)"
     }
 }
-
+#endif
 /// 封面卡片（带番号 + 评分角标）
 public struct MovieCoverCard: View {
     let movie: Movie
@@ -1020,5 +1020,4 @@ struct PosterSizeRegressionGallery: View {
         .padding()
     }
 }
-#endif
 #endif
