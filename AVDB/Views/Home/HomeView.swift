@@ -490,6 +490,10 @@ final class HomeViewModel: ObservableObject {
     private var latestPage = 1
     private var magnetPage = 2
     private let sdk = JavDBSDK.shared
+    /// Plan C: bumped once when a home HQ prefetch learns new covers, so the
+    /// poster grids re-read ListCoverPolicy sources and swap in the HQ URLs.
+    @Published private(set) var hqRevision = 0
+    private var hqPrefetchTask: Task<Void, Never>?
 
     func initialLoad() async {
         #if DEBUG
@@ -513,6 +517,7 @@ final class HomeViewModel: ObservableObject {
             periodLabel = String(created.prefix(10))
         }
         await loadFollowTags()
+        startHQPrefetch()
     }
 
     func loadFollowTags() async {
@@ -533,6 +538,7 @@ final class HomeViewModel: ObservableObject {
         followLoading = true
         defer { followLoading = false }
         following = await movies(for: tag)
+        startHQPrefetch()
     }
 
     func selectFollowSort(_ sort: CatalogSort) async {
@@ -542,6 +548,7 @@ final class HomeViewModel: ObservableObject {
             followLoading = true
             defer { followLoading = false }
             following = await movies(for: tag)
+            startHQPrefetch()
         }
     }
 
@@ -570,7 +577,7 @@ final class HomeViewModel: ObservableObject {
         latestPage += 1
         let next = (try? await sdk.latestMovies(page: latestPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
         if next.isEmpty { latestPage = 1 }
-        else { latest = next }
+        else { latest = next; startHQPrefetch() }
     }
 
     func shuffleMagnets() async {
@@ -578,7 +585,22 @@ final class HomeViewModel: ObservableObject {
         let next = (try? await sdk.latestMovies(page: magnetPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
         let filtered = next.filter { ($0.magnetsCount ?? 0) > 0 }
         if filtered.isEmpty { magnetPage = 1 }
-        else { magnets = filtered }
+        else { magnets = filtered; startHQPrefetch() }
+    }
+
+    /// Plan C: pre-resolve HQ posters for everything currently on Home
+    /// (latest, magnets, following) in the background. When at least one
+    /// new HQ URL is learned, bump hqRevision once so HomeView re-renders
+    /// and the grids swap the learned covers in.
+    private func startHQPrefetch() {
+        let movies = latest + magnets + following
+        guard !movies.isEmpty else { return }
+        hqPrefetchTask?.cancel()
+        hqPrefetchTask = Task {
+            let learned = await HomeHQPosterPrefetch.prefetch(movies, account: APIClient.shared.token)
+            guard learned, !Task.isCancelled else { return }
+            hqRevision += 1
+        }
     }
 }
 

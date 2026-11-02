@@ -858,6 +858,59 @@ enum ListHQCoverCache {
     #endif
 }
 
+#if !HOME_HQ_SIMULATOR
+/// Plan C: home lists pre-resolve every poster through the same verified
+/// detail pipeline (DetailPosterResolver) instead of waiting until the user
+/// opens each detail page. The resolver stores its verified winner in
+/// ListHQCoverCache, and ListCoverPolicy already puts a learned HQ URL
+/// first, so grid cards pick the HQ cover up on the next render. The detail
+/// artwork cache is warmed as a side effect, so detail pages open faster.
+/// Bounded: at most `batchLimit` titles per call, `concurrency` at a time,
+/// titles already learned or recently failed are skipped, and Low Power
+/// Mode defers the whole batch. Returns true when at least one new HQ URL
+/// was learned, so the caller can refresh its grids once.
+enum HomeHQPosterPrefetch {
+    static let batchLimit = 60
+    static let concurrency = 3
+
+    static func prefetch(_ movies: [Movie], account: String?) async -> Bool {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled { return false }
+        var seen = Set<String>()
+        var pending: [Movie] = []
+        for movie in movies {
+            guard let number = movie.number, !number.isEmpty,
+                  seen.insert(number).inserted,
+                  ListHQCoverCache.url(for: number) == nil,
+                  !ListHQCoverCache.isNegative(number: number) else { continue }
+            pending.append(movie)
+            if pending.count >= batchLimit { break }
+        }
+        guard !pending.isEmpty else { return false }
+        var learned = false
+        var index = 0
+        while index < pending.count {
+            if Task.isCancelled { return learned }
+            let chunk = Array(pending[index..<min(index + concurrency, pending.count)])
+            index += chunk.count
+            let hits = await withTaskGroup(of: Bool.self) { group in
+                for movie in chunk {
+                    group.addTask {
+                        _ = await DetailPosterResolver.resolve(movie: movie, account: account)
+                        guard let number = movie.number else { return false }
+                        return ListHQCoverCache.url(for: number) != nil
+                    }
+                }
+                var any = false
+                for await hit in group { any = any || hit }
+                return any
+            }
+            learned = learned || hits
+        }
+        return learned
+    }
+}
+#endif
+
 /// List thumbnails: HQ first (resolved Amazon/DMM/MGS/avbase catalogue pl), then JavDB.
 /// No per-row Tenhow scrape; ImageLoader rejects DMM NOW thumbs and falls back.
 public enum ListCoverPolicy {
