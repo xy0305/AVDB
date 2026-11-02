@@ -3,6 +3,23 @@ import UIKit
 
 // Simulator-only stand-ins for types ImageLoader references. They do not fetch,
 // parse, or enlarge artwork. The production app build does not compile this file.
+struct Movie: Identifiable, Hashable {
+    var id: String
+    var type: String?
+    var number: String?
+    var thumbURL: String?
+    var coverURL: String?
+    var score: Double?
+    var catalogueMetadata: Meta?
+    struct Meta { var images: [String] }
+    var displayNumber: String { number ?? id }
+    var displayTitle: String { number ?? "Neutral" }
+    var playBadge: String? { nil }
+    var magnetStatusText: String? { nil }
+    var hasCnsub: Bool? { nil }
+    var isNewMagnet: Bool { false }
+    var releaseDate: String? { nil }
+}
 enum JavDBConstants { static let imageCDNHost = "tp.spfcas.com"; static let webCDNHost = "c0.jdbstatic.com"; static let baseURL = "https://fixture.invalid" }
 enum JavBusActorRequests { static let version = "fixture" }
 enum JavDBSignature { static func decryptImage(_ data: Data) -> Data { data } }
