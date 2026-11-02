@@ -905,6 +905,7 @@ public struct MoviePosterImage: View {
 }
 
 #if !HOME_HQ_SIMULATOR
+// Simulator host has no GlassChip / ClippedAspectFill. Production still compiles these.
 /// Paints nothing until a visible-card upgrade succeeds. Leaving the screen
 /// cancels the task; the small image underneath is never cleared or enlarged.
 struct VisibleHQPosterUpgrade: View {
@@ -946,7 +947,6 @@ struct VisibleHQPosterUpgrade: View {
         (movie.number ?? movie.id) + "#" + (VisibleHQPosterPolicy.upgradeURL(movie: movie) ?? "") + "#\(pixels)"
     }
 }
-#endif
 /// 封面卡片（带番号 + 评分角标）
 public struct MovieCoverCard: View {
     let movie: Movie
@@ -1020,4 +1020,5 @@ struct PosterSizeRegressionGallery: View {
         .padding()
     }
 }
+#endif
 #endif
