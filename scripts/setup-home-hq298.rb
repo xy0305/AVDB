@@ -4,23 +4,16 @@ d = File.join(r, 'evidence-homehq298')
 Dir.mkdir(d) unless Dir.exist?(d)
 p = Xcodeproj::Project.new(File.join(d, 'HomeHQ298.xcodeproj'))
 a = p.new_target(:application, 'HomeHQ298', :ios, '17.0')
-files = [
-  'AVDB/Services/ImageLoader.swift',
-  'AVDB/Services/DetailPosterPolicy.swift',
-  'AVDB/Services/DetailPosterResolver.swift',
-  'AVDB/Services/DMMCoverResolver.swift',
-  'AVDB/Services/TenhowPoster.swift',
-  'AVDB/Services/CatalogueMetadata.swift',
-  'AVDB/Models/Movie.swift',
-  'AVDB/Networking/APIClient.swift',
-  'AVDB/Networking/JavDBSignature.swift',
-  'scripts/HomeHQUIHost298.swift'
-]
-files.each { |f| a.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, f))) }
+# Production upgrade types only. Detail/catalogue services stay in the app target
+# and are not needed to prove visibility, cancellation, concurrency, or pixels.
+['AVDB/Services/ImageLoader.swift', 'scripts/HomeHQSimulatorStubs298.swift', 'scripts/HomeHQUIHost298.swift'].each do |f|
+  a.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, f)))
+end
 t = p.new_target(:unit_test_bundle, 'HomeHQ298Tests', :ios, '17.0')
 t.add_dependency(a)
-t.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, 'scripts/HomeHQTests298.swift')))
-t.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, 'scripts/HomeHQViewTests298.swift')))
+['scripts/HomeHQTests298.swift', 'scripts/HomeHQViewTests298.swift'].each do |f|
+  t.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, f)))
+end
 [a, t].each do |x|
   x.build_configurations.each do |c|
     c.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'org.avdb.' + x.name
@@ -29,6 +22,7 @@ t.source_build_phase.add_file_reference(p.main_group.new_file(File.join(r, 'scri
     c.build_settings['TARGETED_DEVICE_FAMILY'] = '1'
     c.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
     c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+    c.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'DEBUG'
   end
 end
 p.save
