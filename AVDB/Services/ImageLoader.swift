@@ -336,9 +336,17 @@ public actor ImageLoader {
         }
 
         let task = Task.detached(priority: .utility) { [userAgent] () -> UIImage? in
+            // Verified HQ covers are disk-cached: a hit paints instantly and
+            // never touches the network, even on a cold launch.
+            let cacheable = HQPosterDiskCache.isCacheable(urlString)
+            if cacheable, let diskImage = HQPosterDiskCache.image(forKey: flightKey) {
+                return diskImage
+            }
             let raw = await Self.fetchImage(url: url, urlString: urlString, userAgent: userAgent, maxPixelSize: pixelSize, timeout: timeout)
             guard let raw else { return nil }
-            return JavDBCoverEnhance.maybeApply(raw, source: urlString)
+            let image = JavDBCoverEnhance.maybeApply(raw, source: urlString)
+            if cacheable { HQPosterDiskCache.store(image, forKey: flightKey) }
+            return image
         }
         inFlight[flightKey] = task
         let image = await task.value
@@ -482,6 +490,7 @@ public actor ImageLoader {
     public func clearCache() {
         cache.removeAllObjects()
         posterCache.removeAllObjects()
+        HQPosterDiskCache.removeAll()
     }
 }
 
@@ -858,6 +867,81 @@ enum ListHQCoverCache {
     #endif
 }
 
+/// Persistent on-disk cache for verified HQ poster images.
+/// ListHQCoverCache persists WHICH URL won; this persists the image bytes
+/// themselves, so a learned HQ cover paints instantly on later launches
+/// instead of re-downloading from an overseas CDN on every cold start.
+/// Scope is exactly the hosts ListHQCoverCache already admits as HQ —
+/// no new host, no JavDB traffic. Bounded LRU in the system Caches
+/// directory (iOS may purge it under storage pressure): at most
+/// `maxFiles` images and `maxTotalBytes` total, least-recently-used first.
+enum HQPosterDiskCache {
+    static let maxFiles = 300
+    static let maxTotalBytes = 150 * 1024 * 1024
+    private static let lock = NSLock()
+    private static var cachedDirectory: URL?
+
+    static func isCacheable(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString) else { return false }
+        return ListHQCoverCache.isHQHost(url)
+    }
+
+    private static func directoryURL() -> URL? {
+        lock.lock(); defer { lock.unlock() }
+        if let cachedDirectory { return cachedDirectory }
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        let dir = caches.appendingPathComponent("HQPosterImages", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        cachedDirectory = dir
+        return dir
+    }
+
+    private static func fileURL(forKey key: String) -> URL? {
+        let digest = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+        return directoryURL()?.appendingPathComponent(digest + ".jpg")
+    }
+
+    static func image(forKey key: String) -> UIImage? {
+        guard let file = fileURL(forKey: key),
+              let data = try? Data(contentsOf: file),
+              let image = UIImage(data: data) else { return nil }
+        // Touch so eviction stays least-recently-used.
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path)
+        return image
+    }
+
+    static func store(_ image: UIImage, forKey key: String) {
+        guard let file = fileURL(forKey: key),
+              let data = image.jpegData(compressionQuality: 0.88) else { return }
+        try? data.write(to: file, options: .atomic)
+        evictIfNeeded()
+    }
+
+    static func removeAll() {
+        guard let dir = directoryURL() else { return }
+        try? FileManager.default.removeItem(at: dir)
+        lock.lock(); cachedDirectory = nil; lock.unlock()
+    }
+
+    private static func evictIfNeeded() {
+        guard let dir = directoryURL(),
+              let files = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]) else { return }
+        var entries: [(url: URL, size: Int, modified: Date)] = files.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+                  let size = values.fileSize else { return nil }
+            return (url, size, values.contentModificationDate ?? .distantPast)
+        }
+        var total = entries.reduce(0) { $0 + $1.size }
+        guard entries.count > maxFiles || total > maxTotalBytes else { return }
+        entries.sort { $0.modified < $1.modified }
+        while entries.count > maxFiles || total > maxTotalBytes, let victim = entries.first {
+            entries.removeFirst()
+            if (try? FileManager.default.removeItem(at: victim.url)) != nil { total -= victim.size }
+        }
+    }
+}
+
 #if !HOME_HQ_SIMULATOR
 /// Plan C: home lists pre-resolve every poster through the same verified
 /// detail pipeline (DetailPosterResolver) instead of waiting until the user
@@ -868,7 +952,10 @@ enum ListHQCoverCache {
 /// Bounded: at most `batchLimit` titles per call, `concurrency` at a time,
 /// titles already learned or recently failed are skipped, and Low Power
 /// Mode defers the whole batch. Returns true when at least one new HQ URL
-/// was learned, so the caller can refresh its grids once.
+/// was learned, so the caller can refresh its grids once. Each learned URL
+/// is also warmed through ImageLoader at list size, which persists the HQ
+/// image bytes in HQPosterDiskCache — later launches paint the HQ cover
+/// straight from disk instead of re-downloading it.
 enum HomeHQPosterPrefetch {
     static let batchLimit = 60
     static let concurrency = 3
@@ -896,8 +983,13 @@ enum HomeHQPosterPrefetch {
                 for movie in chunk {
                     group.addTask {
                         _ = await DetailPosterResolver.resolve(movie: movie, account: account)
-                        guard let number = movie.number else { return false }
-                        return ListHQCoverCache.url(for: number) != nil
+                        guard let number = movie.number,
+                              let learned = ListHQCoverCache.url(for: number) else { return false }
+                        // Warm the image itself at list size (MoviePosterImage
+                        // default) so the bytes land in the disk cache, not
+                        // just the winning URL.
+                        _ = await ImageLoader.shared.load(learned, maxPixelSize: 1200)
+                        return true
                     }
                 }
                 var any = false
