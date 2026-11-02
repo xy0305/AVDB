@@ -33,8 +33,8 @@ final class HomeHQTests298: XCTestCase {
         let movie = Movie(id: "n2", type: "0", number: "NEUTRAL-2")
         let url = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/fixture/slowps.jpg"
         ImageLoader.testTransport = { _, pixels in
-            try await Task.sleep(nanoseconds: 2_000_000_000)
-            try Task.checkCancellation()
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if Task.isCancelled { return nil }
             return Self.raster(pixels: pixels, color: .systemOrange)
         }
         let task = Task { await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: 513) }
@@ -48,7 +48,8 @@ final class HomeHQTests298: XCTestCase {
 
     func testConcurrencyCapAndFailureTTL() async {
         ImageLoader.testTransport = { _, pixels in
-            try await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if Task.isCancelled { return nil }
             return pixels == 400 ? nil : Self.raster(pixels: pixels, color: .systemGreen)
         }
         let urls = (0..<4).map { "https://image.mgstage.com/images/prestige/abp/\($0)/pf_e_abp-\($0).jpg" }

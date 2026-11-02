@@ -17,8 +17,7 @@ final class HomeHQViewTests298: XCTestCase {
             XCTAssertLessThanOrEqual(pixels, VisibleHQPosterPolicy.maxPixelCap)
             XCTAssertGreaterThanOrEqual(pixels, VisibleHQPosterPolicy.minPixelFloor)
             started.fulfill()
-            try await Task.sleep(nanoseconds: 5_000_000_000)
-            try Task.checkCancellation()
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
             return nil
         }
         let movie = Movie(id: "view-1", type: "0", number: "NEUTRAL-VIEW",
