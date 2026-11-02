@@ -12,7 +12,7 @@ final class HomeHQTests298: XCTestCase {
         VisibleHQPosterScheduler.testPeakActive = 0
     }
 
-    func testVisibleUpgradeDownsamplesAndCaches() async {
+    func testVisibleUpgradeDownsamplesAndCaches() async throws {
         let movie = Movie(id: "n1", type: "0", number: "NEUTRAL-1",
                           thumbURL: "fixture://small", coverURL: "fixture://cover")
         let url = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/fixture/fixtureps.jpg"
