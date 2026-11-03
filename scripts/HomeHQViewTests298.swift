@@ -32,7 +32,7 @@ final class HomeHQViewTests298: XCTestCase {
         window.makeKeyAndVisible()
         host.view.layoutIfNeeded()
         await fulfillment(of: [started], timeout: 3)
-        XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, 2)
+        XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, VisibleHQPosterPolicy.wifiConcurrency)
         window.isHidden = true
         host.view.removeFromSuperview()
         try await Task.sleep(nanoseconds: 200_000_000)

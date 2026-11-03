@@ -34,12 +34,19 @@ enum TenhowPoster { static func allowedImage(_ url: URL) -> Bool { false } }
 enum AvbaseMetadata { static func allowedDiscoveredImage(_ url: URL) -> Bool { false } }
 
 enum VisibleHQPosterPolicy {
-    static let concurrency = 2
+    static let cellularConcurrency = 2
+    static let wifiConcurrency = 5
+    static var concurrency: Int { wifiConcurrency }
     static let maxPixelCap = 900
     static let minPixelFloor = 360
+    static let pixelBuckets = [360, 540, 720, 900]
+    static func quantizePixels(_ raw: Int) -> Int {
+        let clamped = min(maxPixelCap, max(minPixelFloor, raw))
+        return pixelBuckets.first(where: { $0 >= clamped }) ?? maxPixelCap
+    }
     static func targetPixels(displayPoints: CGSize, scale: CGFloat) -> Int {
         let longest = max(displayPoints.width, displayPoints.height) * max(scale, 1)
-        return min(maxPixelCap, max(minPixelFloor, Int(longest.rounded(.up))))
+        return quantizePixels(Int(longest.rounded(.up)))
     }
     static func isSafeUpgradeHost(_ url: URL) -> Bool {
         url.scheme == "https" && url.query == nil && url.port == nil &&
@@ -48,9 +55,9 @@ enum VisibleHQPosterPolicy {
 }
 
 let phone = VisibleHQPosterPolicy.targetPixels(displayPoints: CGSize(width: 120, height: 171), scale: 3)
-assert(phone == 513, "phone card \(phone)")
+assert(phone == 540, "phone card \(phone)")
 let pad = VisibleHQPosterPolicy.targetPixels(displayPoints: CGSize(width: 220, height: 314), scale: 2)
-assert(pad == 628, "pad card \(pad)")
+assert(pad == 720, "pad card \(pad)")
 let huge = VisibleHQPosterPolicy.targetPixels(displayPoints: CGSize(width: 2000, height: 3000), scale: 3)
 assert(huge == 900, "cap \(huge)")
 let tiny = VisibleHQPosterPolicy.targetPixels(displayPoints: CGSize(width: 10, height: 10), scale: 1)
@@ -58,7 +65,7 @@ assert(tiny == 360, "floor \(tiny)")
 assert(!VisibleHQPosterPolicy.isSafeUpgradeHost(URL(string: "https://evil.example/a.jpg")!))
 assert(!VisibleHQPosterPolicy.isSafeUpgradeHost(URL(string: "http://awsimgsrc.dmm.co.jp/a.jpg")!))
 assert(VisibleHQPosterPolicy.isSafeUpgradeHost(URL(string: "https://awsimgsrc.dmm.co.jp/pics_dig/a.jpg")!))
-assert(VisibleHQPosterPolicy.concurrency == 2 && VisibleHQPosterPolicy.maxPixelCap == 900)
+assert(VisibleHQPosterPolicy.wifiConcurrency == 5 && VisibleHQPosterPolicy.cellularConcurrency == 2 && VisibleHQPosterPolicy.maxPixelCap == 900)
 
 let account = APIClient.shared.token ?? "guest"
 let scope = SHA256.hash(data: Data(("fixture|" + "https://apidd.spthgb.com|" + account).utf8)).map { String(format: "%02x", $0) }.joined()

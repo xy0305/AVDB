@@ -562,6 +562,10 @@ struct MoviePosterGrid: View {
                     if movie.id == movies.last?.id {
                         onAppearLast?(movie)
                     }
+                    // Build 303: while scrolling, warm a few HQ covers ahead of the visible range.
+                    if upgradesVisibleHQ {
+                        HomeHQPosterPrefetch.scheduleAhead(movies: movies, around: idx)
+                    }
                 }
             }
         }

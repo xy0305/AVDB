@@ -14,7 +14,7 @@ assert grid.count('var upgradesVisibleHQ = true') == 2
 assert 'upgradesVisibleHQ: false' in rec, 'blurred backdrop opts out'
 policy = loader.split('enum VisibleHQPosterPolicy', 1)[1].split('actor VisibleHQPosterScheduler', 1)[0]
 assert 'DetailPosterPolicy.candidates(number: movie.number).first' in policy
-assert 'return Array(result.prefix(1))' in policy and 'static let concurrency = 2' in policy
+assert 'return Array(result.prefix(1))' in policy and 'static let wifiConcurrency = 5' in policy
 sched = loader.split('actor VisibleHQPosterScheduler', 1)[1].split('enum ListHQCoverCache', 1)[0]
 assert 'FrontPosterPolicy.cropRect' in sched and 'Task.detached' in sched, 'envelope front crop off-main'
 view = loader.split('struct VisibleHQPosterUpgrade', 1)[1].split('public struct MovieCoverCard', 1)[0]

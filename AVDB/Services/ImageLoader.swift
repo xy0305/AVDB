@@ -649,21 +649,38 @@ public struct JavDBImage: View {
 }
 
 /// Home / grid cards upgrade only while visible. Immediate thumb/cover stays on
-/// screen; at most two screen-sized HQ fetches run. Off-screen cancels. This is
-/// not an upscale of the small image and never starts AI enhancement.
+/// screen; HQ fetches are bounded and cancel off-screen. This is not an upscale
+/// of the small image and never starts AI enhancement.
+/// Build 303: Wi‑Fi allows more parallel upgrades; cellular stays conservative.
+/// Pixel sizes are quantized so disk cache keys match across cells / prefetch.
 enum VisibleHQPosterPolicy {
-    static let concurrency = 2
+    static let cellularConcurrency = 2
+    static let wifiConcurrency = 5
+    /// Effective cap used by the scheduler (Wi‑Fi vs cellular / expensive).
+    static var concurrency: Int { currentConcurrency() }
+    static func currentConcurrency() -> Int {
+        AICoverNetworkState.isExpensive ? cellularConcurrency : wifiConcurrency
+    }
     /// A phone card is ~120 pt; iPad can be wider. Cap the fetch so a 3× screen
     /// never pulls a multi-megapixel original into a list cell.
     static let maxPixelCap = 900
     static let minPixelFloor = 360
+    /// Shared buckets so prefetch and visible cells hit the same disk keys.
+    static let pixelBuckets = [360, 540, 720, 900]
+    /// Prefetch / ahead warm size: typical 3× phone card after quantize (~513→540).
+    static let listPrefetchPixels = 540
     static let negativeTTL: TimeInterval = 10 * 60
     static let requestTimeout: TimeInterval = 8
+
+    static func quantizePixels(_ raw: Int) -> Int {
+        let clamped = min(maxPixelCap, max(minPixelFloor, raw))
+        return pixelBuckets.first(where: { $0 >= clamped }) ?? maxPixelCap
+    }
 
     static func targetPixels(displayPoints: CGSize, scale: CGFloat) -> Int {
         let longest = max(displayPoints.width, displayPoints.height) * max(scale, 1)
         guard longest.isFinite, longest > 0 else { return minPixelFloor }
-        return min(maxPixelCap, max(minPixelFloor, Int(longest.rounded(.up))))
+        return quantizePixels(Int(longest.rounded(.up)))
     }
 
     /// One already-admitted HQ URL, or nil. Never discovers Tenhow/Amazon pages
@@ -730,7 +747,7 @@ enum VisibleHQPosterPolicy {
 
 /// Bounded visible-card upgrades. Account/backend scope follows ListHQCoverCache.
 /// A cancel never writes the negative cache. Low Power Mode skips the upgrade and
-/// leaves the small image. There is no cellular preference to honor.
+/// leaves the small image. Build 303: concurrency follows Wi‑Fi vs cellular.
 actor VisibleHQPosterScheduler {
     static let shared = VisibleHQPosterScheduler()
     private var active = 0
@@ -740,10 +757,11 @@ actor VisibleHQPosterScheduler {
         if ProcessInfo.processInfo.isLowPowerModeEnabled { return nil }
         guard VisibleHQPosterPolicy.isSafeUpgradeHost(URL(string: url) ?? URL(string: "about:blank")!) else { return nil }
         if ListHQCoverCache.isNegative(number: movie.number) { return nil }
+        let pixels = VisibleHQPosterPolicy.quantizePixels(maxPixelSize)
         guard await acquire() else { return nil }
         defer { release() }
         guard !Task.isCancelled else { return nil }
-        let loaded = await ImageLoader.shared.load(url, maxPixelSize: maxPixelSize, timeout: VisibleHQPosterPolicy.requestTimeout)
+        let loaded = await ImageLoader.shared.load(url, maxPixelSize: pixels, timeout: VisibleHQPosterPolicy.requestTimeout)
         if Task.isCancelled { return nil }
         if let loaded {
             // Build 300: a learned DMM pl / store jacket is a landscape envelope; show its
@@ -762,7 +780,7 @@ actor VisibleHQPosterScheduler {
     }
 
     private func acquire() async -> Bool {
-        if active < VisibleHQPosterPolicy.concurrency {
+        if active < VisibleHQPosterPolicy.currentConcurrency() {
             active += 1
             #if DEBUG
             noteActive()
@@ -882,9 +900,11 @@ enum ListHQCoverCache {
 }
 
 /// Persistent on-disk cache for verified HQ poster images.
-/// ListHQCoverCache persists WHICH URL won; this persists the image bytes
-/// themselves, so a learned HQ cover paints instantly on later launches
-/// instead of re-downloading from an overseas CDN on every cold start.
+/// ListHQCoverCache persists WHICH URL won; this persists the *resized*
+/// image bytes (URL + target pixel size key via ImageLoader flightKey), so a
+/// learned HQ cover paints instantly on later launches without re-decoding
+/// the full DMM/MGS original. Build 303: prefetch warms the same quantized
+/// cell size visible upgrades request.
 /// Scope is exactly the hosts ListHQCoverCache already admits as HQ —
 /// no new host, no JavDB traffic. Bounded LRU in the system Caches
 /// directory (iOS may purge it under storage pressure): the byte limit
@@ -990,60 +1010,80 @@ enum HQPosterDiskCache {
 }
 
 #if !HOME_HQ_SIMULATOR
-/// Plan C: home lists pre-resolve every poster through the same verified
-/// detail pipeline (DetailPosterResolver) instead of waiting until the user
-/// opens each detail page. The resolver stores its verified winner in
-/// ListHQCoverCache, and ListCoverPolicy already puts a learned HQ URL
-/// first, so grid cards pick the HQ cover up on the next render. The detail
-/// artwork cache is warmed as a side effect, so detail pages open faster.
-/// Bounded: at most `batchLimit` titles per call, `concurrency` at a time,
-/// titles already learned or recently failed are skipped, and Low Power
-/// Mode defers the whole batch. Returns true when at least one new HQ URL
-/// was learned, so the caller can refresh its grids once. Each learned URL
-/// is also warmed through ImageLoader at list size, which persists the HQ
-/// image bytes in HQPosterDiskCache — later launches paint the HQ cover
-/// straight from disk instead of re-downloading it.
+/// Build 303: light HQ prefetch for home / lists — first ~2 screens when data
+/// arrives, then a few cards ahead while scrolling. Uses the same bounded
+/// VisibleHQ path (one candidate, Plan A crop, junk rejection) and warms the
+/// *cell-sized* HQPosterDiskCache key so the next launch paints HQ from disk
+/// without re-decoding the full DMM/MGS original. Does not call DetailPosterResolver
+/// or touch Cloudflare R2. Low Power Mode skips the batch.
 enum HomeHQPosterPrefetch {
-    static let batchLimit = 60
-    static let concurrency = 3
+    /// ~2 screens of a 3-column phone grid (8 rows × 3).
+    static let firstScreens = 24
+    /// Cards ahead of the last appeared index while scrolling.
+    static let aheadCount = 9
+    private static let lock = NSLock()
+    private static var aheadTask: Task<Void, Never>?
+    private static var aheadToken = 0
 
-    static func prefetch(_ movies: [Movie], account: String?) async -> Bool {
-        if ProcessInfo.processInfo.isLowPowerModeEnabled { return false }
+    /// Warm the first screens when a list / home payload arrives.
+    /// `account` kept for call-site compatibility; unused (no detail discovery).
+    @discardableResult
+    static func prefetch(_ movies: [Movie], account: String? = nil) async -> Bool {
+        await warm(Array(movies.prefix(firstScreens)))
+    }
+
+    /// Coalesced scroll-ahead: warm a few items after `index` in `movies`.
+    static func scheduleAhead(movies: [Movie], around index: Int) {
+        guard upgradesAllowed, index >= 0, !movies.isEmpty else { return }
+        let start = min(movies.count, index + 1)
+        let end = min(movies.count, start + aheadCount)
+        guard start < end else { return }
+        let slice = Array(movies[start..<end])
+        lock.lock()
+        aheadToken += 1
+        let token = aheadToken
+        aheadTask?.cancel()
+        aheadTask = Task(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            guard !Task.isCancelled else { return }
+            lock.lock(); let current = aheadToken; lock.unlock()
+            guard current == token else { return }
+            _ = await warm(slice)
+        }
+        lock.unlock()
+    }
+
+    private static var upgradesAllowed: Bool {
+        !ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+
+    private static func warm(_ movies: [Movie]) async -> Bool {
+        guard upgradesAllowed else { return false }
+        let pixels = VisibleHQPosterPolicy.listPrefetchPixels
         var seen = Set<String>()
-        var pending: [Movie] = []
+        var pending: [(Movie, String)] = []
         for movie in movies {
             guard let number = movie.number, !number.isEmpty,
                   seen.insert(number).inserted,
-                  ListHQCoverCache.url(for: number) == nil,
-                  !ListHQCoverCache.isNegative(number: number) else { continue }
-            pending.append(movie)
-            if pending.count >= batchLimit { break }
+                  !ListHQCoverCache.isNegative(number: number),
+                  let url = VisibleHQPosterPolicy.upgradeURL(movie: movie) else { continue }
+            pending.append((movie, url))
         }
         guard !pending.isEmpty else { return false }
         var learned = false
-        var index = 0
-        while index < pending.count {
-            if Task.isCancelled { return learned }
-            let chunk = Array(pending[index..<min(index + concurrency, pending.count)])
-            index += chunk.count
-            let hits = await withTaskGroup(of: Bool.self) { group in
-                for movie in chunk {
-                    group.addTask {
-                        _ = await DetailPosterResolver.resolve(movie: movie, account: account)
-                        guard let number = movie.number,
-                              let learned = ListHQCoverCache.url(for: number) else { return false }
-                        // Warm the image itself at list size (MoviePosterImage
-                        // default) so the bytes land in the disk cache, not
-                        // just the winning URL.
-                        _ = await ImageLoader.shared.load(learned, maxPixelSize: 1200)
-                        return true
-                    }
+        // Run through the same scheduler so Wi‑Fi/cellular caps + cancel semantics apply.
+        await withTaskGroup(of: Bool.self) { group in
+            for (movie, url) in pending {
+                group.addTask {
+                    if Task.isCancelled { return false }
+                    let image = await VisibleHQPosterScheduler.shared.upgrade(
+                        movie: movie, url: url, maxPixelSize: pixels)
+                    return image != nil
                 }
-                var any = false
-                for await hit in group { any = any || hit }
-                return any
             }
-            learned = learned || hits
+            for await hit in group {
+                if hit { learned = true }
+            }
         }
         return learned
     }

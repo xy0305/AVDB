@@ -236,6 +236,9 @@ final class CategoriesViewModel: ObservableObject {
                 let ids = Set(movies.map(\.id))
                 movies.append(contentsOf: list.filter { !ids.contains($0.id) })
             }
+            // Build 303: warm first ~2 screens of HQ covers at cell size.
+            let warm = movies
+            Task(priority: .utility) { await HomeHQPosterPrefetch.prefetch(warm) }
         } catch {
             // Keep successful content and pagination; failed requests are retryable.
         }

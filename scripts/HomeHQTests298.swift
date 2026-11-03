@@ -59,7 +59,7 @@ final class HomeHQTests298: XCTestCase {
                 group.addTask { await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: i == 3 ? 400 : 513) }
             }
         }
-        XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, VisibleHQPosterPolicy.concurrency)
+        XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, VisibleHQPosterPolicy.wifiConcurrency)
         XCTAssertTrue(ListHQCoverCache.isNegative(number: "CAP-3"))
         ListHQCoverCache.storeNegative(number: "CAP-3", ttl: 0.01)
         try? await Task.sleep(nanoseconds: 30_000_000)
@@ -68,8 +68,10 @@ final class HomeHQTests298: XCTestCase {
 
     func testPixelsFollowDisplayedCard() {
         let pixels = VisibleHQPosterPolicy.targetPixels(displayPoints: CGSize(width: 120, height: 171.4), scale: 3)
-        XCTAssertEqual(pixels, 515)
+        // Build 303: quantized buckets so disk keys match prefetch (513 → 540).
+        XCTAssertEqual(pixels, 540)
         XCTAssertEqual(VisibleHQPosterPolicy.targetPixels(displayPoints: CGSize(width: 2000, height: 3000), scale: 3), 900)
+        XCTAssertEqual(VisibleHQPosterPolicy.listPrefetchPixels, 540)
     }
 
     private static func raster(pixels: Int, color: UIColor) -> UIImage {

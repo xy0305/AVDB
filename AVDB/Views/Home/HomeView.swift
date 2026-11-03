@@ -595,10 +595,10 @@ final class HomeViewModel: ObservableObject {
         else { magnets = filtered; startHQPrefetch() }
     }
 
-    /// Plan C: pre-resolve HQ posters for everything currently on Home
-    /// (latest, magnets, following) in the background. When at least one
-    /// new HQ URL is learned, bump hqRevision once so HomeView re-renders
-    /// and the grids swap the learned covers in.
+    /// Build 303: light cell-sized HQ prefetch for home grids (latest / magnets /
+    /// following). Warms VisibleHQ + HQPosterDiskCache for the first ~2 screens;
+    /// scroll-ahead is handled by MoviePosterGrid. Bump hqRevision when a new
+    /// URL is learned so synchronous ListCoverPolicy can lead with it.
     private func startHQPrefetch() {
         let movies = latest + magnets + following
         guard !movies.isEmpty else { return }

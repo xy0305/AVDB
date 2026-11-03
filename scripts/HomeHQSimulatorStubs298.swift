@@ -37,6 +37,8 @@ enum DMMImageValidation {
     }
 }
 final class APIClient { static let shared = APIClient(); var token: String? = "account-a" }
+/// Simulator default: treat as Wi‑Fi so concurrency tests exercise the wifi cap.
+enum AICoverNetworkState { nonisolated(unsafe) static var isExpensive = false }
 enum JavDBConstants { static let imageCDNHost = "tp.spfcas.com"; static let webCDNHost = "c0.jdbstatic.com"; static let baseURL = "https://fixture.invalid" }
 enum JavBusActorRequests { static let version = "fixture" }
 enum JavDBSignature { static func decryptImage(_ data: Data) -> Data { data } }
