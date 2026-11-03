@@ -4,7 +4,8 @@ from pathlib import Path
 r = Path(__file__).resolve().parents[1]
 src = (r / 'AVDB/Views/Categories/CategoriesView.swift').read_text()
 plist = (r / 'AVDB/Resources/Info.plist').read_text(); pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert '<string>304</string>' in plist and pbx.count('CURRENT_PROJECT_VERSION = 304;') == 2
+ver = plist.split('CFBundleVersion')[1].split('<string>')[1].split('<')[0]
+assert int(ver) >= 304 and pbx.count(f'CURRENT_PROJECT_VERSION = {ver};') == 2
 root = src.split('struct CategoriesView: View', 1)[1].split('enum CatalogSort', 1)[0]
 assert '.safeAreaInset(edge: .bottom, spacing: 0)' in root
 assert 'CategoryInlineFilterPanel(' in root
