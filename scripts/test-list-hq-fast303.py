@@ -8,7 +8,8 @@ home = (r / 'AVDB/Views/Home/HomeView.swift').read_text()
 cat = (r / 'AVDB/Views/Categories/CategoriesView.swift').read_text()
 plist = (r / 'AVDB/Resources/Info.plist').read_text()
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert '<string>303</string>' in plist and pbx.count('CURRENT_PROJECT_VERSION = 303;') == 2
+ver = plist.split('CFBundleVersion')[1].split('<string>')[1].split('<')[0]
+assert int(ver) >= 303 and pbx.count(f'CURRENT_PROJECT_VERSION = {ver};') == 2
 
 policy = loader.split('enum VisibleHQPosterPolicy', 1)[1].split('actor VisibleHQPosterScheduler', 1)[0]
 assert 'static let wifiConcurrency = 5' in policy

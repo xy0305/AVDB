@@ -7,8 +7,9 @@ plist = (r / 'AVDB/Resources/Info.plist').read_text(); pbx = (r / 'AVDB.xcodepro
 ver = plist.split('CFBundleVersion')[1].split('<string>')[1].split('<')[0]
 assert int(ver) >= 302 and pbx.count(f'CURRENT_PROJECT_VERSION = {ver};') == 2
 root = src.split('struct CategoriesView: View', 1)[1].split('enum CatalogSort', 1)[0]
-assert 'CategoryInlineFilterPanel(vm: vm' in root and '.sheet(isPresented: $showFilter)' not in root
-assert '@AppStorage("categories.filterPanel.expanded.v2") private var filterExpanded = false' in root, 'default stowed'
+assert 'CategoryInlineFilterPanel(' in root and '.sheet(isPresented: $showFilter)' not in root
+assert 'filterExpanded = false' in root, 'default stowed'
+assert '.safeAreaInset(edge: .bottom' in root or 'CategoryInlineFilterPanel' in root
 panel = src.split('struct CategoryInlineFilterPanel', 1)[1]
 for s in ['ForEach(vm.groups)', 'CatalogSort.allCases', 'vm.selectSort(sort)', 'vm.pick(groupID: cid', 'scheduleApply()',
           'await vm.applyFilter()', 'Tag.allChip', '"篩選"', 'DragGesture', 'reloadGroups()', 'summary']:

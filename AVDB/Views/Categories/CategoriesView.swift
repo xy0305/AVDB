@@ -11,7 +11,7 @@ struct CategoriesView: View {
     @State private var catalog: MovieCatalogType = .censored
     @StateObject private var vm = CategoriesViewModel()
     @State private var showSearch = false
-    /// Build 302: stowable bottom 篩選 bar (default collapsed) instead of a hidden sheet.
+    /// Build 304: stowable 篩選 bar via safeAreaInset (above floating tab), default collapsed.
     @AppStorage("categories.filterPanel.expanded.v2") private var filterExpanded = false
     @Environment(\.availableLayoutSize) private var layoutSize
 
@@ -41,9 +41,14 @@ struct CategoriesView: View {
                         if vm.isLoading { ProgressView().padding() }
                     }
                 }
-
-                CategoryInlineFilterPanel(vm: vm, expanded: $filterExpanded,
-                                          maxHeight: max(260, min(480, layoutSize.height * 0.52)))
+                // Build 304: nest above FloatingTabContainer's tab inset (same as ActorsView).
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    CategoryInlineFilterPanel(
+                        vm: vm,
+                        expanded: $filterExpanded,
+                        maxHeight: max(260, min(480, layoutSize.height * 0.52))
+                    )
+                }
             }
             .background {
                 LiquidGlassBackground()
@@ -588,12 +593,11 @@ struct CatalogListView: View {
 }
 
 
-// MARK: - Build 302 stowable filter panel
+// MARK: - Build 304 stowable filter panel (safeAreaInset)
 
-/// Stowable bottom bar matching the JavDB 類別 screen. Default collapsed: one thin bar with
-/// 「篩選」 + current sort + optional active-filter summary + chevron/handle, sitting above the
-/// floating tab bar. Drag up / tap expands the chip panel (基本 / 年份 / 月份 / …); drag down /
-/// tap stows it. A chip tap applies at once; the grid above reloads. Expand state is remembered.
+/// Stowable bottom bar. Hosted via `.safeAreaInset(edge: .bottom)` so it stacks above
+/// FloatingTabContainer's tab bar. Default collapsed but always visible: 「篩選」 + sort +
+/// chevron on regularMaterial (~52pt). Drag/tap expands chips (基本/年份/月份…).
 struct CategoryInlineFilterPanel: View {
     @ObservedObject var vm: CategoriesViewModel
     @Binding var expanded: Bool
@@ -629,11 +633,13 @@ struct CategoryInlineFilterPanel: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        // Collapsed strip stays unmistakable above the floating tab (~52pt chrome).
+        .frame(minHeight: expanded ? nil : 52)
         .frame(maxWidth: .infinity)
         .background {
-            UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18, style: .continuous)
+            UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 18, style: .continuous)
                 .fill(.regularMaterial)
-                .shadow(color: .black.opacity(0.12), radius: 10, y: -2)
+                .shadow(color: .black.opacity(0.18), radius: 12, y: -3)
         }
         .offset(y: max(0, dragOffset))
         .gesture(
@@ -684,7 +690,8 @@ struct CategoryInlineFilterPanel: View {
             .accessibilityIdentifier("category-filter-sort")
         }
         .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-        .padding(.bottom, expanded ? 10 : 8)
+        .padding(.top, expanded ? 0 : 2)
+        .padding(.bottom, expanded ? 10 : 12)
     }
 
     /// Active non-default picks, e.g. 「可下載 · 2025 · 3月」.
