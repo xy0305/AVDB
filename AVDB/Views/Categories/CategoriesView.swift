@@ -10,8 +10,10 @@ import SwiftUI
 struct CategoriesView: View {
     @State private var catalog: MovieCatalogType = .censored
     @StateObject private var vm = CategoriesViewModel()
-    @State private var showFilter = false
     @State private var showSearch = false
+    /// Build 301: inline bottom 篩選 panel (JavDB-style) instead of a hidden sheet.
+    @AppStorage("categories.filterPanel.expanded") private var filterExpanded = true
+    @Environment(\.availableLayoutSize) private var layoutSize
 
     var body: some View {
         NavigationStack {
@@ -40,7 +42,8 @@ struct CategoriesView: View {
                     }
                 }
 
-                filterBar
+                CategoryInlineFilterPanel(vm: vm, expanded: $filterExpanded,
+                                          maxHeight: max(260, min(480, layoutSize.height * 0.52)))
             }
             .background {
                 LiquidGlassBackground()
@@ -57,70 +60,12 @@ struct CategoriesView: View {
                 }
             }
             .navigationDestination(isPresented: $showSearch) { SearchView() }
-            .sheet(isPresented: $showFilter) {
-                CategoryFilterSheet(vm: vm)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-            }
             .task { await vm.load(type: catalog) }
             .onChange(of: catalog) { _, new in
                 Task { await vm.load(type: new) }
             }
             .refreshable { await vm.load(type: catalog, force: true) }
         }
-    }
-
-    private var filterBar: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button {
-                    GlassHaptic.tap()
-                    showFilter = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("篩選")
-                            .font(.headline)
-                    }
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .contentShape(Capsule())
-                    .liquidGlass(interactive: false)
-                }
-                .pressableGlass(scale: 0.95)
-                Spacer()
-                Menu {
-                    ForEach(CatalogSort.allCases) { sort in
-                        Button {
-                            Task { await vm.selectSort(sort) }
-                        } label: {
-                            if vm.sort == sort {
-                                Label(sort.title, systemImage: "checkmark")
-                            } else {
-                                Text(sort.title)
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(vm.sort.title)
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.tint)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .contentShape(Capsule())
-                    .liquidGlass(interactive: false)
-                }
-            }
-            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
-        }
-        .frame(maxWidth: .infinity)
     }
 }
 
@@ -224,6 +169,11 @@ final class CategoriesViewModel: ObservableObject {
 
     func applyFilter() async {
         await fetch(replacing: true)
+    }
+
+    /// Build 301: retry the official tag groups if the first load failed.
+    func reloadGroups() async {
+        await fetch(replacing: true, reloadGroups: true)
     }
 
     func selectSort(_ sort: CatalogSort) async {
@@ -632,4 +582,161 @@ struct CatalogListView: View {
         .padding(.vertical, 2)
     }
 
+}
+
+
+// MARK: - Build 301 inline filter panel
+
+/// Bottom panel matching the JavDB 類別 screen: drag handle, 「篩選」 + sort on one row,
+/// then every official tag group (基本 / 年份 / 月份 / …) as chips. A tap applies at once;
+/// the grid above reloads. Collapsed it is one row with the active selections summarized.
+struct CategoryInlineFilterPanel: View {
+    @ObservedObject var vm: CategoriesViewModel
+    @Binding var expanded: Bool
+    let maxHeight: CGFloat
+    @State private var dragOffset: CGFloat = 0
+    @State private var applyTask: Task<Void, Never>?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Capsule(style: .continuous)
+                .fill(Color.secondary.opacity(0.35))
+                .frame(width: 38, height: 5)
+                .padding(.top, 7).padding(.bottom, 6)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { toggle() }
+                .accessibilityIdentifier("category-filter-handle")
+            header
+            if expanded {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if vm.groups.isEmpty {
+                            Text(vm.isLoading ? "載入篩選…" : "暫無可用篩選")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity).padding(.vertical, 20)
+                        }
+                        ForEach(vm.groups) { group in row(group) }
+                    }
+                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                    .padding(.bottom, 14)
+                }
+                .frame(maxHeight: maxHeight)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18, style: .continuous)
+                .fill(.regularMaterial)
+                .shadow(color: .black.opacity(0.12), radius: 10, y: -2)
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .offset(y: max(0, dragOffset))
+        .gesture(
+            DragGesture(minimumDistance: 12)
+                .onChanged { value in dragOffset = expanded ? value.translation.height : min(0, value.translation.height) / 3 }
+                .onEnded { value in
+                    let dy = value.translation.height
+                    dragOffset = 0
+                    if expanded, dy > 60 { setExpanded(false) }
+                    else if !expanded, dy < -30 { setExpanded(true) }
+                }
+        )
+        .accessibilityIdentifier("category-filter-panel")
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Button { toggle() } label: {
+                HStack(spacing: 6) {
+                    Text("篩選").font(.headline).foregroundStyle(.primary)
+                    if !expanded, !summary.isEmpty {
+                        Text(summary).font(.caption).foregroundStyle(.tint).lineLimit(1)
+                    }
+                    Image(systemName: expanded ? "chevron.down" : "chevron.up")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("category-filter-toggle")
+            Spacer(minLength: 8)
+            Menu {
+                ForEach(CatalogSort.allCases) { sort in
+                    Button {
+                        Task { await vm.selectSort(sort) }
+                    } label: {
+                        if vm.sort == sort { Label(sort.title, systemImage: "checkmark") } else { Text(sort.title) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(vm.sort.title)
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            .accessibilityIdentifier("category-filter-sort")
+        }
+        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+        .padding(.bottom, 10)
+    }
+
+    /// Active non-default picks, e.g. 「可下載 · 2025 · 3月」.
+    private var summary: String {
+        vm.groups.compactMap { group -> String? in
+            let current = vm.selectedID(in: group)
+            guard !current.isEmpty, current != "all", !(group.categoryID == "main" && current == "m") else { return nil }
+            return group.tags?.first { $0.id == current }?.name
+        }.joined(separator: " · ")
+    }
+
+    private func row(_ group: TagGroup) -> some View {
+        let cid = group.categoryID ?? group.id
+        let current = vm.selectedID(in: group)
+        let selected = current.isEmpty ? "all" : current
+        return HStack(alignment: .top, spacing: 10) {
+            Text(group.category ?? "")
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 40, alignment: .leading)
+                .padding(.top, 5)
+            FlowLayout(spacing: 8) {
+                ForEach([Tag.allChip] + (group.tags ?? [])) { tag in
+                    let on = selected == tag.id
+                    Button {
+                        GlassHaptic.tap()
+                        vm.pick(groupID: cid, tagID: tag.id == "all" ? nil : tag.id)
+                        scheduleApply()
+                    } label: {
+                        // Static chips (no live glass) so a 40-chip panel scrolls smoothly.
+                        Text(tag.name ?? tag.id)
+                            .font(.subheadline.weight(on ? .semibold : .regular))
+                            .foregroundStyle(on ? Color.white : Color.primary)
+                            .padding(.horizontal, 12).padding(.vertical, 5)
+                            .background(on ? Color.accentColor : Color(.tertiarySystemFill),
+                                        in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    /// Coalesce quick successive taps (e.g. 年份 then 月份) into one request.
+    private func scheduleApply() {
+        applyTask?.cancel()
+        applyTask = Task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            await vm.applyFilter()
+        }
+    }
+
+    private func toggle() { setExpanded(!expanded) }
+    private func setExpanded(_ value: Bool) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { expanded = value }
+        if value, vm.groups.isEmpty, !vm.isLoading { Task { await vm.reloadGroups() } }
+    }
 }

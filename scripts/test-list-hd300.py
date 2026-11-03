@@ -6,7 +6,8 @@ loader = (r / 'AVDB/Services/ImageLoader.swift').read_text()
 grid = (r / 'AVDB/Views/Components/JAVDBUI.swift').read_text()
 rec = (r / 'AVDB/Views/User/RecommendationsView.swift').read_text()
 plist = (r / 'AVDB/Resources/Info.plist').read_text(); pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert '>300<' in plist and pbx.count('CURRENT_PROJECT_VERSION = 300;') == 2
+v = plist.split('CFBundleVersion')[1].split('<string>')[1].split('<')[0]
+assert int(v) >= 300 and pbx.count(f'CURRENT_PROJECT_VERSION = {v};') == 2
 img = loader.split('public struct MoviePosterImage', 1)[1].split('public var body', 1)[0]
 assert 'var upgradesVisibleHQ = true' in img
 assert grid.count('var upgradesVisibleHQ = true') == 2
