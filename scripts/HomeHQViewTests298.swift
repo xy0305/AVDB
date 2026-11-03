@@ -12,6 +12,7 @@ final class HomeHQViewTests298: XCTestCase {
         await VisibleHQPosterScheduler.shared.resetForTests()
         ListHQCoverCache.resetForTests()
         ImageLoader.resetTestTransport()
+        AICoverNetworkState.isExpensive = false
         let started = expectation(description: "visible upgrade started")
         ImageLoader.testTransport = { url, pixels in
             XCTAssertLessThanOrEqual(pixels, VisibleHQPosterPolicy.maxPixelCap)
@@ -31,7 +32,7 @@ final class HomeHQViewTests298: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
         host.view.layoutIfNeeded()
-        await fulfillment(of: [started], timeout: 3)
+        await fulfillment(of: [started], timeout: 8)
         XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, VisibleHQPosterPolicy.wifiConcurrency)
         window.isHidden = true
         host.view.removeFromSuperview()

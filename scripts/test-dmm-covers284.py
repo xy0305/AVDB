@@ -26,7 +26,7 @@ assert policy.count('return source') == 1 and 'return Array(result.prefix(1))' i
 assert 'for guess in DetailPosterPolicy.candidates(number: movie.number).prefix(2)' not in policy, 'visible upgrade does not fan out guessed full-size URLs'
 for host in ('awsimgsrc.dmm.co.jp', 'pics.dmm.co.jp', 'm.media-amazon.com', 'images-na.ssl-images-amazon.com', 'www.tenhow.net', 'image.mgstage.com', 'pic.duga.jp'):
     assert host in loader, host
-assert 'static let concurrency = 2' in loader and 'ListHQCoverCache.storeNegative' in loader and 'if Task.isCancelled { return nil }' in loader, 'concurrency, negative cache, and cancel contracts stay'
+assert 'static let wifiConcurrency = 5' in loader and 'static let cellularConcurrency = 2' in loader and 'static var concurrency: Int' in loader and 'ListHQCoverCache.storeNegative' in loader and 'if Task.isCancelled { return nil }' in loader, 'wifi/cellular concurrency, negative cache, and cancel contracts stay'
 assert 'officialRank' in detail_policy
 assert int(plist['CFBundleVersion']) >= 284 and pbx.count(f"CURRENT_PROJECT_VERSION = {plist['CFBundleVersion']};") == 2
 swiftc = shutil.which('swiftc')

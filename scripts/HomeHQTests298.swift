@@ -21,9 +21,10 @@ final class HomeHQTests298: XCTestCase {
             XCTAssertLessThanOrEqual(pixels, VisibleHQPosterPolicy.maxPixelCap)
             return Self.raster(pixels: pixels, color: .systemTeal)
         }
+        // Build 303 quantizes 513 → 540 so disk keys match prefetch buckets.
         let image = await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: 513)
         let cg = try XCTUnwrap(image?.cgImage)
-        XCTAssertLessThanOrEqual(max(cg.width, cg.height), 513)
+        XCTAssertLessThanOrEqual(max(cg.width, cg.height), 540)
         XCTAssertGreaterThan(max(cg.width, cg.height), 360)
         XCTAssertEqual(ListHQCoverCache.url(for: "NEUTRAL-1"), url)
         XCTAssertFalse(ListHQCoverCache.isNegative(number: "NEUTRAL-1"))
@@ -47,16 +48,21 @@ final class HomeHQTests298: XCTestCase {
     }
 
     func testConcurrencyCapAndFailureTTL() async {
-        ImageLoader.testTransport = { _, pixels in
+        // Fail by URL, not by raw pixel size: upgrade() quantizes before load (400→540).
+        ImageLoader.testTransport = { url, pixels in
             try? await Task.sleep(nanoseconds: 300_000_000)
             if Task.isCancelled { return nil }
-            return pixels == 400 ? nil : Self.raster(pixels: pixels, color: .systemGreen)
+            return url.contains("/fail/") ? nil : Self.raster(pixels: pixels, color: .systemGreen)
         }
-        let urls = (0..<4).map { "https://image.mgstage.com/images/prestige/abp/\($0)/pf_e_abp-\($0).jpg" }
+        let urls = (0..<4).map { i -> String in
+            i == 3
+                ? "https://image.mgstage.com/images/prestige/abp/fail/pf_e_abp-3.jpg"
+                : "https://image.mgstage.com/images/prestige/abp/\(i)/pf_e_abp-\(i).jpg"
+        }
         await withTaskGroup(of: UIImage?.self) { group in
             for (i, url) in urls.enumerated() {
                 let movie = Movie(id: "c\(i)", type: "0", number: "CAP-\(i)")
-                group.addTask { await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: i == 3 ? 400 : 513) }
+                group.addTask { await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: 513) }
             }
         }
         XCTAssertLessThanOrEqual(VisibleHQPosterScheduler.testPeakActive, VisibleHQPosterPolicy.wifiConcurrency)
