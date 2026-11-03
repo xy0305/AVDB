@@ -46,6 +46,9 @@ struct SearchView: View {
     @State private var sortBy: MovieSortBy = .relevance
     @StateObject private var suggest = SearchSuggestStore.shared
     @FocusState private var isSearchFocused: Bool
+    /// Build 299: home→search push + keyboard + tag cloud used to hitch together.
+    /// Hold tags/keyboard until the navigation transition finishes.
+    @State private var openSettled = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,12 +63,17 @@ struct SearchView: View {
 
             Group {
                 if submitted.isEmpty {
-                    SearchIdleView(
-                        hotKeywords: suggest.hotKeywords,
-                        history: suggest.history,
-                        onPick: { pick($0) },
-                        onClearHistory: { suggest.clearHistory() }
-                    )
+                    if openSettled {
+                        SearchIdleView(
+                            hotKeywords: suggest.hotKeywords,
+                            history: suggest.history,
+                            onPick: { pick($0) },
+                            onClearHistory: { suggest.clearHistory() }
+                        )
+                    } else {
+                        // Light placeholder while the push animates — no FlowLayout / glass chips.
+                        Color.clear
+                    }
                 } else {
                     SearchResultView(
                         keyword: submitted,
@@ -84,8 +92,17 @@ struct SearchView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
-        .task { await suggest.loadHotKeywords() }
-        .onAppear { isSearchFocused = submitted.isEmpty }
+        .task {
+            // Hot keywords are usually prefetched from Home; refresh in the background.
+            async let hot: Void = suggest.loadHotKeywords()
+            // ~one navigation push; then reveal chips and focus the field (keyboard).
+            try? await Task.sleep(nanoseconds: 340_000_000)
+            openSettled = true
+            if submitted.isEmpty {
+                isSearchFocused = true
+            }
+            await hot
+        }
         .modifier(HidesFloatingTabBar())
     }
 
@@ -274,8 +291,10 @@ private struct SearchIdleView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.system(size: 18, weight: .bold))
+            // Build 299: static fill chips (scrolling: true) — no material resample /
+            // dual shadows / stagger animations on first paint of the tag cloud.
             FlowLayout(spacing: 8) {
-                ForEach(Array(words.enumerated()), id: \.element) { idx, word in
+                ForEach(Array(words.enumerated()), id: \.offset) { _, word in
                     Button {
                         GlassHaptic.tap()
                         onPick(word)
@@ -285,10 +304,9 @@ private struct SearchIdleView: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .glassSurface(in: Capsule(), elevation: 0.35)
+                            .glassSurface(in: Capsule(), elevation: 0.2, scrolling: true)
                     }
-                    .pressableGlass(scale: 0.94)
-                    .staggerAppear(index: idx)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -304,15 +322,35 @@ final class SearchSuggestStore: ObservableObject {
 
     private let historyKey = "avdb.search.history"
     private let historyLimit = 30
+    private var hotLoadTask: Task<Void, Never>?
 
     private init() {
         history = UserDefaults.standard.stringArray(forKey: historyKey) ?? []
     }
 
+    /// Kick the hot-keyword fetch before SearchView pushes. History is already warm.
+    func prefetch() {
+        guard hotLoadTask == nil, hotKeywords.isEmpty else { return }
+        hotLoadTask = Task { await self.fetchHotKeywords() }
+    }
+
     func loadHotKeywords() async {
-        if let words = try? await JavDBSDK.shared.startup().recentKeywords, !words.isEmpty {
+        if let existing = hotLoadTask {
+            await existing.value
+            return
+        }
+        let task = Task { await self.fetchHotKeywords() }
+        hotLoadTask = task
+        await task.value
+        if hotLoadTask == task { hotLoadTask = nil }
+    }
+
+    private func fetchHotKeywords() async {
+        if let words = try? await JavDBSDK.shared.startup().recentKeywords, !words.isEmpty,
+           hotKeywords != words {
             hotKeywords = words
         }
+        hotLoadTask = nil
     }
 
     func addHistory(_ keyword: String) {

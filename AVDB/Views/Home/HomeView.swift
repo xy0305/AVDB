@@ -45,7 +45,11 @@ struct HomeView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
-            .task { await vm.initialLoad() }
+            .task {
+                // Prefetch search suggestions on the home tab so opening search is cheap.
+                SearchSuggestStore.shared.prefetch()
+                await vm.initialLoad()
+            }
             .refreshable { await vm.initialLoad() }
             .navigationDestination(isPresented: $goSearch) {
                 SearchView()
@@ -90,6 +94,9 @@ struct HomeView: View {
     private var searchBar: some View {
         Button {
             GlassHaptic.tap()
+            // Warm 近期熱搜 / 歷史搜索 before the push so the idle page does not
+            // hitch mid-transition waiting on startup.recent_keywords.
+            SearchSuggestStore.shared.prefetch()
             goSearch = true
         } label: {
             HStack(spacing: 12) {
