@@ -701,8 +701,14 @@ enum VisibleHQPosterPolicy {
             }
             if result.count >= 1 { break }
         }
-        // Guessed full-size URLs are not a visible-card candidate. Only an
-        // already-admitted catalogue image (or a learned cache hit above) upgrades.
+        // Build 300: every list (not only Home) upgrades visible cards. Most list rows
+        // carry no catalogue images, so when none is admitted try exactly ONE rule
+        // candidate (DMM awsimgsrc ps portrait / MGS pf_e), never a fan-out. DMM
+        // NOW-PRINTING / 147x200 answers are rejected by ImageLoader and land in the
+        // short negative cache; the small JavDB image stays underneath.
+        if result.isEmpty, let guess = DetailPosterPolicy.candidates(number: movie.number).first {
+            append(guess)
+        }
         return Array(result.prefix(1))
     }
 
@@ -737,9 +743,17 @@ actor VisibleHQPosterScheduler {
         guard await acquire() else { return nil }
         defer { release() }
         guard !Task.isCancelled else { return nil }
-        let image = await ImageLoader.shared.load(url, maxPixelSize: maxPixelSize, timeout: VisibleHQPosterPolicy.requestTimeout)
+        let loaded = await ImageLoader.shared.load(url, maxPixelSize: maxPixelSize, timeout: VisibleHQPosterPolicy.requestTimeout)
         if Task.isCancelled { return nil }
-        if let image {
+        if let loaded {
+            // Build 300: a learned DMM pl / store jacket is a landscape envelope; show its
+            // front (Plan A crop) off the main thread. Portrait sources pass through.
+            let image = await Task.detached(priority: .utility) { () -> UIImage in
+                guard let cg = loaded.cgImage,
+                      let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: url),
+                      let front = cg.cropping(to: rect) else { return loaded }
+                return UIImage(cgImage: front)
+            }.value
             ListHQCoverCache.store(number: movie.number, source: url)
             return image
         }
@@ -1076,8 +1090,8 @@ public enum ListCoverPolicy {
 public struct MoviePosterImage: View {
     let movie: Movie
     var maxPixelSize: Int = 1200
-    /// Home / grid cards upgrade after they appear. Detail and one-off callers stay off.
-    var upgradesVisibleHQ = false
+    /// Build 300: every poster cell upgrades to HD once visible (opt out for blurred backdrops).
+    var upgradesVisibleHQ = true
 
     public var body: some View {
         let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
@@ -1123,6 +1137,7 @@ struct VisibleHQPosterUpgrade: View {
                 .allowsHitTesting(false)
                 .task(id: requestIdentity(pixels)) {
                     let current = requestIdentity(pixels)
+                    // Policy lookup runs in the task, not in every body/layout pass.
                     guard let url = VisibleHQPosterPolicy.upgradeURL(movie: movie) else { return }
                     let image = await VisibleHQPosterScheduler.shared.upgrade(movie: movie, url: url, maxPixelSize: pixels)
                     guard !Task.isCancelled, let image else { return }
@@ -1138,7 +1153,7 @@ struct VisibleHQPosterUpgrade: View {
     }
 
     private func requestIdentity(_ pixels: Int) -> String {
-        (movie.number ?? movie.id) + "#" + (VisibleHQPosterPolicy.upgradeURL(movie: movie) ?? "") + "#\(pixels)"
+        movie.id + "#" + (movie.number ?? "") + "#\(pixels)"
     }
 }
 /// 封面卡片（带番号 + 评分角标）

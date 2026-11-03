@@ -6,8 +6,8 @@ search = (r / 'AVDB/Views/Search/SearchView.swift').read_text()
 home = (r / 'AVDB/Views/Home/HomeView.swift').read_text()
 plist = (r / 'AVDB/Resources/Info.plist').read_text()
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert 'CFBundleVersion' in plist and '>299<' in plist
-assert pbx.count('CURRENT_PROJECT_VERSION = 299;') == 2
+assert 'CFBundleVersion' in plist and ('>299<' in plist or '>300<' in plist)
+assert pbx.count('CURRENT_PROJECT_VERSION = 299;') == 2 or pbx.count('CURRENT_PROJECT_VERSION = 300;') == 2
 # Defer idle tag cloud + keyboard until after push
 assert '@State private var openSettled = false' in search
 assert '340_000_000' in search

@@ -201,7 +201,7 @@ struct RecHero: View {
             ZStack(alignment: .bottomLeading) {
                 // Blurred cover backdrop (rendered once, no animation).
                 Color.clear
-                    .overlay { MoviePosterImage(movie: result.item.movie, maxPixelSize: 400).scaleEffect(1.4).blur(radius: 28) }
+                    .overlay { MoviePosterImage(movie: result.item.movie, maxPixelSize: 400, upgradesVisibleHQ: false).scaleEffect(1.4).blur(radius: 28) }
                     .overlay(LinearGradient(colors: [.black.opacity(0.10), .black.opacity(0.62)], startPoint: .top, endPoint: .bottom))
                     .clipped()
                 layout {

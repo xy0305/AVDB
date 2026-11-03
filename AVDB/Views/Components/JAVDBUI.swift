@@ -394,8 +394,8 @@ struct ClippedAspectFill<Content: View>: View {
 struct MoviePosterCard: View {
     let movie: Movie
     var rank: Int? = nil
-    /// Home grids opt in. Other lists keep the existing thumb until a later build.
-    var upgradesVisibleHQ = false
+    /// Build 300: all grids upgrade visible cards to HD.
+    var upgradesVisibleHQ = true
     // Optional JavVerse presentation only; all existing callers retain their original layout.
     var artwork: AnyView? = nil
     var expandsTitle = false
@@ -521,8 +521,8 @@ struct MoviePosterCard: View {
 
 /// 自适应列数海报网格（iPhone 3 列，iPad 4–6 列）
 struct MoviePosterGrid: View {
-    /// Only HomeView passes true. Default false preserves every other list.
-    var upgradesVisibleHQ = false
+    /// Build 300: default on for every list (search, rankings, categories, actors, lists…).
+    var upgradesVisibleHQ = true
     let movies: [Movie]
     var showRank: Bool = false
     var scrollTargets: Bool = false
