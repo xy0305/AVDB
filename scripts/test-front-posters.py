@@ -77,7 +77,8 @@ else:
 assert 'kCGImageSourceCreateThumbnailWithTransform: true' in source
 assert 'posterCache.totalCostLimit = 48 * 1024 * 1024' in source
 assert 'posterInFlight[key]' in source
-assert 'contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original' in source
+assert 'contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original || wrapLead' in source
+assert 'let wrapLead = sources.first.map(FrontPosterPolicy.isKnownWrap) == true' in source
 assert 'ListCoverPolicy.sources(movie: movie)' in source
 assert 'secondFallbackURL: sources.dropFirst(2).first' in source
 assert 'ListHQCoverCache.store(number: movie.number, source: winner.source)' in (root/'AVDB/Services/DetailPosterResolver.swift').read_text()

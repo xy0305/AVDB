@@ -11,6 +11,7 @@ assert "ListCoverPolicy.sources(movie: movie)" in loader
 assert "secondFallbackURL: sources.dropFirst(2).first" in loader
 assert "DetailPosterPolicy.candidates(number: movie.number).prefix(2)" not in loader, "guessed full-size URLs stay out of the synchronous list"
 assert "for source in javdb { append(source) }" in loader, "list falls back to JavDB thumb/cover"
+assert "javdb.remove(at: index)" in loader, "list leads with a recognized jacket for original types too"
 assert "ListHQCoverCache.url(for: movie.number)" in loader
 assert "AmazonPoster.allowedImage(url)" in loader
 assert "AvbaseMetadata.allowedDiscoveredImage(url)" in loader

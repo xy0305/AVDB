@@ -1041,7 +1041,19 @@ enum HomeHQPosterPrefetch {
 public enum ListCoverPolicy {
     public static func sources(movie: Movie) -> [String] {
         let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
-        let javdb = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
+        var javdb = FrontPosterPolicy.sources(thumb: movie.thumbURL, cover: movie.coverURL, original: original)
+        // List thumbnails only: FrontPosterPolicy keeps original-artwork types
+        // thumb-first for detail display, but in grids the 147x200 small_cover
+        // upscales badly. When JavDB pairs it with a recognized 800x538 jacket,
+        // lead with the jacket — MoviePosterImage crops its front (about
+        // 376x538) and the thumb stays as fallback. Non-jacket covers and
+        // detail-page ordering are untouched.
+        if original, let cover = movie.coverURL,
+           FrontPosterPolicy.isKnownWrap(cover),
+           let index = javdb.firstIndex(of: cover), index > 0 {
+            javdb.remove(at: index)
+            javdb.insert(cover, at: 0)
+        }
         var result: [String] = []
         func append(_ value: String?) {
             guard let value else { return }
@@ -1070,10 +1082,14 @@ public struct MoviePosterImage: View {
     public var body: some View {
         let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
         let sources = ListCoverPolicy.sources(movie: movie)
+        // Poster loading also when an original-artwork card leads with a
+        // recognized jacket (the ListCoverPolicy reorder above): loadPoster
+        // only crops known wraps / DMM jackets and passes other sources through.
+        let wrapLead = sources.first.map(FrontPosterPolicy.isKnownWrap) == true
         JavDBImage(url: sources.first,
                    fallbackURL: sources.dropFirst().first,
                    secondFallbackURL: sources.dropFirst(2).first,
-                   contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original)
+                   contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original || wrapLead)
             .overlay {
                 if upgradesVisibleHQ, !original {
                     VisibleHQPosterUpgrade(movie: movie)
