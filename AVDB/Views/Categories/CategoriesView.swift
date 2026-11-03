@@ -11,8 +11,8 @@ struct CategoriesView: View {
     @State private var catalog: MovieCatalogType = .censored
     @StateObject private var vm = CategoriesViewModel()
     @State private var showSearch = false
-    /// Build 301: inline bottom 篩選 panel (JavDB-style) instead of a hidden sheet.
-    @AppStorage("categories.filterPanel.expanded") private var filterExpanded = true
+    /// Build 302: stowable bottom 篩選 bar (default collapsed) instead of a hidden sheet.
+    @AppStorage("categories.filterPanel.expanded.v2") private var filterExpanded = false
     @Environment(\.availableLayoutSize) private var layoutSize
 
     var body: some View {
@@ -585,11 +585,12 @@ struct CatalogListView: View {
 }
 
 
-// MARK: - Build 301 inline filter panel
+// MARK: - Build 302 stowable filter panel
 
-/// Bottom panel matching the JavDB 類別 screen: drag handle, 「篩選」 + sort on one row,
-/// then every official tag group (基本 / 年份 / 月份 / …) as chips. A tap applies at once;
-/// the grid above reloads. Collapsed it is one row with the active selections summarized.
+/// Stowable bottom bar matching the JavDB 類別 screen. Default collapsed: one thin bar with
+/// 「篩選」 + current sort + optional active-filter summary + chevron/handle, sitting above the
+/// floating tab bar. Drag up / tap expands the chip panel (基本 / 年份 / 月份 / …); drag down /
+/// tap stows it. A chip tap applies at once; the grid above reloads. Expand state is remembered.
 struct CategoryInlineFilterPanel: View {
     @ObservedObject var vm: CategoriesViewModel
     @Binding var expanded: Bool
@@ -630,7 +631,6 @@ struct CategoryInlineFilterPanel: View {
             UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18, style: .continuous)
                 .fill(.regularMaterial)
                 .shadow(color: .black.opacity(0.12), radius: 10, y: -2)
-                .ignoresSafeArea(edges: .bottom)
         }
         .offset(y: max(0, dragOffset))
         .gesture(
@@ -681,7 +681,7 @@ struct CategoryInlineFilterPanel: View {
             .accessibilityIdentifier("category-filter-sort")
         }
         .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-        .padding(.bottom, 10)
+        .padding(.bottom, expanded ? 10 : 8)
     }
 
     /// Active non-default picks, e.g. 「可下載 · 2025 · 3月」.
