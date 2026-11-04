@@ -28,6 +28,7 @@ struct PlaybackHistoryItem: Codable, Identifiable, Hashable {
     var id: String { movieID }
     var movie: Movie { Movie(id: movieID, type: type, number: number, title: title, coverURL: coverURL) }
     var isTangxin: Bool { movieID.hasPrefix(PlaybackHistoryList.tangxinPrefix) }
+    var isOne: Bool { movieID.hasPrefix(PlaybackHistoryList.onePrefix) }
     /// 0…1 when both values are meaningful; nil hides the bar.
     var fraction: Double? {
         guard let position, let length, length > 1, position.isFinite, length.isFinite, position > 0 else { return nil }
@@ -39,6 +40,7 @@ struct PlaybackHistoryItem: Codable, Identifiable, Hashable {
 struct PlaybackHistoryList: Equatable {
     static let capacity = 500
     static let tangxinPrefix = "tangxin:"
+    static let onePrefix = "one:"
     private(set) var items: [PlaybackHistoryItem] = []
 
     init(items: [PlaybackHistoryItem] = []) {

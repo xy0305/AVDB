@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Six peer native buttons, never UIKit's five-item More overflow. Visited roots
+// Seven peer native buttons, never UIKit's five-item More overflow. Visited roots
 // remain mounted so navigation paths and scroll positions survive tab changes.
 struct AVDBNativeTabBar: View {
     @Binding var selection: AppTab

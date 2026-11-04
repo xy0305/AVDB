@@ -86,7 +86,9 @@ struct PlaybackHistoryCover: View {
     }
 
     @ViewBuilder private var artwork: some View {
-        if item.isTangxin {
+        if item.isOne {
+            OneImage(url: item.posterURL.flatMap { URL(string: $0) })
+        } else if item.isTangxin {
             TangxinImage(url: item.posterURL.flatMap { URL(string: $0) },
                          client: TangxinClient().withDNSMode(tangxinCompatibility ? .systemProxy : .strict))
         } else if let image = store.artwork(for: item.movieID) {
@@ -119,11 +121,15 @@ struct PlaybackHistoryDestination: View {
     var launch: PlaybackHistoryLaunch = .resume
     @AppStorage("tangxin.systemProxyCompatibility") private var tangxinCompatibility = false
     private var autoLaunch: PlaybackAutoLaunch {
-        PlaybackAutoLaunch(route: PlaybackHistoryRoute.route(source: item.source, isTangxin: item.isTangxin),
+        PlaybackAutoLaunch(route: PlaybackHistoryRoute.route(source: item.source, isTangxin: item.isTangxin, isOne: item.isOne),
                            fromBeginning: launch == .fromStart, position: item.position, length: item.length)
     }
     var body: some View {
-        if item.isTangxin, let page = item.pageURL.flatMap { URL(string: $0) } {
+        if item.isOne {
+            OneDetailView(seed: OneArticle.stub(id: Int(item.movieID.dropFirst(PlaybackHistoryList.onePrefix.count)) ?? 0,
+                                                title: item.title,
+                                                cover: item.posterURL.flatMap { URL(string: $0) }))
+        } else if item.isTangxin, let page = item.pageURL.flatMap { URL(string: $0) } {
             TangxinDetailView(video: TangxinVideo(url: page, title: item.title,
                                                   poster: item.posterURL.flatMap { URL(string: $0) }, author: nil),
                               client: TangxinClient().withDNSMode(tangxinCompatibility ? .systemProxy : .strict))
@@ -179,7 +185,7 @@ struct PlaybackHistoryMenuDestinations: ViewModifier {
 enum PlaybackHistoryActions {
     static func delete(_ item: PlaybackHistoryItem) {
         let store = PlaybackHistoryStore.shared
-        if !item.isTangxin { PlaybackResumeStore.shared.clear(number: item.number, scope: store.scope) }
+        if !item.isTangxin && !item.isOne { PlaybackResumeStore.shared.clear(number: item.number, scope: store.scope) }
         store.remove(item.id)
     }
 }
@@ -196,6 +202,19 @@ struct TangxinHistoryDestinations: ViewModifier {
             }
             .navigationDestination(for: TangxinTag.self) { tag in
                 TangxinListView(root: tag.url, title: tag.name, client: client)
+            }
+    }
+}
+
+/// Build 308: ONE detail pushes episode / keyword values; the 我的 stack must resolve them too.
+struct OneHistoryDestinations: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .navigationDestination(for: OneArticle.self) { OneDetailView(seed: $0) }
+            .navigationDestination(for: OneKeyword.self) { keyword in
+                OneListView(source: .keyword(keyword.keyword))
+                    .navigationTitle(keyword.keyword)
+                    .navigationBarTitleDisplayMode(.inline)
             }
     }
 }

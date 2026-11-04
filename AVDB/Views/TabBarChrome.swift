@@ -1,12 +1,12 @@
 import SwiftUI
 import UIKit
 
-/// Build 283: visibility of the custom floating tab bar (首頁/排行/類別/演員/糖心/我的).
+/// Build 283: visibility of the custom floating tab bar (首頁/排行/類別/演員/糖心/ONE/我的).
 /// The bar lives in a bottom `safeAreaInset`, which follows the keyboard safe area, so it
 /// used to float above the keyboard and cover search chips. It is now hidden while a
 /// search screen is active in the selected tab, or whenever the software keyboard is up.
 enum AppTab: Int, CaseIterable, Identifiable, Hashable {
-    case home, rankings, categories, actors, tangxin, me
+    case home, rankings, categories, actors, tangxin, one, me
     var id: Int { rawValue }
 
     var title: String {
@@ -16,6 +16,7 @@ enum AppTab: Int, CaseIterable, Identifiable, Hashable {
         case .categories: return "類別"
         case .actors: return "演員"
         case .tangxin: return "糖心"
+        case .one: return "ONE"
         case .me: return "我的"
         }
     }
@@ -27,6 +28,7 @@ enum AppTab: Int, CaseIterable, Identifiable, Hashable {
         case .categories: return "square.grid.2x2"
         case .actors: return "person.2"
         case .tangxin: return "play.rectangle"
+        case .one: return "play.circle"
         case .me: return "person.crop.circle"
         }
     }
@@ -99,7 +101,7 @@ struct KeyboardVisibilityReader: ViewModifier {
     }
 }
 
-/// Production container for the six root tabs: content + floating bar in a bottom inset.
+/// Production container for the seven root tabs: content + floating bar in a bottom inset.
 struct FloatingTabContainer<Content: View>: View {
     @Binding var selection: AppTab
     @StateObject private var chrome = TabBarChrome()

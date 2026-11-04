@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  AVDB
 //
-//  原生六栏容器：iOS 26 Liquid Glass、iOS 17 material 回退。
+//  原生七栏容器：iOS 26 Liquid Glass、iOS 17 material 回退。
 //  不使用系统五项溢出 More，避免新增栏目产生双重导航。
 //
 
@@ -79,6 +79,7 @@ struct ContentView: View {
         case .categories: CategoriesView()
         case .actors: ActorsView()
         case .tangxin: TangxinRootView(client: tangxinClient)
+        case .one: OneRootView()
         case .me: UserView()
         }
     }

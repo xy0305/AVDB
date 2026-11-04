@@ -121,9 +121,10 @@ enum PlaybackHistoryLaunch: String, Equatable {
 
 /// Which player a history entry reopens (from its display source label).
 enum PlaybackHistoryRoute: Equatable {
-    case pan115, online(String), javdb, tangxin, detailsOnly
+    case pan115, online(String), javdb, tangxin, one, detailsOnly
     static let onlineLabels = ["Jable", "MissAV", "123AV", "MemoJav", "JavDay"]
-    static func route(source: String?, isTangxin: Bool) -> PlaybackHistoryRoute {
+    static func route(source: String?, isTangxin: Bool, isOne: Bool = false) -> PlaybackHistoryRoute {
+        if isOne { return .one }
         if isTangxin { return .tangxin }
         guard let source else { return .detailsOnly }
         if source == "115" { return .pan115 }

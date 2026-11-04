@@ -544,7 +544,7 @@ struct MovieDetailView: View {
         case .online(let label):
             guard let source = OnlineSource.allCases.first(where: { $0.label == label }) else { showOnlinePlayback = true; return }
             onlineResume.start(source, number: movie.displayNumber, fromBeginning: launch.fromBeginning)
-        case .javdb, .tangxin, .detailsOnly:
+        case .javdb, .tangxin, .one, .detailsOnly:
             break // stay on the detail page
         }
     }

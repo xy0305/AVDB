@@ -38,6 +38,8 @@
 		B26100000000000000000003 /* AVDBNativeTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000003 /* AVDBNativeTabBar.swift */; };
 		B26100000000000000000002 /* TangxinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000002 /* TangxinView.swift */; };
 		B26100000000000000000001 /* TangxinCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26100000000000000000001 /* TangxinCore.swift */; };
+		E30800000000000000000001 /* OneCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30800000000000000000001 /* OneCore.swift */; };
+		E30800000000000000000002 /* OneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30800000000000000000002 /* OneView.swift */; };
 		B25700000000000000000001 /* PlaybackDiagnostic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25700000000000000000001 /* PlaybackDiagnostic.swift */; };
 		B25400000000000000000004 /* OnlinePlaybackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000004 /* OnlinePlaybackPanel.swift */; };
 		B25400000000000000000003 /* DetailOnlineAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25400000000000000000003 /* DetailOnlineAdapters.swift */; };
@@ -164,6 +166,8 @@
 		C26100000000000000000003 /* AVDBNativeTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVDBNativeTabBar.swift; sourceTree = "<group>"; };
 		C26100000000000000000002 /* TangxinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TangxinView.swift; sourceTree = "<group>"; };
 		C26100000000000000000001 /* TangxinCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TangxinCore.swift; sourceTree = "<group>"; };
+		D30800000000000000000001 /* OneCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneCore.swift; sourceTree = "<group>"; };
+		D30800000000000000000002 /* OneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneView.swift; sourceTree = "<group>"; };
 		C25700000000000000000001 /* PlaybackDiagnostic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackDiagnostic.swift; sourceTree = "<group>"; };
 		C25400000000000000000004 /* OnlinePlaybackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnlinePlaybackPanel.swift; sourceTree = "<group>"; };
 		C25400000000000000000003 /* DetailOnlineAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailOnlineAdapters.swift; sourceTree = "<group>"; };
@@ -409,6 +413,7 @@
 				C25700000000000000000001 /* PlaybackDiagnostic.swift */,
 				C25400000000000000000001 /* OnlinePlaybackCore.swift */,
 				C26100000000000000000001 /* TangxinCore.swift */,
+				D30800000000000000000001 /* OneCore.swift */,
 				A16700000000000000000004 /* JavRankingSource.swift */,
 				B17400000000000000000001 /* MissAVSource.swift */,
 				B17600000000000000000001 /* MissAVMetadata.swift */,
@@ -545,6 +550,7 @@
 				TABCHROME28300000000001F /* TabBarChrome.swift */,
 				C26100000000000000000003 /* AVDBNativeTabBar.swift */,
 				C26100000000000000000002 /* TangxinView.swift */,
+				D30800000000000000000002 /* OneView.swift */,
 				90AF03F73ECC44EEA75E592E /* ListsView.swift */,
 				BE1B261A3D98E18F55F9BF42 /* Home */,
 				A115C11E7A7B115C11E7A201 /* Rankings */,
@@ -656,6 +662,8 @@
 				B26100000000000000000003 /* AVDBNativeTabBar.swift in Sources */,
 				B26100000000000000000002 /* TangxinView.swift in Sources */,
 				B26100000000000000000001 /* TangxinCore.swift in Sources */,
+				E30800000000000000000001 /* OneCore.swift in Sources */,
+				E30800000000000000000002 /* OneView.swift in Sources */,
 				A16700000000000000000001 /* JavRankingCore.swift in Sources */,
 				A17400000000000000000000 /* MissAVCore.swift in Sources */,
 				B25400000000000000000004 /* OnlinePlaybackPanel.swift in Sources */,
@@ -771,7 +779,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 307;
+				CURRENT_PROJECT_VERSION = 308;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -794,7 +802,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 307;
+				CURRENT_PROJECT_VERSION = 308;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

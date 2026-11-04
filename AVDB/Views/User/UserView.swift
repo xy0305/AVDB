@@ -270,6 +270,7 @@ struct UserView: View {
             .navigationTitle("我的")
             .liquidGlassList()
             .modifier(TangxinHistoryDestinations())
+            .modifier(OneHistoryDestinations())
             .modifier(PlaybackHistoryMenuDestinations())
             .sheet(isPresented: $showLogin) {
                 LoginView()
