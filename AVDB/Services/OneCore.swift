@@ -128,6 +128,7 @@ enum OneCrypto {
         let iv = [UInt8](Data(appIV.utf8))
         let input = [UInt8](data)
         var output = [UInt8](repeating: 0, count: input.count + kCCBlockSizeAES128)
+        let outputCapacity = output.count
         var outLength = 0
         let status: CCCryptorStatus = input.withUnsafeBytes { inRaw in
             key.withUnsafeBytes { keyRaw in
@@ -135,7 +136,7 @@ enum OneCrypto {
                     output.withUnsafeMutableBytes { outRaw in
                         CCCrypt(operation, CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionPKCS7Padding),
                                 keyRaw.baseAddress, key.count, ivRaw.baseAddress,
-                                inRaw.baseAddress, input.count, outRaw.baseAddress, output.count, &outLength)
+                                inRaw.baseAddress, input.count, outRaw.baseAddress, outputCapacity, &outLength)
                     }
                 }
             }
