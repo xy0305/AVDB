@@ -11,7 +11,8 @@ struct CategoriesView: View {
     @State private var catalog: MovieCatalogType = .censored
     @StateObject private var vm = CategoriesViewModel()
     @State private var showSearch = false
-    /// Build 304: stowable 篩選 bar via safeAreaInset (above floating tab), default collapsed.
+    /// Build 307: 篩選 entry is the top-left toolbar button; the panel drops from
+    /// the top under the category tabs. Default stowed (panel hidden).
     @AppStorage("categories.filterPanel.expanded.v2") private var filterExpanded = false
     @Environment(\.availableLayoutSize) private var layoutSize
 
@@ -30,6 +31,19 @@ struct CategoriesView: View {
                 )
                 .padding(.top, 4)
 
+                // Build 307: the filter panel hangs from the top, directly under
+                // the category tabs, in normal layout flow — the floating tab bar
+                // at the bottom can never cover it (the 302–306 bottom placements
+                // kept losing that fight). Entry point: top-left toolbar button.
+                if filterExpanded {
+                    CategoryInlineFilterPanel(
+                        vm: vm,
+                        expanded: $filterExpanded,
+                        maxHeight: max(260, min(480, layoutSize.height * 0.52))
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 ScrollView {
                     if vm.isLoading && vm.movies.isEmpty {
                         EmptyStateView(text: "載入類別…")
@@ -41,14 +55,6 @@ struct CategoriesView: View {
                         if vm.isLoading { ProgressView().padding() }
                     }
                 }
-                // Build 304: nest above FloatingTabContainer's tab inset (same as ActorsView).
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    CategoryInlineFilterPanel(
-                        vm: vm,
-                        expanded: $filterExpanded,
-                        maxHeight: max(260, min(480, layoutSize.height * 0.52))
-                    )
-                }
             }
             .background {
                 LiquidGlassBackground()
@@ -58,6 +64,22 @@ struct CategoriesView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Build 307: filter entry lives in the top-left corner, always
+                // visible; the dot marks active (non-default) filter picks.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { toggleFilter() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                            Text("篩選")
+                            if !vm.activeFilterSummary.isEmpty {
+                                Circle().fill(Color.accentColor).frame(width: 7, height: 7)
+                            }
+                            Image(systemName: filterExpanded ? "chevron.up" : "chevron.down")
+                                .font(.caption2.weight(.semibold))
+                        }
+                    }
+                    .accessibilityIdentifier("category-filter-toolbar-toggle")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSearch = true } label: {
                         Image(systemName: "magnifyingglass")
@@ -71,6 +93,11 @@ struct CategoriesView: View {
             }
             .refreshable { await vm.load(type: catalog, force: true) }
         }
+    }
+
+    private func toggleFilter() {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { filterExpanded.toggle() }
+        if filterExpanded, vm.groups.isEmpty, !vm.isLoading { Task { await vm.reloadGroups() } }
     }
 }
 
@@ -128,6 +155,15 @@ final class CategoriesViewModel: ObservableObject {
     @Published var catalog: MovieCatalogType = .censored
 
     var sortLabel: String { sort.title }
+
+    /// Active non-default picks, e.g. 「可下載 · 2025 · 3月」.
+    var activeFilterSummary: String {
+        groups.compactMap { group -> String? in
+            let current = selectedID(in: group)
+            guard !current.isEmpty, current != "all", !(group.categoryID == "main" && current == "m") else { return nil }
+            return group.tags?.first { $0.id == current }?.name
+        }.joined(separator: " · ")
+    }
 
     private var page = 1
     private var hasMore = true
@@ -593,11 +629,15 @@ struct CatalogListView: View {
 }
 
 
-// MARK: - Build 304 stowable filter panel (safeAreaInset)
+// MARK: - Build 307 top filter panel
 
-/// Stowable bottom bar. Hosted via `.safeAreaInset(edge: .bottom)` so it stacks above
-/// FloatingTabContainer's tab bar. Default collapsed but always visible: 「篩選」 + sort +
-/// chevron on regularMaterial (~52pt). Drag/tap expands chips (基本/年份/月份…).
+/// Filter panel hanging from the top of the categories page, directly under the
+/// category tabs. Builds 302–306 hosted the filter at the bottom — first as a
+/// VStack sibling, then via `.safeAreaInset(edge: .bottom)` — and the floating
+/// tab bar kept covering it, so Build 307 moves the entry point to the top-left
+/// toolbar button and drops the panel from the top in normal layout flow, where
+/// nothing can cover it. Chips apply immediately (250ms coalesced); the sort
+/// menu lives in the panel header; drag the bottom handle up to stow.
 struct CategoryInlineFilterPanel: View {
     @ObservedObject var vm: CategoriesViewModel
     @Binding var expanded: Bool
@@ -607,49 +647,44 @@ struct CategoryInlineFilterPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            header
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if vm.groups.isEmpty {
+                        Text(vm.isLoading ? "載入篩選…" : "暫無可用篩選")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity).padding(.vertical, 20)
+                    }
+                    ForEach(vm.groups) { group in row(group) }
+                }
+                .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                .padding(.bottom, 10)
+            }
+            .frame(maxHeight: maxHeight)
+            // Grab handle on the panel's bottom edge: tap or drag up to stow.
             Capsule(style: .continuous)
                 .fill(Color.secondary.opacity(0.35))
                 .frame(width: 38, height: 5)
-                .padding(.top, 7).padding(.bottom, 6)
+                .padding(.top, 2).padding(.bottom, 7)
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture { toggle() }
                 .accessibilityIdentifier("category-filter-handle")
-            header
-            if expanded {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if vm.groups.isEmpty {
-                            Text(vm.isLoading ? "載入篩選…" : "暫無可用篩選")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity).padding(.vertical, 20)
-                        }
-                        ForEach(vm.groups) { group in row(group) }
-                    }
-                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                    .padding(.bottom, 14)
-                }
-                .frame(maxHeight: maxHeight)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
         }
-        // Collapsed strip stays unmistakable above the floating tab (~52pt chrome).
-        .frame(minHeight: expanded ? nil : 52)
         .frame(maxWidth: .infinity)
         .background {
-            UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 18, style: .continuous)
+            UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 0, style: .continuous)
                 .fill(.regularMaterial)
-                .shadow(color: .black.opacity(0.18), radius: 12, y: -3)
+                .shadow(color: .black.opacity(0.18), radius: 12, y: 3)
         }
-        .offset(y: max(0, dragOffset))
+        .offset(y: min(0, dragOffset))
         .gesture(
             DragGesture(minimumDistance: 12)
-                .onChanged { value in dragOffset = expanded ? value.translation.height : min(0, value.translation.height) / 3 }
+                .onChanged { value in dragOffset = min(0, value.translation.height) }
                 .onEnded { value in
                     let dy = value.translation.height
                     dragOffset = 0
-                    if expanded, dy > 60 { setExpanded(false) }
-                    else if !expanded, dy < -30 { setExpanded(true) }
+                    if dy < -60 { setExpanded(false) }
                 }
         )
         .accessibilityIdentifier("category-filter-panel")
@@ -660,10 +695,10 @@ struct CategoryInlineFilterPanel: View {
             Button { toggle() } label: {
                 HStack(spacing: 6) {
                     Text("篩選").font(.headline).foregroundStyle(.primary)
-                    if !expanded, !summary.isEmpty {
+                    if !summary.isEmpty {
                         Text(summary).font(.caption).foregroundStyle(.tint).lineLimit(1)
                     }
-                    Image(systemName: expanded ? "chevron.down" : "chevron.up")
+                    Image(systemName: "chevron.up")
                         .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
                 .contentShape(Rectangle())
@@ -690,18 +725,12 @@ struct CategoryInlineFilterPanel: View {
             .accessibilityIdentifier("category-filter-sort")
         }
         .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-        .padding(.top, expanded ? 0 : 2)
-        .padding(.bottom, expanded ? 10 : 12)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
     }
 
     /// Active non-default picks, e.g. 「可下載 · 2025 · 3月」.
-    private var summary: String {
-        vm.groups.compactMap { group -> String? in
-            let current = vm.selectedID(in: group)
-            guard !current.isEmpty, current != "all", !(group.categoryID == "main" && current == "m") else { return nil }
-            return group.tags?.first { $0.id == current }?.name
-        }.joined(separator: " · ")
-    }
+    private var summary: String { vm.activeFilterSummary }
 
     private func row(_ group: TagGroup) -> some View {
         let cid = group.categoryID ?? group.id
