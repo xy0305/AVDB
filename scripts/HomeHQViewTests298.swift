@@ -12,6 +12,8 @@ final class HomeHQViewTests298: XCTestCase {
         await VisibleHQPosterScheduler.shared.resetForTests()
         ListHQCoverCache.resetForTests()
         ImageLoader.resetTestTransport()
+        await ImageLoader.shared.resetCachesForTests()
+        HQPosterDiskCache.removeAll()
         AICoverNetworkState.isExpensive = false
         let started = expectation(description: "visible upgrade started")
         ImageLoader.testTransport = { url, pixels in
@@ -25,7 +27,7 @@ final class HomeHQViewTests298: XCTestCase {
         // is an already-admitted catalogue image, not a guessed full-size URL.
         let movie = Movie(id: "view-1", type: "0", number: "ABP-1",
                           thumbURL: "fixture://thumb", coverURL: "fixture://cover",
-                          catalogueMetadata: .init(images: ["https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/fixture/fixtureps.jpg"]))
+                          catalogueMetadata: .init(images: ["https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/fixture/view-unique-ps.jpg"]))
         let host = UIHostingController(rootView: VisibleHQPosterUpgrade(movie: movie)
             .frame(width: 120, height: 172))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))

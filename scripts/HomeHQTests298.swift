@@ -9,6 +9,8 @@ final class HomeHQTests298: XCTestCase {
         await VisibleHQPosterScheduler.shared.resetForTests()
         ListHQCoverCache.resetForTests()
         ImageLoader.resetTestTransport()
+        await ImageLoader.shared.resetCachesForTests()
+        HQPosterDiskCache.removeAll()
         VisibleHQPosterScheduler.testPeakActive = 0
     }
 

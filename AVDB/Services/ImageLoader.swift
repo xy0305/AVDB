@@ -408,6 +408,13 @@ public actor ImageLoader {
     static func resetTestTransport() {
         testTransportLock.lock(); testTransport = nil; testTransportCalls = 0; testTransportLock.unlock()
     }
+    /// Drop memory caches so a later test's testTransport is not skipped on a warm hit.
+    func resetCachesForTests() {
+        cache.removeAllObjects()
+        posterCache.removeAllObjects()
+        inFlight.removeAll()
+        posterInFlight.removeAll()
+    }
     #endif
 
     private static func fetchImage(url: URL, urlString: String, userAgent: String, maxPixelSize: Int, timeout: TimeInterval = 20) async -> UIImage? {

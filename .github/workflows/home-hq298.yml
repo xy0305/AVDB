@@ -1,4 +1,4 @@
-name: Home HQ posters App 305
+name: Home HQ posters App 306
 on:
   push:
     branches: [feat/home-hq-posters-from297]
@@ -81,7 +81,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$app" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
-          python3 scripts/package-lut305.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
+          python3 scripts/package-lut306.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
           file "$app/AVDB" | tee evidence-release/macho.txt
           xcrun vtool -show-build "$app/AVDB" | tee -a evidence-release/macho.txt
           codesign -dv "$app" 2> evidence-release/codesign.txt || true
@@ -102,7 +102,7 @@ jobs:
           test "$bytes" -gt 500000000
       - uses: actions/upload-artifact@v4
         with:
-          name: AVDB-305-release
+          name: AVDB-306-release
           path: |
             AVDB-unsigned-*.ipa
             evidence-release/*
@@ -112,7 +112,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: AVDB-305-release-logs
+          name: AVDB-306-release-logs
           path: |
             evidence-release/*
             fetch-live289.log
@@ -133,7 +133,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-305-cloud-tests
+          name: AVDB-306-cloud-tests
           path: evidence-cloud290/*
           if-no-files-found: warn
   ai-cover-settings-screenshots:
@@ -149,7 +149,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-305-ai-cover-cloud-screenshots
+          name: AVDB-306-ai-cover-cloud-screenshots
           path: |
             evidence-ai290ui/shots/*
             evidence-ai290ui/status.json
@@ -168,7 +168,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-305-live-subtitle-screenshots
+          name: AVDB-306-live-subtitle-screenshots
           path: |
             evidence-live287/ui/shots/*
             evidence-live287/ui/status.json
@@ -189,7 +189,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-305-production-controller-HLS
+          name: AVDB-306-production-controller-HLS
           path: |
             evidence-hls-app/*.json
             evidence-hls-app/*.log
@@ -217,7 +217,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-305-strict-runtime
+          name: AVDB-306-strict-runtime
           path: |
             evidence-hls-runtime/*.json
             evidence-hls-runtime/*.log
@@ -234,6 +234,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-305-home-hq-simulator
+          name: AVDB-306-home-hq-simulator
           path: evidence-homehq298/*
           if-no-files-found: warn
