@@ -399,8 +399,12 @@ actor OneClient {
         }
     }
 
-    private func saveSession() {
-        sessionSavedAt = Date().timeIntervalSince1970
+    private func saveSession(updateTimestamp: Bool = true) {
+        // Only a successful bootstrap may stamp the clock: it marks the age of the
+        // CDN domain table. Routine API calls persist host/token changes with
+        // updateTimestamp: false, otherwise the freshness check in bootstrap()
+        // never fires and the table rots while lists keep loading fine.
+        if updateTimestamp { sessionSavedAt = Date().timeIntervalSince1970 }
         var dom: [String: Any] = [:]
         for (k, v) in domains { dom[k] = v }
         let dict: [String: Any] = ["uuid": uuid, "token": token, "host": host, "domain": dom, "ts": sessionSavedAt]
@@ -472,10 +476,11 @@ actor OneClient {
 
     private func bootstrap(force: Bool) async throws {
         loadSessionIfNeeded()
-        // CDN domain tables rotate and hosts die; a session older than 24h re-bootstraps
-        // so playback lines are built from freshly issued domains instead of stale ones.
+        // CDN domain tables rotate within hours and hosts die (dlmk0129 was issued,
+        // died, and every line built from the stale table failed); a domain table
+        // older than 1h re-bootstraps so playback lines use freshly issued domains.
         if !force, !token.isEmpty, !host.isEmpty,
-           Date().timeIntervalSince1970 - sessionSavedAt < 24 * 3600 { return }
+           Date().timeIntervalSince1970 - sessionSavedAt < 3600 { return }
         var lastError: Error = OneError.bootstrap
         for candidate in hostCandidates() {
             do {
@@ -516,7 +521,7 @@ actor OneClient {
                     let code = OneJSON.int(json, "code")
                     if code == 200 {
                         host = candidate
-                        saveSession()
+                        saveSession(updateTimestamp: false)
                         return json["data"] ?? NSNull()
                     }
                     if code == 401 { saw401 = true; lastError = OneError.api(401, OneJSON.string(json, "message")); break }
@@ -629,9 +634,13 @@ actor OneClient {
         if list.isEmpty { return ["https://46e9nz.mfpt8g.com", "https://f86xxm.upmf83.com"] }
         // Field note from the original script: vd.* hosts only complete the TLS
         // handshake under the official app's fingerprint; ffmpeg-based players fail
-        // on them. Keep the group order, but demote any vd.* host behind the stable
-        // hosts so the first lines never start on the fragile class.
-        func isFragile(_ raw: String) -> Bool { (URL(string: raw)?.host ?? raw).contains("vd.") }
+        // on them. Numbered dlmk* mirrors rotate and die just as fast. Keep the
+        // group order, but demote any vd.* / dlmk* host behind the stable hosts
+        // so the first lines never start on the fragile classes.
+        func isFragile(_ raw: String) -> Bool {
+            let h = URL(string: raw)?.host ?? raw
+            return h.contains("vd.") || h.contains("dlmk")
+        }
         return list.filter { !isFragile($0) } + list.filter { isFragile($0) }
     }
 
@@ -653,7 +662,7 @@ actor OneClient {
                 if let u = URL(string: p) { lines.append(OnePlayLine(name: label, note: note, url: u)) }
                 return
             }
-            for (i, h) in hosts.prefix(5).enumerated() {
+            for (i, h) in hosts.prefix(8).enumerated() {
                 if let u = URL(string: h + (p.hasPrefix("/") ? p : "/" + p)) {
                     lines.append(OnePlayLine(name: "\(label) · 线路 \(i + 1)" + (p.lowercased().contains("h265") ? "（H.265）" : ""), note: note, url: u))
                 }
@@ -685,6 +694,45 @@ actor OneClient {
         // Same URL can repeat when video_download == video_file on some hosts; keep first occurrence.
         var seen: Set<String> = []
         return lines.filter { seen.insert($0.url.absoluteString).inserted }
+    }
+
+    /// Issued hosts differ wildly for player-style access: some answer a curl
+    /// range probe in <1s yet take >25s to open in ffmpeg, and some are already
+    /// dead when issued. Before the detail page is shown, probe the MP4 lines
+    /// concurrently with a 1-byte range request (4s timeout each) and move the
+    /// lines that answer 200/206 to the front, keeping their relative order;
+    /// dead or slow lines stay reachable at the back for the player's fallback.
+    /// If every probe fails the original order is returned unchanged.
+    private func probeOrderedLines(_ lines: [OnePlayLine]) async -> [OnePlayLine] {
+        let probedCount = min(lines.count, 8)
+        guard probedCount > 1 else { return lines }
+        let targets = Array(lines.prefix(probedCount))
+        let probeSession = session
+        let verdicts: [Bool] = await withTaskGroup(of: (Int, Bool).self) { group in
+            for (index, line) in targets.enumerated() where line.url.pathExtension.lowercased() == "mp4" {
+                group.addTask {
+                    var request = URLRequest(url: line.url)
+                    request.timeoutInterval = 4
+                    request.setValue("bytes=0-0", forHTTPHeaderField: "Range")
+                    do {
+                        let (_, response) = try await probeSession.data(for: request)
+                        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                        return (index, code == 200 || code == 206)
+                    } catch {
+                        return (index, false)
+                    }
+                }
+            }
+            var results = [Bool](repeating: true, count: probedCount)
+            for await (index, ok) in group { results[index] = ok }
+            return results
+        }
+        var front: [OnePlayLine] = []
+        var back: [OnePlayLine] = []
+        for (index, line) in lines.enumerated() {
+            if index < probedCount, !verdicts[index] { back.append(line) } else { front.append(line) }
+        }
+        return front + back
     }
 
     // MARK: Conversion
@@ -889,7 +937,8 @@ actor OneClient {
             if !epDate.isEmpty { bits.append(String(epDate.prefix(10))) }
             episodes.append(OneEpisode(id: epID, title: epTitle.isEmpty ? bits[0] : epTitle, metaLine: bits.joined(separator: " · ")))
         }
-        return OneDetail(article: article, lines: videoLines(dict), tagNames: tagNames,
+        let orderedLines = await probeOrderedLines(videoLines(dict))
+        return OneDetail(article: article, lines: orderedLines, tagNames: tagNames,
                          episodes: episodes, bodyText: summary)
     }
 }
