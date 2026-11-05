@@ -282,8 +282,10 @@ struct OneImage: View {
 }
 
 private struct OnePlayback: Identifiable {
-    let line: OnePlayLine
-    var id: String { line.url.absoluteString }
+    let lines: [OnePlayLine]
+    var index: Int = 0
+    var line: OnePlayLine { lines[min(index, lines.count - 1)] }
+    var id: String { line.url.absoluteString + "#\(index)" }
 }
 
 struct OneDetailView: View {
@@ -338,6 +340,14 @@ struct OneDetailView: View {
                            title: display.title,
                            subtitle: "ONE · " + play.line.name,
                            progressID: "one:\(seed.id)",
+                           onPlaybackFailure: {
+                               // CDN hosts die individually (502 / TLS) while the same
+                               // file stays up on the other issued hosts: fall through
+                               // to the next line instead of dead-ending on the error.
+                               if play.index + 1 < play.lines.count {
+                                   playback = OnePlayback(lines: play.lines, index: play.index + 1)
+                               }
+                           },
                            historyMovie: Movie(id: "one:\(seed.id)", number: "ONE", title: display.title),
                            historySource: "ONE",
                            historyPage: URL(string: "one://a/\(seed.id)"),
@@ -363,7 +373,7 @@ struct OneDetailView: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture {
-            if let first = detail?.lines.first { playback = OnePlayback(line: first) }
+            if let lines = detail?.lines, !lines.isEmpty { playback = OnePlayback(lines: lines) }
         }
         .accessibilityLabel("播放")
         .accessibilityIdentifier("one.play.cover")
@@ -372,7 +382,7 @@ struct OneDetailView: View {
     private func playBar(_ detail: OneDetail) -> some View {
         Group {
             if let first = detail.lines.first {
-                Button { playback = OnePlayback(line: first) } label: {
+                Button { playback = OnePlayback(lines: detail.lines) } label: {
                     Label("播放 · \(first.name)", systemImage: "play.fill")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
@@ -390,12 +400,12 @@ struct OneDetailView: View {
         if detail.lines.count > 1 {
             VStack(alignment: .leading, spacing: 8) {
                 Text("播放线路").font(.headline)
-                ForEach(detail.lines) { line in
-                    Button { playback = OnePlayback(line: line) } label: {
+                ForEach(detail.lines.indices, id: \.self) { i in
+                    Button { playback = OnePlayback(lines: detail.lines, index: i) } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(line.name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
-                                Text(line.note).font(.caption).foregroundStyle(.secondary)
+                                Text(detail.lines[i].name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                                Text(detail.lines[i].note).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             Image(systemName: "play.circle").foregroundStyle(Color.accentColor)

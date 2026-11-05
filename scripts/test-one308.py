@@ -6,7 +6,7 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '308' and pbx.count('CURRENT_PROJECT_VERSION = 308;') == 2
+assert plist['CFBundleVersion'] == '309' and pbx.count('CURRENT_PROJECT_VERSION = 309;') == 2
 
 # Bottom tab wiring: .one sits between tangxin and me, titled ONE.
 chrome = (r / 'AVDB/Views/TabBarChrome.swift').read_text()
@@ -38,6 +38,11 @@ for token in ['struct OneRootView', 'struct OneSearchView', 'struct OneDetailVie
               'KSChromePlayer', 'progressID: "one:', 'historySource: "ONE"', 'HidesFloatingTabBar']:
     assert token in view, token
 
+# Build 309 playback resilience: a dead CDN host (502 / TLS) must not dead-end playback.
+assert 'onPlaybackFailure' in view and 'OnePlayback(lines:' in view and 'play.index + 1' in view
+for token in ['isFragile', '"vd."', 'sessionSavedAt', '24 * 3600', '"ts": sessionSavedAt']:
+    assert token in core, token
+
 # Playback history: ONE entries reopen the ONE detail, never a JavDB detail.
 stores = (r / 'AVDB/Services/FeatureStores.swift').read_text()
 assert 'onePrefix = "one:"' in stores and 'var isOne' in stores
@@ -48,11 +53,12 @@ assert 'OneHistoryDestinations' in library and 'OneDetailView(seed: OneArticle.s
 
 # Release wiring.
 workflow = (r / '.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 308' in workflow
+assert 'Home HQ posters App 309' in workflow
 assert 'python3 scripts/test-one308.py;' in workflow
-assert 'scripts/package-lut308.py' in workflow and 'AVDB-308-release' in workflow
-package = (r / 'scripts/package-lut308.py').read_text()
-assert "=='308'" in package and 'AVDB-unsigned-1.0.2-308-one-tab.ipa' in package
+assert 'scripts/package-lut309.py' in workflow and 'AVDB-309-release' in workflow
+package = (r / 'scripts/package-lut309.py').read_text()
+assert "=='309'" in package and 'AVDB-unsigned-1.0.2-309-one-playback-fix.ipa' in package
 
 print('PASS one308: ONE is the 7th bottom tab; native protocol port (bootstrap/discovery/search/detail, '
-      'AES+MD5, month-scan partitions, full-MP4 lines), history route, build 308')
+      'AES+MD5, month-scan partitions, full-MP4 lines), history route, build 309 playback resilience '
+      '(auto line fallback, vd.* demotion, 24h domain refresh)')

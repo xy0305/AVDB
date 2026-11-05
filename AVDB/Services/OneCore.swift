@@ -350,6 +350,7 @@ actor OneClient {
     private var token = ""
     private var host = ""
     private var domains: [String: [String]] = [:]
+    private var sessionSavedAt: TimeInterval = 0
     private var sessionLoaded = false
 
     private struct MonthEntry { let ts: Date; let rows: [[String: Any]] }
@@ -390,6 +391,7 @@ actor OneClient {
                     else if let s = v as? String { domains[k] = [s] }
                 }
             }
+            if let ts = dict["ts"] as? NSNumber { sessionSavedAt = ts.doubleValue }
         }
         if uuid.isEmpty {
             uuid = UUID().uuidString.lowercased()
@@ -398,9 +400,10 @@ actor OneClient {
     }
 
     private func saveSession() {
+        sessionSavedAt = Date().timeIntervalSince1970
         var dom: [String: Any] = [:]
         for (k, v) in domains { dom[k] = v }
-        let dict: [String: Any] = ["uuid": uuid, "token": token, "host": host, "domain": dom]
+        let dict: [String: Any] = ["uuid": uuid, "token": token, "host": host, "domain": dom, "ts": sessionSavedAt]
         if let data = try? JSONSerialization.data(withJSONObject: dict) {
             UserDefaults.standard.set(data, forKey: Self.sessionKey)
         }
@@ -469,7 +472,10 @@ actor OneClient {
 
     private func bootstrap(force: Bool) async throws {
         loadSessionIfNeeded()
-        if !force, !token.isEmpty, !host.isEmpty { return }
+        // CDN domain tables rotate and hosts die; a session older than 24h re-bootstraps
+        // so playback lines are built from freshly issued domains instead of stale ones.
+        if !force, !token.isEmpty, !host.isEmpty,
+           Date().timeIntervalSince1970 - sessionSavedAt < 24 * 3600 { return }
         var lastError: Error = OneError.bootstrap
         for candidate in hostCandidates() {
             do {
@@ -620,7 +626,13 @@ actor OneClient {
 
     private func videoHosts() -> [String] {
         let list = mediaHosts(from: ["video", "flutter_video_download", "flutter_video_play", "audio_download", "audio"])
-        return list.isEmpty ? ["https://46e9nz.mfpt8g.com", "https://f86xxm.upmf83.com"] : list
+        if list.isEmpty { return ["https://46e9nz.mfpt8g.com", "https://f86xxm.upmf83.com"] }
+        // Field note from the original script: vd.* hosts only complete the TLS
+        // handshake under the official app's fingerprint; ffmpeg-based players fail
+        // on them. Keep the group order, but demote any vd.* host behind the stable
+        // hosts so the first lines never start on the fragile class.
+        func isFragile(_ raw: String) -> Bool { (URL(string: raw)?.host ?? raw).contains("vd.") }
+        return list.filter { !isFragile($0) } + list.filter { isFragile($0) }
     }
 
     private func absMedia(_ raw: String, hosts: [String]) -> URL? {
