@@ -72,12 +72,29 @@ import UIKit
 struct TangxinRootView: View {
     @AppStorage("tangxin.systemProxyCompatibility") private var compatibility = false
     @State private var networkSettings = false
+    @State private var partition = 0
     let client: TangxinClient
     init(client: TangxinClient = TangxinClient()) { self.client = client }
     var body: some View {
         let selected = client.withDNSMode(compatibility ? .systemProxy : .strict)
         NavigationStack {
-            TangxinListView(root:TangxinPolicy.featured,title:"糖心",client:selected)
+            VStack(spacing:0) {
+                // Build 311: partitions — 精选 (featured stream), 作者 and 标签
+                // indexes parsed live from the site's own sitemap.
+                Picker("糖心分区",selection:$partition) {
+                    Text("精选").tag(0)
+                    Text("作者").tag(1)
+                    Text("标签").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal).padding(.vertical,8)
+                .accessibilityIdentifier("tangxin.partition")
+                switch partition {
+                case 1: TangxinIndexView(kind:.authors,client:selected)
+                case 2: TangxinIndexView(kind:.tags,client:selected)
+                default: TangxinListView(root:TangxinPolicy.featured,title:"糖心",client:selected)
+                }
+            }
                 .toolbar {
                     ToolbarItem(placement:.topBarTrailing) {
                         Button { networkSettings = true } label: { Label("网络设置/诊断",systemImage:"network") }
@@ -93,6 +110,65 @@ struct TangxinRootView: View {
                 }
         }.id(compatibility)
         .sheet(isPresented:$networkSettings) { TangxinNetworkSettings(client:client,compatibility:$compatibility) }
+    }
+}
+
+@MainActor final class TangxinIndexModel: ObservableObject {
+    @Published private(set) var index: TangxinIndex?
+    @Published private(set) var loading = false
+    @Published private(set) var error: String?
+    private var loaded = false
+    let client: TangxinClient
+    init(client: TangxinClient) { self.client = client }
+    func start() async {
+        guard !loaded, !loading else { return }
+        loading = true; error = nil
+        do { index = try await client.index(); loaded = true }
+        catch { self.error = error.localizedDescription }
+        loading = false
+    }
+    func retry() async { loaded = false; await start() }
+}
+
+/// Build 311: searchable author/tag index from the site sitemap.
+struct TangxinIndexView: View {
+    enum Kind { case authors, tags }
+    let kind: Kind
+    @StateObject private var model: TangxinIndexModel
+    @State private var query = ""
+    init(kind: Kind, client: TangxinClient) {
+        self.kind = kind
+        _model = StateObject(wrappedValue:TangxinIndexModel(client:client))
+    }
+    private func matches(_ name: String) -> Bool { query.isEmpty || name.localizedCaseInsensitiveContains(query) }
+    var body: some View {
+        Group {
+            if let index = model.index {
+                switch kind {
+                case .authors:
+                    List(index.authors.filter { matches($0.name) }) { author in
+                        NavigationLink(value:author) { Label(author.name,systemImage:"person.crop.circle") }
+                    }.accessibilityIdentifier("tangxin.index.authors")
+                case .tags:
+                    List(index.tags.filter { matches($0.name) }) { tag in
+                        NavigationLink(value:tag) { Label(tag.name,systemImage:"tag") }
+                    }.accessibilityIdentifier("tangxin.index.tags")
+                }
+            } else if model.loading {
+                ProgressView("正在加载来源").frame(maxWidth:.infinity,maxHeight:.infinity)
+            } else if let error = model.error {
+                VStack(spacing:8) {
+                    Text(error).font(.footnote)
+                    Button("重试") { Task { await model.retry() } }.frame(minWidth:44,minHeight:44)
+                }.frame(maxWidth:.infinity,maxHeight:.infinity).padding()
+                    .accessibilityIdentifier("tangxin.index.retry")
+            } else {
+                Text("尚未加载完成，请重试。").frame(maxWidth:.infinity,maxHeight:.infinity)
+            }
+        }
+        .navigationTitle(kind == .authors ? "作者" : "标签").navigationBarTitleDisplayMode(.inline)
+        .searchable(text:$query,prompt:kind == .authors ? "搜索作者" : "搜索标签")
+        .task { await model.start() }
     }
 }
 
@@ -161,7 +237,7 @@ struct TangxinListView: View {
                     Label(model.heading ?? title,systemImage:"person.crop.circle")
                         .font(.title2.bold()).padding(.horizontal)
                         .accessibilityIdentifier("tangxin.author.heading")
-                    Text("作者作品 · 仅显示当前已加载且通过内容筛查的视频")
+                    Text("作者作品 · 按来源原样显示")
                         .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
                 }
                 Link("在 Safari 核对来源",destination:model.root)
@@ -200,7 +276,7 @@ struct TangxinListView: View {
                             Text("来源返回空列表，未发生内容筛除。")
                         case .filtered:
                             Label("当前页无可显示内容",systemImage:"hand.raised")
-                            Text("当前页可解析的视频均未通过年龄或同意风险筛查。")
+                            Text("来源当前页没有可显示的视频。")
                         case .structureChanged:
                             Label("来源结构变化",systemImage:"exclamationmark.triangle")
                             Text("未能完整识别视频卡片，不能将其判定为筛查空页。")

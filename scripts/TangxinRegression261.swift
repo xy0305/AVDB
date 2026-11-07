@@ -15,7 +15,7 @@ import Foundation
         precondition(detail.tagLinks.first?.url.lastPathComponent == "original")
         let encodedTag = "/tag/%E5%8E%9F%E5%88%9B/"
         let parsedTags = TangxinParser.detailTags("<a href='\(encodedTag)'>原创</a><a href='\(encodedTag)'>原创</a><a href='https://evil.org/tag/x/'>外部</a><a class='tag'>只有文字</a><a href='/tag/hidden-camera/'>偷拍</a><a href='/tag/%E6%9C%AA%E6%88%90%E5%B9%B4/'>测试</a><a href='/tag/black/'>黑料</a>",at:first.videos[0].url)
-        precondition(parsedTags.links.count == 2 && parsedTags.links[0].name == "原创")
+        precondition(parsedTags.links.count == 4 && parsedTags.links[0].name == "原创")
         precondition(parsedTags.links[0].url.absoluteString.contains("%E5%8E%9F"))
         precondition(parsedTags.names.contains("只有文字") && !parsedTags.links.contains { $0.name == "只有文字" })
         let tagRoot = parsedTags.links[0].url
@@ -25,11 +25,20 @@ import Foundation
         precondition(detail.stream.host == TangxinPolicy.cdn)
         let author = try TangxinParser.list(TangxinFixtures261.authorPage,at:first.videos[0].author!.url)
         precondition(author.videos.count == 1 && author.next == nil)
+        // Build 311: creator-chosen titles are shown as published; no keyword gate.
         for word in ["未成年","偷拍","私密流出","迷奸","泄露","17岁","高中生","未满18"] {
             let page = try TangxinParser.list("<div class=\"grid\">"+TangxinFixtures261.card("bad",title:word)+"</div>",at:root)
-            precondition(page.videos.isEmpty)
-            reject { _ = try TangxinParser.detail(TangxinFixtures261.detail.replacingOccurrences(of:"成人自愿演示作品",with:word),at:first.videos[0].url) }
+            precondition(page.videos.count == 1 && page.report.blocked == 0)
+            _ = try TangxinParser.detail(TangxinFixtures261.detail.replacingOccurrences(of:"成人自愿演示作品",with:word),at:first.videos[0].url)
         }
+        // Build 311: sitemap-driven author/tag index parsing.
+        let indexXML = "<urlset><url><loc>https://tangxinvlog.app/a/%E9%BB%91%E6%96%99%E6%98%B5%E7%A7%B0/</loc></url><url><loc>https://tangxinvlog.app/tag/cospaly/</loc></url><url><loc>https://tangxinvlog.app/v/abc/</loc></url><url><loc>https://evil.org/a/x/</loc></url></urlset>"
+        let entries = TangxinParser.sitemapEntries(indexXML)
+        precondition(entries.authors.count == 1 && entries.authors[0].name == "黑料昵称")
+        precondition(entries.tags.count == 1 && entries.tags[0].name == "cospaly")
+        let children = TangxinParser.sitemapChildren("<sitemapindex><sitemap><loc>https://tangxinvlog.app/sitemap-0.xml</loc></sitemap><sitemap><loc>https://evil.org/sitemap-1.xml</loc></sitemap></sitemapindex>")
+        precondition(children.count == 1 && children[0].lastPathComponent == "sitemap-0.xml")
+        precondition(TangxinPolicy.sitemap(TangxinPolicy.sitemapIndex) && !TangxinPolicy.sitemap(root))
         precondition(TangxinPolicy.permitted("普通黑料昵称 成人自愿原创"))
         for raw in ["http://tangxinvlog.app/featured/","https://127.0.0.1/featured/","https://tangxinvlog.app.evil.org/featured/","https://user:pass@tangxinvlog.app/featured/","https://tangxinvlog.app:8443/featured/","https://tangxinvlog.app/featured/?url=foo"] { precondition(!TangxinPolicy.page(URL(string:raw)!)) }
         for raw in ["https://t.5gcdn.xyz.evil.org/videos/n/index.m3u8","https://10.0.0.1/videos/n/index.m3u8","http://t.5gcdn.xyz/videos/n/index.m3u8"] { precondition(!TangxinPolicy.stream(URL(string:raw)!)) }
@@ -48,19 +57,19 @@ import Foundation
         let unsafe = TangxinFixtures261.card("blocked",title:"未成年")
         let nextLink = "<a rel='next' href='/featured/2'>Next</a>"
         let allBlocked = try TangxinParser.list("<div class='grid'>" + unsafe + "</div>" + nextLink,at:root)
-        precondition(allBlocked.state == .filtered && allBlocked.next != nil && allBlocked.report.blocked == 1)
+        precondition(allBlocked.state == .content && allBlocked.videos.count == 1 && allBlocked.report.blocked == 0 && allBlocked.next != nil)
         let empty = try TangxinParser.list("<div class='grid additional'></div>" + nextLink,at:root)
         precondition(empty.state == .sourceEmpty && empty.report.blocked == 0 && empty.next != nil)
         let malformed = try TangxinParser.list("<div class='grid'><article class='card'><a class='cover-link' href='/v/missing/'></a></article></div>" + nextLink,at:root)
         precondition(malformed.state == .structureChanged && malformed.report.malformed == 1 && malformed.next != nil)
         let mixed = try TangxinParser.list("<nav><a href='/tag/risk/'>偷拍</a></nav><div class='grid'>" + safe + unsafe + "</div>" + nextLink,at:root)
-        precondition(mixed.videos.count == 1 && mixed.report.blocked == 1 && mixed.state == .content && mixed.next != nil)
+        precondition(mixed.videos.count == 2 && mixed.report.blocked == 0 && mixed.state == .content && mixed.next != nil)
         let headingCard = "<article class='card'><a class='cover-link' href='/v/heading/'><img alt=''></a><h3 class='title'><a href='/v/heading/'>成人自愿合成标题</a></h3><a class='nickname' href='/a/test/'>黑料昵称</a></article>"
         let headingPage = try TangxinParser.list(headingCard,at:root)
         precondition(headingPage.videos.count == 1)
         let conflicting = headingCard.replacingOccurrences(of:"alt=''",with:"alt='成人自愿合成标题'").replacingOccurrences(of:">成人自愿合成标题<",with:">偷拍<")
         let conflictingPage = try TangxinParser.list(conflicting,at:root)
-        precondition(conflictingPage.state == .filtered)
+        precondition(conflictingPage.state == .content && conflictingPage.videos.count == 1)
         // Optional live HTML captured with a read-only production-header request. Counts only.
         if let path = ProcessInfo.processInfo.environment["TANGXIN_LIVE_HTML"] {
             let live = try TangxinParser.list(String(contentsOfFile:path,encoding:.utf8),at:root)

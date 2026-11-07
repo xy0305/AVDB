@@ -64,15 +64,16 @@ actor TangxinModelFixture261 {
         }))
         let pages = TangxinListModel(root:TangxinPolicy.featured,client:sequence)
         await pages.start()
-        precondition(pages.videos.isEmpty && pages.pageState == .filtered && pages.next?.path == "/featured/2")
+        // Build 311: the first page's card is shown as published (no keyword gate).
+        precondition(pages.videos.count == 1 && pages.pageState == .content && pages.next?.path == "/featured/2")
         for _ in 0..<20 { await pages.nearBottom(tail:TangxinPolicy.featured) }
-        precondition(pages.pageState == .filtered && pages.next?.path == "/featured/2")
+        precondition(pages.pageState == .content && pages.next?.path == "/featured/2")
         await pages.more()
-        precondition(pages.videos.isEmpty && pages.pageState == .sourceEmpty && pages.next?.path == "/featured/3")
+        precondition(pages.videos.count == 1 && pages.pageState == .sourceEmpty && pages.next?.path == "/featured/3")
         await pages.more()
-        precondition(pages.videos.isEmpty && pages.pageState == .structureChanged && pages.next?.path == "/featured/4")
+        precondition(pages.videos.count == 1 && pages.pageState == .structureChanged && pages.next?.path == "/featured/4")
         await pages.more()
-        precondition(pages.videos.count == 1 && pages.pageState == .content && pages.next == nil)
+        precondition(pages.videos.count == 2 && pages.pageState == .content && pages.next == nil)
         let duplicates = TangxinClient(transport:OnlineTransport(loader:{ request in
             let next = request.url!.path.hasSuffix("2") ? "/featured/3" : "/featured/2"
             return Data(("<div class='grid'>" + TangxinFixtures261.card("same") + "</div><a rel='next' href='\(next)'>Next</a>").utf8)

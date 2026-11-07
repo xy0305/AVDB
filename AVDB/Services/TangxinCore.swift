@@ -48,6 +48,11 @@ struct TangxinPlayback: Identifiable, Sendable {
     let headers: [String:String]
     var id: URL { url }
 }
+/// Build 311: author/tag index parsed from the site's sitemap.
+struct TangxinIndex: Sendable {
+    let authors: [TangxinAuthor]
+    let tags: [TangxinTag]
+}
 enum TangxinError: LocalizedError {
     case structure, blocked, unsafe
     var errorDescription: String? {
@@ -62,8 +67,18 @@ enum TangxinPolicy {
     static let origin = URL(string: "https://tangxinvlog.app/")!
     // Directory form: site 307s `/featured` → `/featured/` (and same for /featured/N, /a/…, /v/…).
     static let featured = URL(string: "https://tangxinvlog.app/featured/")!
+    // Build 311: the site's own sitemap is the live author/tag enumeration source.
+    static let sitemapIndex = URL(string: "https://tangxinvlog.app/sitemap-index.xml")!
+    static func sitemap(_ url: URL) -> Bool {
+        guard OnlinePolicy.secure(url), url.host == origin.host, url.query == nil, url.fragment == nil else { return false }
+        let p = url.path.lowercased()
+        return p == "/sitemap-index.xml" || p.range(of: #"^/sitemap-\d+\.xml$"#, options: .regularExpression) != nil
+    }
     static let cdn = "t.5gcdn.xyz"
     static let headers = ["User-Agent": OnlinePolicy.ua, "Referer": origin.absoluteString]
+    // Build 311: the app owner directed that Tangxin show the source as published
+    // (creator-chosen titles on a creator platform), so Tangxin no longer gates
+    // lists, details, tags or playback on this screen. It is retained for OneCore.
     // Nicknames are deliberately NOT inspected. Generic 黑料 alone is not a verdict.
     static func permitted(_ metadata: String) -> Bool {
         let s = metadata.folding(options: [.widthInsensitive], locale: nil).lowercased().replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
@@ -76,7 +91,7 @@ enum TangxinPolicy {
         guard !encoded.contains("%2f"), !encoded.contains("%5c"), !encoded.contains("%25") else { return false }
         let p = url.path.split(separator: "/").map(String.init)
         if p.first == "featured" { return p.count == 1 || (p.count == 2 && Int(p[1]).map { $0 > 1 } == true) }
-        return ["a", "tag"].contains(p.first ?? "") && (p.count == 2 || (p.count == 3 && Int(p[2]).map { $0 > 1 } == true)) && slug(p[1]) && (p.first != "tag" || permitted(p[1]))
+        return ["a", "tag"].contains(p.first ?? "") && (p.count == 2 || (p.count == 3 && Int(p[2]).map { $0 > 1 } == true)) && slug(p[1])
     }
     static func slug(_ s: String) -> Bool {
         !s.isEmpty && s.count <= 150 && s != "." && s != ".." && !s.contains(where: { $0 == "/" || $0 == "\\" || $0.isNewline || $0.asciiValue.map { $0 < 32 } == true })
@@ -159,7 +174,7 @@ enum TangxinParser {
             guard !name.isEmpty else { continue }
             if seenNames.insert(name).inserted { names.append(name) }
             guard !raw.isEmpty, let url, url.path.hasPrefix("/tag/"),
-                  TangxinPolicy.page(url), TangxinPolicy.permitted(name),
+                  TangxinPolicy.page(url),
                   seenURLs.insert(url).inserted else { continue }
             result.append(TangxinTag(url:url,name:name))
         }
@@ -176,7 +191,8 @@ enum TangxinParser {
     static func list(_ html: String, at page: URL) throws -> TangxinPage {
         guard TangxinPolicy.page(page) else { throw TangxinError.unsafe }
         var videos: [TangxinVideo] = []; var seen = Set<URL>()
-        var extracted = 0, blocked = 0, malformed = 0, duplicates = 0
+        var extracted = 0, malformed = 0, duplicates = 0
+        let blocked = 0 // Build 311: the keyword gate is gone; the field stays for report shape.
         let cards = matches("<article\\b([^>]*)>(.*?)</article\\s*>",html).filter { (attrs($0[1])["class"] ?? "").split(separator:" ").contains("card") }
         for card in cards {
             // Scope title/tags to this card; never inspect global tag navigation or nicknames.
@@ -192,9 +208,7 @@ enum TangxinParser {
             }.map { clean($0.1) }.filter { !$0.isEmpty }
             guard let title = (candidates + titles).first else { malformed += 1; continue }
             extracted += 1
-            let tags = links(card[2]).filter { ($0.0["href"] ?? "").hasPrefix("/tag/") }.map { clean($0.1) }
-            // Check every available video title; a benign alt cannot mask a risky heading.
-            guard TangxinPolicy.permitted((candidates + titles + tags).joined(separator:" ")) else { blocked += 1; continue }
+            // Build 311: no title/tag keyword gate; the source is shown as published.
             guard seen.insert(u).inserted else { duplicates += 1; continue }
             let poster = imageTag["src"].flatMap { TangxinPolicy.resolve($0,at:page) }.flatMap { TangxinPolicy.image($0) ? $0 : nil }
             videos.append(TangxinVideo(url:u,title:title,poster:poster,author:author(card[2],at:page)))
@@ -223,12 +237,38 @@ enum TangxinParser {
         let tags = parsedTags.names
         // Do not scan unrelated recommendations or the author's nickname as video metadata.
         let summary = matches("<p\\b([^>]*)>(.*?)</p>",primary).filter { (attrs($0[1])["class"] ?? "").contains("desc") }.map { clean($0[2]) }.joined(separator:"\n")
-        guard TangxinPolicy.permitted(([title,summary]+tags).joined(separator:" ")) else { throw TangxinError.blocked }
         // Only an actually issued player source is accepted. Never guess CDN /<id>/index.m3u8.
         let candidates = matches("https://[^\\s\"'<>]+\\.m3u8[^\\s\"'<>]*",html).compactMap { TangxinPolicy.resolve(clean($0[0]),at:page) }.filter(TangxinPolicy.stream)
         guard let stream = candidates.first, Set(candidates).count == 1 else { throw TangxinError.structure }
         let poster = matches("<video\\b([^>]*)>",html).first.flatMap { attrs($0[1])["poster"] }.flatMap { TangxinPolicy.resolve($0,at:page) }.flatMap { TangxinPolicy.image($0) ? $0 : nil }
         return TangxinDetail(video:TangxinVideo(url:page,title:title,poster:poster,author:author(primary,at:page)),summary:summary,tags:tags,tagLinks:parsedTags.links,stream:stream)
+    }
+    /// Build 311: child sitemaps listed by sitemap-index.xml (validated, same-origin only).
+    static func sitemapChildren(_ xml: String) -> [URL] {
+        var result: [URL] = []; var seen = Set<URL>()
+        for m in matches("<loc>\\s*([^<]+?)\\s*</loc>", xml) {
+            guard let u = TangxinPolicy.resolve(clean(m[1]),at:TangxinPolicy.origin), TangxinPolicy.sitemap(u), u != TangxinPolicy.sitemapIndex, seen.insert(u).inserted else { continue }
+            result.append(u)
+        }
+        return result
+    }
+    /// Build 311: author/tag entries from one sitemap file. Only single-segment
+    /// /a/ and /tag/ paths pass; display names are the decoded slugs.
+    static func sitemapEntries(_ xml: String) -> (authors:[TangxinAuthor], tags:[TangxinTag]) {
+        var authors: [TangxinAuthor] = [], tags: [TangxinTag] = []
+        var seenA = Set<URL>(), seenT = Set<URL>()
+        for m in matches("<loc>\\s*([^<]+?)\\s*</loc>", xml) {
+            guard let u = TangxinPolicy.resolve(clean(m[1]),at:TangxinPolicy.origin), TangxinPolicy.page(u) else { continue }
+            let p = u.path.split(separator:"/").map(String.init)
+            guard p.count == 2 else { continue }
+            let name = clean(p[1])
+            guard !name.isEmpty else { continue }
+            if p[0] == "a", seenA.insert(u).inserted { authors.append(TangxinAuthor(url:u,name:name)) }
+            if p[0] == "tag", seenT.insert(u).inserted { tags.append(TangxinTag(url:u,name:name)) }
+        }
+        authors.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        tags.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return (authors,tags)
     }
 }
 
@@ -246,12 +286,32 @@ struct TangxinClient: Sendable {
     }
     func list(_ url: URL) async throws -> TangxinPage { try TangxinParser.list(await document(url),at:url) }
     func detail(_ url: URL) async throws -> TangxinDetail { try TangxinParser.detail(await document(url),at:url) }
+    func xml(_ url: URL) async throws -> String {
+        guard TangxinPolicy.sitemap(url) else { throw TangxinError.unsafe }
+        let bytes = try await transport.fetch(url,cap:8*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:TangxinPolicy.origin),context:.discovery)
+        guard let text = String(data:bytes,encoding:.utf8) else { throw TangxinError.structure }
+        return text
+    }
+    /// Build 311: live author/tag index built from the site's own sitemap.
+    func index() async throws -> TangxinIndex {
+        let children = TangxinParser.sitemapChildren(try await xml(TangxinPolicy.sitemapIndex)).prefix(4)
+        guard !children.isEmpty else { throw TangxinError.structure }
+        var authors: [TangxinAuthor] = [], tags: [TangxinTag] = []
+        var seenA = Set<URL>(), seenT = Set<URL>()
+        for child in children {
+            let entries = TangxinParser.sitemapEntries(try await xml(child))
+            for a in entries.authors where seenA.insert(a.url).inserted { authors.append(a) }
+            for t in entries.tags where seenT.insert(t.url).inserted { tags.append(t) }
+        }
+        guard !authors.isEmpty || !tags.isEmpty else { throw TangxinError.structure }
+        return TangxinIndex(authors:authors,tags:tags)
+    }
     func image(_ url: URL) async throws -> Data {
         guard TangxinPolicy.image(url) else { throw TangxinError.unsafe }
         return try await transport.fetch(url,cap:8*1024*1024,headers:TangxinPolicy.headers,scope:OnlineMediaScope(root:url),context:.image)
     }
     func playback(_ detail: TangxinDetail) async throws -> TangxinPlayback {
-        guard TangxinPolicy.stream(detail.stream), TangxinPolicy.permitted(([detail.video.title,detail.summary]+detail.tags).joined(separator:" ")) else { throw TangxinError.unsafe }
+        guard TangxinPolicy.stream(detail.stream) else { throw TangxinError.unsafe }
         let scope = OnlineMediaScope(root:detail.stream)
         var pending: [(URL,Int)] = [(detail.stream,0)]; var seen = Set<URL>(); var keys = Set<URL>(); var leaf = false
         while !pending.isEmpty {

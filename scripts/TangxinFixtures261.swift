@@ -27,12 +27,11 @@ enum TangxinFixtures261 {
                 let next: (Int) -> String = { "<a rel='next' href='/featured/\($0)'>Next</a>" }
                 let html: String
                 if path == "/featured" || path == "/featured/" {
-                    html = "<div class='grid'>" + card("blocked",title:"未成年") + "</div>" + next(2)
+                    html = "<div class='grid'></div>" + next(2)
                 } else if path == "/featured/2" || path == "/featured/2/" {
-                    html = "<div class='grid'></div>" + next(3)
-                } else if path == "/featured/3" || path == "/featured/3/" {
-                    html = "<article class='card'></article>" + next(4)
+                    html = "<article class='card'></article>" + next(3)
                 } else {
+                    // Build 311: previously keyword-blocked cards now display too.
                     html = "<div class='grid'>" + card("neutral1") + card("blocked",title:"偷拍") + "</div>"
                 }
                 return Data(html.utf8)
