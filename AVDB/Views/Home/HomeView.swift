@@ -246,12 +246,12 @@ struct HomeView: View {
             .padding(.horizontal, AdaptiveLayout.horizontalPadding)
             .staggerAppear(index: 1)
 
-            if vm.recommended.isEmpty {
-                EmptyStateView(text: "載入推薦…")
-                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-            } else {
+            if !vm.recommended.isEmpty {
                 RecommendCarousel(movies: vm.recommended)
                     .staggerAppear(index: 2)
+            }
+            homeListStatus(vm.recommendedState, hasItems: !vm.recommended.isEmpty) {
+                Task { await vm.retry(.recommended) }
             }
         }
     }
@@ -261,13 +261,49 @@ struct HomeView: View {
             SectionHeaderBar(title: "最新上架", trailing: "全部") { goLatest = true }
                 .accessibilityIdentifier("home-latest-header")
                 .staggerAppear(index: 3)
-            if vm.latest.isEmpty {
-                EmptyStateView(text: "載入最新…")
-            } else {
+            if !vm.latest.isEmpty {
                 MoviePosterGrid(upgradesVisibleHQ: true, movies: Array(vm.latest.prefix(9)))
+            }
+            homeListStatus(vm.latestState, hasItems: !vm.latest.isEmpty) {
+                Task { await vm.retry(.latest) }
             }
             shufflePill { Task { await vm.shuffleLatest() } }
                 .staggerAppear(index: 4)
+        }
+    }
+
+    @ViewBuilder
+    private func homeListStatus(_ state: HomeListState, hasItems: Bool,
+                                retry: @escaping () -> Void) -> some View {
+        switch state {
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text(hasItems ? "更新中…" : "載入中…")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        case .failed:
+            HStack {
+                Text(hasItems ? "更新失敗，顯示上次內容" : "載入失敗，請稍後重試")
+                    .foregroundStyle(.secondary)
+                Button("重試", action: retry)
+            }
+            .font(.caption)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        case .empty:
+            if !hasItems {
+                Text("暫無內容")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+        case .loaded:
+            EmptyView()
         }
     }
 
@@ -350,10 +386,11 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeaderBar(title: "近期磁鏈更新", trailing: "全部") { goMagnets = true }
                 .staggerAppear(index: 6)
-            if vm.magnets.isEmpty {
-                EmptyStateView(text: "載入磁鏈…")
-            } else {
+            if !vm.magnets.isEmpty {
                 MoviePosterGrid(upgradesVisibleHQ: true, movies: Array(vm.magnets.prefix(9)))
+            }
+            homeListStatus(vm.magnetsState, hasItems: !vm.magnets.isEmpty) {
+                Task { await vm.retry(.magnets) }
             }
             shufflePill { Task { await vm.shuffleMagnets() } }
                 .staggerAppear(index: 7)
@@ -482,11 +519,76 @@ struct HomeView: View {
     }
 }
 
+// Small list-only snapshot. Original image URLs and all card badges are retained.
+// Uses the API wire names so restoring follows Movie's existing tolerant decoder.
+private struct HomeMovieSnapshot: Codable {
+    let id: String
+    let type: String?
+    let number: String?
+    let title: String?
+    let thumb_url: String?
+    let cover_url: String?
+    let duration: Int?
+    let score: Double?
+    let rating: Double?
+    let release_date: String?
+    let magnets_count: Int?
+    let can_play: Bool?
+    let play_subtitle: String?
+    let has_cnsub: Bool?
+    let has_preview_video: Bool?
+    let has_preview_images: Bool?
+    let new_magnets: Bool
+    let actor_names: [String]?
+    let maker_id: String?
+    let maker_name: String?
+    let series_id: String?
+    let series_name: String?
+    init(_ movie: Movie) {
+        id = movie.id
+        type = movie.type
+        number = movie.number
+        title = movie.title
+        thumb_url = movie.thumbURL
+        cover_url = movie.coverURL
+        duration = movie.duration
+        score = movie.score
+        rating = movie.rating
+        release_date = movie.releaseDate
+        magnets_count = movie.magnetsCount
+        can_play = movie.canPlay
+        play_subtitle = movie.playSubtitle
+        has_cnsub = movie.hasCnsub
+        has_preview_video = movie.hasPreviewVideo
+        has_preview_images = movie.hasPreviewImages
+        new_magnets = movie.hasNewMagnets
+        actor_names = movie.actorNames
+        maker_id = movie.makerID
+        maker_name = movie.makerName
+        series_id = movie.seriesID
+        series_name = movie.seriesName
+    }
+    var movie: Movie? {
+        guard let data = try? JSONEncoder().encode(self) else { return nil }
+        return try? JSONDecoder().decode(Movie.self, from: data)
+    }
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var recommended: [Movie] = []
     @Published var latest: [Movie] = []
     @Published var magnets: [Movie] = []
+    @Published private(set) var recommendedState: HomeListState = .loading
+    @Published private(set) var latestState: HomeListState = .loading
+    @Published private(set) var magnetsState: HomeListState = .loading
+    enum Section: CaseIterable { case recommended, latest, magnets }
+    private let recommendedLoader = HomeListLoader<HomeMovieSnapshot>()
+    private let latestLoader = HomeListLoader<HomeMovieSnapshot>()
+    private let magnetsLoader = HomeListLoader<HomeMovieSnapshot>()
+    private var loadGeneration = UUID()
+    private var context: String?
+    private let unresolvedAccountID = UUID().uuidString
     @Published var following: [Movie] = []
     @Published var followTags: [FollowingTag] = []
     @Published var selectedFollowTag: FollowingTag?
@@ -500,31 +602,112 @@ final class HomeViewModel: ObservableObject {
     /// Plan C: bumped once when a home HQ prefetch learns new covers, so the
     /// poster grids re-read ListCoverPolicy sources and swap in the HQ URLs.
     @Published private(set) var hqRevision = 0
-    private var hqPrefetchTask: Task<Void, Never>?
+    private var hqPrefetchTasks: [String: Task<Void, Never>] = [:]
 
     func initialLoad() async {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
             latest = (1...9).map { Movie(id: "fixture-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)") }
             magnets = (1...9).map { Movie(id: "magnet-\($0)", number: "TEST-M\($0)", title: "Neutral magnet \($0)", coverURL: "fixture://poster/\($0)") }
+            latestState = .loaded; magnetsState = .loaded; recommendedState = .empty
             return
         }
         #endif
-        async let rec = try? sdk.recommendMovies(page: 1)
-        async let latestTask = try? sdk.latestMovies(page: 1, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
-        async let magTask = try? sdk.latestMovies(page: 2, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
-        async let periodsTask = try? sdk.recommendPeriods()
+        let generation = UUID()
+        loadGeneration = generation
+        let scope = cacheContext
+        let changedContext = context != scope
+        context = scope
+        recommendedLoader.cancel(clear: changedContext)
+        latestLoader.cancel(clear: changedContext)
+        magnetsLoader.cancel(clear: changedContext)
+        if changedContext {
+            for task in hqPrefetchTasks.values { task.cancel() }
+            hqPrefetchTasks = [:]
+            recommended = []; latest = []; magnets = []
+        }
+        latestPage = 1
+        magnetPage = 2
+        // Children publish inside their own load, never in sequential await order.
+        await withTaskGroup(of: Void.self) { group in
+            for section in Section.allCases {
+                group.addTask { [weak self] in
+                    guard let self else { return }
+                    await self.load(section, page: section == .magnets ? 2 : 1,
+                                    generation: generation, scope: scope)
+                }
+            }
+            group.addTask { [weak self] in
+                guard let self else { return }
+                await self.loadPeriods(generation: generation, scope: scope)
+            }
+        }
+        guard loadGeneration == generation, !Task.isCancelled, cacheContext == scope else { return }
+        await loadFollowTags()
+    }
 
-        recommended = await rec ?? []
-        latest = await latestTask ?? []
-        magnets = (await magTask ?? []).filter { ($0.magnetsCount ?? 0) > 0 }
-        if magnets.isEmpty { magnets = latest }
-        periods = await periodsTask ?? []
+    private var cacheAccountID: String {
+        if let user = APIClient.shared.currentUser { return String(user.id) }
+        // Never share an anonymous disk snapshot with an authenticated but unresolved user.
+        return APIClient.shared.token == nil ? "anonymous" : "session-" + unresolvedAccountID
+    }
+
+    private var cacheContext: String {
+        // Token only lives in memory for change detection, never in the disk key/payload.
+        JavDBConstants.baseURL + "|" + cacheAccountID + "|" + (APIClient.shared.token ?? "")
+    }
+
+    private func loadPeriods(generation: UUID, scope: String) async {
+        guard let result = try? await sdk.recommendPeriods(),
+              loadGeneration == generation, !Task.isCancelled, cacheContext == scope else { return }
+        periods = result
         if let created = periods.first?.createdAt, created.count >= 10 {
             periodLabel = String(created.prefix(10))
         }
-        await loadFollowTags()
-        startHQPrefetch()
+    }
+
+    func retry(_ section: Section) async {
+        await load(section, page: section == .latest ? latestPage : section == .magnets ? magnetPage : 1,
+                   generation: loadGeneration, scope: cacheContext)
+    }
+
+    private func load(_ section: Section, page: Int, generation: UUID, scope: String,
+                      restore: Bool = true) async {
+        guard loadGeneration == generation, cacheContext == scope, !Task.isCancelled else { return }
+        let loader: HomeListLoader<HomeMovieSnapshot>
+        switch section {
+        case .recommended: loader = recommendedLoader
+        case .latest: loader = latestLoader
+        case .magnets: loader = magnetsLoader
+        }
+        let query = section == .recommended ? "/movies/recommend?page=1" :
+            "/movies?page=\(page)&limit=9&type=all&filter_by=can_play&sort_by=update&home=\(section == .magnets ? "magnets" : "latest")"
+        let key = HomeListKey(base: JavDBConstants.baseURL,
+                              accountID: cacheAccountID, query: query)
+        await loader.load(key: key, restore: restore, isCurrent: { [weak self] in
+            guard let self else { return false }
+            return self.loadGeneration == generation && self.cacheContext == scope
+        }, fetch: { [sdk] in
+            let result: [Movie]
+            switch section {
+            case .recommended: result = try await sdk.recommendMovies(page: 1)
+            case .latest, .magnets:
+                result = try await sdk.latestMovies(page: page, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
+            }
+            let items = section == .magnets ? result.filter { ($0.magnetsCount ?? 0) > 0 } : result
+            // A genuinely empty magnet response is empty, not a copy of another section.
+            return items.map(HomeMovieSnapshot.init)
+        }, changed: { [weak self] items, state in
+            guard let self else { return }
+            let movies = items.compactMap { $0.movie }
+            let previous: [Movie]
+            switch section {
+            case .recommended: previous = self.recommended; self.recommended = movies; self.recommendedState = state
+            case .latest: previous = self.latest; self.latest = movies; self.latestState = state
+            case .magnets: previous = self.magnets; self.magnets = movies; self.magnetsState = state
+            }
+            if !movies.isEmpty, movies != previous { self.startHQPrefetch(movies, section: String(describing: section)) }
+        })
     }
 
     func loadFollowTags() async {
@@ -582,28 +765,25 @@ final class HomeViewModel: ObservableObject {
 
     func shuffleLatest() async {
         latestPage += 1
-        let next = (try? await sdk.latestMovies(page: latestPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
-        if next.isEmpty { latestPage = 1 }
-        else { latest = next; startHQPrefetch() }
+        await load(.latest, page: latestPage, generation: loadGeneration, scope: cacheContext, restore: false)
+        if latestState == .empty { latestPage = 1 }
     }
 
     func shuffleMagnets() async {
         magnetPage += 1
-        let next = (try? await sdk.latestMovies(page: magnetPage, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")) ?? []
-        let filtered = next.filter { ($0.magnetsCount ?? 0) > 0 }
-        if filtered.isEmpty { magnetPage = 1 }
-        else { magnets = filtered; startHQPrefetch() }
+        await load(.magnets, page: magnetPage, generation: loadGeneration, scope: cacheContext, restore: false)
+        if magnetsState == .empty { magnetPage = 2 }
     }
 
     /// Build 303: light cell-sized HQ prefetch for home grids (latest / magnets /
     /// following). Warms VisibleHQ + HQPosterDiskCache for the first ~2 screens;
     /// scroll-ahead is handled by MoviePosterGrid. Bump hqRevision when a new
     /// URL is learned so synchronous ListCoverPolicy can lead with it.
-    private func startHQPrefetch() {
-        let movies = latest + magnets + following
+    private func startHQPrefetch(_ sectionMovies: [Movie]? = nil, section: String = "following") {
+        let movies = sectionMovies ?? following
         guard !movies.isEmpty else { return }
-        hqPrefetchTask?.cancel()
-        hqPrefetchTask = Task {
+        hqPrefetchTasks[section]?.cancel()
+        hqPrefetchTasks[section] = Task {
             let learned = await HomeHQPosterPrefetch.prefetch(movies, account: APIClient.shared.token)
             guard learned, !Task.isCancelled else { return }
             hqRevision += 1
