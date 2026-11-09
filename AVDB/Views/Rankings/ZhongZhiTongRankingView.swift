@@ -96,6 +96,7 @@ struct ZhongZhiTongRankingView: View {
         case "forum_list": return "番号来自网友整理清单"
         case "youtube_transcript": return "番号来自影片字幕，已用资料库发行日期核对"
         case "video_title": return "仅影片标题提到的作品（本月清单不完整）"
+        case "video_ocr": return "番号来自影片画面/字幕文字辨识，已用资料库核对（可能不完整）"
         default: return "来源未标注"
         }
     }

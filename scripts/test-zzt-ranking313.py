@@ -5,7 +5,7 @@ import json, plistlib, re, shutil, subprocess, tempfile
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '314' and pbx.count('CURRENT_PROJECT_VERSION = 314;') == 2
+assert plist['CFBundleVersion'] == '315' and pbx.count('CURRENT_PROJECT_VERSION = 315;') == 2
 for name in ['ZhongZhiTongCatalog.swift in Sources', 'ZhongZhiTongRankingView.swift in Sources', 'ZhongZhiTongMonthly.json in Resources']:
     assert pbx.count(name) == 2, name
 
@@ -17,7 +17,7 @@ code_re = re.compile(r'^[0-9]{0,3}[A-Z]{2,8}-[0-9]{2,6}$')
 total = 0
 for m in data['months']:
     assert re.match(r'^20\d{2}-(0[1-9]|1[0-2])$', m['month'])
-    assert m['source_type'] in ('forum_list', 'youtube_transcript', 'video_title')
+    assert m['source_type'] in ('forum_list', 'youtube_transcript', 'video_title', 'video_ocr')
     assert m['video'].startswith('https://www.youtube.com/watch?v=')
     assert m['entries'], m['month']
     for e in m['entries']:
