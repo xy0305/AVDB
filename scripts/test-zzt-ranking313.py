@@ -17,7 +17,7 @@ code_re = re.compile(r'^[0-9]{0,3}[A-Z]{2,8}-[0-9]{2,6}$')
 total = 0
 for m in data['months']:
     assert re.match(r'^20\d{2}-(0[1-9]|1[0-2])$', m['month'])
-    assert m['source_type'] in ('forum_list', 'youtube_transcript', 'video_title', 'video_ocr')
+    assert m['source_type'] in ('forum_list', 'youtube_transcript', 'video_title', 'video_ocr', 'youtube_comments')
     assert m['video'].startswith('https://www.youtube.com/watch?v=')
     assert m['entries'], m['month']
     for e in m['entries']:

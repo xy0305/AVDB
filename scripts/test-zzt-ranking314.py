@@ -16,7 +16,7 @@ total = sum(len(m['entries']) for m in data['months'])
 assert total >= 600, total
 for m in data['months']:
     assert m['source'] and m['source'].startswith('https://'), m['month']
-    assert m['source_type'] in ('forum_list', 'youtube_transcript', 'video_title', 'video_ocr')
+    assert m['source_type'] in ('forum_list', 'youtube_transcript', 'video_title', 'video_ocr', 'youtube_comments')
     codes = [e['code'] for e in m['entries']]
     assert len(codes) == len(set(codes)), m['month']
 raw = json.dumps(data, ensure_ascii=False).lower()
