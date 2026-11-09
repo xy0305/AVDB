@@ -1,6 +1,6 @@
 {
  "version": 1,
- "updated_at": "2026-11-09",
+ "updated_at": "2026-11-10",
  "months": [
   {
    "month": "2026-10",
@@ -255,6 +255,20 @@
       "七瀬アリス"
      ],
      "note": null
+    },
+    {
+     "code": "MIDA-804",
+     "actresses": [
+      "百田光希"
+     ],
+     "note": null
+    },
+    {
+     "code": "CAWB-040",
+     "actresses": [
+      "彩月七緒"
+     ],
+     "note": null
     }
    ]
   },
@@ -309,9 +323,10 @@
      "note": null
     },
     {
-     "code": "ACHJ-088",
+     "code": "ACHJ-089",
      "actresses": [
-      "桃園怜奈"
+      "藤浦めぐ",
+      "黒川一花"
      ],
      "note": null
     },
@@ -441,6 +456,14 @@
       "いち花"
      ],
      "note": null
+    },
+    {
+     "code": "PRPM-002",
+     "actresses": [
+      "逢沢みゆ",
+      "彩月七緒"
+     ],
+     "note": null
     }
    ]
   },
@@ -448,8 +471,8 @@
    "month": "2026-08",
    "title": "暗黑版魷魚遊戲推出續集?!身材教科書復出拍新作!!中指通的八月作品精選",
    "video": "https://www.youtube.com/watch?v=cqH7NrWU_AQ",
-   "source": "https://chilllovehk.com/2026/07/16/dsod001-dso-001-waka-misono-dass-534/",
-   "source_type": "video_title",
+   "source": "https://www.youtube.com/watch?v=cqH7NrWU_AQ",
+   "source_type": "youtube_comments",
    "entries": [
     {
      "code": "DSOD-001",
@@ -460,7 +483,204 @@
       "松丸香澄",
       "柊もみじ"
      ],
-     "note": "標題「暗黑版魷魚遊戲續集」"
+     "note": null
+    },
+    {
+     "code": "SNOS-334",
+     "actresses": [
+      "瀬戸環奈"
+     ],
+     "note": null
+    },
+    {
+     "code": "IPZZ-932",
+     "actresses": [
+      "田中レモン"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-732",
+     "actresses": [
+      "八木奈々"
+     ],
+     "note": null
+    },
+    {
+     "code": "SNOS-335",
+     "actresses": [
+      "木村愛心"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-727",
+     "actresses": [
+      "百田光希"
+     ],
+     "note": null
+    },
+    {
+     "code": "MNGS-076",
+     "actresses": [
+      "美園和花"
+     ],
+     "note": null
+    },
+    {
+     "code": "CJOD-591",
+     "actresses": [
+      "結城りの"
+     ],
+     "note": null
+    },
+    {
+     "code": "WAAA-679",
+     "actresses": [
+      "結城りの"
+     ],
+     "note": null
+    },
+    {
+     "code": "SNOS-309",
+     "actresses": [
+      "金松季歩"
+     ],
+     "note": null
+    },
+    {
+     "code": "CAWD-989",
+     "actresses": [
+      "伊藤舞雪"
+     ],
+     "note": null
+    },
+    {
+     "code": "FPRE-239",
+     "actresses": [
+      "菊乃らん"
+     ],
+     "note": null
+    },
+    {
+     "code": "SNOS-365",
+     "actresses": [
+      "白上咲花"
+     ],
+     "note": null
+    },
+    {
+     "code": "IPZZ-907",
+     "actresses": [
+      "明日葉みつは"
+     ],
+     "note": null
+    },
+    {
+     "code": "EBWH-353",
+     "actresses": [
+      "稲場るか",
+      "小花のん"
+     ],
+     "note": null
+    },
+    {
+     "code": "SNOS-373",
+     "actresses": [
+      "早坂奏音"
+     ],
+     "note": null
+    },
+    {
+     "code": "JUR-102",
+     "actresses": [
+      "山田ゆり"
+     ],
+     "note": null
+    },
+    {
+     "code": "SNOS-321",
+     "actresses": [
+      "紫堂るい"
+     ],
+     "note": null
+    },
+    {
+     "code": "SNOS-065",
+     "actresses": [
+      "田野憂"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-762",
+     "actresses": [
+      "石川澪"
+     ],
+     "note": null
+    },
+    {
+     "code": "MNGS-057",
+     "actresses": [
+      "七瀬アリス"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-735",
+     "actresses": [
+      "松本いちか"
+     ],
+     "note": null
+    },
+    {
+     "code": "CAWB-012",
+     "actresses": [
+      "清野咲"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-703",
+     "actresses": [
+      "七沢みあ"
+     ],
+     "note": null
+    },
+    {
+     "code": "ABF-376",
+     "actresses": [
+      "涼森れむ"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-728",
+     "actresses": [
+      "井上もも"
+     ],
+     "note": null
+    },
+    {
+     "code": "SNOS-352",
+     "actresses": [
+      "夢乃あいか"
+     ],
+     "note": null
+    },
+    {
+     "code": "ADN-801",
+     "actresses": [
+      "彩月七緒"
+     ],
+     "note": null
+    },
+    {
+     "code": "ABF-378",
+     "actresses": [
+      "河合あすな"
+     ],
+     "note": null
     }
    ]
   },
@@ -674,6 +894,20 @@
      "code": "MIDA-686",
      "actresses": [
       "百田光希"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIMK-275",
+     "actresses": [
+      "松本いちか"
+     ],
+     "note": null
+    },
+    {
+     "code": "DVMM-422",
+     "actresses": [
+      "二羽紗愛"
      ],
      "note": null
     }
@@ -1476,6 +1710,13 @@
      "code": "ABF-330",
      "actresses": [
       "瀧本雫葉"
+     ],
+     "note": null
+    },
+    {
+     "code": "IPZZ-788",
+     "actresses": [
+      "三澄寧々"
      ],
      "note": null
     }
@@ -3826,6 +4067,72 @@
       "青空ひかり"
      ],
      "note": null
+    },
+    {
+     "code": "IPZZ-523",
+     "actresses": [
+      "桃乃木かな"
+     ],
+     "note": null
+    },
+    {
+     "code": "PFES-107",
+     "actresses": [
+      "楓ふうあ",
+      "明日葉みつは"
+     ],
+     "note": null
+    },
+    {
+     "code": "SONE-689",
+     "actresses": [
+      "歌野こころ"
+     ],
+     "note": null
+    },
+    {
+     "code": "PFES-110",
+     "actresses": [
+      "佐山愛"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-117",
+     "actresses": [
+      "新ありな"
+     ],
+     "note": null
+    },
+    {
+     "code": "HUNTC-310",
+     "actresses": [
+      "羽月乃蒼"
+     ],
+     "note": null
+    },
+    {
+     "code": "JUFE-583",
+     "actresses": [
+      "春陽モカ",
+      "新井リマ"
+     ],
+     "note": null
+    },
+    {
+     "code": "CAWD-809",
+     "actresses": [
+      "日向なつ"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDA-101",
+     "actresses": [
+      "石川澪",
+      "東城ゆい"
+     ],
+     "note": null
     }
    ]
   },
@@ -4352,6 +4659,29 @@
      "code": "SONE-576",
      "actresses": [
       "明日葉みつは"
+     ],
+     "note": null
+    },
+    {
+     "code": "SONE-616",
+     "actresses": [
+      "兒玉七海",
+      "村上悠華"
+     ],
+     "note": null
+    },
+    {
+     "code": "WAAA-482",
+     "actresses": [
+      "北岡果林"
+     ],
+     "note": null
+    },
+    {
+     "code": "EBWH-195",
+     "actresses": [
+      "宮本留衣",
+      "北野未奈"
      ],
      "note": null
     }
@@ -5147,6 +5477,13 @@
      "code": "SDMUA-086",
      "actresses": [
       "ちゃんよた"
+     ],
+     "note": null
+    },
+    {
+     "code": "JUQ-895",
+     "actresses": [
+      "真田春香"
      ],
      "note": null
     }
@@ -6297,6 +6634,64 @@
       "安達夕莉"
      ],
      "note": null
+    },
+    {
+     "code": "MEYD-893",
+     "actresses": [
+      "橘メアリー",
+      "新村あかり"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIAB-125",
+     "actresses": [
+      "都月るいさ"
+     ],
+     "note": null
+    },
+    {
+     "code": "PRED-567",
+     "actresses": [
+      "楪カレン"
+     ],
+     "note": null
+    },
+    {
+     "code": "SONE-106",
+     "actresses": [
+      "葵つかさ"
+     ],
+     "note": null
+    },
+    {
+     "code": "MVSD-594",
+     "actresses": [
+      "白都四季",
+      "みけだ実希"
+     ],
+     "note": null
+    },
+    {
+     "code": "FSDSS-762",
+     "actresses": [
+      "天使もえ"
+     ],
+     "note": null
+    },
+    {
+     "code": "IPZZ-225",
+     "actresses": [
+      "桃乃木かな"
+     ],
+     "note": null
+    },
+    {
+     "code": "PRED-564",
+     "actresses": [
+      "松本梨穂"
+     ],
+     "note": null
     }
    ]
   },
@@ -6957,6 +7352,13 @@
       "松本いちか"
      ],
      "note": null
+    },
+    {
+     "code": "MIMK-143",
+     "actresses": [
+      "吉根ゆりあ"
+     ],
+     "note": null
     }
    ]
   },
@@ -7487,6 +7889,83 @@
       "星乃莉子"
      ],
      "note": null
+    },
+    {
+     "code": "YUJ-007",
+     "actresses": [
+      "二葉エマ"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDV-459",
+     "actresses": [
+      "石川澪"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-867",
+     "actresses": [
+      "清原みゆう"
+     ],
+     "note": null
+    },
+    {
+     "code": "DVEH-013",
+     "actresses": [
+      "都月るいさ"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDV-384",
+     "actresses": [
+      "絵恋空"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDV-475",
+     "actresses": [
+      "中山ふみか"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDV-472",
+     "actresses": [
+      "新ありな"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDV-463",
+     "actresses": [
+      "宍戸里帆"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDV-462",
+     "actresses": [
+      "九野ひなの"
+     ],
+     "note": null
+    },
+    {
+     "code": "VOTAN-056",
+     "actresses": [
+      "横宮七海"
+     ],
+     "note": null
+    },
+    {
+     "code": "MIDV-372",
+     "actresses": [
+      "宮下玲奈"
+     ],
+     "note": null
     }
    ]
   },
@@ -7627,6 +8106,20 @@
     },
     {
      "code": "ABF-021",
+     "actresses": [
+      "八掛うみ"
+     ],
+     "note": null
+    },
+    {
+     "code": "STARS-899",
+     "actresses": [
+      "西元めいさ"
+     ],
+     "note": null
+    },
+    {
+     "code": "ABF-011",
      "actresses": [
       "八掛うみ"
      ],
@@ -7922,6 +8415,34 @@
       "桃乃木かな"
      ],
      "note": null
+    },
+    {
+     "code": "SSIS-745",
+     "actresses": [
+      "つばさ舞"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-675",
+     "actresses": [
+      "宮城りえ"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-669",
+     "actresses": [
+      "楓ふうあ"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-757",
+     "actresses": [
+      "夢乃あいか"
+     ],
+     "note": null
     }
    ]
   },
@@ -8068,6 +8589,13 @@
       "柊ゆうき"
      ],
      "note": null
+    },
+    {
+     "code": "SSIS-703",
+     "actresses": [
+      "有栖花あか"
+     ],
+     "note": null
     }
    ]
   },
@@ -8204,6 +8732,13 @@
       "篠田ゆう"
      ],
      "note": null
+    },
+    {
+     "code": "SSIS-679",
+     "actresses": [
+      "葵つかさ"
+     ],
+     "note": null
     }
    ]
   },
@@ -8309,6 +8844,27 @@
      "code": "MIDV-309",
      "actresses": [
       "絵恋空"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-658",
+     "actresses": [
+      "天音まひな"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-641",
+     "actresses": [
+      "有栖花あか"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-655",
+     "actresses": [
+      "坂道みる"
      ],
      "note": null
     }
@@ -8758,6 +9314,39 @@
       "流川莉央"
      ],
      "note": null
+    },
+    {
+     "code": "SSIS-648",
+     "actresses": [
+      "夢乃あいか"
+     ],
+     "note": null
+    },
+    {
+     "code": "STARS-744",
+     "actresses": [
+      "工藤ゆら"
+     ],
+     "note": null
+    },
+    {
+     "code": "KATU-107",
+     "actresses": [
+      "弥生みづき"
+     ],
+     "note": null
+    },
+    {
+     "code": "CRDD-023",
+     "actresses": [],
+     "note": null
+    },
+    {
+     "code": "DASS-092",
+     "actresses": [
+      "美谷朱里"
+     ],
+     "note": null
     }
    ]
   },
@@ -8884,6 +9473,42 @@
      "code": "STARS-703",
      "actresses": [
       "神木麗"
+     ],
+     "note": null
+    },
+    {
+     "code": "BLK-608",
+     "actresses": [
+      "横宮七海"
+     ],
+     "note": null
+    },
+    {
+     "code": "MTALL-037",
+     "actresses": [
+      "松本いちか",
+      "倉本すみれ"
+     ],
+     "note": null
+    },
+    {
+     "code": "STARS-686",
+     "actresses": [
+      "恋渕ももな"
+     ],
+     "note": null
+    },
+    {
+     "code": "STARS-715",
+     "actresses": [
+      "小湊よつ葉"
+     ],
+     "note": null
+    },
+    {
+     "code": "STARS-664",
+     "actresses": [
+      "紗倉まな"
      ],
      "note": null
     }
@@ -9493,6 +10118,13 @@
      "actresses": [
       "つぼみ",
       "枢木あおい"
+     ],
+     "note": null
+    },
+    {
+     "code": "NIMA-011",
+     "actresses": [
+      "桃園怜奈"
      ],
      "note": null
     }
@@ -10539,6 +11171,13 @@
      "code": "ABW-164",
      "actresses": [
       "河合あすな"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSIS-256",
+     "actresses": [
+      "山手梨愛"
      ],
      "note": null
     }
@@ -12247,6 +12886,13 @@
       "田中ねね"
      ],
      "note": null
+    },
+    {
+     "code": "SSNI-963",
+     "actresses": [
+      "三上悠亞"
+     ],
+     "note": null
     }
    ]
   },
@@ -12721,6 +13367,13 @@
       "加美杏奈"
      ],
      "note": null
+    },
+    {
+     "code": "SSNI-887",
+     "actresses": [
+      "有栖花あか"
+     ],
+     "note": null
     }
    ]
   },
@@ -12923,6 +13576,34 @@
      "code": "STARS-248",
      "actresses": [
       "小倉由菜"
+     ],
+     "note": null
+    },
+    {
+     "code": "PKPD-107",
+     "actresses": [
+      "石原希望"
+     ],
+     "note": null
+    },
+    {
+     "code": "FSDSS-077",
+     "actresses": [
+      "天使もえ"
+     ],
+     "note": null
+    },
+    {
+     "code": "FSDSS-079",
+     "actresses": [
+      "本郷愛"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSNI-845",
+     "actresses": [
+      "三上悠亞"
      ],
      "note": null
     }
@@ -13283,6 +13964,13 @@
      "code": "ABP-959",
      "actresses": [
       "鈴村あいり"
+     ],
+     "note": null
+    },
+    {
+     "code": "SSNI-727",
+     "actresses": [
+      "安齋らら"
      ],
      "note": null
     }
