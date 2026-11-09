@@ -1,7 +1,7 @@
-name: Home HQ posters App 318
+name: Home HQ posters App 319
 on:
   push:
-    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318]
+    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319]
 permissions:
   contents: read
 jobs:
@@ -22,6 +22,7 @@ jobs:
       - run: python3 scripts/test-zzt-ranking316.py
       - run: python3 scripts/test-zzt-ranking317.py
       - run: python3 scripts/test-zzt-ranking318.py
+      - run: python3 scripts/test-zzt-ranking319.py
   models:
     runs-on: macos-26
     timeout-minutes: 60
@@ -72,7 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence-release
-          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; } 2>&1 | tee evidence-release/regressions.log
+          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; python3 scripts/test-zzt-ranking319.py; } 2>&1 | tee evidence-release/regressions.log
       - name: Install actual pinned MediaPipe SDK
         run: |
           gem install cocoapods -v 1.16.2 --no-document
@@ -98,7 +99,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$app" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
-          python3 scripts/package-lut318.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
+          python3 scripts/package-lut319.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
           file "$app/AVDB" | tee evidence-release/macho.txt
           xcrun vtool -show-build "$app/AVDB" | tee -a evidence-release/macho.txt
           codesign -dv "$app" 2> evidence-release/codesign.txt || true
@@ -119,7 +120,7 @@ jobs:
           test "$bytes" -gt 500000000
       - uses: actions/upload-artifact@v4
         with:
-          name: AVDB-318-release
+          name: AVDB-319-release
           path: |
             AVDB-unsigned-*.ipa
             evidence-release/*
@@ -129,7 +130,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: AVDB-318-release-logs
+          name: AVDB-319-release-logs
           path: |
             evidence-release/*
             fetch-live289.log
@@ -150,7 +151,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-318-cloud-tests
+          name: AVDB-319-cloud-tests
           path: evidence-cloud290/*
           if-no-files-found: warn
   ai-cover-settings-screenshots:
@@ -166,7 +167,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-318-ai-cover-cloud-screenshots
+          name: AVDB-319-ai-cover-cloud-screenshots
           path: |
             evidence-ai290ui/shots/*
             evidence-ai290ui/status.json
@@ -185,7 +186,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-318-live-subtitle-screenshots
+          name: AVDB-319-live-subtitle-screenshots
           path: |
             evidence-live287/ui/shots/*
             evidence-live287/ui/status.json
@@ -206,7 +207,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-318-production-controller-HLS
+          name: AVDB-319-production-controller-HLS
           path: |
             evidence-hls-app/*.json
             evidence-hls-app/*.log
@@ -234,7 +235,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-318-strict-runtime
+          name: AVDB-319-strict-runtime
           path: |
             evidence-hls-runtime/*.json
             evidence-hls-runtime/*.log
@@ -251,6 +252,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-318-home-hq-simulator
+          name: AVDB-319-home-hq-simulator
           path: evidence-homehq298/*
           if-no-files-found: warn
