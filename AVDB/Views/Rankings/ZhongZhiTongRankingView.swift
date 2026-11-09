@@ -15,6 +15,7 @@ struct ZhongZhiTongRankingView: View {
 
     private var months: [ZZTMonth] { catalog?.months ?? [] }
     private var current: ZZTMonth? { months.first { $0.month == selectedMonth } ?? months.first }
+    private var currentYearMonths: [ZZTMonth] { months.filter { $0.year == current?.year } }
 
     var body: some View {
         ScrollView {
@@ -49,9 +50,16 @@ struct ZhongZhiTongRankingView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Text("月份").font(.subheadline.weight(.medium))
+            // Build 314: many months now (history back-filled) — pick a year, then a month in it.
+            Picker("年份", selection: Binding(get: { current?.year ?? "" }, set: { year in
+                selectedMonth = catalog?.years.first(where: { $0.year == year })?.months.first?.month ?? selectedMonth
+            })) {
+                ForEach(catalog?.years ?? []) { year in Text("\(year.label)（\(year.months.count)）").tag(year.year) }
+            }
+            .pickerStyle(.menu)
+            .accessibilityIdentifier("zzt-year-picker")
             Picker("月份", selection: Binding(get: { current?.month ?? "" }, set: { selectedMonth = $0 })) {
-                ForEach(months) { month in Text(month.label).tag(month.month) }
+                ForEach(currentYearMonths) { month in Text(month.monthLabel).tag(month.month) }
             }
             .pickerStyle(.menu)
             .accessibilityIdentifier("zzt-month-picker")
@@ -64,6 +72,7 @@ struct ZhongZhiTongRankingView: View {
     @ViewBuilder
     private func monthInfo(_ month: ZZTMonth) -> some View {
         VStack(alignment: .leading, spacing: 4) {
+            Text(month.label).font(.subheadline.weight(.semibold))
             Text(month.title).font(.footnote.weight(.semibold)).lineLimit(3)
             Text("\(month.entries.count) 部 · 依影片介绍顺序 · \(Self.sourceLabel(month.sourceType))")
                 .font(.caption).foregroundStyle(.secondary)

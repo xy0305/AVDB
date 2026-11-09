@@ -30,6 +30,19 @@ struct ZZTMonth: Codable, Hashable, Identifiable {
         guard parts.count == 2, let m = Int(parts[1]) else { return month }
         return "\(parts[0]) 年 \(m) 月"
     }
+    var year: String { String(month.prefix(4)) }
+    var monthLabel: String {
+        guard let m = Int(month.suffix(2)) else { return month }
+        return "\(m) 月"
+    }
+}
+
+/// Build 314: history back-filled, so the picker groups months by year (newest year first).
+struct ZZTYear: Hashable, Identifiable {
+    let year: String
+    let months: [ZZTMonth]   // newest first
+    var id: String { year }
+    var label: String { "\(year) 年" }
 }
 
 struct ZZTCatalog: Codable, Equatable {
@@ -39,6 +52,17 @@ struct ZZTCatalog: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case version, months
         case updatedAt = "updated_at"
+    }
+
+    /// Months grouped by year; assumes `months` is newest first (decode guarantees it).
+    var years: [ZZTYear] {
+        var order: [String] = []
+        var buckets: [String: [ZZTMonth]] = [:]
+        for month in months {
+            if buckets[month.year] == nil { order.append(month.year) }
+            buckets[month.year, default: []].append(month)
+        }
+        return order.map { ZZTYear(year: $0, months: buckets[$0] ?? []) }
     }
 
     static let fileName = "ZhongZhiTongMonthly"

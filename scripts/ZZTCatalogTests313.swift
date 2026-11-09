@@ -29,6 +29,13 @@ struct ZZTCatalogTests313 {
         check(c.months.first?.month == "2026-10" && c.months.first?.entries.map(\.code) == ["SNOS-384", "IPZZ-937", "300MIUM-423"], "order")
         check(c.months.first?.label == "2026 年 10 月", "label")
 
+        // Build 314: year grouping keeps newest-first years and months.
+        let y = try ZZTCatalog.decode(catalogJSON(updated: "2026-11-09", months: [("2023-05", ["ABC-001"]), ("2026-01", ["ABC-002"]), ("2026-10", ["ABC-003"]), ("2024-12", ["ABC-004"])]))
+        check(y.years.map(\.year) == ["2026", "2024", "2023"], "years newest first")
+        check(y.years.first?.months.map(\.month) == ["2026-10", "2026-01"], "months within year")
+        check(y.years.first?.label == "2026 年" && y.years.first?.months.first?.monthLabel == "10 月", "year/month labels")
+        check(bundled.years.flatMap(\.months) == bundled.months, "bundled years cover all months")
+
         // Strict rejection.
         for bad in [catalogJSON(updated: "x", months: [("2026-13", ["ABC-001"])]),
                     catalogJSON(updated: "x", months: [("2026-10", ["abc 001"])]),
