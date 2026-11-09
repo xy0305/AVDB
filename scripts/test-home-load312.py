@@ -7,8 +7,8 @@ home = (r/'AVDB/Views/Home/HomeView.swift').read_text()
 loader = r/'AVDB/Services/HomeListLoading.swift'
 s = loader.read_text()
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion'] == '315'
-assert pbx.count('CURRENT_PROJECT_VERSION = 315;') == 2
+assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion'] == '316'
+assert pbx.count('CURRENT_PROJECT_VERSION = 316;') == 2
 assert pbx.count('HomeListLoading.swift in Sources') == 2
 initial = home.split('    func initialLoad() async {')[1].split('    private var cacheAccountID:')[0]
 assert 'withTaskGroup' in initial and 'for section in Section.allCases' in initial
