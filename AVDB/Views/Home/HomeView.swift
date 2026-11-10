@@ -791,26 +791,45 @@ final class HomeViewModel: ObservableObject {
     }
 }
 
-/// 官方首页「佳片推薦」：大图横向轮播，下一张露出一点；可滑动，约 4 秒自动翻页。
+/// 官方首页「佳片推薦」：竖版大图卡轮播（Build 324，参考图样式）。
+/// 海报按正面封套裁切完整显示在大卡里，卡片与下方分区同边距、同圆角；
+/// 当前海报的模糊版垫在卡片后方向下渐隐，让大图融进页面背景；
+/// 图上只压一行「番号 + 标题」，圆点指示移到卡片下方；约 4 秒自动翻页。
 private struct RecommendCarousel: View {
     let movies: [Movie]
     @State private var currentID: String?
     @State private var isDragging = false
+    @Environment(\.availableLayoutSize) private var layoutSize
 
-    private var bannerHeight: CGFloat { AdaptiveLayout.isPad ? 280 : 200 }
+    private var currentMovie: Movie? {
+        movies.first(where: { $0.id == currentID }) ?? movies.first
+    }
+
+    private var cardWidth: CGFloat {
+        let content = min(layoutSize.width, AdaptiveLayout.contentMaxWidth)
+        return max(content - AdaptiveLayout.horizontalPadding * 2, 200)
+    }
+
+    private var cardHeight: CGFloat {
+        min(cardWidth * 4 / 3, AdaptiveLayout.isPad ? 560 : 640)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            GeometryReader { geo in
-                let cardWidth = max(geo.size.width - AdaptiveLayout.horizontalPadding - 36, 200)
+            ZStack(alignment: .top) {
+                if let movie = currentMovie {
+                    backdrop(movie)
+                        .frame(width: min(layoutSize.width, AdaptiveLayout.contentMaxWidth),
+                               height: cardHeight + 150)
+                }
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         ForEach(movies) { movie in
                             NavigationLink {
                                 MovieDetailView(movie: movie)
                             } label: {
-                                RecommendBannerCard(movie: movie)
-                                    .frame(width: cardWidth, height: geo.size.height)
+                                RecommendHeroCard(movie: movie)
+                                    .frame(width: cardWidth, height: cardHeight)
                             }
                             .buttonStyle(.plain)
                             .id(movie.id)
@@ -831,7 +850,7 @@ private struct RecommendCarousel: View {
                         }
                 )
             }
-            .frame(height: bannerHeight)
+            .frame(height: cardHeight)
             .onAppear {
                 if currentID == nil { currentID = movies.first?.id }
             }
@@ -845,56 +864,74 @@ private struct RecommendCarousel: View {
                 }
             }
 
-            if let movie = movies.first(where: { $0.id == currentID }) ?? movies.first {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("\(movie.displayNumber)  \(movie.displayTitle)")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    if let score = movie.score, score > 0 {
-                        HStack(spacing: 4) {
-                            ForEach(0..<5, id: \.self) { i in
-                                Image(systemName: i < Int((score / 2).rounded()) ? "star.fill" : "star")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.orange)
-                            }
-                            Text(String(format: "%.2f", score))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+            if movies.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(movies) { movie in
+                        Circle()
+                            .fill(movie.id == currentMovie?.id
+                                  ? Color.primary.opacity(0.85)
+                                  : Color.primary.opacity(0.22))
+                            .frame(width: movie.id == currentMovie?.id ? 7 : 6,
+                                   height: movie.id == currentMovie?.id ? 7 : 6)
                     }
                 }
-                .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                .frame(maxWidth: .infinity)
+                .animation(GlassMotion.select, value: currentID)
+                .allowsHitTesting(false)
             }
         }
     }
+
+    /// 当前海报的模糊放大版：垫在大卡后方，向下渐隐到页面背景里，
+    /// 换页时随 currentID 交叉淡入淡出，颜色跟着海报走。
+    private func backdrop(_ movie: Movie) -> some View {
+        JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill, frontPoster: true)
+            .blur(radius: 28)
+            .saturation(1.25)
+            .opacity(0.55)
+            .mask {
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.5),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .id(movie.id)
+            .transition(.opacity)
+            .animation(GlassMotion.page, value: currentID)
+            .allowsHitTesting(false)
+    }
 }
 
-private struct RecommendBannerCard: View {
+private struct RecommendHeroCard: View {
     let movie: Movie
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill)
+            JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill, frontPoster: true)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
             LinearGradient(
-                colors: [.clear, .black.opacity(0.38)],
-                startPoint: .center,
+                stops: [
+                    .init(color: .clear, location: 0.55),
+                    .init(color: .black.opacity(0.46), location: 1)
+                ],
+                startPoint: .top,
                 endPoint: .bottom
             )
             .allowsHitTesting(false)
-            HStack(spacing: 10) {
-                Image(systemName: "play.circle.fill")
-                    .font(.system(size: 34, weight: .light))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .frame(width: 50, height: 50)
-                    .liquidGlassCircle()
-                    .allowsHitTesting(false)
-                Spacer()
-            }
-            .padding(14)
-            .allowsHitTesting(false)
+            Text("\(movie.displayNumber)  \(movie.displayTitle)")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
+                .allowsHitTesting(false)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .liquidCover(cornerRadius: 16)

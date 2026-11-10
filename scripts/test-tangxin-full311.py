@@ -12,7 +12,7 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '323' and pbx.count('CURRENT_PROJECT_VERSION = 323;') == 2
+assert plist['CFBundleVersion'] == '324' and pbx.count('CURRENT_PROJECT_VERSION = 324;') == 2
 
 core = (r / 'AVDB/Services/TangxinCore.swift').read_text()
 # Sitemap is the live enumeration source (no hardcoded author/tag lists).
@@ -45,11 +45,11 @@ assert 'XCTAssertTrue(app.buttons["tangxin.video.blocked"].waitForExistence' in 
 
 # Release wiring.
 workflow = (r / '.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 323' in workflow
+assert 'Home HQ posters App 324' in workflow
 assert 'python3 scripts/test-tangxin-full311.py;' in workflow
-assert 'scripts/package-lut323.py' in workflow and 'AVDB-323-release' in workflow
-package = (r / 'scripts/package-lut323.py').read_text()
-assert "=='323'" in package and 'AVDB-unsigned-1.0.2-323-player-chrome.ipa' in package
+assert 'scripts/package-lut324.py' in workflow and 'AVDB-324-release' in workflow
+package = (r / 'scripts/package-lut324.py').read_text()
+assert "=='324'" in package and 'AVDB-unsigned-1.0.2-324-home-hero.ipa' in package
 
 print('PASS tangxin-full311: sitemap author/tag indexes + partitions, Tangxin keyword gate removed '
       '(permitted retained for ONE), version + release wiring at 311')
