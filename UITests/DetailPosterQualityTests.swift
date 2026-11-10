@@ -926,8 +926,7 @@ final class HomeChrome330Tests: XCTestCase {
             id: "delay-330",
             number: "DELAY-330",
             title: "Resolver delayed 15s",
-            thumbURL: "fixture://poster/thumb147-floor",
-            coverURL: "https://c0.jdbstatic.com/covers/delay-330.jpg"
+            thumbURL: "fixture://poster/thumb147-floor"
         )
         let t0 = Date()
         HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)

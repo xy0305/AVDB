@@ -510,12 +510,23 @@ final class HeroCoverStore: ObservableObject {
     private func startFloorLoad(_ movie: Movie) {
         if presentations[movie.id]?.blurImage != nil || floorCache[movie.id] != nil { return }
         let id = movie.id
+        let thumb = movie.thumbURL ?? ""
         Task { @MainActor [weak self] in
             guard let self else { return }
-            for source in HeroCoverSources.blur(movie: movie).prefix(3) {
+            // Paint the ranking DTO thumb immediately. Never let a slower
+            // cover URL block the unblurred floor.
+            func isQuickFloor(_ source: String) -> Bool {
+                if source.hasPrefix("fixture://hang") || source.hasPrefix("fixture://delay") { return false }
+                if source.hasPrefix("fixture://") { return true }
+                return !thumb.isEmpty && source == thumb
+            }
+            var sources = Array(HeroCoverSources.blur(movie: movie).prefix(5))
+            sources = sources.filter(isQuickFloor) + sources.filter { source in
+                !isQuickFloor(source) && !source.hasPrefix("fixture://hang") && !source.hasPrefix("fixture://delay")
+            }
+            for source in sources {
                 if Task.isCancelled { return }
-                if source.hasPrefix("fixture://hang") || source.hasPrefix("fixture://delay") { continue }
-                if let image = await ImageLoader.shared.load(source, maxPixelSize: 640, timeout: 4) {
+                if let image = await ImageLoader.shared.load(source, maxPixelSize: 640, timeout: isQuickFloor(source) ? 4 : 2) {
                     self.applyBlur(image, movieID: id)
                     return
                 }
@@ -609,8 +620,19 @@ final class HeroCoverStore: ObservableObject {
         lastAttempt[movie.id] = ProcessInfo.processInfo.systemUptime
         let keepBitmaps = isCurrent || isAdjacent
         #if DEBUG
+        if movie.coverURL?.hasPrefix("fixture://hang") == true || movie.thumbURL?.hasPrefix("fixture://hang") == true {
+            return
+        }
+        // Injected test resolvers take precedence over instant fixture covers
+        // (an enrich-merged fixture cover_url is the middle step, not a sharp stand-in).
+        if let provider = Self.testResolverProvider {
+            if let art = await provider(movie) {
+                guard generation == self.generation, !Task.isCancelled else { return }
+                applyArtwork(art, movie: movie, keepBitmaps: keepBitmaps)
+            }
+            return
+        }
         if let url = movie.coverURL, url.hasPrefix("fixture://") {
-            if url.hasPrefix("fixture://hang") { return }
             if url.hasPrefix("fixture://delay/") {
                 let rest = String(url.dropFirst("fixture://delay/".count))
                 let parts = rest.split(separator: "/", maxSplits: 1)
@@ -628,13 +650,6 @@ final class HeroCoverStore: ObservableObject {
                 return
             }
             applyResolverImage(image, source: url, movie: movie, keepBitmaps: keepBitmaps)
-            return
-        }
-        if let provider = Self.testResolverProvider {
-            if let art = await provider(movie) {
-                guard generation == self.generation, !Task.isCancelled else { return }
-                applyArtwork(art, movie: movie, keepBitmaps: keepBitmaps)
-            }
             return
         }
         #endif
