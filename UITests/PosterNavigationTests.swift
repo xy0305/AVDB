@@ -187,6 +187,28 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["jr-lucky-start"].waitForExistence(timeout: 15))
     }
 
+    /// Build 325: production immersive Home (neutral fixture rasters) — evidence screenshots.
+    func test325HomeImmersiveScreenshots() {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--home325-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate() }
+        let search = app.buttons["home-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 30))
+        sleep(3)
+        let top = XCTAttachment(screenshot: app.screenshot()); top.name = "325-home-immersive-top"; top.lifetime = .keepAlways; add(top)
+        XCTAssertTrue(app.buttons["home-hero"].exists)
+        XCTAssertGreaterThanOrEqual(search.frame.width, 44)
+        app.swipeUp(velocity: 600)
+        sleep(2)
+        let rails = XCTAttachment(screenshot: app.screenshot()); rails.name = "325-home-immersive-rails"; rails.lifetime = .keepAlways; add(rails)
+        XCTAssertTrue(search.isHittable, "floating search stays reachable after scrolling")
+        app.swipeUp(velocity: 600)
+        sleep(1)
+        let bottom = XCTAttachment(screenshot: app.screenshot()); bottom.name = "325-home-immersive-bottom"; bottom.lifetime = .keepAlways; add(bottom)
+    }
+
     func test236HomeEmbeddedHeaderDoesNotOwnNavigation() {
         continueAfterFailure = true
         let app = XCUIApplication()

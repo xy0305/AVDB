@@ -2,13 +2,21 @@
 //  HomeView.swift
 //  AVDB
 //
-//  首页：快捷入口、佳片推荐、最新上架、TOP250、近期磁链、我的关注。
+//  首页（Build 325 沉浸式改版）：全出血大图轮播（佳片推薦）、暖色氛围背景、
+//  玻璃快捷入口、横向海报栏（最新上架 / TOP250 / 近期磁鏈 / 我的關注）、悬浮玻璃搜索钮。
 //
 
 import SwiftUI
+import UIKit
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
+    // Build 325: reference objects held in @State (not @StateObject) on purpose — HomeView
+    // must not re-render its rails on every scroll tick; only the hero / search button /
+    // ambient background observe them.
+    @State private var scroll = HomeScrollState()
+    @State private var ambient = HomeAmbient()
+    @Environment(\.selectedAppTab) private var selectedTab
     @State private var goSearch = false
     @State private var goRankings = false
     @State private var goHot = false
@@ -23,26 +31,30 @@ struct HomeView: View {
     @State private var goWatchLater = false
     @State private var goUpdates = false
     @State private var goChallenge = false
+    @State private var goPast = false
+    @State private var goFollowManage = false
+    @State private var openMovie: Movie?
+
+    /// Home root is on screen (nothing pushed from it).
+    private var atRoot: Bool {
+        openMovie == nil && ![goSearch, goRankings, goHot, goLatest, goMagnets, goArticles, goReviews,
+                              goSeries, goMakers, goDirectors, goDailyDraw, goWatchLater, goUpdates,
+                              goChallenge, goPast, goFollowManage].contains(true)
+    }
+
+    /// Immersive dark home is the visible screen: home tab selected and at its root.
+    private var immersiveActive: Bool {
+        (selectedTab == nil || selectedTab == .home) && atRoot
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    searchBar
-                    shortcutRow
-                    recommendSection
-                    latestSection
-                    top250Banner
-                    magnetSection
-                    followingSection
-                }
-                .padding(.vertical, 8)
-                .frame(maxWidth: AdaptiveLayout.contentMaxWidth)
-                .frame(maxWidth: .infinity)
+            GeometryReader { proxy in
+                homeRoot(HomeMetrics(width: proxy.size.width, safeTop: proxy.safeAreaInsets.top))
             }
-            .background {
-                LiquidGlassBackground()
-            }
+            // Home is a dark, poster-led surface; pushed screens keep the app's light look
+            // (destinations are declared outside this environment override).
+            .environment(\.colorScheme, .dark)
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
             .task {
@@ -50,7 +62,6 @@ struct HomeView: View {
                 SearchSuggestStore.shared.prefetch()
                 await vm.initialLoad()
             }
-            .refreshable { await vm.initialLoad() }
             .navigationDestination(isPresented: $goSearch) {
                 SearchView()
             }
@@ -87,218 +98,235 @@ struct HomeView: View {
             .navigationDestination(isPresented: $goWatchLater) { WatchLaterView() }
             .navigationDestination(isPresented: $goUpdates) { UpdateNoticesView() }
             .navigationDestination(isPresented: $goChallenge) { TripleDrawView() }
-        }
-    }
-
-    /// 首页顶部搜索框（整条可点，避免 Spacer 吃掉右半边点击）
-    private var searchBar: some View {
-        Button {
-            GlassHaptic.tap()
-            // Warm 近期熱搜 / 歷史搜索 before the push so the idle page does not
-            // hitch mid-transition waiting on startup.recent_keywords.
-            SearchSuggestStore.shared.prefetch()
-            goSearch = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.secondary)
-                Text("搜索番號 / 關鍵詞")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-                Spacer(minLength: 0)
-                Image(systemName: "barcode.viewfinder")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.blue)
-                    .allowsHitTesting(false)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .liquidGlassRect(cornerRadius: 14, interactive: false)
-        }
-        .pressableGlass(scale: 0.98)
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-        .padding(.top, 8)
-        .staggerAppear(index: 0)
-    }
-
-    private var shortcutRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LiquidGlassContainer(spacing: AdaptiveLayout.isPad ? 16 : 12) {
-                HStack(spacing: AdaptiveLayout.isPad ? 16 : 12) {
-                    shortcut("稍後再看", "clock.fill", Color.orange) { goWatchLater = true }
-                    shortcut("新作提醒", "bell.fill", Color.red) { goUpdates = true }
-                    shortcut("三連挑戰", "rectangle.stack.fill", Color.purple) { goChallenge = true }
-                    shortcut("每日抽簽", "sparkles", Color.pink) { goDailyDraw = true }
-                        .staggerAppear(index: 0)
-                    shortcut("看熱播", "play.rectangle.fill", Color.red) { goHot = true }
-                        .staggerAppear(index: 0)
-                    shortcut("AV資訊", "newspaper.fill", Color.orange) { goArticles = true }
-                        .staggerAppear(index: 1)
-                    shortcut("看短評", "text.bubble.fill", Color.purple) { goReviews = true }
-                        .staggerAppear(index: 2)
-                    shortcut("找磁鏈", "link.circle.fill", Color.green) { goMagnets = true }
-                        .staggerAppear(index: 3)
-                    shortcut("系列", "square.stack.3d.up.fill", Color.blue) { goSeries = true }
-                        .staggerAppear(index: 4)
-                    shortcut("片商", "building.2.fill", Color.teal) { goMakers = true }
-                        .staggerAppear(index: 5)
-                    shortcut("導演", "person.3.fill", Color.indigo) { goDirectors = true }
-                        .staggerAppear(index: 6)
-                    shortcut("TOP250", "crown.fill", Color.yellow) { goRankings = true }
-                        .staggerAppear(index: 7)
-                }
-            }
-            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-        }
-    }
-
-    private func shortcut(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
-        Button {
-            GlassHaptic.tap()
-            action()
-        } label: {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 58, height: 58)
-                    .background(
-                        LinearGradient(
-                            colors: [color.opacity(0.95), color.opacity(0.68)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(.white.opacity(0.28), lineWidth: 0.7)
-                    }
-                    .shadow(color: color.opacity(0.24), radius: 7, y: 3)
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.primary)
-            }
-            .frame(width: 72)
-        }
-        .pressableGlass(scale: 0.92)
-    }
-
-    private var recommendSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.yellow.gradient)
-                    .frame(width: 28, height: 28)
-                    .background {
-                        Circle().fill(.ultraThinMaterial)
-                        Circle().fill(Color.yellow.opacity(0.22))
-                        Circle().fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.35), .clear],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    }
-                    .overlay {
-                        Circle().strokeBorder(
-                            LinearGradient(
-                                colors: [.white.opacity(0.55), .white.opacity(0.08)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.6
-                        )
-                    }
-                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                Text("佳片推薦")
-                    .font(.system(size: 17, weight: .bold))
-                GlassChip(
-                    text: vm.periodLabel,
-                    tint: Color.accentColor,
-                    font: .system(size: 11, weight: .semibold),
-                    foreground: Color.accentColor,
-                    compact: true,
-                    tintStrength: 0.14
-                )
-                Spacer()
-                NavigationLink {
-                    PastRecommendView()
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("往期")
-                            .font(.system(size: 14, weight: .medium))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(.blue)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
-                }
-                .pressableGlass(scale: 0.94)
-            }
-            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-            .staggerAppear(index: 1)
-
-            if !vm.recommended.isEmpty {
-                RecommendCarousel(movies: vm.recommended)
-                    .staggerAppear(index: 2)
-            }
-            homeListStatus(vm.recommendedState, hasItems: !vm.recommended.isEmpty) {
-                Task { await vm.retry(.recommended) }
+            .navigationDestination(isPresented: $goPast) { PastRecommendView() }
+            .navigationDestination(isPresented: $goFollowManage) { FollowingTagsView() }
+            .navigationDestination(item: $openMovie) { movie in
+                homeMovieDestination(movie)
             }
         }
-    }
-
-    private var latestSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeaderBar(title: "最新上架", trailing: "全部") { goLatest = true }
-                .accessibilityIdentifier("home-latest-header")
-                .staggerAppear(index: 3)
-            if !vm.latest.isEmpty {
-                MoviePosterGrid(upgradesVisibleHQ: true, movies: Array(vm.latest.prefix(9)))
+        // Light status bar over the full-bleed hero, only while home's root is visible.
+        // Emitted from a background so toggling never changes the stack's identity.
+        .background {
+            if immersiveActive {
+                Color.clear.preferredColorScheme(.dark)
             }
-            homeListStatus(vm.latestState, hasItems: !vm.latest.isEmpty) {
-                Task { await vm.retry(.latest) }
-            }
-            shufflePill { Task { await vm.shuffleLatest() } }
-                .staggerAppear(index: 4)
         }
     }
 
     @ViewBuilder
-    private func homeListStatus(_ state: HomeListState, hasItems: Bool,
+    private func homeMovieDestination(_ movie: Movie) -> some View {
+        let movieID = movie.id
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") {
+            Text("Neutral detail \(movieID)")
+                .accessibilityIdentifier("detail-\(movieID)")
+                .navigationTitle("Neutral detail")
+                .toolbar(.visible, for: .navigationBar)
+        } else {
+            MovieDetailView(movie: movie)
+        }
+        #else
+        MovieDetailView(movie: movie)
+        #endif
+    }
+
+    private func homeRoot(_ m: HomeMetrics) -> some View {
+        ZStack(alignment: .top) {
+            HomeAmbientBackground(ambient: ambient)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    heroSection(m)
+                    VStack(alignment: .leading, spacing: 0) {
+                        quickActionRow(m)
+                            .padding(.top, 18)
+                        latestSection(m)
+                            .padding(.top, 22)
+                        top250Banner(m)
+                            .padding(.top, 26)
+                        magnetSection(m)
+                            .padding(.top, 26)
+                        followingSection(m)
+                            .padding(.top, 26)
+                    }
+                    // iPad: sections capped at 1100 and centered; the hero stays full width.
+                    .frame(maxWidth: m.contentWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 28)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .coordinateSpace(.named(HomeScrollState.space))
+            .onPreferenceChange(HomeScrollOffsetKey.self) { value in
+                scroll.update(value)
+            }
+            // Full-bleed: the hero runs under the status bar. Bottom safe area (floating
+            // tab bar inset) is kept so the last rail scrolls clear of the bar.
+            .ignoresSafeArea(.container, edges: .top)
+            .refreshable { await vm.initialLoad() }
+
+            HomeTopScrim(scroll: scroll, start: max(0, m.heroHeight - m.safeTop - 90))
+
+            HomeSearchButton(scroll: scroll) {
+                GlassHaptic.tap()
+                // Warm 近期熱搜 / 歷史搜索 before the push so the idle page does not
+                // hitch mid-transition waiting on startup.recent_keywords.
+                SearchSuggestStore.shared.prefetch()
+                goSearch = true
+            }
+            .padding(.top, 6)
+            .padding(.trailing, m.padding)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .foregroundStyle(HomeTheme.primary)
+    }
+
+    // MARK: Hero
+
+    @ViewBuilder
+    private func heroSection(_ m: HomeMetrics) -> some View {
+        Group {
+            if !vm.recommended.isEmpty {
+                HomeHeroCarousel(
+                    movies: vm.recommended,
+                    metrics: m,
+                    periodLabel: vm.periodLabel,
+                    scroll: scroll,
+                    ambient: ambient,
+                    isActive: immersiveActive,
+                    onOpen: { openMovie = $0 },
+                    onPast: { goPast = true }
+                )
+            } else if vm.recommendedState == .loading || vm.recommendedState == .failed {
+                homeListStatus(vm.recommendedState, hasItems: !vm.recommended.isEmpty, placeholder: .hero(m)) {
+                    Task { await vm.retry(.recommended) }
+                }
+            } else {
+                // No recommendations: keep the quick actions clear of the status bar and
+                // the floating search button, and keep 往期 reachable.
+                HStack {
+                    HomePastChip(periodLabel: vm.periodLabel) { goPast = true }
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, m.padding)
+                .padding(.top, m.safeTop + 13)
+                .frame(height: m.safeTop + 64, alignment: .top)
+            }
+        }
+        .background {
+            GeometryReader { g in
+                Color.clear.preference(key: HomeScrollOffsetKey.self,
+                                       value: g.frame(in: .named(HomeScrollState.space)).minY)
+            }
+        }
+    }
+
+    // MARK: Quick actions (12 destinations, frosted glass circles)
+
+    private func quickActionRow(_ m: HomeMetrics) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: m.quickSpacing) {
+                quickAction("稍後再看", "clock.fill", m) { goWatchLater = true }
+                quickAction("新作提醒", "bell.fill", m) { goUpdates = true }
+                quickAction("三連挑戰", "rectangle.stack.fill", m) { goChallenge = true }
+                quickAction("每日抽簽", "sparkles", m) { goDailyDraw = true }
+                quickAction("看熱播", "play.rectangle.fill", m) { goHot = true }
+                quickAction("AV資訊", "newspaper.fill", m) { goArticles = true }
+                quickAction("看短評", "text.bubble.fill", m) { goReviews = true }
+                quickAction("找磁鏈", "link", m) { goMagnets = true }
+                quickAction("系列", "square.stack.3d.up.fill", m) { goSeries = true }
+                quickAction("片商", "building.2.fill", m) { goMakers = true }
+                quickAction("導演", "person.3.fill", m) { goDirectors = true }
+                quickAction("TOP250", "crown.fill", m) { goRankings = true }
+            }
+            .padding(.vertical, 2)
+        }
+        .contentMargins(.horizontal, m.padding, for: .scrollContent)
+    }
+
+    private func quickAction(_ title: String, _ icon: String, _ m: HomeMetrics,
+                             action: @escaping () -> Void) -> some View {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.92))
+                    .frame(width: m.quickCircle, height: m.quickCircle)
+                    .homeGlass(in: Circle())
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.86))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(width: m.quickItem)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(HomePressStyle(scale: 0.92))
+        .accessibilityLabel(title)
+    }
+
+    // MARK: Rails
+
+    private func latestSection(_ m: HomeMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HomeRailHeader(title: "最新上架", padding: m.padding,
+                           titleIdentifier: "home-latest-header",
+                           shuffle: { Task { await vm.shuffleLatest() } },
+                           more: { goLatest = true })
+            if !vm.latest.isEmpty {
+                HomePosterRail(upgradesVisibleHQ: true, movies: vm.latest, metrics: m) { openMovie = $0 }
+            }
+            homeListStatus(vm.latestState, hasItems: !vm.latest.isEmpty, placeholder: .rail(m)) {
+                Task { await vm.retry(.latest) }
+            }
+        }
+    }
+
+    private func magnetSection(_ m: HomeMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HomeRailHeader(title: "近期磁鏈更新", padding: m.padding,
+                           shuffle: { Task { await vm.shuffleMagnets() } },
+                           more: { goMagnets = true })
+            if !vm.magnets.isEmpty {
+                HomePosterRail(upgradesVisibleHQ: true, movies: vm.magnets, metrics: m) { openMovie = $0 }
+            }
+            homeListStatus(vm.magnetsState, hasItems: !vm.magnets.isEmpty, placeholder: .rail(m)) {
+                Task { await vm.retry(.magnets) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func homeListStatus(_ state: HomeListState, hasItems: Bool, placeholder: HomePlaceholder,
                                 retry: @escaping () -> Void) -> some View {
         switch state {
         case .loading:
-            HStack(spacing: 8) {
-                ProgressView()
-                Text(hasItems ? "更新中…" : "載入中…")
+            if !hasItems {
+                HomePlaceholderView(kind: placeholder, failed: false, retry: retry)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
         case .failed:
-            HStack {
-                Text(hasItems ? "更新失敗，顯示上次內容" : "載入失敗，請稍後重試")
-                    .foregroundStyle(.secondary)
-                Button("重試", action: retry)
+            if hasItems {
+                HStack(spacing: 8) {
+                    Text("更新失敗，顯示上次內容")
+                        .foregroundStyle(HomeTheme.secondary)
+                    Button("重試", action: retry)
+                        .foregroundStyle(HomeTheme.accent)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity)
+            } else {
+                HomePlaceholderView(kind: placeholder, failed: true, retry: retry)
             }
-            .font(.caption)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
         case .empty:
             if !hasItems {
                 Text("暫無內容")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HomeTheme.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
             }
@@ -307,128 +335,63 @@ struct HomeView: View {
         }
     }
 
-    private func shufflePill(action: @escaping () -> Void) -> some View {
-        Button {
-            GlassHaptic.tap()
-            action()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("換一組")
-                    .font(.subheadline.weight(.medium))
-            }
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .contentShape(Capsule())
-            .liquidGlass(interactive: false)
-        }
-        .pressableGlass(scale: 0.97)
-        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-    }
-
-    private var top250Banner: some View {
-        Button {
+    private func top250Banner(_ m: HomeMetrics) -> some View {
+        let height: CGFloat = m.isPadWidth ? 132 : 104
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        return Button {
             GlassHaptic.tap()
             goRankings = true
         } label: {
-            ZStack {
+            ZStack(alignment: .leading) {
                 JavDBImage(url: vm.latest.first?.coverURL, contentMode: .fill)
-                    .frame(height: AdaptiveLayout.isPad ? 132 : 104)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
                     .clipped()
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.18),
-                        Color.black.opacity(0.08),
-                        Color.black.opacity(0.28)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("TOP250")
-                            .font(.largeTitle.weight(.heavy))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-                        Text("本季口碑榜 · 每日更新")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.92))
-                            .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+                    .overlay {
+                        LinearGradient(
+                            colors: [HomeTheme.floor.opacity(0.94), HomeTheme.floor.opacity(0.62), HomeTheme.floor.opacity(0.30)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .glassSurface(
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous),
-                        tint: .blue,
-                        tintStrength: 0.18,
-                        elevation: 0.6
-                    )
-                    Spacer()
-                    Image(systemName: "chevron.right.circle.fill")
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(.white.opacity(0.95))
+                HStack(spacing: 12) {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(HomeTheme.accent)
                         .frame(width: 44, height: 44)
-                        .liquidGlassCircle()
+                        .homeGlass(in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("TOP250")
+                            .font(.system(size: 22, weight: .heavy))
+                            .foregroundStyle(HomeTheme.primary)
+                        Text("本季口碑榜 · 每日更新")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(HomeTheme.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    HomeChevronCircle()
                 }
                 .padding(.horizontal, 16)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .liquidCover(cornerRadius: 16)
-            .padding(.horizontal, AdaptiveLayout.gridPadding)
+            .frame(height: height)
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5) }
+            .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+            .contentShape(shape)
         }
-        .pressableGlass(scale: 0.98)
-        .staggerAppear(index: 5)
+        .buttonStyle(HomePressStyle(scale: 0.98, spring: true))
+        .accessibilityLabel("TOP250 本季口碑榜")
+        .padding(.horizontal, m.padding)
     }
 
-    private var magnetSection: some View {
+    private func followingSection(_ m: HomeMetrics) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeaderBar(title: "近期磁鏈更新", trailing: "全部") { goMagnets = true }
-                .staggerAppear(index: 6)
-            if !vm.magnets.isEmpty {
-                MoviePosterGrid(upgradesVisibleHQ: true, movies: Array(vm.magnets.prefix(9)))
-            }
-            homeListStatus(vm.magnetsState, hasItems: !vm.magnets.isEmpty) {
-                Task { await vm.retry(.magnets) }
-            }
-            shufflePill { Task { await vm.shuffleMagnets() } }
-                .staggerAppear(index: 7)
-        }
-    }
-
-    private var followingSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "eye.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 28, height: 28)
-                    .background {
-                        Circle().fill(.ultraThinMaterial)
-                        Circle().fill(Color.accentColor.opacity(0.16))
-                        Circle().fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.35), .clear],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    }
-                    .overlay {
-                        Circle().strokeBorder(
-                            LinearGradient(
-                                colors: [.white.opacity(0.55), .white.opacity(0.08)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.6
-                        )
-                    }
-                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+            HStack(spacing: 6) {
                 Text("我的關注")
                     .font(.system(size: 17, weight: .bold))
-                Spacer()
+                    .foregroundStyle(HomeTheme.primary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
                 Menu {
                     ForEach([CatalogSort.releaseDesc, CatalogSort.updateDesc]) { item in
                         Button {
@@ -445,39 +408,45 @@ struct HomeView: View {
                     HStack(spacing: 4) {
                         Text(vm.followSort.title)
                         Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 11, weight: .semibold))
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(HomeTheme.secondary)
+                    .padding(.horizontal, 6)
+                    .frame(height: 26)
+                    .contentShape(Rectangle().inset(by: -9))
                 }
-                NavigationLink {
-                    FollowingTagsView()
+                Button {
+                    GlassHaptic.tap()
+                    goFollowManage = true
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Text("管理")
                         Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .semibold))
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(HomeTheme.secondary)
+                    .padding(.horizontal, 6)
+                    .frame(height: 26)
+                    .contentShape(Rectangle().inset(by: -9))
                 }
+                .buttonStyle(HomePressStyle(scale: 0.94))
             }
-            .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+            .padding(.horizontal, m.padding)
+            .frame(minHeight: 26)
 
             if vm.followTags.isEmpty {
                 Text("登入後顯示關注內容")
                     .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                    .foregroundStyle(HomeTheme.secondary)
+                    .padding(.horizontal, m.padding)
                     .padding(.bottom, 20)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(vm.followTags) { tag in
+                            let selected = vm.selectedFollowTag?.id == tag.id
                             Button {
                                 GlassHaptic.tap()
                                 withAnimation(GlassMotion.select) {
@@ -485,34 +454,31 @@ struct HomeView: View {
                                 }
                             } label: {
                                 Text(tag.displayName)
-                                    .font(.caption.weight(vm.selectedFollowTag?.id == tag.id ? .semibold : .regular))
+                                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                                    .foregroundStyle(selected ? Color.white : Color.white.opacity(0.78))
                                     .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .foregroundStyle(vm.selectedFollowTag?.id == tag.id ? Color.white : Color.primary)
-                                    .shadow(color: vm.selectedFollowTag?.id == tag.id ? .black.opacity(0.16) : .clear, radius: 1, y: 0.5)
-                                    .liquidGlass(
-                                        tint: vm.selectedFollowTag?.id == tag.id
-                                            ? Color.accentColor.opacity(0.7)
-                                            : nil,
-                                        interactive: false
-                                    )
+                                    .frame(height: 30)
+                                    .background(Capsule().fill(selected ? HomeTheme.accent : Color.white.opacity(0.10)))
+                                    .contentShape(Capsule().inset(by: -7))
                             }
-                            .pressableGlass(scale: 0.94)
+                            .buttonStyle(HomePressStyle(scale: 0.94))
+                            .accessibilityAddTraits(selected ? [.isSelected] : [])
                         }
                     }
-                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                    .padding(.vertical, 7)
                 }
+                .contentMargins(.horizontal, m.padding, for: .scrollContent)
 
                 if vm.following.isEmpty && vm.followLoading {
-                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
+                    HomePlaceholderView(kind: .rail(m), failed: false, retry: {})
                 } else if vm.following.isEmpty {
                     Text("暫無更新")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, AdaptiveLayout.horizontalPadding)
+                        .foregroundStyle(HomeTheme.secondary)
+                        .padding(.horizontal, m.padding)
                         .padding(.bottom, 12)
                 } else {
-                    MoviePosterGrid(upgradesVisibleHQ: true, movies: vm.following)
+                    HomePosterRail(upgradesVisibleHQ: true, movies: vm.following, metrics: m) { openMovie = $0 }
                 }
             }
         }
@@ -610,6 +576,12 @@ final class HomeViewModel: ObservableObject {
             latest = (1...9).map { Movie(id: "fixture-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)") }
             magnets = (1...9).map { Movie(id: "magnet-\($0)", number: "TEST-M\($0)", title: "Neutral magnet \($0)", coverURL: "fixture://poster/\($0)") }
             latestState = .loaded; magnetsState = .loaded; recommendedState = .empty
+            if ProcessInfo.processInfo.arguments.contains("--home325-fixture") {
+                // Build 325 screenshots: neutral portrait hero rasters (no network).
+                recommended = (1...5).map { Movie(id: "hero-\($0)", number: "TEST-H\($0)", title: "Neutral hero film \($0)", coverURL: "fixture://poster/portrait-hero-\($0)") }
+                recommendedState = .loaded
+                periodLabel = "2026-11-09"
+            }
             return
         }
         #endif
@@ -791,151 +763,1006 @@ final class HomeViewModel: ObservableObject {
     }
 }
 
-/// 官方首页「佳片推薦」：竖版大图卡轮播（Build 324，参考图样式）。
-/// 海报按正面封套裁切完整显示在大卡里，卡片与下方分区同边距、同圆角；
-/// 当前海报的模糊版垫在卡片后方向下渐隐，让大图融进页面背景；
-/// 图上只压一行「番号 + 标题」，圆点指示移到卡片下方；约 4 秒自动翻页。
-private struct RecommendCarousel: View {
-    let movies: [Movie]
-    @State private var currentID: String?
-    @State private var isDragging = false
-    @Environment(\.availableLayoutSize) private var layoutSize
+// MARK: - Build 325 immersive home: theme, metrics, glass
 
-    private var currentMovie: Movie? {
-        movies.first(where: { $0.id == currentID }) ?? movies.first
+/// Home-only palette: warm dark surface, one accent (#FF8A3D), white text tiers.
+enum HomeTheme {
+    static let accent = Color(red: 1.0, green: 138.0 / 255.0, blue: 61.0 / 255.0)          // #FF8A3D
+    static let accentPressed = Color(red: 229.0 / 255.0, green: 119.0 / 255.0, blue: 42.0 / 255.0) // #E5772A
+    static let floor = Color(red: 20.0 / 255.0, green: 16.0 / 255.0, blue: 13.0 / 255.0)     // #14100D
+    static let fallbackBase = Color(red: 42.0 / 255.0, green: 32.0 / 255.0, blue: 25.0 / 255.0) // #2A2019
+    /// Glass fill rgba(20,16,13,0.32).
+    static let glassFill = Color(red: 20.0 / 255.0, green: 16.0 / 255.0, blue: 13.0 / 255.0).opacity(0.32)
+    static let primary = Color.white
+    static let secondary = Color.white.opacity(0.62)
+    static let tertiary = Color.white.opacity(0.40)
+    static let separator = Color.white.opacity(0.10)
+}
+
+/// Scene-width driven metrics (never UIScreen): P, hero height, rail card size.
+struct HomeMetrics {
+    let width: CGFloat
+    let safeTop: CGFloat
+
+    /// iPad layout from the actual window width.
+    var isPadWidth: Bool { width >= 768 }
+    /// P = 16 (W < 380), 20, 24 on iPad.
+    var padding: CGFloat { isPadWidth ? 24 : (width < 380 ? 16 : 20) }
+    /// clamp(W * 1.15, 430, 560) on phone; 600 on iPad.
+    var heroHeight: CGFloat { isPadWidth ? 600 : min(max(width * 1.15, 430), 560) }
+    /// Sections are capped at 1100 and centered.
+    var contentWidth: CGFloat { min(width, AdaptiveLayout.contentMaxWidth) }
+    /// Rail card: clamp((CW-2P-24)/2.75, 108, 132) phone, clamp((CW-2P-24)/4.6, 132, 156) iPad; height = width * 1.5.
+    var cardWidth: CGFloat {
+        let usable = contentWidth - 2 * padding - 24
+        return isPadWidth ? min(max(usable / 4.6, 132), 156) : min(max(usable / 2.75, 108), 132)
     }
-
-    private var cardWidth: CGFloat {
-        let content = min(layoutSize.width, AdaptiveLayout.contentMaxWidth)
-        return max(content - AdaptiveLayout.horizontalPadding * 2, 200)
+    var cardHeight: CGFloat { (cardWidth * 1.5).rounded() }
+    var quickItem: CGFloat { width <= 375 ? 56 : 60 }
+    var quickCircle: CGFloat { width <= 375 ? 48 : 52 }
+    /// Phone: five full items plus a peek of the sixth; iPad: roomy fixed spacing.
+    var quickSpacing: CGFloat {
+        if isPadWidth { return 22 }
+        let free = contentWidth - padding - quickItem * 5.4
+        return max(8, (free / 5).rounded(.down))
     }
+}
 
-    private var cardHeight: CGFloat {
-        min(cardWidth * 4 / 3, AdaptiveLayout.isPad ? 560 : 640)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ZStack(alignment: .top) {
-                if let movie = currentMovie {
-                    backdrop(movie)
-                        .frame(width: min(layoutSize.width, AdaptiveLayout.contentMaxWidth),
-                               height: cardHeight + 150)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(movies) { movie in
-                            NavigationLink {
-                                MovieDetailView(movie: movie)
-                            } label: {
-                                RecommendHeroCard(movie: movie)
-                                    .frame(width: cardWidth, height: cardHeight)
-                            }
-                            .buttonStyle(.plain)
-                            .id(movie.id)
-                        }
-                    }
-                    .scrollTargetLayout()
-                    .padding(.horizontal, AdaptiveLayout.horizontalPadding)
-                }
-                .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $currentID)
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 8)
-                        .onChanged { _ in isDragging = true }
-                        .onEnded { _ in
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                isDragging = false
-                            }
-                        }
-                )
+extension View {
+    /// Home glass recipe: ultraThin material + rgba(20,16,13,0.32) + accent 10% tint + 0.5pt white 16% stroke.
+    func homeGlass<S: InsettableShape>(in shape: S) -> some View {
+        background {
+            ZStack {
+                shape.fill(.ultraThinMaterial)
+                shape.fill(HomeTheme.glassFill)
+                shape.fill(HomeTheme.accent.opacity(0.10))
             }
-            .frame(height: cardHeight)
-            .onAppear {
-                if currentID == nil { currentID = movies.first?.id }
-            }
-            .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
-                guard movies.count > 1, !isDragging else { return }
-                let ids = movies.map(\.id)
-                let current = currentID ?? ids[0]
-                guard let i = ids.firstIndex(of: current) else { return }
-                withAnimation(GlassMotion.page) {
-                    currentID = ids[(i + 1) % ids.count]
-                }
-            }
-
-            if movies.count > 1 {
-                HStack(spacing: 6) {
-                    ForEach(movies) { movie in
-                        Circle()
-                            .fill(movie.id == currentMovie?.id
-                                  ? Color.primary.opacity(0.85)
-                                  : Color.primary.opacity(0.22))
-                            .frame(width: movie.id == currentMovie?.id ? 7 : 6,
-                                   height: movie.id == currentMovie?.id ? 7 : 6)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .animation(GlassMotion.select, value: currentID)
-                .allowsHitTesting(false)
-            }
+            .environment(\.colorScheme, .dark)
+        }
+        .overlay {
+            shape.strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)
         }
     }
+}
 
-    /// 当前海报的模糊放大版：垫在大卡后方，向下渐隐到页面背景里，
-    /// 换页时随 currentID 交叉淡入淡出，颜色跟着海报走。
-    private func backdrop(_ movie: Movie) -> some View {
-        JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill, frontPoster: true)
-            .blur(radius: 28)
-            .saturation(1.25)
-            .opacity(0.55)
-            .mask {
+/// Press feedback: scale only (quick actions 0.92 / 0.12 s, cards 0.97 spring).
+struct HomePressStyle: ButtonStyle {
+    var scale: CGFloat = 0.96
+    var spring = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? scale : 1))
+            .animation(spring ? .spring(response: 0.3, dampingFraction: 0.8) : .easeOut(duration: 0.12),
+                       value: configuration.isPressed)
+    }
+}
+
+// MARK: Scroll offset (stretch / parallax / fades) without re-rendering the rails
+
+struct HomeScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+final class HomeScrollState: ObservableObject {
+    static let space = "home325.scroll"
+    /// Hero top in the scroll view: > 0 pulled down, < 0 scrolled up. Clamped and rounded so
+    /// far-down scrolling does not publish.
+    @Published private(set) var offset: CGFloat = 0
+    var up: CGFloat { max(0, -offset) }
+    var pull: CGFloat { max(0, offset) }
+
+    func update(_ raw: CGFloat) {
+        guard raw.isFinite else { return }
+        let value = min(max(raw, -720), 200).rounded()
+        if value != offset { offset = value }
+    }
+}
+
+// MARK: Ambient warm background (average of the current hero poster)
+
+struct HomeHSB: Equatable {
+    var h: Double
+    var s: Double
+    var b: Double
+    /// #2A2019.
+    static let fallback = HomeHSB(h: 0.0686, s: 0.405, b: 0.165)
+    var topColor: Color { Color(hue: h, saturation: s, brightness: b) }
+    var deepColor: Color { Color(hue: h, saturation: s, brightness: b * 0.55) }
+}
+
+enum HomeAmbientColor {
+    /// Downscale to 32x32, average, convert to HSB, clamp S to [0.25, 0.45] and B to [0.16, 0.22].
+    static func base(from image: UIImage) -> HomeHSB? {
+        guard let cg = image.cgImage else { return nil }
+        let side = 32
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side,
+                                          bitsPerComponent: 8, bytesPerRow: side * 4,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+        var r = 0.0, g = 0.0, b = 0.0, n = 0.0
+        for i in stride(from: 0, to: pixels.count, by: 4) where pixels[i + 3] > 0 {
+            r += Double(pixels[i]); g += Double(pixels[i + 1]); b += Double(pixels[i + 2]); n += 1
+        }
+        guard n > 0 else { return nil }
+        var hue: CGFloat = 0, sat: CGFloat = 0, bri: CGFloat = 0, alpha: CGFloat = 0
+        _ = UIColor(red: CGFloat(r / n / 255), green: CGFloat(g / n / 255), blue: CGFloat(b / n / 255), alpha: 1)
+            .getHue(&hue, saturation: &sat, brightness: &bri, alpha: &alpha)
+        return HomeHSB(h: Double(hue),
+                       s: min(max(Double(sat), 0.25), 0.45),
+                       b: min(max(Double(bri), 0.16), 0.22))
+    }
+}
+
+final class HomeAmbient: ObservableObject {
+    @Published private(set) var base: HomeHSB = .fallback
+    @Published private(set) var key = "fallback"
+
+    func show(_ hsb: HomeHSB?, id: String) {
+        let nextKey = hsb == nil ? "fallback" : id
+        let next = hsb ?? .fallback
+        guard nextKey != key || next != base else { return }
+        base = next
+        key = nextKey
+    }
+}
+
+/// 0 → base, 0.45 → base with B × 0.55, 0.75 → #14100D. Crossfades 0.8 s on page change;
+/// Reduce Transparency → solid #14100D.
+private struct HomeAmbientBackground: View {
+    @ObservedObject var ambient: HomeAmbient
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        ZStack {
+            HomeTheme.floor
+            if !reduceTransparency {
                 LinearGradient(
                     stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: 0.5),
-                        .init(color: .clear, location: 1)
+                        .init(color: ambient.base.topColor, location: 0),
+                        .init(color: ambient.base.deepColor, location: 0.45),
+                        .init(color: HomeTheme.floor, location: 0.75),
+                        .init(color: HomeTheme.floor, location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .id(ambient.key)
+                .transition(.opacity)
             }
-            .id(movie.id)
-            .transition(.opacity)
-            .animation(GlassMotion.page, value: currentID)
-            .allowsHitTesting(false)
+        }
+        .animation(.easeInOut(duration: 0.8), value: ambient.key)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
-private struct RecommendHeroCard: View {
-    let movie: Movie
+// MARK: Floating chrome over the hero
+
+/// 58 pt frosted glass search button, floating top-right below the status bar.
+private struct HomeSearchButton: View {
+    @ObservedObject var scroll: HomeScrollState
+    let action: () -> Void
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            JavDBImage(url: movie.coverURL ?? movie.thumbURL, contentMode: .fill, frontPoster: true)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
+        Button(action: action) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(Color.white)
+                .frame(width: 58, height: 58)
+                .homeGlass(in: Circle())
+                .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+                .contentShape(Circle())
+        }
+        .buttonStyle(HomePressStyle(scale: 0.92))
+        // Fades slightly while scrolling up but stays visible and tappable.
+        .opacity(1 - 0.22 * min(scroll.up, 120) / 120)
+        .accessibilityLabel("搜索")
+        .accessibilityIdentifier("home-search")
+    }
+}
+
+/// Status-bar legibility once the hero has scrolled away.
+private struct HomeTopScrim: View {
+    @ObservedObject var scroll: HomeScrollState
+    let start: CGFloat
+
+    var body: some View {
+        LinearGradient(colors: [HomeTheme.floor.opacity(0.94), HomeTheme.floor.opacity(0)],
+                       startPoint: .top, endPoint: .bottom)
+            .frame(height: 30)
+            .ignoresSafeArea(.container, edges: .top)
+            .opacity(min(max((scroll.up - start) / 60, 0), 1))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// 往期 entry: small glass chip, top-left of the hero.
+private struct HomePastChip: View {
+    let periodLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
+            HStack(spacing: 5) {
+                Text("往期")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(periodLabel)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.7))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .homeGlass(in: Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(HomePressStyle(scale: 0.94))
+        .accessibilityLabel("往期推薦，\(periodLabel)")
+        .accessibilityIdentifier("home-past-recommend")
+    }
+}
+
+private struct HomeChevronCircle: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color.white)
+            .frame(width: 26, height: 26)
+            .background(Circle().fill(Color.white.opacity(0.10)))
+    }
+}
+
+// MARK: Hero carousel
+
+struct HomeHeroImage {
+    let image: UIImage
+    let pixelWidth: CGFloat
+    let landscape: Bool
+    let ambient: HomeHSB?
+    /// Too small (or landscape) to stretch full-bleed: show an inset card instead of a blurry crop.
+    var inset: Bool { pixelWidth < 500 || landscape }
+}
+
+/// HQ portrait / front-poster loading for the hero: quick list source first, then the
+/// bounded HQ upgrade (same VisibleHQ path the grids use) if it is sharper.
+enum HomeHeroImageLoader {
+    static let posterPixels = 1600
+
+    static func quick(_ movie: Movie) async -> HomeHeroImage? {
+        #if DEBUG
+        if let url = movie.coverURL, url.hasPrefix("fixture://poster/") {
+            return await make(fixture(url))
+        }
+        #endif
+        let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
+        let sources = ListCoverPolicy.sources(movie: movie)
+        let wrapLead = sources.first.map(FrontPosterPolicy.isKnownWrap) == true
+        let crop = !original || wrapLead
+        var landscape: UIImage?
+        for source in sources.prefix(3) {
+            if Task.isCancelled { return nil }
+            let loaded = crop
+                ? await ImageLoader.shared.loadPoster(source, maxPixelSize: posterPixels)
+                : await ImageLoader.shared.load(source, maxPixelSize: posterPixels)
+            guard let loaded else { continue }
+            if loaded.size.width > loaded.size.height {
+                landscape = landscape ?? loaded
+                continue
+            }
+            return await make(loaded)
+        }
+        if let landscape { return await make(landscape) }
+        return nil
+    }
+
+    static func hq(_ movie: Movie) async -> HomeHeroImage? {
+        #if DEBUG
+        if movie.coverURL?.hasPrefix("fixture://") == true { return nil }
+        #endif
+        guard let url = VisibleHQPosterPolicy.upgradeURL(movie: movie) else { return nil }
+        guard let image = await VisibleHQPosterScheduler.shared.upgrade(
+            movie: movie, url: url, maxPixelSize: VisibleHQPosterPolicy.maxPixelCap) else { return nil }
+        return await make(image)
+    }
+
+    static func make(_ image: UIImage) async -> HomeHeroImage {
+        let width = image.cgImage.map { CGFloat($0.width) } ?? image.size.width * image.scale
+        let ambient = await Task.detached(priority: .utility) { HomeAmbientColor.base(from: image) }.value
+        return HomeHeroImage(image: image, pixelWidth: width,
+                             landscape: image.size.width > image.size.height, ambient: ambient)
+    }
+
+    #if DEBUG
+    /// Neutral portrait raster for UI fixtures (no network).
+    static func fixture(_ url: String) -> UIImage {
+        let size = CGSize(width: 700, height: 1000)
+        let digit = Double(Int(String(url.last ?? "1")) ?? 1)
+        let top = UIColor(hue: CGFloat((0.04 + digit * 0.09).truncatingRemainder(dividingBy: 1)),
+                          saturation: 0.55, brightness: 0.62, alpha: 1)
+        let bottom = UIColor(red: 0.10, green: 0.08, blue: 0.07, alpha: 1)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            let colors = [top.cgColor, bottom.cgColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
+            }
+            UIColor(white: 1, alpha: 0.16).setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: 170, y: 150, width: 360, height: 360))
+            ("NEUTRAL " + (url.components(separatedBy: "/").last ?? "")).draw(
+                at: CGPoint(x: 60, y: 560),
+                withAttributes: [.font: UIFont.systemFont(ofSize: 48, weight: .bold), .foregroundColor: UIColor.white])
+        }
+    }
+    #endif
+}
+
+/// Synopsis is not in the list snapshot: fetched lazily from movieDetail (/api/v4/movies/{id})
+/// for the current and next hero items, cached for the session. Never blocks the hero.
+@MainActor
+final class HomeHeroSynopsisStore {
+    static let shared = HomeHeroSynopsisStore()
+    private var values: [String: String] = [:]
+    private var inFlight: Set<String> = []
+
+    func cached(_ id: String) -> String? { values[id] }
+
+    func fetch(_ movie: Movie) async -> String? {
+        if let value = values[movie.id] { return value }
+        if let own = Self.text(movie) { values[movie.id] = own; return own }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--poster-navigation-fixture") { return nil }
+        #endif
+        guard !inFlight.contains(movie.id) else { return nil }
+        inFlight.insert(movie.id)
+        defer { inFlight.remove(movie.id) }
+        guard let detail = try? await JavDBSDK.shared.movieDetail(movie.id) else { return nil }
+        let text = Self.text(detail) ?? ""
+        values[movie.id] = text
+        return text
+    }
+
+    private static func text(_ movie: Movie) -> String? {
+        for candidate in [movie.summary, movie.desc] {
+            let trimmed = (candidate ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return nil
+    }
+}
+
+/// 官方首页「佳片推薦」：全出血沉浸式大图轮播（Build 325）。
+/// 宽 = 屏宽、无圆角无边距、延伸到状态栏下；底部 / 顶部 scrim；左下文字块 + 独立圆点层；
+/// 5 s 自动交叉淡入 + Ken Burns，手动翻页弹簧；下拉拉伸、上滑视差、文字随滚动淡出。
+private struct HomeHeroCarousel: View {
+    let movies: [Movie]
+    let metrics: HomeMetrics
+    let periodLabel: String
+    @ObservedObject var scroll: HomeScrollState
+    let ambient: HomeAmbient
+    let isActive: Bool
+    let onOpen: (Movie) -> Void
+    let onPast: () -> Void
+
+    @State private var index = 0
+    @State private var images: [String: HomeHeroImage] = [:]
+    @State private var synopses: [String: String] = [:]
+    @State private var touching = false
+    @State private var dragging = false
+    @State private var dragX: CGFloat = 0
+    @State private var lastDragAt = Date.distantPast
+    @State private var slideEdge: Edge?
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+
+    private var width: CGFloat { metrics.width }
+    private var height: CGFloat { metrics.heroHeight }
+    private var padding: CGFloat { metrics.padding }
+    private var showsDots: Bool { movies.count > 1 }
+
+    private var current: Movie? {
+        guard !movies.isEmpty else { return nil }
+        return movies[min(max(index, 0), movies.count - 1)]
+    }
+
+    private func heroMovie(at offset: Int) -> Movie? {
+        guard !movies.isEmpty else { return nil }
+        return movies[(min(max(index, 0), movies.count - 1) + offset) % movies.count]
+    }
+
+    private var autoplayEnabled: Bool {
+        movies.count > 1 && isActive && !touching && !dragging && scenePhase == .active
+            && !reduceMotion && !voiceOver && scroll.up < height * 0.85
+    }
+
+    /// Fade text / dots / chip over the first 120 pt of scroll-up.
+    private var chromeOpacity: Double { 1 - Double(min(scroll.up, 120) / 120) }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Button {
+                // A horizontal swipe must not also open the detail page.
+                guard Date().timeIntervalSince(lastDragAt) > 0.35, let movie = current else { return }
+                onOpen(movie)
+            } label: {
+                imageLayer
+            }
+            .buttonStyle(HeroTouchStyle(touching: $touching))
+            .simultaneousGesture(swipe)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
+            .accessibilityHint("打開詳情")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("home-hero")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: go(1, slide: false)
+                case .decrement: go(-1, slide: false)
+                @unknown default: break
+                }
+            }
+
+            scrims
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+
+            textBlock
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+
+            if showsDots {
+                HomeHeroDots(count: movies.count, index: min(index, movies.count - 1))
+                    .padding(.leading, padding)
+                    .padding(.bottom, 16)
+                    .frame(width: width, height: height, alignment: .bottomLeading)
+                    .opacity(chromeOpacity)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+
+            HomePastChip(periodLabel: periodLabel, action: onPast)
+                .padding(.leading, padding)
+                .padding(.top, metrics.safeTop + 13)
+                .opacity(chromeOpacity)
+        }
+        .frame(width: width, height: height)
+        .onAppear { publishAmbient() }
+        .onChange(of: movies.map(\.id)) { _, _ in
+            index = 0
+            publishAmbient()
+        }
+        .onChange(of: ambientKey) { _, _ in publishAmbient() }
+        // Current first, then prefetch the next two.
+        .task(id: loadKey) {
+            for offset in 0..<min(3, movies.count) {
+                guard let movie = heroMovie(at: offset), !Task.isCancelled else { return }
+                await ensureImage(movie)
+            }
+        }
+        // Synopsis for current + next, lazily; never blocks the hero.
+        .task(id: current?.id) {
+            for offset in 0..<min(2, movies.count) {
+                guard let movie = heroMovie(at: offset), synopses[movie.id] == nil, !Task.isCancelled else { continue }
+                if let text = await HomeHeroSynopsisStore.shared.fetch(movie), !Task.isCancelled {
+                    withAnimation(.easeOut(duration: 0.25)) { synopses[movie.id] = text }
+                }
+            }
+        }
+        // Autoplay: restarts on every page change (incl. manual swipes) and pause change.
+        .task(id: autoplayKey) {
+            guard autoplayEnabled else { return }
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, autoplayEnabled else { return }
+            go(1, slide: false)
+        }
+    }
+
+    // Image layer: only transform / opacity animate (stretch, parallax, Ken Burns, crossfade).
+    private var imageLayer: some View {
+        ZStack {
+            if let movie = current {
+                HomeHeroPage(image: images[movie.id], metrics: metrics, kenBurns: !reduceMotion)
+                    .id(movie.id)
+                    .transition(pageTransition)
+            }
+        }
+        .frame(width: width, height: height)
+        .offset(x: dragX)
+        // Pull-down stretch (anchored at the bottom so it fills the gap above) + scroll-up parallax.
+        .scaleEffect(1 + min(scroll.pull, 120) / height, anchor: .bottom)
+        .offset(y: scroll.up * 0.45)
+        // Clip the sides and the bottom edge only; the stretch may grow above the top.
+        .mask(alignment: .bottom) {
+            Rectangle().frame(width: width, height: height + 400)
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// Bottom scrim over 35%–100% (0.35→0, 0.62→0.18, 0.82→0.45, 1.0→0.66 black) and a top
+    /// scrim (black 0.28 → 0 over 110 pt) for the status bar. Not parallaxed.
+    private var scrims: some View {
+        ZStack(alignment: .top) {
             LinearGradient(
                 stops: [
-                    .init(color: .clear, location: 0.55),
-                    .init(color: .black.opacity(0.46), location: 1)
+                    .init(color: .black.opacity(0), location: 0.35),
+                    .init(color: .black.opacity(0.18), location: 0.62),
+                    .init(color: .black.opacity(0.45), location: 0.82),
+                    .init(color: .black.opacity(0.66), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .allowsHitTesting(false)
-            Text("\(movie.displayNumber)  \(movie.displayTitle)")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 12)
-                .allowsHitTesting(false)
+            LinearGradient(colors: [.black.opacity(0.28), .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+                .frame(height: 110)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .liquidCover(cornerRadius: 16)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .frame(width: width, height: height)
+    }
+
+    private var textBlock: some View {
+        Group {
+            if let movie = current {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(headline(movie))
+                        .font(.system(size: 23, weight: .bold))
+                        .foregroundStyle(Color.white)
+                        .lineLimit(1)
+                        .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
+                    if let date = movie.releaseDate?.trimmingCharacters(in: .whitespaces), !date.isEmpty {
+                        Text(date)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.72))
+                    }
+                    if let synopsis = synopsis(movie) {
+                        Text(synopsis)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.85))
+                            .lineLimit(2)
+                            .shadow(color: .black.opacity(0.25), radius: 4, y: 1)
+                    }
+                }
+                .frame(maxWidth: width - padding * 2, alignment: .leading)
+                .id(movie.id)
+                .transition(.opacity)
+            }
+        }
+        .padding(.leading, padding)
+        // Text block sits 10 pt above the dots (dots: 6 pt tall, 16 pt above the bottom).
+        .padding(.bottom, showsDots ? 32 : 16)
+        .frame(width: width, height: height, alignment: .bottomLeading)
+        .opacity(chromeOpacity)
+    }
+
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                let dx = value.translation.width, dy = value.translation.height
+                guard movies.count > 1, dragging || abs(dx) > abs(dy) * 1.2 else { return }
+                dragging = true
+                lastDragAt = Date()
+                dragX = dx * 0.85
+            }
+            .onEnded { value in
+                guard dragging else { return }
+                lastDragAt = Date()
+                let dx = value.translation.width
+                let predicted = value.predictedEndTranslation.width
+                dragging = false
+                if abs(dx) > 60 || abs(predicted) > 140 {
+                    go(dx < 0 ? 1 : -1, slide: true)
+                } else {
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) { dragX = 0 }
+                }
+            }
+    }
+
+    private var pageTransition: AnyTransition {
+        guard let edge = slideEdge else { return .opacity }
+        return .asymmetric(insertion: .move(edge: edge),
+                           removal: .move(edge: edge == .trailing ? .leading : .trailing))
+    }
+
+    private func go(_ delta: Int, slide: Bool) {
+        guard movies.count > 1 else { return }
+        let next = (min(max(index, 0), movies.count - 1) + delta + movies.count) % movies.count
+        if slide {
+            slideEdge = delta > 0 ? .trailing : .leading
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+                index = next
+                dragX = 0
+            }
+        } else {
+            slideEdge = nil
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.6)) {
+                index = next
+            }
+        }
+    }
+
+    private var loadKey: String {
+        (0..<min(3, movies.count)).compactMap { heroMovie(at: $0)?.id }.joined(separator: "|")
+    }
+
+    private var autoplayKey: String { "\(index)|\(autoplayEnabled)|\(movies.count)" }
+
+    private var ambientKey: String {
+        guard let movie = current else { return "" }
+        return movie.id + (images[movie.id]?.ambient == nil ? "#" : "#hsb")
+    }
+
+    private func publishAmbient() {
+        guard let movie = current else { return }
+        ambient.show(images[movie.id]?.ambient, id: movie.id)
+    }
+
+    private func ensureImage(_ movie: Movie) async {
+        if images[movie.id] == nil, let quick = await HomeHeroImageLoader.quick(movie), !Task.isCancelled {
+            images[movie.id] = quick
+        }
+        guard !Task.isCancelled, let existing = images[movie.id], existing.inset || existing.pixelWidth < 900 else { return }
+        if let hq = await HomeHeroImageLoader.hq(movie), !Task.isCancelled,
+           hq.pixelWidth > existing.pixelWidth || (existing.landscape && !hq.landscape) {
+            images[movie.id] = hq
+        }
+    }
+
+    private func headline(_ movie: Movie) -> String {
+        let number = movie.displayNumber
+        guard let title = movie.title?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !title.isEmpty, title != number else { return number }
+        return number + "  " + title
+    }
+
+    private func synopsis(_ movie: Movie) -> String? {
+        guard let text = synopses[movie.id] ?? HomeHeroSynopsisStore.shared.cached(movie.id), !text.isEmpty else { return nil }
+        return text
+    }
+
+    private var accessibilityText: String {
+        guard let movie = current else { return "佳片推薦" }
+        let date = movie.releaseDate?.trimmingCharacters(in: .whitespaces) ?? ""
+        return date.isEmpty ? headline(movie) : "\(movie.displayNumber) \(movie.displayTitle), \(date)"
+    }
+}
+
+/// Reports touch-down so autoplay pauses while the finger is on the hero; no visual change.
+private struct HeroTouchStyle: ButtonStyle {
+    @Binding var touching: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in touching = pressed }
+    }
+}
+
+/// One hero page: full-bleed aspect-fill (anchored ~22% from the top to keep faces), or an
+/// inset card (blurred fill + aspect-fit poster) when the source is too small to stretch.
+private struct HomeHeroPage: View {
+    let image: HomeHeroImage?
+    let metrics: HomeMetrics
+    let kenBurns: Bool
+    @State private var zoomed = false
+
+    var body: some View {
+        let size = CGSize(width: metrics.width, height: metrics.heroHeight)
+        ZStack {
+            if let image {
+                if image.inset {
+                    HomeAnchoredFill(image: image.image, size: size)
+                        .blur(radius: 30, opaque: true)
+                        .overlay { Color.black.opacity(0.22) }
+                    Image(uiImage: image.image)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+                        .padding(.horizontal, metrics.padding)
+                        .padding(.top, metrics.safeTop + 70)
+                        .padding(.bottom, 128)
+                        .frame(width: size.width, height: size.height)
+                } else {
+                    HomeAnchoredFill(image: image.image, size: size)
+                }
+            } else {
+                HomeShimmer()
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .scaleEffect(zoomed ? 1.05 : 1.0)
+        .onAppear {
+            guard kenBurns else { return }
+            withAnimation(.linear(duration: 5.6)) { zoomed = true }
+        }
+    }
+}
+
+/// aspectFill with a vertical anchor (0 = top, 0.5 = center).
+private struct HomeAnchoredFill: View {
+    let image: UIImage
+    let size: CGSize
+    var anchorY: CGFloat = 0.22
+
+    var body: some View {
+        let iw = max(image.size.width, 1), ih = max(image.size.height, 1)
+        let scale = max(size.width / iw, size.height / ih)
+        let dw = iw * scale, dh = ih * scale
+        Image(uiImage: image)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: dw, height: dh)
+            .offset(x: (size.width - dw) / 2, y: -(dh - size.height) * anchorY)
+            .frame(width: size.width, height: size.height, alignment: .topLeading)
+            .clipped()
+    }
+}
+
+/// Independent dots layer: 6×6 white 45%, selected 18×6 white capsule, spacing 5; windowed to 9.
+private struct HomeHeroDots: View {
+    let count: Int
+    let index: Int
+
+    var body: some View {
+        let visible = min(count, 9)
+        let start = count <= 9 ? 0 : min(max(index - 4, 0), count - 9)
+        HStack(spacing: 5) {
+            ForEach(start..<(start + visible), id: \.self) { i in
+                Capsule()
+                    .fill(Color.white.opacity(i == index ? 1 : 0.45))
+                    .frame(width: i == index ? 18 : 6, height: 6)
+            }
+        }
+        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: index)
+    }
+}
+
+// MARK: Rails
+
+private struct HomeRailHeader: View {
+    let title: String
+    let padding: CGFloat
+    var titleIdentifier: String? = nil
+    var shuffle: (() -> Void)? = nil
+    var more: (() -> Void)? = nil
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(HomeTheme.primary)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier(titleIdentifier ?? "home-section-\(title)")
+            Spacer(minLength: 8)
+            if let shuffle {
+                // 換一組 kept as a small text button.
+                Button {
+                    GlassHaptic.tap()
+                    shuffle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("換一組")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundStyle(HomeTheme.secondary)
+                    .padding(.horizontal, 6)
+                    .frame(height: 26)
+                    .contentShape(Rectangle().inset(by: -9))
+                }
+                .buttonStyle(HomePressStyle(scale: 0.94))
+            }
+            if let more {
+                Button {
+                    GlassHaptic.tap()
+                    more()
+                } label: {
+                    HomeChevronCircle()
+                        .frame(width: 26, height: 26)
+                        // 44 pt hit area around the 26 pt circle.
+                        .contentShape(Rectangle().inset(by: -9))
+                }
+                .buttonStyle(HomePressStyle(scale: 0.9))
+                .accessibilityLabel("\(title) 全部")
+            }
+        }
+        .padding(.horizontal, padding)
+        .frame(minHeight: 26)
+    }
+}
+
+/// Horizontal 2:3 poster rail (replaces the home 3-column grids).
+private struct HomePosterRail: View {
+    var upgradesVisibleHQ = true
+    let movies: [Movie]
+    let metrics: HomeMetrics
+    let open: (Movie) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: 12) {
+                ForEach(Array(movies.enumerated()), id: \.element.id) { idx, movie in
+                    Button {
+                        open(movie)
+                    } label: {
+                        HomePosterCard(movie: movie, width: metrics.cardWidth, height: metrics.cardHeight,
+                                       upgradesVisibleHQ: upgradesVisibleHQ)
+                    }
+                    .buttonStyle(HomePressStyle(scale: 0.97, spring: true))
+                    .accessibilityIdentifier("poster-\(movie.id)")
+                    .onAppear {
+                        // Same HQ/portrait crops as the grids: warm a few covers ahead.
+                        if upgradesVisibleHQ {
+                            HomeHQPosterPrefetch.scheduleAhead(movies: movies, around: idx)
+                        }
+                    }
+                }
+            }
+            .scrollTargetLayout()
+            // Room for the card shadow inside the horizontal scroller's clip.
+            .padding(.vertical, 8)
+        }
+        .contentMargins(.horizontal, metrics.padding, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
+        .padding(.vertical, -8)
+    }
+}
+
+private struct HomePosterCard: View {
+    let movie: Movie
+    let width: CGFloat
+    let height: CGFloat
+    var upgradesVisibleHQ = true
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        VStack(alignment: .leading, spacing: 6) {
+            MoviePosterImage(movie: movie, maxPixelSize: 900, upgradesVisibleHQ: upgradesVisibleHQ)
+                .frame(width: width, height: height)
+                .clipShape(shape)
+                .overlay { shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5) }
+                .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cardTitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(HomeTheme.primary)
+                    .lineLimit(1)
+                Text(movie.releaseDate ?? "")
+                    .font(.system(size: 11))
+                    .foregroundStyle(HomeTheme.secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: width, height: 34, alignment: .topLeading)
+        }
+        .frame(width: width)
+        .contentShape(Rectangle())
+    }
+
+    private var cardTitle: String {
+        let number = movie.displayNumber
+        guard let title = movie.title, !title.isEmpty, title != number else { return number }
+        return number + " " + title
+    }
+}
+
+enum HomePlaceholder {
+    case hero(HomeMetrics)
+    case rail(HomeMetrics)
+}
+
+/// Same-size shimmer while loading; film.stack tap-to-retry when a first load failed.
+private struct HomePlaceholderView: View {
+    let kind: HomePlaceholder
+    let failed: Bool
+    let retry: () -> Void
+
+    var body: some View {
+        switch kind {
+        case .hero(let m):
+            ZStack {
+                if failed {
+                    Color.white.opacity(0.04)
+                    failedBadge(size: 26)
+                } else {
+                    HomeShimmer()
+                }
+            }
+            .frame(width: m.width, height: m.heroHeight)
+            .contentShape(Rectangle())
+            .onTapGesture { if failed { retry() } }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(failed ? "載入失敗，點按重試" : "載入中")
+            .accessibilityAddTraits(failed ? .isButton : [])
+        case .rail(let m):
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(0..<railCount(m), id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: 6) {
+                        ZStack {
+                            if failed {
+                                Color.white.opacity(0.05)
+                                failedBadge(size: 20)
+                            } else {
+                                HomeShimmer()
+                            }
+                        }
+                        .frame(width: m.cardWidth, height: m.cardHeight)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                        }
+                        VStack(alignment: .leading, spacing: 5) {
+                            Capsule().fill(Color.white.opacity(0.08)).frame(width: m.cardWidth * 0.8, height: 9)
+                            Capsule().fill(Color.white.opacity(0.06)).frame(width: m.cardWidth * 0.45, height: 8)
+                        }
+                        .frame(width: m.cardWidth, height: 34, alignment: .topLeading)
+                    }
+                }
+            }
+            .padding(.horizontal, m.padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped()
+            .contentShape(Rectangle())
+            .onTapGesture { if failed { retry() } }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(failed ? "載入失敗，點按重試" : "載入中")
+            .accessibilityAddTraits(failed ? .isButton : [])
+        }
+    }
+
+    private func railCount(_ m: HomeMetrics) -> Int {
+        max(3, Int((m.contentWidth - m.padding) / (m.cardWidth + 12)) + 1)
+    }
+
+    private func failedBadge(size: CGFloat) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: "film.stack")
+                .font(.system(size: size, weight: .medium))
+                .foregroundStyle(HomeTheme.tertiary)
+            Text("點按重試")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(HomeTheme.tertiary)
+        }
+    }
+}
+
+/// Dark shimmer for loading placeholders on the warm surface.
+private struct HomeShimmer: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = max(geo.size.width, 1)
+            Color.white.opacity(0.06)
+                .overlay {
+                    LinearGradient(colors: [.clear, .white.opacity(0.08), .clear],
+                                   startPoint: .leading, endPoint: .trailing)
+                        .frame(width: w * 0.6)
+                        .offset(x: phase * w * 1.3)
+                }
+        }
+        .clipped()
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { phase = 1.2 }
+        }
+        .accessibilityHidden(true)
     }
 }
 

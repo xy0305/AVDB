@@ -60,6 +60,7 @@ final class TabBarChrome: ObservableObject {
 
 private struct AppTabKey: EnvironmentKey { static let defaultValue: AppTab? = nil }
 private struct TabBarChromeKey: EnvironmentKey { static let defaultValue: TabBarChrome? = nil }
+private struct SelectedAppTabKey: EnvironmentKey { static let defaultValue: AppTab? = nil }
 extension EnvironmentValues {
     /// Optional so fixtures / previews / sheets without the tab container never crash.
     var tabBarChrome: TabBarChrome? {
@@ -70,6 +71,12 @@ extension EnvironmentValues {
     var appTab: AppTab? {
         get { self[AppTabKey.self] }
         set { self[AppTabKey.self] = newValue }
+    }
+    /// Build 325: the currently selected root tab (set by FloatingTabContainer), so a root
+    /// screen can tell whether it is the visible one (e.g. Home's dark status bar).
+    var selectedAppTab: AppTab? {
+        get { self[SelectedAppTabKey.self] }
+        set { self[SelectedAppTabKey.self] = newValue }
     }
 }
 
@@ -111,6 +118,7 @@ struct FloatingTabContainer<Content: View>: View {
     }
     var body: some View {
         content
+            .environment(\.selectedAppTab, selection)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 // Build 283: hidden while search is active in the selected tab or the keyboard

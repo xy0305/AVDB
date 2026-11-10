@@ -119,6 +119,14 @@ struct SearchView: View {
                     .submitLabel(.search)
                     .focused($isSearchFocused)
                     .onSubmit { submit() }
+                if keyword.isEmpty {
+                    // Build 325: the scan glyph moved here from the removed home search bar.
+                    Image(systemName: "barcode.viewfinder")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.tint)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 if !keyword.isEmpty {
                     Button {
                         keyword = ""
