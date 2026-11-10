@@ -86,6 +86,7 @@ assert 'title: "往期推薦"' in home
 assert 'titleIdentifier: "home-past-header"' in home
 assert 'PastRecommendView()' in home
 assert home.count('HomePosterRail(upgradesVisibleHQ: true') == 4
+assert home.count('upgradesVisibleHQ: true') == 5  # 4 rails + PeriodMoviesView
 
 # --- Blank hero fix: ungated floor, no #2A2019 visible empty, per-item deadline ---
 page = home.split('private struct HomeHeroPage: View {')[1].split('private struct HomeHeroMoreButton')[0]

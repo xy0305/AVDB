@@ -23,7 +23,7 @@ assert "for guess in DetailPosterPolicy.candidates(number: movie.number).prefix(
 for host in ("awsimgsrc.dmm.co.jp", "pics.dmm.co.jp", "m.media-amazon.com", "images-na.ssl-images-amazon.com", "www.tenhow.net", "image.mgstage.com", "pic.duga.jp"):
     assert host in loader, host
 assert "secondFallbackURL: sources.dropFirst(2).first" in loader, "synchronous list still has at most three attempts, JavDB last"
-assert "upgradesVisibleHQ" in home and home.count("upgradesVisibleHQ: true") == 4
+assert "upgradesVisibleHQ" in home and home.count("upgradesVisibleHQ: true") == 5  # 328 adds 往期推薦 rail; PeriodMoviesView also uses the flag
 assert "MoviePosterImage(movie: movie, upgradesVisibleHQ: upgradesVisibleHQ)" in grid
 assert "DetailPosterResolver.resolve" in detail
 assert "VisibleHQPoster" not in detail
