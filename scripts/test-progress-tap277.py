@@ -14,7 +14,7 @@ bar = player.split("private var progressBar:")[1].split("private func tapSeekPro
 assert "Slider(" in bar
 assert "seek(to: seekValue)" in bar
 assert "seekPreview.request(time: seekValue" in bar
-helper = player.split("private func tapSeekProgress(atX")[1].split("private func glassButton")[0]
+helper = player.split("private func tapSeekProgress(atX")[1].split("private func applyFillMode")[0]
 assert "x / width" in helper
 assert "seek(to: target)" in helper
 assert "!horizontalDrag" in helper

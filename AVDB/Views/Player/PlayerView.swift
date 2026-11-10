@@ -221,6 +221,11 @@ struct KSChromePlayer: View {
     @State private var scrubStart: Double = 0
     @State private var skipHUD: SkipHUD?
     @State private var fillMode: FillMode = .fit
+    /// Build 323 倍速: session choice, re-applied to a replaced item / reset player layer.
+    @State private var playbackRate: Float = 1.0
+    /// Build 323: measured network bytes/s (AVPlayerItem access log); nil = not measurable → hidden.
+    @State private var downloadSpeed: Double?
+    @State private var throughput = PlaybackThroughputSampler()
 
     private enum OverlayKind { case brightness, volume, seek }
     private enum FillMode: String, CaseIterable {
@@ -346,6 +351,8 @@ struct KSChromePlayer: View {
             attachLiveSubtitles()
             seekGeneration += 1
             seekPending = false
+            throughput.reset()
+            downloadSpeed = nil
             cancelPlayerDrag()
             configureSeekPreview()
         }
@@ -658,31 +665,42 @@ struct KSChromePlayer: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    /// Build 323 播放页样式: thin white line icons and plain white text over a light scrim — no capsules,
+    /// glass or dark fills. Only AVDB's own functions are shown (no AirPlay/弹幕/next-episode placeholders).
     private var chromeOverlay: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 20, weight: .regular))
                         .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                         .frame(width: 52, height: 52)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("关闭")
                 .zIndex(20)
 
                 Text(title.isEmpty ? "正在播放" : title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 420, alignment: .leading)
+                    .layoutPriority(1)
+
+                Spacer(minLength: 8)
+
                 Button {
                     if onlineSubtitles.query.isEmpty { onlineSubtitles.query = String(publicSubtitleQuery.prefix(200)) }
                     showOnlineSubtitles = true
                 } label: {
-                    Image(systemName: "captions.bubble")
-                        .font(.system(size: 20, weight: .medium))
+                    Image(systemName: onlineSubtitles.cues.isEmpty ? "captions.bubble" : "captions.bubble.fill")
+                        .font(.system(size: 20, weight: .regular))
                         .foregroundStyle(.white).frame(width: 48, height: 48)
-                        .background(.black.opacity(0.35), in: Capsule())
+                        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                         .contentShape(Rectangle())
                 }.buttonStyle(.plain)
                     .fixedSize().layoutPriority(2).zIndex(20)
@@ -692,10 +710,14 @@ struct KSChromePlayer: View {
                     if lutHoldConsumed { lutHoldConsumed = false } else { showLUT = true }
                 } label: {
                     Image(systemName: "camera.filters")
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: 20, weight: .regular))
                         .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+                        // LUT on: a small white dot under the line icon instead of a filled capsule.
+                        .overlay(alignment: .bottom) {
+                            if lut.enabled { Circle().fill(.white).frame(width: 4, height: 4).offset(y: 8) }
+                        }
                         .frame(width: 48, height: 48)
-                        .background(lut.enabled ? Color.white.opacity(0.22) : Color.black.opacity(0.35), in: Capsule())
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -727,7 +749,7 @@ struct KSChromePlayer: View {
                         }
                     }
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: 8).frame(maxWidth: 16) // keep the three icons grouped at the right
 
                 Menu {
                     if !AdaptiveLayout.isPad {
@@ -753,9 +775,23 @@ struct KSChromePlayer: View {
                     }
                 } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                         .frame(width: 48, height: 48)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("画面与方向")
+
+                // Real network throughput only (AVPlayerItem access-log bytes); hidden when it cannot be measured.
+                if let downloadSpeed {
+                    Text(PlaybackThroughputSampler.display(downloadSpeed))
+                        .font(.system(size: 13, weight: .regular).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+                        .lineLimit(1).fixedSize()
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("player.download.speed")
                 }
             }
             .padding(.horizontal, 20)
@@ -768,9 +804,9 @@ struct KSChromePlayer: View {
                 .allowsHitTesting(false)
 
             progressBar
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 28)
 
-            HStack(spacing: 12) {
+            HStack(spacing: 18) {
                 Button {
                     if isPlaying {
                         coordinator.playerLayer?.pause()
@@ -784,66 +820,72 @@ struct KSChromePlayer: View {
                             ProgressView().tint(.white)
                         } else {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 22, weight: .semibold))
+                                .font(.system(size: 26, weight: .regular))
+                                .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                         }
                     }
                     .foregroundStyle(.white)
                     .frame(width: 48, height: 48)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(isPlaying ? "暂停" : "播放")
                 .accessibilityIdentifier("player.play.toggle")
 
-                Button {
-                    seek(to: min((isSeeking ? seekValue : currentTime) + 10, max(duration, 0)))
-                } label: {
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 48, height: 48)
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
+                Spacer(minLength: 8)
 
                 LiveSubtitleMenuButton(engine: live) { showLiveSettings = true }
                     .fixedSize().layoutPriority(3)
 
-                if let onSelectEpisode {
-                    Button(action: onSelectEpisode) {
-                        Image(systemName: "rectangle.stack.badge.play")
-                            .foregroundStyle(.white).frame(width: 48, height: 48)
-                    }.buttonStyle(.plain)
-                        .foregroundStyle(.white).tint(.white)
-                        .accessibilityLabel("选择集数")
-                        .accessibilityIdentifier("player.episode.settings")
+                if onlineQuality != nil {
+                    Text(onlineQualityStatus)
+                        .font(.system(size: 13, weight: .regular)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
+                        .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+                        .accessibilityIdentifier("player.online-quality-status")
                 }
                 if let onSelectSource {
                     Button(action: onSelectSource) {
-                        Text(subtitle.isEmpty ? "播放源" : subtitle)
-                            .font(.caption.weight(.medium)).lineLimit(1)
+                        chromeTextLabel(subtitle.isEmpty ? "播放源" : subtitle)
                             .frame(maxWidth: 180)
-                            .frame(minHeight: 48)
                     }.buttonStyle(.plain)
-                        .foregroundStyle(.white)
                         .accessibilityLabel("选择播放源")
                         .accessibilityIdentifier("player.source.settings")
                 } else if !subtitle.isEmpty {
-                    Text(subtitle).font(.caption).foregroundStyle(.white.opacity(0.8))
+                    Text(subtitle).font(.system(size: 15, weight: .regular)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
-                if onlineQuality != nil {
-                    Text(onlineQualityStatus)
-                        .font(.caption2).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
-                        .accessibilityIdentifier("player.online-quality-status")
+                if let onSelectEpisode {
+                    Button(action: onSelectEpisode) {
+                        chromeTextLabel("选集")
+                    }.buttonStyle(.plain)
+                        .accessibilityLabel("选择集数")
+                        .accessibilityIdentifier("player.episode.settings")
                 }
+
+                Menu {
+                    ForEach(Self.playbackRates, id: \.self) { rate in
+                        Button {
+                            selectPlaybackRate(rate)
+                        } label: {
+                            if playbackRate == rate {
+                                Label(Self.rateTitle(rate), systemImage: "checkmark")
+                            } else {
+                                Text(Self.rateTitle(rate))
+                            }
+                        }
+                    }
+                } label: {
+                    chromeTextLabel(playbackRate == 1 ? "倍速" : Self.rateTitle(playbackRate))
+                }
+                .accessibilityLabel("倍速：\(Self.rateTitle(playbackRate))")
+                .accessibilityIdentifier("player.playback.rate")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 28)
             .padding(.bottom, 10)
-            .padding(.top, 6)
+            .padding(.top, 2)
         }
         .background {
             LinearGradient(
-                colors: [Color.black.opacity(0.55), .clear, .clear, Color.black.opacity(0.7)],
+                colors: [Color.black.opacity(0.45), .clear, .clear, Color.black.opacity(0.55)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -851,14 +893,61 @@ struct KSChromePlayer: View {
         }
     }
 
+    /// Plain white text control label (1080P / 选集 / 倍速 style): no capsule, 48pt hit height.
+    private func chromeTextLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 16, weight: .medium))
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+    }
+
+    static let playbackRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+
+    static func rateTitle(_ rate: Float) -> String {
+        let tenths = Double(rate) * 10
+        return String(format: tenths == tenths.rounded() ? "%.1fx" : "%.2fx", Double(rate))
+    }
+
+    /// 倍速: KSAVPlayer/KSMEPlayer `playbackRate` (AVPlayer only applies it while playing, so no paused autoplay).
+    private func selectPlaybackRate(_ rate: Float) {
+        playbackRate = rate
+        applyPlaybackRate()
+        scheduleHide()
+    }
+
+    /// Re-applied on readyToPlay and every tick, so a replaced item / reset layer in this session keeps the choice.
+    private func applyPlaybackRate() {
+        guard let player = coordinator.playerLayer?.player else { return }
+        if player.playbackRate != playbackRate { player.playbackRate = playbackRate }
+    }
+
     private var progressBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             Text(formatTime(isSeeking ? seekValue : currentTime))
-                .font(.caption.monospacedDigit())
+                .font(.system(size: 14, weight: .regular).monospacedDigit())
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
-                .frame(width: 48, alignment: .leading)
+                .lineLimit(1)
+                .frame(minWidth: 44, alignment: .leading)
+                .fixedSize()
             GeometryReader { geo in
+                let shown = isSeeking ? seekValue : currentTime
+                let fraction = duration > 0 ? CGFloat(min(1, max(0, shown / duration))) : 0
+                // Thin drawn track (no glass/capsule wrapper, no large thumb). The real Slider sits on top,
+                // nearly transparent, so drag editing, accessibility and UI tests keep the native control.
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.32)).frame(height: 3)
+                    Capsule().fill(Color.white).frame(width: max(0, geo.size.width * fraction), height: 3)
+                    Circle().fill(Color.white)
+                        .frame(width: isSeeking ? 12 : 7, height: isSeeking ? 12 : 7)
+                        .offset(x: min(max(0, geo.size.width * fraction - (isSeeking ? 6 : 3.5)), max(0, geo.size.width - (isSeeking ? 12 : 7))))
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .allowsHitTesting(false)
                 Slider(
                     value: Binding(
                         get: { isSeeking ? seekValue : currentTime },
@@ -886,6 +975,8 @@ struct KSChromePlayer: View {
                     }
                 }
                 .disabled(seekPending || duration <= 0)
+                .opacity(0.02)
+                .frame(width: geo.size.width, height: geo.size.height)
                 .contentShape(Rectangle())
                 .tint(.white)
                 .controlSize(.small)
@@ -912,19 +1003,13 @@ struct KSChromePlayer: View {
             }
             .frame(height: 34)
             Text(formatTime(duration))
-                .font(.caption.monospacedDigit())
+                .font(.system(size: 14, weight: .regular).monospacedDigit())
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
-                .frame(width: 48, alignment: .trailing)
+                .lineLimit(1)
+                .frame(minWidth: 44, alignment: .trailing)
+                .fixedSize()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .glassSurface(
-            in: Capsule(),
-            tint: .black,
-            tintStrength: 0.18,
-            elevation: 0.4
-        )
     }
 
     /// Map a tap on the progress track to an absolute seek. Drag continues to use Slider editing.
@@ -939,39 +1024,6 @@ struct KSChromePlayer: View {
         isSeeking = false
         seekPreview.cancel()
         scheduleHide()
-    }
-
-    private func glassButton(_ system: String, action: @escaping () -> Void) -> some View {
-        Button {
-            GlassHaptic.tap()
-            action()
-        } label: {
-            Image(systemName: system)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
-                .frame(width: 48, height: 48)
-                .liquidGlass()
-        }
-        .pressableGlass(scale: 0.9)
-        .contentShape(Circle())
-    }
-
-    private func capsuleButton(_ system: String, action: @escaping () -> Void) -> some View {
-        Button {
-            GlassHaptic.tap()
-            action()
-        } label: {
-            Image(systemName: system)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
-                .frame(width: 48, height: 48)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .liquidGlass()
-        }
-        .pressableGlass(scale: 0.9)
     }
 
     private func applyFillMode() {
@@ -1034,6 +1086,7 @@ struct KSChromePlayer: View {
                     coordinator.playerLayer?.play()
                     applyOnlineQuality()
                     applyFillMode()
+                    applyPlaybackRate()
                     syncTime()
                 }
             }
@@ -1138,6 +1191,8 @@ struct KSChromePlayer: View {
                     historyRecordedID = movie.id
                 }
                 applyOnlineQuality()
+                applyPlaybackRate()
+                sampleThroughput()
                 publishVideoMetrics(timedOut: Date().timeIntervalSince(start) > 30)
                 if !hasStarted, !failureReported, Date().timeIntervalSince(start) > 30, onPlaybackFailure != nil {
                     failureReported = true
@@ -1159,6 +1214,16 @@ struct KSChromePlayer: View {
         _ = applied
         let presented = item.presentationSize
         if presented.width > 1, presented.height > 1 { observedResolution = presented }
+    }
+
+    /// Real downloaded bytes from the AVPlayerItem access log, sampled over time. Never the encoded/indicated bitrate.
+    /// KSMEPlayer (FFmpeg) exposes no byte counter, so the label stays hidden there.
+    @MainActor
+    private func sampleThroughput() {
+        let item = (coordinator.playerLayer?.player as? KSAVPlayer)?.player.currentItem
+        let total = item.flatMap { PlaybackThroughputSampler.transferredBytes($0) }
+        throughput.sample(totalBytes: total, at: ProcessInfo.processInfo.systemUptime)
+        if downloadSpeed != throughput.bytesPerSecond { downloadSpeed = throughput.bytesPerSecond }
     }
 
     var onlineQualityStatus: String {
@@ -1252,6 +1317,50 @@ struct KSChromePlayer: View {
             guard !Task.isCancelled else { return }
             withAnimation { showChrome = false }
         }
+    }
+}
+
+/// Build 323: network download speed from cumulative transferred bytes (delta bytes / delta time over a short window).
+struct PlaybackThroughputSampler: Equatable {
+    private var lastBytes: Int64?
+    private var lastTime: TimeInterval = 0
+    private var window: [Sample] = []
+    private(set) var bytesPerSecond: Double?
+    private struct Sample: Equatable { var bytes: Int64; var seconds: Double }
+    static let windowSeconds: Double = 2.0
+
+    /// Sum of `numberOfBytesTransferred` over the item's access-log events; nil when there is no network log.
+    static func transferredBytes(_ item: AVPlayerItem) -> Int64? {
+        guard let events = item.accessLog()?.events, !events.isEmpty else { return nil }
+        let total = events.reduce(Int64(0)) { $0 + max(0, $1.numberOfBytesTransferred) }
+        return total > 0 ? total : nil
+    }
+
+    mutating func reset() {
+        lastBytes = nil
+        window.removeAll()
+        bytesPerSecond = nil
+    }
+
+    mutating func sample(totalBytes: Int64?, at time: TimeInterval) {
+        guard let totalBytes, totalBytes > 0 else { reset(); return }
+        defer { lastBytes = totalBytes; lastTime = time }
+        guard let previous = lastBytes, time > lastTime else { return }
+        guard totalBytes >= previous else { window.removeAll(); bytesPerSecond = nil; return } // new item / log
+        window.append(Sample(bytes: totalBytes - previous, seconds: time - lastTime))
+        var seconds = window.reduce(0) { $0 + $1.seconds }
+        while window.count > 1, seconds - window[0].seconds >= Self.windowSeconds {
+            seconds -= window[0].seconds
+            window.removeFirst()
+        }
+        let bytes = window.reduce(Int64(0)) { $0 + $1.bytes }
+        bytesPerSecond = seconds > 0 ? Double(bytes) / seconds : nil
+    }
+
+    static func display(_ bytesPerSecond: Double) -> String {
+        let mb = 1024.0 * 1024.0
+        if bytesPerSecond >= mb { return String(format: "%.1f MB/s", bytesPerSecond / mb) }
+        return String(format: "%.0f KB/s", max(0, bytesPerSecond) / 1024.0)
     }
 }
 

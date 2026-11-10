@@ -156,16 +156,15 @@ struct LiveSubtitleMenuButton: View {
             Divider()
             Button { openSettings() } label: { Label("实时字幕设置…", systemImage: "slider.horizontal.3") }
         } label: {
+            // 323: plain white text label like 选集 / 倍速 — no capsule fill; a mode title shows when on.
             HStack(spacing: 4) {
-                Image(systemName: engine.mode == .off ? "captions.bubble" : "captions.bubble.fill")
-                    .font(.system(size: 17, weight: .medium))
                 Text(engine.mode == .off ? "字幕" : engine.mode.title)
-                    .font(.caption.weight(.semibold)).lineLimit(1)
+                    .font(.system(size: 16, weight: .medium)).lineLimit(1)
                 if case .loading = engine.phase { ProgressView().controlSize(.mini).tint(.white) }
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 10).frame(minHeight: 48)
-            .background(engine.mode == .off ? Color.clear : Color.white.opacity(0.18), in: Capsule())
+            .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+            .padding(.horizontal, 6).frame(minHeight: 48)
             .contentShape(Rectangle())
         }
         .accessibilityLabel("实时字幕：\(engine.mode.title)")
