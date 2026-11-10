@@ -263,20 +263,16 @@ jobs:
   home-immersive-screenshots:
     # Build 325: production HomeView (neutral --home325-fixture rasters, no network) on an
     # iPhone simulator; screenshots of the immersive hero and the rails.
-    needs: models
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: live287-models
-          path: AVDB/Resources/LiveModels
-      - name: Fetch sherpa-onnx / llama xcframeworks (sha256-pinned)
+      - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
-          python3 scripts/live289/fetch_live289.py . AVDB/Resources/LiveModels
-          python3 scripts/live292/fetch_llama292.py .
+          mkdir -p AVDB/Resources/LiveModels
+          gem install xcodeproj --no-document
+          ruby -e 'require "xcodeproj"; p = Xcodeproj::Project.open("AVDB.xcodeproj"); app = p.targets.find { |t| t.name == "AVDB" }; app.build_phases.each { |ph| next unless ph.respond_to?(:files); ph.files.select { |f| f.file_ref && f.file_ref.path.to_s =~ /(llama|SherpaOnnxC)\.xcframework/ }.each { |f| puts "drop #{f.file_ref.path} from #{ph.display_name}"; ph.remove_build_file(f) } }; p.save'
       - name: Install dependencies and the generated PosterNavigation UI-test scheme
         run: |
           gem install cocoapods -v 1.16.2 --no-document
