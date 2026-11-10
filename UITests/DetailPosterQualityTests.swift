@@ -870,3 +870,192 @@ final class HomeHot329Tests: XCTestCase {
         XCTAssertEqual(HeroCIDMap.cid(from: bare), "ipx00706")
     }
 }
+
+
+final class HomeChrome330Tests: XCTestCase {
+    override func tearDown() async throws {
+        await MainActor.run { HeroCoverStore.shared.resetForTests() }
+        HeroCoverPolicy.overallBudgetOverride = nil
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        try await super.tearDown()
+    }
+
+    /// (a) A clean tap opens detail; a swipe / page-commit does not.
+    func test330CleanTapOpensDetailAndPageCommitDoesNot() {
+        let origin = Date()
+        XCTAssertTrue(HeroTapPolicy.shouldOpen(translation: 0, duration: 0.12,
+                                               consumedPageChange: false,
+                                               lastPageCommitAt: .distantPast, now: origin))
+        XCTAssertTrue(HeroTapPolicy.shouldOpen(translation: 9.5, duration: 0.29,
+                                               consumedPageChange: false,
+                                               lastPageCommitAt: .distantPast, now: origin))
+        XCTAssertFalse(HeroTapPolicy.shouldOpen(translation: 10, duration: 0.12,
+                                                consumedPageChange: false,
+                                                lastPageCommitAt: .distantPast, now: origin))
+        XCTAssertFalse(HeroTapPolicy.shouldOpen(translation: 2, duration: 0.3,
+                                                consumedPageChange: false,
+                                                lastPageCommitAt: .distantPast, now: origin))
+        XCTAssertFalse(HeroTapPolicy.shouldOpen(translation: 2, duration: 0.12,
+                                                consumedPageChange: true,
+                                                lastPageCommitAt: .distantPast, now: origin))
+        // lastDragAt is set only on page-commit and suppresses a trailing touch for 0.35s.
+        XCTAssertFalse(HeroTapPolicy.shouldOpen(translation: 0, duration: 0.08,
+                                                consumedPageChange: false,
+                                                lastPageCommitAt: origin,
+                                                now: origin.addingTimeInterval(0.34)))
+        XCTAssertTrue(HeroTapPolicy.shouldOpen(translation: 0, duration: 0.08,
+                                               consumedPageChange: false,
+                                               lastPageCommitAt: origin,
+                                               now: origin.addingTimeInterval(0.36)))
+    }
+
+    /// (b) DTO floor paints immediately even if the resolver is delayed 15s, then upgrades to the winner.
+    @MainActor
+    func test330DTOFloorPaintsThenUpgradesToResolverWinner() async throws {
+        HeroCoverStore.shared.resetForTests()
+        let winner = ImageLoader.fixturePoster("fixture://poster/portrait-hero-a")
+        HeroCoverStore.testResolverProvider = { movie in
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            return DetailPosterArtwork(image: winner, backdrop: winner, tint: .black,
+                                       provenance: PosterProvenance(source: "official-ps"),
+                                       sourceURL: "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00706/ipx00706ps.jpg",
+                                       nativeWidth: 1200, nativeHeight: 1800, rawImage: winner)
+        }
+        let movie = Movie(
+            id: "delay-330",
+            number: "DELAY-330",
+            title: "Resolver delayed 15s",
+            thumbURL: "fixture://poster/thumb147-floor",
+            coverURL: "https://c0.jdbstatic.com/covers/delay-330.jpg"
+        )
+        let t0 = Date()
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        var presentation = HeroCoverStore.shared.presentation(for: "delay-330")
+        let floorDeadline = Date().addingTimeInterval(2.0)
+        while Date() < floorDeadline, presentation.blurImage == nil && presentation.sharpImage == nil {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "delay-330")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(t0), 3, "DTO floor must paint well before the delayed resolver")
+        XCTAssertNotNil(presentation.blurImage, "ranking DTO thumb must be the unblurred floor at t0")
+        XCTAssertNil(presentation.sharpImage)
+        XCTAssertFalse(presentation.isAB)
+
+        let upgradeDeadline = Date().addingTimeInterval(18)
+        while Date() < upgradeDeadline, presentation.isAB == false {
+            try await Task.sleep(nanoseconds: 200_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "delay-330")
+        }
+        XCTAssertTrue(presentation.isAB, "late official resolver winner must upgrade after the 6s rhythm point, at ~15s")
+        XCTAssertEqual(presentation.tier, .a)
+        XCTAssertNotNil(presentation.sharpImage)
+        XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(t0), 14.5)
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(presentation.sharpImage!), HeroCoverPolicy.pixelWidth(winner))
+    }
+
+    /// (c) A HeroCoverDisk / resolver-cache hit is used immediately as the sharp layer.
+    @MainActor
+    func test330CacheHitUsedImmediately() async throws {
+        HeroCoverStore.shared.resetForTests()
+        let image = ImageLoader.fixturePoster("fixture://poster/portrait-hero-a")
+        HeroCoverDisk.storeAccepted(image, number: "CACHE-330", source: "hero-disk")
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            return nil
+        }
+        let movie = Movie(
+            id: "cache-330",
+            number: "CACHE-330",
+            title: "Cached official portrait",
+            coverURL: "https://c0.jdbstatic.com/covers/cache-330.jpg"
+        )
+        let t0 = Date()
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        var presentation = HeroCoverStore.shared.presentation(for: "cache-330")
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, presentation.sharpImage == nil {
+            try await Task.sleep(nanoseconds: 40_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "cache-330")
+        }
+        XCTAssertNotNil(presentation.sharpImage, "HeroCoverDisk / resolver cache must be the sharp layer immediately")
+        XCTAssertLessThan(Date().timeIntervalSince(t0), 1.0)
+        XCTAssertTrue(presentation.tier.isAB || presentation.tier == .c)
+    }
+
+    /// (d) Enrich-merged detail cover_url can appear as the middle step (not small_covers).
+    @MainActor
+    func test330EnrichMergedDetailCoverIsMiddleStep() async throws {
+        HeroCoverStore.shared.resetForTests()
+        HeroCoverStore.testDetailProvider = { movie in
+            Movie(id: movie.id, number: movie.number, title: movie.title,
+                  coverURL: "fixture://poster/portrait-mid-cover")
+        }
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            return nil
+        }
+        let movie = Movie(
+            id: "enrich-330",
+            number: "ENRICH-330",
+            title: "Needs detail cover",
+            thumbURL: "fixture://poster/thumb147-floor"
+        )
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        var presentation = HeroCoverStore.shared.presentation(for: "enrich-330")
+        let floorDeadline = Date().addingTimeInterval(2)
+        while Date() < floorDeadline, presentation.blurImage == nil {
+            try await Task.sleep(nanoseconds: 40_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "enrich-330")
+        }
+        XCTAssertNotNil(presentation.blurImage, "DTO thumb floor must paint first")
+        let midDeadline = Date().addingTimeInterval(3)
+        while Date() < midDeadline, presentation.enrichImage == nil {
+            try await Task.sleep(nanoseconds: 40_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "enrich-330")
+        }
+        XCTAssertNotNil(presentation.enrichImage, "enrich-merged detail cover_url must appear as the middle step")
+        XCTAssertNotEqual(HeroCoverPolicy.pixelWidth(presentation.enrichImage!), 147)
+        XCTAssertNil(presentation.sharpImage, "delayed resolver must not have won yet")
+    }
+
+    /// (e) backdrop / pl is not chosen as the primary sharp over the official portrait winner.
+    @MainActor
+    func test330BackdropPLIsNotPrimaryOverOfficialPortrait() async throws {
+        let ps = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00706/ipx00706ps.jpg"
+        let pl = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00706/ipx00706pl.jpg"
+        XCTAssertFalse(HeroResolverSharp.isBackdropOrJacket(ps))
+        XCTAssertTrue(HeroResolverSharp.isBackdropOrJacket(pl))
+        XCTAssertTrue(HeroResolverSharp.isBackdropOrJacket("https://example/hdBackdrop.jpg"))
+
+        let official = DetailPosterQuality(source: ps, width: 745, height: 1081, originalPortrait: true)
+        let jacket = DetailPosterQuality(source: pl, width: 800, height: 1080, originalPortrait: false)
+        let winner = DetailPosterQuality.winner([jacket, official])
+        XCTAssertEqual(winner?.source, ps, "official typography / front-crop portrait must beat the pl jacket")
+
+        let portrait = ImageLoader.fixturePoster("fixture://poster/portrait-hero-a")
+        let backdrop = ImageLoader.fixturePoster("fixture://poster/jacket-pl")
+        XCTAssertNotEqual(HeroCoverPolicy.pixelWidth(portrait), HeroCoverPolicy.pixelWidth(backdrop))
+        let art = DetailPosterArtwork(image: portrait, backdrop: backdrop, tint: .black,
+                                      provenance: PosterProvenance(source: ps),
+                                      sourceURL: ps, nativeWidth: 1200, nativeHeight: 1800, rawImage: portrait)
+        let primary = HeroResolverSharp.primaryImage(from: art)
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(primary), HeroCoverPolicy.pixelWidth(portrait))
+        XCTAssertNotEqual(HeroCoverPolicy.pixelWidth(primary), HeroCoverPolicy.pixelWidth(backdrop))
+
+        HeroCoverStore.shared.resetForTests()
+        HeroCoverStore.testResolverProvider = { _ in art }
+        let movie = Movie(id: "pl-330", number: "PL-330", title: "Portrait vs jacket",
+                          thumbURL: "fixture://poster/thumb147-floor")
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        var presentation = HeroCoverStore.shared.presentation(for: "pl-330")
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline, presentation.sharpImage == nil {
+            try await Task.sleep(nanoseconds: 40_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "pl-330")
+        }
+        XCTAssertNotNil(presentation.sharpImage)
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(presentation.sharpImage!), HeroCoverPolicy.pixelWidth(portrait),
+                       "home hero sharp must be the official portrait, not the backdrop / pl jacket")
+    }
+}

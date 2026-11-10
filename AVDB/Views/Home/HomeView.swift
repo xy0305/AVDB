@@ -256,7 +256,17 @@ struct HomeView: View {
 
     // MARK: Quick actions (12 destinations, frosted glass circles)
 
+    @ViewBuilder
     private func quickActionRow(_ m: HomeMetrics) -> some View {
+        // iPad: do not wrap in LiquidGlassContainer — GlassEffectContainer ate taps.
+        if AdaptiveLayout.isPad {
+            quickActionScroll(m)
+        } else {
+            LiquidGlassContainer { quickActionScroll(m) }
+        }
+    }
+
+    private func quickActionScroll(_ m: HomeMetrics) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: m.quickSpacing) {
                 quickAction("稍後再看", "clock.fill", m) { goWatchLater = true }
@@ -288,7 +298,7 @@ struct HomeView: View {
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.primary)
                     .frame(width: m.quickCircle, height: m.quickCircle)
-                    .background(Circle().fill(Color(.secondarySystemBackground)))
+                    .liquidGlassCircle(interactive: true)
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.primary)
@@ -1069,7 +1079,10 @@ private struct HomeAmbientBackground: View {
 
 // MARK: Floating chrome over the hero
 
-/// 58 pt frosted glass search button, floating top-right below the status bar.
+/// 44 pt liquid-glass search button, floating top-right below the status bar.
+/// Hit area is 44 pt (do not go below 44). If the glyph is unreadable on the
+/// brightest daily-ranking poster, fall back the *material only* to `homeGlass`,
+/// not the size.
 private struct HomeSearchButton: View {
     @ObservedObject var scroll: HomeScrollState
     let action: () -> Void
@@ -1077,10 +1090,10 @@ private struct HomeSearchButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 21, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.white)
-                .frame(width: 58, height: 58)
-                .homeGlass(in: Circle())
+                .frame(width: 44, height: 44)
+                .liquidGlassCircle()
                 .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
                 .contentShape(Circle())
         }
@@ -1276,55 +1289,15 @@ private struct HomeHeroCarousel: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Button {
-                // A horizontal or vertical swipe must not also open the detail page.
-                guard Date().timeIntervalSince(lastDragAt) > 0.35, let movie = current else { return }
+                // Overlay tap is the sole navigation entry. The button stays for
+                // VoiceOver only and is hit-disabled so the overlay can receive taps.
+                guard let movie = current else { return }
                 onOpen(movie)
             } label: {
                 imageLayer
             }
             .buttonStyle(HeroTouchStyle(touching: $touching))
-            .overlay {
-                HeroSwipeOverlay(
-                    scrollOffset: { scroll.offset },
-                    index: { index },
-                    count: { movies.count },
-                    onTrackHorizontal: { value in
-                        lastDragAt = Date()
-                        dragging = true
-                        dragX = value
-                    },
-                    onTrackVertical: { value in
-                        lastDragAt = Date()
-                        dragging = true
-                        dragY = value
-                    },
-                    onPageHorizontal: { delta in
-                        lastDragAt = Date()
-                        dragging = false
-                        go(delta, slide: true, vertical: false)
-                    },
-                    onPageVertical: { delta in
-                        lastDragAt = Date()
-                        dragging = false
-                        go(delta, slide: true, vertical: true)
-                    },
-                    onSpringHorizontal: {
-                        dragging = false
-                        withAnimation(.spring(response: HeroSwipePolicy.pageSpringResponse,
-                                              dampingFraction: HeroSwipePolicy.pageSpringDamping)) { dragX = 0 }
-                    },
-                    onSpringVertical: {
-                        dragging = false
-                        withAnimation(.spring(response: HeroSwipePolicy.pageSpringResponse,
-                                              dampingFraction: HeroSwipePolicy.pageSpringDamping)) { dragY = 0 }
-                    },
-                    onTouch: { down in
-                        touching = down
-                        if down { lastDragAt = Date() }
-                    }
-                )
-                .accessibilityHidden(true)
-            }
+            .allowsHitTesting(false)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
             .accessibilityHint("打開詳情")
@@ -1337,6 +1310,56 @@ private struct HomeHeroCarousel: View {
                 @unknown default: break
                 }
             }
+
+            // Sibling of the hit-disabled button (not its overlay) so taps reach
+            // it. HomeHotChip and HomeHeroMoreButton are later in this ZStack
+            // and keep their own hit targets; taps there must not also open detail.
+            HeroSwipeOverlay(
+                scrollOffset: { scroll.offset },
+                index: { index },
+                count: { movies.count },
+                onTrackHorizontal: { value in
+                    dragging = true
+                    dragX = value
+                },
+                onTrackVertical: { value in
+                    dragging = true
+                    dragY = value
+                },
+                onPageHorizontal: { delta in
+                    // lastDragAt is set only on page-commit, then used to
+                    // suppress a trailing touch for 0.35s after a swipe.
+                    lastDragAt = Date()
+                    dragging = false
+                    go(delta, slide: true, vertical: false)
+                },
+                onPageVertical: { delta in
+                    lastDragAt = Date()
+                    dragging = false
+                    go(delta, slide: true, vertical: true)
+                },
+                onSpringHorizontal: {
+                    dragging = false
+                    withAnimation(.spring(response: HeroSwipePolicy.pageSpringResponse,
+                                          dampingFraction: HeroSwipePolicy.pageSpringDamping)) { dragX = 0 }
+                },
+                onSpringVertical: {
+                    dragging = false
+                    withAnimation(.spring(response: HeroSwipePolicy.pageSpringResponse,
+                                          dampingFraction: HeroSwipePolicy.pageSpringDamping)) { dragY = 0 }
+                },
+                onTouch: { down in
+                    touching = down
+                },
+                onTap: {
+                    guard Date().timeIntervalSince(lastDragAt) > HeroTapPolicy.trailingSuppress,
+                          let movie = current else { return }
+                    onOpen(movie)
+                },
+                lastPageCommitAt: { lastDragAt }
+            )
+            .frame(width: width, height: height)
+            .accessibilityHidden(true)
 
             scrims
                 .allowsHitTesting(false)
@@ -1597,12 +1620,14 @@ private struct HomeHeroPage: View {
         let size = CGSize(width: metrics.width, height: metrics.heroHeight)
         ZStack {
             HomeTheme.heroLoadingFloor
-            // Main image layer: never apply blur or a dim multiply.
-            if presentation.blurImage == nil, presentation.sharpImage == nil, let floor = floorImage {
+            // Three-step floor with cross-fades (≤0.45s): ranking DTO → enrich
+            // detail cover_url → DetailPosterResolver official portrait winner.
+            // Later layers sit on top; quality rules never gate the DTO floor.
+            if let floor = presentation.blurImage ?? floorImage {
                 HomeAnchoredFill(image: floor, size: size)
             }
-            if let quick = presentation.blurImage, presentation.sharpImage == nil {
-                HomeAnchoredFill(image: quick, size: size)
+            if let mid = presentation.enrichImage {
+                HomeAnchoredFill(image: mid, size: size)
             }
             if let sharp = presentation.sharpImage {
                 HomeAnchoredFill(image: sharp, size: size)

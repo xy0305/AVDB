@@ -28,6 +28,8 @@ enum HeroCoverPolicy {
     static let graceWindow: TimeInterval = 0.4
     static let crossfadeDuration: TimeInterval = 0.45
     static let prefetchConcurrency = 3
+    /// Build 330: DetailPosterResolver scheduler cap (current → +1 → −1 → +2 → −2).
+    static let resolverConcurrency = 2
     static let lowPowerPrefetchConcurrency = 1
     static let negativeTTL: TimeInterval = 60
     static let foregroundRetryInterval: TimeInterval = 60
@@ -41,7 +43,7 @@ enum HeroCoverPolicy {
     static let sameTierWidthEpsilon = 0.10
 
     static func prefetchLimit(lowPower: Bool = ProcessInfo.processInfo.isLowPowerModeEnabled) -> Int {
-        lowPower ? lowPowerPrefetchConcurrency : prefetchConcurrency
+        lowPower ? lowPowerPrefetchConcurrency : resolverConcurrency
     }
 
     static func pixelWidth(_ image: UIImage) -> Int {
@@ -191,8 +193,11 @@ enum HeroCoverNegativeCache {
     #endif
 }
 
-/// Quick-blur and sharp source lists for one title. Reuses DMM / DetailPoster
-/// URL rules with hero-tier parameters; does not call VisibleHQPosterPolicy.
+/// Quick-blur and (historical) sharp source lists for one title. Reuses DMM /
+/// DetailPoster URL rules with hero-tier parameters; does not call VisibleHQPosterPolicy.
+/// Build 330: `sharp` is no longer the authoritative sharp target. The official
+/// iPhone detail-page winner from DetailPosterResolver is. The independent
+/// queue is a resolver scheduler, not a hero-only DMM ps/pl race.
 enum HeroCoverSources {
     struct Source: Sendable {
         let url: String
@@ -265,6 +270,9 @@ enum HeroCoverPhase: String, Equatable, Sendable {
 struct HeroCoverPresentation: Equatable {
     var phase: HeroCoverPhase = .empty
     var blurImage: UIImage?
+    /// Middle step of the Build 330 floor: enrich-merged detail `cover_url`
+    /// (real cover, not `small_covers`).
+    var enrichImage: UIImage?
     var sharpImage: UIImage?
     var tier: HeroCoverTier = .none
     var pixelWidth: Int = 0
@@ -274,10 +282,10 @@ struct HeroCoverPresentation: Equatable {
     var settled: Bool = false
 
     var isAB: Bool { phase == .finalized && tier.isAB }
-    var hasQuick: Bool { blurImage != nil || sharpImage != nil }
+    var hasQuick: Bool { blurImage != nil || enrichImage != nil || sharpImage != nil }
 
     var token: String {
-        "\(phase.rawValue)#\(tier.rawValue)#\(pixelWidth)#\(blurImage != nil)#\(sharpImage != nil)#\(settled)"
+        "\(phase.rawValue)#\(tier.rawValue)#\(pixelWidth)#\(blurImage != nil)#\(enrichImage != nil)#\(sharpImage != nil)#\(settled)"
     }
 
     static func == (lhs: HeroCoverPresentation, rhs: HeroCoverPresentation) -> Bool { lhs.token == rhs.token }
@@ -300,6 +308,22 @@ enum HeroCoverSRHook {
     }
 }
 
+/// Official portrait from DetailPosterResolver is the primary sharp layer.
+/// `hdBackdrop` / `pl` jackets must not be chosen over that winner, and the
+/// home hero never uses the artwork backdrop or AICover-enhanced display raster.
+enum HeroResolverSharp {
+    static func primaryImage(from art: DetailPosterArtwork) -> UIImage {
+        art.rawImage ?? art.image
+    }
+
+    static func isBackdropOrJacket(_ source: String) -> Bool {
+        let lower = source.lowercased()
+        if lower.contains("hdbackdrop") || lower.contains("hd_backdrop") { return true }
+        if lower.hasSuffix("pl.jpg") { return true }
+        return false
+    }
+}
+
 /// Main-actor façade the hero carousel reads. Prefetch starts when the
 /// recommend list returns. Memory keeps only the current + next decoded bitmaps.
 @MainActor
@@ -316,6 +340,13 @@ final class HeroCoverStore: ObservableObject {
     private var pathMonitor: NWPathMonitor?
     private var lastPathSatisfied = true
     private let gate = HeroCoverPrefetchGate()
+    private var enrichFinished = false
+    private var enrichedIDs: Set<String> = []
+    private var settleStarted: Set<String> = []
+    #if DEBUG
+    static var testDetailProvider: ((Movie) async -> Movie?)?
+    static var testResolverProvider: ((Movie) async -> DetailPosterArtwork?)?
+    #endif
 
     func presentation(for id: String) -> HeroCoverPresentation {
         presentations[id] ?? HeroCoverPresentation()
@@ -327,9 +358,14 @@ final class HeroCoverStore: ObservableObject {
         generation = UUID()
         for task in tasks.values { task.cancel() }
         tasks.removeAll()
+        enrichFinished = false
+        enrichedIDs.removeAll()
+        settleStarted.removeAll()
         startNetworkWatchIfNeeded()
-        enqueuePrefetch()
-        Task { await self.enrichHeroCIDs() }
+        // DTO floor + cached official winners paint immediately. The resolver
+        // scheduler starts only after enrich has merged cover / actors / CID.
+        enqueueFloorAndCachedSharp()
+        Task { await self.enrichThenResolve() }
     }
 
     func setCurrentIndex(_ index: Int, movies: [Movie]? = nil) {
@@ -337,11 +373,12 @@ final class HeroCoverStore: ObservableObject {
         currentIndex = min(max(index, 0), max(self.movies.count - 1, 0))
         evictNonAdjacentBitmaps()
         // Current ±1: restore unblurred floor + sharp from in-memory floor cache,
-        // HeroCoverDisk, and HQPosterDiskCache so a swipe back is never a smear.
+        // HeroCoverDisk, and the DetailPosterResolver cache so a swipe back is never a smear.
         for movie in adjacentMovies() {
             restoreBitmaps(for: movie)
         }
-        enqueuePrefetch()
+        enqueueFloorAndCachedSharp()
+        if enrichFinished { enqueueResolver() }
     }
 
     func clearNegatives() {
@@ -353,7 +390,13 @@ final class HeroCoverStore: ObservableObject {
         generation = UUID()
         for task in tasks.values { task.cancel() }
         tasks.removeAll()
-        enqueuePrefetch(force: true)
+        settleStarted.removeAll()
+        enqueueFloorAndCachedSharp()
+        if enrichFinished {
+            enqueueResolver(force: true)
+        } else {
+            Task { await self.enrichThenResolve() }
+        }
     }
 
     func retryOnForeground() {
@@ -365,12 +408,12 @@ final class HeroCoverStore: ObservableObject {
             let last = lastAttempt[movie.id] ?? 0
             if now - last > HeroCoverPolicy.foregroundRetryInterval { needed = true }
         }
-        if needed { enqueuePrefetch(force: true) }
+        if needed, enrichFinished { enqueueResolver(force: true) }
     }
 
     func noteNetworkRecovered() {
         let needsUpgrade = movies.contains { presentations[$0.id]?.isAB != true }
-        if needsUpgrade { enqueuePrefetch(force: true) }
+        if needsUpgrade, enrichFinished { enqueueResolver(force: true) }
     }
 
     #if DEBUG
@@ -383,6 +426,11 @@ final class HeroCoverStore: ObservableObject {
         floorCache.removeAll()
         movies = []
         currentIndex = 0
+        enrichFinished = false
+        enrichedIDs.removeAll()
+        settleStarted.removeAll()
+        Self.testDetailProvider = nil
+        Self.testResolverProvider = nil
         HeroCoverNegativeCache.resetForTests()
     }
     #endif
@@ -415,7 +463,7 @@ final class HeroCoverStore: ObservableObject {
                 presentation.sharpImage = nil
                 presentations[id] = presentation
             }
-            // Keep blurImage if present; if already evicted, the floor cache can restore it.
+            // Keep blurImage / enrichImage; if already evicted, the floor cache can restore it.
             if presentation.blurImage == nil, let floor = floorCache[id] {
                 presentation.blurImage = floor
                 if presentation.phase == .empty { presentation.phase = .blur }
@@ -432,23 +480,88 @@ final class HeroCoverStore: ObservableObject {
             presentations[movie.id] = current
         }
         if current.sharpImage == nil {
-            // HeroCoverDisk first, then any accepted HQPosterDiskCache raster
-            // already stored under the hero key (HeroCoverDisk uses that cache).
-            if let number = movie.number, let disk = HeroCoverDisk.image(for: number),
-               let candidate = HeroCoverClassifier.classify(image: disk, source: "hero-disk", kind: .disk, verifiedFrontCrop: true) {
-                applySharp(candidate, movie: movie, provisional: !candidate.tier.isAB)
+            if let number = movie.number, let disk = HeroCoverDisk.image(for: number) {
+                applyResolverImage(disk, source: "hero-disk", movie: movie)
                 return
+            }
+            if let image = cachedResolverPortrait(for: movie) {
+                applyResolverImage(image, source: "resolver-cache", movie: movie)
             }
         }
     }
 
-    private func enqueuePrefetch(force: Bool = false) {
-        guard !movies.isEmpty else { return }
+    private func cachedResolverPortrait(for movie: Movie) -> UIImage? {
+        let account = APIClient.shared.token
+        if let art = DetailPosterResolver.initialLayout(movie: movie, account: account).artwork {
+            return HeroResolverSharp.primaryImage(from: art)
+        }
+        return nil
+    }
+
+    /// Immediate DTO floor + HeroCoverDisk / resolver-cache sharp. Never waits on enrich.
+    private func enqueueFloorAndCachedSharp() {
+        for movie in movies {
+            startSettleTimer(for: movie)
+            restoreBitmaps(for: movie)
+            startFloorLoad(movie)
+        }
+    }
+
+    private func startFloorLoad(_ movie: Movie) {
+        if presentations[movie.id]?.blurImage != nil || floorCache[movie.id] != nil { return }
+        let id = movie.id
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            for source in HeroCoverSources.blur(movie: movie).prefix(3) {
+                if Task.isCancelled { return }
+                if source.hasPrefix("fixture://hang") || source.hasPrefix("fixture://delay") { continue }
+                if let image = await ImageLoader.shared.load(source, maxPixelSize: 640, timeout: 4) {
+                    self.applyBlur(image, movieID: id)
+                    return
+                }
+            }
+        }
+    }
+
+    private func applyBlur(_ image: UIImage, movieID: String) {
+        var current = presentations[movieID] ?? HeroCoverPresentation()
+        guard current.blurImage == nil else { return }
+        floorCache[movieID] = image
+        current.blurImage = image
+        if current.phase == .empty { current.phase = .blur }
+        if current.ambient == nil { current.ambient = HomeAmbientColor.base(from: image) }
+        presentations[movieID] = current
+    }
+
+    private func startSettleTimer(for movie: Movie) {
+        guard settleStarted.insert(movie.id).inserted else { return }
+        let gen = generation
+        let id = movie.id
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(HeroCoverPolicy.effectiveOverallBudget * 1_000_000_000))
+            guard let self, self.generation == gen else { return }
+            // 6s is a provisional floor-display rhythm point, not a cancel of
+            // in-flight resolver winners. Late winners may still upgrade.
+            // Provisional settle, not a cancel of in-flight work.
+            self.markSettled(id: id, finalized: (self.presentations[id]?.tier ?? .none) >= .c)
+        }
+    }
+
+    private func enrichThenResolve() async {
+        await enrichHeroCIDs()
+        // First official resolve must run even if the 6s rhythm point already
+        // marked 已定案（可升级） during enrich.
+        enqueueResolver(force: true)
+    }
+
+    /// Scheduler covers the cap-10 hero list in order: current → +1 → −1 → +2 → −2.
+    /// Concurrency cap 2. Starts only after enrich has merged fields.
+    private func enqueueResolver(force: Bool = false) {
+        guard enrichFinished, !movies.isEmpty else { return }
         let gen = generation
         let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         let current = min(max(currentIndex, 0), movies.count - 1)
         // Priority: current → +1 → −1 → +2 → −2, then the rest. No wrap.
-        // Low Power defers non-adjacent pages.
         var order: [Int] = [current]
         for delta in [1, -1, 2, -2] {
             let i = current + delta
@@ -468,16 +581,14 @@ final class HeroCoverStore: ObservableObject {
             let isAdjacent = adjacentIds.contains(movie.id)
             tasks[movie.id] = Task { @MainActor [weak self] in
                 guard let self else { return }
-                if !isCurrent {
-                    await self.gate.acquire(lowPower: lowPower)
-                }
+                await self.gate.acquire(lowPower: lowPower)
                 defer { self.tasks[movie.id] = nil }
                 guard !Task.isCancelled, self.generation == gen else {
-                    if !isCurrent { await self.gate.release() }
+                    await self.gate.release()
                     return
                 }
-                await self.resolve(movie, isCurrent: isCurrent, isAdjacent: isAdjacent, generation: gen)
-                if !isCurrent { await self.gate.release() }
+                await self.resolveOfficial(movie, isCurrent: isCurrent, isAdjacent: isAdjacent, generation: gen)
+                await self.gate.release()
             }
         }
     }
@@ -485,58 +596,91 @@ final class HeroCoverStore: ObservableObject {
     private func shouldRetry(_ movie: Movie, state: HeroCoverPresentation?) -> Bool {
         if state == nil { return true }
         if state?.phase == .finalized, state?.tier.isAB == true { return false }
-        // A settled (已定案（可升级）) item is not restarted automatically — the
-        // in-flight race, if any, continues, and foreground / network / pull
-        // retry with force: true.
-        if state?.settled == true { return false }
+        // A settled (已定案（可升级）) item is not restarted automatically once a
+        // resolver attempt has been made — in-flight work continues, and
+        // foreground / network / pull retry with force: true. An item that has
+        // not been attempted yet must still run after the 6s rhythm point.
+        if state?.settled == true, lastAttempt[movie.id] != nil { return false }
         if HeroCoverNegativeCache.isNegative(number: movie.number) { return false }
         return true
     }
 
-    private func resolve(_ movie: Movie, isCurrent: Bool, isAdjacent: Bool, generation: UUID) async {
+    private func resolveOfficial(_ movie: Movie, isCurrent: Bool, isAdjacent: Bool, generation: UUID) async {
         lastAttempt[movie.id] = ProcessInfo.processInfo.systemUptime
+        let keepBitmaps = isCurrent || isAdjacent
         #if DEBUG
-        // Instant B-tier for screenshot fixtures. Hanging / stuck CDN fixtures
-        // (fixture://hang) must go through the race so the per-item deadline can
-        // force a terminal state instead of a brown empty field.
-        if let url = movie.coverURL, url.hasPrefix("fixture://"),
-           !url.hasPrefix("fixture://hang"), !url.hasPrefix("fixture://delay") {
+        if let url = movie.coverURL, url.hasPrefix("fixture://") {
+            if url.hasPrefix("fixture://hang") { return }
+            if url.hasPrefix("fixture://delay/") {
+                let rest = String(url.dropFirst("fixture://delay/".count))
+                let parts = rest.split(separator: "/", maxSplits: 1)
+                let seconds = TimeInterval(parts.first.flatMap { Double($0) } ?? 15)
+                try? await Task.sleep(nanoseconds: UInt64(max(seconds, 0) * 1_000_000_000))
+                guard generation == self.generation, !Task.isCancelled else { return }
+                let remainder = parts.count > 1 ? "fixture://" + String(parts[1]) : url
+                let image = ImageLoader.fixturePoster(remainder)
+                applyResolverImage(image, source: url, movie: movie, keepBitmaps: keepBitmaps)
+                return
+            }
             let image = HeroCoverFixture.portrait(url)
             if let candidate = HeroCoverClassifier.classify(image: image, source: url, kind: .javdb, verifiedFrontCrop: true) {
-                applySharp(candidate, movie: movie, provisional: false)
+                applySharp(candidate, movie: movie, provisional: false, keepBitmaps: keepBitmaps)
                 return
             }
+            applyResolverImage(image, source: url, movie: movie, keepBitmaps: keepBitmaps)
+            return
+        }
+        if let provider = Self.testResolverProvider {
+            if let art = await provider(movie) {
+                guard generation == self.generation, !Task.isCancelled else { return }
+                applyArtwork(art, movie: movie, keepBitmaps: keepBitmaps)
+            }
+            return
         }
         #endif
-        // Priority 1: previously accepted HQ for this title (detail write-back included).
-        if let disk = HeroCoverDisk.image(for: movie.number),
-           let candidate = HeroCoverClassifier.classify(image: disk, source: "hero-disk", kind: .disk, verifiedFrontCrop: true) {
-            if candidate.tier.isAB {
-                applySharp(candidate, movie: movie, provisional: false)
-                return
-            }
-            if candidate.tier == .c {
-                applySharp(candidate, movie: movie, provisional: true)
-            }
+        if let disk = HeroCoverDisk.image(for: movie.number) {
+            applyResolverImage(disk, source: "hero-disk", movie: movie, keepBitmaps: keepBitmaps)
+            if presentations[movie.id]?.tier.isAB == true { return }
         }
-
-        let keepBitmaps = isCurrent || isAdjacent
-        let result = await HeroCoverRace.run(movie: movie, keepBitmaps: keepBitmaps) { [weak self] event in
-            guard let self, self.generation == generation else { return }
-            self.apply(event, movie: movie, keepBitmaps: keepBitmaps)
+        if let cached = cachedResolverPortrait(for: movie) {
+            applyResolverImage(cached, source: "resolver-cache", movie: movie, keepBitmaps: keepBitmaps)
+            if presentations[movie.id]?.tier.isAB == true { return }
         }
+        let art = await DetailPosterResolver.resolveShared(movie: movie, account: APIClient.shared.token)
         guard generation == self.generation, !Task.isCancelled else { return }
-        switch result {
-        case .finalized(let candidate), .provisionalFinal(let candidate):
-            applySharp(candidate, movie: movie, provisional: false, keepBitmaps: keepBitmaps)
-            HeroCoverDisk.storeAccepted(candidate.image, number: movie.number, source: candidate.source)
-            HeroCoverSRHook.scheduleIdleUpscaleIfNeeded(movie: movie, image: candidate.image, tier: candidate.tier)
-        case .blurOnly:
-            // Race finished with no ≥C sharp. The unblurred floor (if any) stays;
-            // mark 已定案（可升级） so a later force retry can still run.
-            markSettled(movie, finalized: false)
+        if let art {
+            applyArtwork(art, movie: movie, keepBitmaps: keepBitmaps)
         }
         evictNonAdjacentBitmaps()
+    }
+
+    private func applyArtwork(_ art: DetailPosterArtwork, movie: Movie, keepBitmaps: Bool) {
+        // Official resolver winner (raw artwork). Do not run AICover on the home hero.
+        // Do not use art.backdrop (hdBackdrop / pl jacket is not the 单人大图).
+        let image = HeroResolverSharp.primaryImage(from: art)
+        applyResolverImage(image, source: art.sourceURL, movie: movie, keepBitmaps: keepBitmaps)
+        HeroCoverDisk.storeAccepted(image, number: movie.number, source: art.sourceURL)
+    }
+
+    private func applyResolverImage(_ image: UIImage, source: String, movie: Movie, keepBitmaps: Bool = true) {
+        if let candidate = HeroCoverClassifier.classify(image: image, source: source.isEmpty ? "resolver" : source,
+                                                        kind: .disk, verifiedFrontCrop: true) {
+            applySharp(candidate, movie: movie, provisional: !candidate.tier.isAB, keepBitmaps: keepBitmaps)
+            HeroCoverDisk.storeAccepted(candidate.image, number: movie.number, source: candidate.source)
+            return
+        }
+        // The official portrait is still the sharp layer even if it is slightly
+        // outside the historical 1.30...1.55 hero-aspect window.
+        let width = HeroCoverPolicy.pixelWidth(image)
+        let height = HeroCoverPolicy.pixelHeight(image)
+        let tier: HeroCoverTier = width >= HeroCoverPolicy.tierAWidth ? .a
+            : width >= HeroCoverPolicy.tierBWidth ? .b : .c
+        let candidate = HeroCoverCandidate(image: image, pixelWidth: width, pixelHeight: height,
+                                           source: source, kind: .disk, tier: tier,
+                                           isNativePortraitPS: source.lowercased().contains("ps.jpg"),
+                                           verifiedFrontCrop: true)
+        applySharp(candidate, movie: movie, provisional: !tier.isAB, keepBitmaps: keepBitmaps)
+        HeroCoverDisk.storeAccepted(image, number: movie.number, source: source)
     }
 
     private func apply(_ event: HeroCoverRace.Event, movie: Movie, keepBitmaps: Bool) {
@@ -552,7 +696,7 @@ final class HeroCoverStore: ObservableObject {
         case .provisional(let candidate):
             applySharp(candidate, movie: movie, provisional: true, keepBitmaps: keepBitmaps)
         case .settled:
-            markSettled(movie, finalized: current.tier >= .c)
+            markSettled(id: movie.id, finalized: current.tier >= .c)
         }
     }
 
@@ -573,36 +717,80 @@ final class HeroCoverStore: ObservableObject {
     }
 
     private func markSettled(_ movie: Movie, finalized: Bool) {
-        var current = presentations[movie.id] ?? HeroCoverPresentation()
+        markSettled(id: movie.id, finalized: finalized)
+    }
+
+    private func markSettled(id: String, finalized: Bool) {
+        var current = presentations[id] ?? HeroCoverPresentation()
         current.settled = true
         if finalized, current.tier >= .c, current.phase != .finalized {
             current.phase = .finalized
         }
-        presentations[movie.id] = current
+        presentations[id] = current
     }
 
-    /// Check the playback DTO / mapping cache for a DMM CID. If missing, a
-    /// lightweight detail fetch fills the cache for the cap-10 hero list so
-    /// sharp sources can be constructed. Never blocks the first floor paint.
+    /// Merge cover / actors / CID into the hero movie *before* the resolver starts.
+    /// Never blocks the first floor paint. CID-only is not enough.
     private func enrichHeroCIDs() async {
         let snapshot = movies
-        var learned = false
         for movie in snapshot {
             if Task.isCancelled { return }
-            if HeroCIDMap.cid(from: movie) != nil { continue }
             #if DEBUG
+            if let provider = Self.testDetailProvider {
+                if let detail = await provider(movie) {
+                    applyMergedDetail(movie, detail)
+                } else {
+                    enrichedIDs.insert(movie.id)
+                }
+                continue
+            }
             if movie.coverURL?.hasPrefix("fixture://") == true || movie.thumbURL?.hasPrefix("fixture://") == true {
+                enrichedIDs.insert(movie.id)
                 continue
             }
             #endif
-            guard let detail = try? await JavDBSDK.shared.movieDetail(movie.id) else { continue }
-            if HeroCIDMap.learn(from: detail) { learned = true }
-            if var state = presentations[movie.id], state.isAB != true {
-                state.settled = false
-                presentations[movie.id] = state
+            guard let detail = try? await JavDBSDK.shared.movieDetail(movie.id) else {
+                enrichedIDs.insert(movie.id)
+                continue
+            }
+            applyMergedDetail(movie, detail)
+        }
+        enrichFinished = true
+    }
+
+    private func applyMergedDetail(_ movie: Movie, _ detail: Movie) {
+        HeroCIDMap.learn(from: detail)
+        let merged = movie.mergingHeroDetail(detail)
+        if let idx = movies.firstIndex(where: { $0.id == movie.id }) {
+            movies[idx] = merged
+        }
+        enrichedIDs.insert(movie.id)
+        if let cover = merged.coverURL, !cover.contains("/small_covers/") {
+            let dtoCover = movie.coverURL ?? ""
+            let dtoThumb = movie.thumbURL ?? ""
+            let isNewCover = cover != dtoThumb && (cover != dtoCover || dtoCover.contains("/small_covers/") || dtoCover.isEmpty)
+            if isNewCover || (cover != dtoThumb) {
+                loadEnrichCover(cover, movieID: movie.id)
             }
         }
-        if learned { enqueuePrefetch(force: true) }
+        if var state = presentations[movie.id], state.isAB != true {
+            state.settled = false
+            presentations[movie.id] = state
+        }
+    }
+
+    private func loadEnrichCover(_ url: String, movieID: String) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if url.hasPrefix("fixture://hang") { return }
+            if let image = await ImageLoader.shared.load(url, maxPixelSize: 1024, timeout: HeroCoverPolicy.upgradeTimeout) {
+                var current = self.presentations[movieID] ?? HeroCoverPresentation()
+                current.enrichImage = image
+                if current.phase == .empty { current.phase = .blur }
+                if current.ambient == nil { current.ambient = HomeAmbientColor.base(from: image) }
+                self.presentations[movieID] = current
+            }
+        }
     }
 
     private func startNetworkWatchIfNeeded() {

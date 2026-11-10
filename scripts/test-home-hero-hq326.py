@@ -9,21 +9,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '329' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 329;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '330' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 330;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 # Release wiring.
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 329' in wf and 'feat/home-hero-hq-326' in wf
+assert 'Home HQ posters App 330' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf and 'test-home-immersive325.py' not in wf
-assert 'scripts/package-lut329.py' in wf and 'AVDB-329-release' in wf and 'AVDB-325-' not in wf
-assert 'AVDB-329-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
+assert 'scripts/package-lut330.py' in wf and 'AVDB-330-release' in wf and 'AVDB-325-' not in wf
+assert 'AVDB-330-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'home-hero-hq-screenshots' in wf
 assert 'llama|SherpaOnnxC' in wf  # screenshot job still drops device-only xcframeworks
 assert not (r/'scripts/test-home-immersive325.py').exists() and not (r/'scripts/package-lut325.py').exists()
-pkg = (r/'scripts/package-lut329.py').read_text()
-assert "=='329'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-329-home-hot.ipa' in pkg
+pkg = (r/'scripts/package-lut330.py').read_text()
+assert "=='330'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-330-home-chrome.ipa' in pkg
 doc = (r/'Build326-HomeHeroHQ.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '326' in doc
 
@@ -45,6 +45,7 @@ assert 'static let overallBudget: TimeInterval = 6' in resolver
 assert 'static let graceWindow: TimeInterval = 0.4' in resolver
 assert 'static let crossfadeDuration: TimeInterval = 0.45' in resolver
 assert 'static let prefetchConcurrency = 3' in resolver
+assert 'static let resolverConcurrency = 2' in resolver
 assert 'static let lowPowerPrefetchConcurrency = 1' in resolver
 assert 'static let negativeTTL: TimeInterval = 60' in resolver
 assert 'static let aspectMin = 1.30' in resolver and 'static let aspectMax = 1.55' in resolver
@@ -157,7 +158,7 @@ assert qa.count('quickAction("') == 12
 assert 'MoviePosterGrid(' not in view
 assert 'usable / 3' in metrics  # 329: 3-column grid card width
 sb = home.split('private struct HomeSearchButton: View {')[1].split('private struct HomeTopScrim')[0]
-assert 'width: 58, height: 58' in sb
+assert 'width: 44, height: 44' in sb
 bar = (r/'AVDB/Views/AVDBNativeTabBar.swift').read_text()
 chrome = (r/'AVDB/Views/TabBarChrome.swift').read_text()
 assert 'case home, rankings, categories, actors, tangxin, one, me' in chrome
@@ -169,4 +170,4 @@ assert 'home-hero' in ui.split('func test326HomeHeroHQScreenshots()')[1].split('
 assert 'hero.frame.width, window.frame.width' in ui
 
 print('PASS home-hero-hq326 source contracts: independent HQ resolver, A/B/C tiers, no inset, '
-      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 329')
+      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 330')

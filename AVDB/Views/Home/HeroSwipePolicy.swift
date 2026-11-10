@@ -121,6 +121,26 @@ enum HeroSwipePolicy {
     }
 }
 
+/// Build 330: overlay tap is the sole hero navigation entry. A clean tap opens
+/// the current title; a swipe / page-commit does not. lastDragAt is recorded
+/// only on page-commit and suppresses a trailing touch for 0.35s.
+enum HeroTapPolicy {
+    static let maxTranslation: CGFloat = 10
+    static let maxDuration: TimeInterval = 0.3
+    static let trailingSuppress: TimeInterval = 0.35
+
+    static func shouldOpen(translation: CGFloat, duration: TimeInterval,
+                           consumedPageChange: Bool,
+                           lastPageCommitAt: Date,
+                           now: Date = Date()) -> Bool {
+        guard !consumedPageChange else { return false }
+        guard translation < maxTranslation else { return false }
+        guard duration < maxDuration else { return false }
+        guard now.timeIntervalSince(lastPageCommitAt) > trailingSuppress else { return false }
+        return true
+    }
+}
+
 /// UIKit pan on the hero. The parent UIScrollView's pan is required to wait
 /// for this recognizer to fail (passthrough / scroll-lock / first-down / last-up).
 /// When this recognizer begins, the ScrollView must not run.
@@ -135,19 +155,27 @@ struct HeroSwipeOverlay: UIViewRepresentable {
     var onSpringHorizontal: () -> Void
     var onSpringVertical: () -> Void
     var onTouch: (Bool) -> Void
+    var onTap: () -> Void
+    var lastPageCommitAt: () -> Date
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> UIView {
-        let view = UIView()
+        let view = HeroHitView()
         view.backgroundColor = .clear
         view.isOpaque = false
+        view.coordinator = context.coordinator
         let recognizer = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handle(_:)))
         recognizer.delegate = context.coordinator
         recognizer.cancelsTouchesInView = false
         recognizer.maximumNumberOfTouches = 1
         view.addGestureRecognizer(recognizer)
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        tap.delegate = context.coordinator
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
         context.coordinator.recognizer = recognizer
+        context.coordinator.tapRecognizer = tap
         context.coordinator.parent = self
         return view
     }
@@ -159,7 +187,11 @@ struct HeroSwipeOverlay: UIViewRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: HeroSwipeOverlay?
         weak var recognizer: UIPanGestureRecognizer?
+        weak var tapRecognizer: UITapGestureRecognizer?
         var session: HeroSwipePolicy.Session?
+        var touchBeganAt: Date?
+        var touchStart: CGPoint = .zero
+        var openedThisGesture = false
 
         @objc func handle(_ sender: UIPanGestureRecognizer) {
             guard let parent, let view = sender.view else { return }
@@ -168,6 +200,8 @@ struct HeroSwipeOverlay: UIViewRepresentable {
             switch sender.state {
             case .began:
                 parent.onTouch(true)
+                openedThisGesture = false
+                if touchBeganAt == nil { touchBeganAt = Date() }
                 var started = HeroSwipePolicy.Session.begin(
                     scrollOffset: parent.scrollOffset(),
                     index: parent.index(),
@@ -199,7 +233,9 @@ struct HeroSwipeOverlay: UIViewRepresentable {
                 apply(outcome)
             case .ended:
                 guard var session else {
+                    maybeOpenFromPan(translation: translation, consumedPageChange: false)
                     parent.onTouch(false)
+                    touchBeganAt = nil
                     return
                 }
                 let predictedX = translation.x + velocity.x * 0.25
@@ -208,8 +244,10 @@ struct HeroSwipeOverlay: UIViewRepresentable {
                                             predictedX: predictedX)
                 self.session = session
                 apply(outcome)
+                maybeOpenFromPan(translation: translation, consumedPageChange: session.consumedPageChange)
                 self.session = nil
                 parent.onTouch(false)
+                touchBeganAt = nil
             case .cancelled, .failed:
                 if let session, !session.consumedPageChange {
                     if session.axis == .horizontal { parent.onSpringHorizontal() }
@@ -217,6 +255,7 @@ struct HeroSwipeOverlay: UIViewRepresentable {
                 }
                 self.session = nil
                 parent.onTouch(false)
+                touchBeganAt = nil
             default:
                 break
             }
@@ -240,6 +279,31 @@ struct HeroSwipeOverlay: UIViewRepresentable {
             case .springVertical:
                 parent.onSpringVertical()
             }
+        }
+
+        @objc func handleTap(_ sender: UITapGestureRecognizer) {
+            guard let parent, let view = sender.view, sender.state == .ended else { return }
+            let loc = sender.location(in: view)
+            let translation = hypot(loc.x - touchStart.x, loc.y - touchStart.y)
+            let duration = Date().timeIntervalSince(touchBeganAt ?? Date())
+            let consumed = session?.consumedPageChange ?? false
+            openIfNeeded(translation: translation, duration: duration, consumedPageChange: consumed)
+            touchBeganAt = nil
+        }
+
+        private func maybeOpenFromPan(translation: CGPoint, consumedPageChange: Bool) {
+            let distance = hypot(translation.x, translation.y)
+            let duration = Date().timeIntervalSince(touchBeganAt ?? Date())
+            openIfNeeded(translation: distance, duration: duration, consumedPageChange: consumedPageChange)
+        }
+
+        private func openIfNeeded(translation: CGFloat, duration: TimeInterval, consumedPageChange: Bool) {
+            guard !openedThisGesture, let parent else { return }
+            guard HeroTapPolicy.shouldOpen(translation: translation, duration: duration,
+                                           consumedPageChange: consumedPageChange,
+                                           lastPageCommitAt: parent.lastPageCommitAt()) else { return }
+            openedThisGesture = true
+            parent.onTap()
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
@@ -272,8 +336,23 @@ struct HeroSwipeOverlay: UIViewRepresentable {
             // If the finger landed while the page was already scrolled, never begin.
             // (touches may not have run .began against our session yet on some paths.)
             guard let parent else { return true }
+            if gestureRecognizer is UITapGestureRecognizer { return parent.scrollOffset() <= 1 }
             if parent.scrollOffset() > 1 { return false }
             return parent.count() > 1
         }
     }
 }
+
+/// Records touch-down time and start location so a clean tap can be measured
+/// even when the pan recognizer never begins (single-item hero, no movement).
+private final class HeroHitView: UIView {
+    weak var coordinator: HeroSwipeOverlay.Coordinator?
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        coordinator?.touchBeganAt = Date()
+        coordinator?.touchStart = touches.first?.location(in: self) ?? .zero
+        coordinator?.openedThisGesture = false
+        super.touchesBegan(touches, with: event)
+    }
+}
+

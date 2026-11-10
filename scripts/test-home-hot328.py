@@ -8,19 +8,19 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '329' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 329;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '330' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 330;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HERO32800000000000001B' in pbx
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 329' in wf and 'feat/home-hot-328' in wf
+assert 'Home HQ posters App 330' in wf and 'feat/home-hot-328' in wf
 assert 'feat/detail-auth-327' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf
 assert 'python3 scripts/test-detail-auth327.py' in wf
-assert 'scripts/package-lut329.py' in wf and 'AVDB-329-release' in wf
-assert 'AVDB-unsigned-1.0.2-329-home-hot.ipa' in (r/'scripts/package-lut329.py').read_text()
+assert 'scripts/package-lut330.py' in wf and 'AVDB-330-release' in wf
+assert 'AVDB-unsigned-1.0.2-330-home-chrome.ipa' in (r/'scripts/package-lut330.py').read_text()
 assert 'home-hero-hq-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'detail-auth-327' in wf and 'test327DetailAuthErrorMessageVisible' in wf
 assert 'home-hot-328' in wf
@@ -139,7 +139,7 @@ assert 'preferredColorScheme(.dark)' not in home
 assert 'Color(.systemBackground)' in root
 assert 'HomeTheme.heroLoadingFloor' in home
 assert 'static let primary = Color.primary' in home
-assert 'Color(.secondarySystemBackground)' in home
+assert 'liquidGlassCircle(interactive: true)' in home
 assert 'Color(.systemGray5)' in home
 assert 'HomeStatusBarStyle' in home
 assert 'lightContent' in home
@@ -147,9 +147,9 @@ assert 'lightContent' in home
 assert 'heroHeight: m.heroHeight, scroll: scroll' in home
 assert 'max(0, heroHeight - scroll.up) + scroll.pull' in home
 assert 'Color(.systemBackground).opacity(0.94)' in home
-# Search stays dark-glass + white glyph (legible on hero and light page).
+# Search is 44 pt liquid glass + white glyph (Build 330; legible on hero and light page).
 sb = home.split('private struct HomeSearchButton: View {')[1].split('private struct HomeTopScrim')[0]
-assert 'width: 58, height: 58' in sb and 'Color.white' in sb and 'homeGlass' in sb
+assert 'width: 44, height: 44' in sb and 'Color.white' in sb and 'liquidGlassCircle' in sb
 # TOP250 stays a dark island; tab bar not restyled beyond 0.66 fill for contrast.
 assert 'HomeTheme.floor.opacity(0.94)' in home.split('private func top250Banner')[1].split('private func followingSection')[0]
 assert 'HomeChevronCircle(onDark: true)' in home
@@ -186,4 +186,4 @@ assert 'home-past-header' in nearby
 
 print('PASS home-hot328 source contracts: playback high_score+daily cap 10, '
       'DTO floor + per-item deadline, 往期 rail, light tokens, vertical arbitrator, '
-      '327 auth + 326 HQ intact, release 329')
+      '327 auth + 326 HQ intact, release 330')

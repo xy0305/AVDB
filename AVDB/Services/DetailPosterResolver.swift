@@ -15,6 +15,8 @@ struct DetailPosterArtwork: @unchecked Sendable {
     var sourceURL: String = ""
     var nativeWidth: Int = 0
     var nativeHeight: Int = 0
+    /// Official resolver winner before JavDBCoverEnhance / AICover. Home hero uses this.
+    var rawImage: UIImage? = nil
 }
 
 /// A separate cookie-free session is essential: this resolver never sees a 115
@@ -136,6 +138,31 @@ enum DetailPosterResolver {
             if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty && !catalogueEligible(movie) { return .landscape }
         }
         return saved
+    }
+
+    /// Coalesce in-flight resolve work with the home hero *by movie id*, so a
+    /// sparse ranking DTO and the detail page do not run the same resolve twice.
+    /// The identity cache is still consulted first.
+    private static let idFlightLock = NSLock()
+    private static var idFlights: [String: Task<DetailPosterArtwork?, Never>] = [:]
+
+    static func resolveShared(movie: Movie, account: String?) async -> DetailPosterArtwork? {
+        let id = movie.id
+        if let cached = cache.snapshot(key: identity(movie: movie, account: account)).artwork {
+            return cached
+        }
+        let task: Task<DetailPosterArtwork?, Never> = {
+            idFlightLock.lock(); defer { idFlightLock.unlock() }
+            if let existing = idFlights[id] { return existing }
+            let created = Task { await resolve(movie: movie, account: account) }
+            idFlights[id] = created
+            return created
+        }()
+        let value = await task.value
+        idFlightLock.lock()
+        idFlights[id] = nil
+        idFlightLock.unlock()
+        return value
     }
 
     static func resolve(movie: Movie, account: String?) async -> DetailPosterArtwork? {
@@ -460,8 +487,10 @@ enum DetailPosterResolver {
             let blurred = input.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 12]).cropped(to: input.extent)
             let backdrop = CIContext(options: [.cacheIntermediates: false]).createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) } ?? UIImage(cgImage: cg)
             // Enhance only the displayed JavDB-native winner; quality score already used raw pixels.
-            let display = JavDBCoverEnhance.maybeApply(UIImage(cgImage: cg), source: source)
-            return DetailPosterArtwork(image: display, backdrop: backdrop, tint: tint, provenance: PosterProvenance(source: source))
+            // Home hero uses rawImage (no AICover / JavDBCoverEnhance).
+            let raw = UIImage(cgImage: cg)
+            let display = JavDBCoverEnhance.maybeApply(raw, source: source)
+            return DetailPosterArtwork(image: display, backdrop: backdrop, tint: tint, provenance: PosterProvenance(source: source), rawImage: raw)
         }.value
     }
 }

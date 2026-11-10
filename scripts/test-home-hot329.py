@@ -9,19 +9,19 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '329' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 329;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '330' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 330;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HeroCoverResolver.swift' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 329' in wf and 'feat/home-hot-329' in wf
+assert 'Home HQ posters App 330' in wf and 'feat/home-hot-329' in wf
 assert 'feat/home-hot-328' in wf and 'feat/detail-auth-327' in wf
 assert 'python3 scripts/test-home-hot329.py' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf
 assert 'python3 scripts/test-detail-auth327.py' in wf
-assert 'scripts/package-lut329.py' in wf and 'AVDB-329-release' in wf
-assert 'AVDB-unsigned-1.0.2-329-home-hot.ipa' in (r/'scripts/package-lut329.py').read_text()
+assert 'scripts/package-lut330.py' in wf and 'AVDB-330-release' in wf
+assert 'AVDB-unsigned-1.0.2-330-home-chrome.ipa' in (r/'scripts/package-lut330.py').read_text()
 assert 'home-hot-329' in wf
 assert 'HomeHot329Tests' in wf
 assert 'test329HomeHotChrome' in wf
@@ -160,4 +160,4 @@ assert 'home-following-more' in nearby and 'poster-follow-1' in nearby
 assert '--home329-fixture' in nearby
 
 print('PASS home-hot329 source contracts: unblurred floor, 3x3 grids, 147 floor, '
-      'late A/B after settle, preheat, 換一組 only on two sections, release 329')
+      'late A/B after settle, preheat, 換一組 only on two sections, release 330')

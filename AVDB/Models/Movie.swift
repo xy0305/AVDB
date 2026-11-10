@@ -116,7 +116,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
 
     public let tags: [Tag]?
     public let category: String?
-    public let actors: [Actor]?
+    public private(set) var actors: [Actor]?
     public private(set) var actorNames: [String]?
 
     public let makerID: String?
@@ -144,6 +144,35 @@ public struct Movie: Decodable, Identifiable, Hashable {
     public let review: Review?
 
     // 派生字段
+    /// Build 330: merge detail cover / actors / CID-bearing fields into a
+    /// ranking-list movie so DetailPosterResolver can run with the same inputs
+    /// as the iPhone detail page. Never copies `small_covers` into coverURL.
+    func mergingHeroDetail(_ detail: Movie) -> Movie {
+        guard detail.id == id else { return self }
+        var copy = self
+        if let cover = detail.coverURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !cover.isEmpty, !cover.contains("/small_covers/") {
+            copy.coverURL = cover
+        }
+        if let thumb = detail.thumbURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !thumb.isEmpty, (copy.thumbURL == nil || copy.thumbURL?.isEmpty == true) {
+            copy.thumbURL = thumb
+        }
+        if let actors = detail.actors, !actors.isEmpty, (copy.actors ?? []).isEmpty {
+            copy.actors = actors
+        }
+        if let names = detail.actorNames, !names.isEmpty, (copy.actorNames ?? []).isEmpty {
+            copy.actorNames = names
+        }
+        if copy.type == nil || copy.type?.isEmpty == true, let type = detail.type, !type.isEmpty {
+            copy.type = type
+        }
+        if copy.catalogueMetadata == nil, let meta = detail.catalogueMetadata {
+            copy.catalogueMetadata = meta
+        }
+        return copy
+    }
+
     public var displayTitle: String { title ?? number ?? "未知影片" }
     public var displayNumber: String { number ?? id }
 

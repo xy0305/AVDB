@@ -237,10 +237,10 @@ struct MovieDetailView: View {
                     return Self.neutralHeroArtwork(wide: false)
                 }
             } else {
-                art = await DetailPosterResolver.resolve(movie: movie, account: account)
+                art = await DetailPosterResolver.resolveShared(movie: movie, account: account)
             }
             #else
-            art = await DetailPosterResolver.resolve(movie: movie, account: account)
+            art = await DetailPosterResolver.resolveShared(movie: movie, account: account)
             #endif
             guard !Task.isCancelled, posterRequestKey == key, APIClient.shared.token == account,
                   var presentation = posterPresentation else { return }
