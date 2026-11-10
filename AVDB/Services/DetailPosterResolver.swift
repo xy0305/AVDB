@@ -188,10 +188,14 @@ enum DetailPosterResolver {
                   let selected = decoded.first(where: { $0.quality.source == winner.source }) else { return nil }
             // Tip list grids with the verified HQ URL (Amazon/DMM/MGS/Tenhow).
             ListHQCoverCache.store(number: movie.number, source: winner.source)
+            // Build 326: write accepted HQ back to HQPosterDiskCache under the
+            // title-scoped hero key so the home hero can hit priority 1 next time.
+            HeroCoverDisk.storeAccepted(selected.image, number: movie.number, source: winner.source)
             // No intermediate publication. The winner cache, not ImageLoader's
             // independently downsampled source cache, is the only warm fast path.
             guard var art = await artwork(image: selected.image, source: winner.source, derive: false) else { return nil }
             art.sourceURL = winner.source; art.nativeWidth = winner.width; art.nativeHeight = winner.height
+            HeroCoverDisk.storeAccepted(art.image, number: movie.number, source: winner.source)
             return art
         }
     }

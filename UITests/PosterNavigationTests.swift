@@ -187,26 +187,32 @@ final class PosterNavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["jr-lucky-start"].waitForExistence(timeout: 15))
     }
 
-    /// Build 325: production immersive Home (neutral fixture rasters) — evidence screenshots.
-    func test325HomeImmersiveScreenshots() {
+    /// Build 326: production immersive Home with full-bleed B-tier hero (neutral 700×1000 fixtures).
+    func test326HomeHeroHQScreenshots() {
         continueAfterFailure = true
         let app = XCUIApplication()
-        app.launchArguments = ["--poster-navigation-fixture", "--home325-fixture"]
+        app.launchArguments = ["--poster-navigation-fixture", "--home326-fixture"]
         XCUIDevice.shared.orientation = .portrait; app.launch()
         defer { app.terminate() }
         let search = app.buttons["home-search"]
         XCTAssertTrue(search.waitForExistence(timeout: 30))
+        let hero = app.buttons["home-hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 30))
         sleep(3)
-        let top = XCTAttachment(screenshot: app.screenshot()); top.name = "325-home-immersive-top"; top.lifetime = .keepAlways; add(top)
-        XCTAssertTrue(app.buttons["home-hero"].exists)
+        let window = app.windows.firstMatch
+        // Full-bleed: the hero must span the window width, not sit as an inset card.
+        XCTAssertEqual(hero.frame.minX, window.frame.minX, accuracy: 1.5)
+        XCTAssertEqual(hero.frame.width, window.frame.width, accuracy: 1.5)
+        XCTAssertGreaterThanOrEqual(hero.frame.height, 430)
+        let top = XCTAttachment(screenshot: app.screenshot()); top.name = "326-home-hero-hq-top"; top.lifetime = .keepAlways; add(top)
         XCTAssertGreaterThanOrEqual(search.frame.width, 44)
         app.swipeUp(velocity: 600)
         sleep(2)
-        let rails = XCTAttachment(screenshot: app.screenshot()); rails.name = "325-home-immersive-rails"; rails.lifetime = .keepAlways; add(rails)
+        let rails = XCTAttachment(screenshot: app.screenshot()); rails.name = "326-home-hero-hq-rails"; rails.lifetime = .keepAlways; add(rails)
         XCTAssertTrue(search.isHittable, "floating search stays reachable after scrolling")
         app.swipeUp(velocity: 600)
         sleep(1)
-        let bottom = XCTAttachment(screenshot: app.screenshot()); bottom.name = "325-home-immersive-bottom"; bottom.lifetime = .keepAlways; add(bottom)
+        let bottom = XCTAttachment(screenshot: app.screenshot()); bottom.name = "326-home-hero-hq-bottom"; bottom.lifetime = .keepAlways; add(bottom)
     }
 
     func test236HomeEmbeddedHeaderDoesNotOwnNavigation() {

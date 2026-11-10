@@ -625,6 +625,11 @@ public struct JavDBImage: View {
                     : await ImageLoader.shared.load(candidate, maxPixelSize: maxPixelSize)
                 if let img = loaded {
                     guard !Task.isCancelled else { return }
+                    // Build 326 rail floor: never finalize a source narrower than 360 px
+                    // or a pics.dmm.co.jp 147×200 thumb. VisibleHQ can still upgrade.
+                    if RailCoverFloor.rejects(source: candidate, image: img) {
+                        continue
+                    }
                     if frontPoster, img.size.width > img.size.height {
                         landscapeFallback = landscapeFallback ?? (img, candidate)
                         continue
@@ -633,7 +638,10 @@ public struct JavDBImage: View {
                     return
                 }
             }
-            if !Task.isCancelled, let landscapeFallback { publish(landscapeFallback.image, identity: identity, source: landscapeFallback.source) }
+            if !Task.isCancelled, let landscapeFallback,
+               !RailCoverFloor.rejects(source: landscapeFallback.source, image: landscapeFallback.image) {
+                publish(landscapeFallback.image, identity: identity, source: landscapeFallback.source)
+            }
         }
     }
 
@@ -779,6 +787,7 @@ actor VisibleHQPosterScheduler {
                       let front = cg.cropping(to: rect) else { return loaded }
                 return UIImage(cgImage: front)
             }.value
+            if RailCoverFloor.rejects(source: url, image: image) { return nil }
             ListHQCoverCache.store(number: movie.number, source: url)
             return image
         }
@@ -1096,6 +1105,22 @@ enum HomeHQPosterPrefetch {
     }
 }
 #endif
+
+/// Build 326 rail floor only. ListCoverPolicy + VisibleHQ are otherwise unchanged.
+/// A finalized rail image must be ≥ 360 px wide; pics.dmm.co.jp 147×200 must never
+/// be the finalized rail image — VisibleHQ can still upgrade a short source.
+enum RailCoverFloor {
+    static let minWidth = 360
+    static func rejects(source: String, image: UIImage) -> Bool {
+        let width = image.cgImage?.width ?? Int((image.size.width * image.scale).rounded())
+        let height = image.cgImage?.height ?? Int((image.size.height * image.scale).rounded())
+        if width < minWidth { return true }
+        if width == 147 && height == 200 && source.contains("pics.dmm.co.jp") { return true }
+        if let url = URL(string: source), url.host?.lowercased() == "pics.dmm.co.jp",
+           url.path.lowercased().hasSuffix("ps.jpg") { return true }
+        return false
+    }
+}
 
 /// List thumbnails: HQ first (resolved Amazon/DMM/MGS/avbase catalogue pl), then JavDB.
 /// No per-row Tenhow scrape; ImageLoader rejects DMM NOW thumbs and falls back.

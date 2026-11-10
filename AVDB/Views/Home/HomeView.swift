@@ -163,7 +163,10 @@ struct HomeView: View {
             // Full-bleed: the hero runs under the status bar. Bottom safe area (floating
             // tab bar inset) is kept so the last rail scrolls clear of the bar.
             .ignoresSafeArea(.container, edges: .top)
-            .refreshable { await vm.initialLoad() }
+            .refreshable {
+                HeroCoverStore.shared.clearNegativesAndRetry()
+                await vm.initialLoad()
+            }
 
             HomeTopScrim(scroll: scroll, start: max(0, m.heroHeight - m.safeTop - 90))
 
@@ -202,15 +205,15 @@ struct HomeView: View {
                     Task { await vm.retry(.recommended) }
                 }
             } else {
-                // No recommendations: keep the quick actions clear of the status bar and
-                // the floating search button, and keep 往期 reachable.
-                HStack {
+                // Empty recommend list: keep the full hero height (never collapse to a
+                // short strip). Ambient background + 往期 chip; no sharp thumbs.
+                ZStack(alignment: .topLeading) {
+                    HomeTheme.fallbackBase
                     HomePastChip(periodLabel: vm.periodLabel) { goPast = true }
-                    Spacer(minLength: 0)
+                        .padding(.leading, m.padding)
+                        .padding(.top, m.safeTop + 13)
                 }
-                .padding(.leading, m.padding)
-                .padding(.top, m.safeTop + 13)
-                .frame(height: m.safeTop + 64, alignment: .top)
+                .frame(width: m.width, height: m.heroHeight)
             }
         }
         .background {
@@ -576,11 +579,13 @@ final class HomeViewModel: ObservableObject {
             latest = (1...9).map { Movie(id: "fixture-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)") }
             magnets = (1...9).map { Movie(id: "magnet-\($0)", number: "TEST-M\($0)", title: "Neutral magnet \($0)", coverURL: "fixture://poster/\($0)") }
             latestState = .loaded; magnetsState = .loaded; recommendedState = .empty
-            if ProcessInfo.processInfo.arguments.contains("--home325-fixture") {
-                // Build 325 screenshots: neutral portrait hero rasters (no network).
+            if ProcessInfo.processInfo.arguments.contains("--home326-fixture")
+                || ProcessInfo.processInfo.arguments.contains("--home325-fixture") {
+                // Build 326 screenshots: neutral 700×1000 B-tier portrait rasters (no network).
                 recommended = (1...5).map { Movie(id: "hero-\($0)", number: "TEST-H\($0)", title: "Neutral hero film \($0)", coverURL: "fixture://poster/portrait-hero-\($0)") }
                 recommendedState = .loaded
                 periodLabel = "2026-11-09"
+                HeroCoverStore.shared.start(movies: recommended, currentIndex: 0)
             }
             return
         }
@@ -674,7 +679,13 @@ final class HomeViewModel: ObservableObject {
             let movies = items.compactMap { $0.movie }
             let previous: [Movie]
             switch section {
-            case .recommended: previous = self.recommended; self.recommended = movies; self.recommendedState = state
+            case .recommended:
+                previous = self.recommended
+                self.recommended = movies
+                self.recommendedState = state
+                // Prefetch starts when the recommend list returns. Image success/failure
+                // never mutates this array (dot count stays fixed).
+                HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
             case .latest: previous = self.latest; self.latest = movies; self.latestState = state
             case .magnets: previous = self.magnets; self.magnets = movies; self.magnetsState = state
             }
@@ -1032,87 +1043,6 @@ private struct HomeChevronCircle: View {
 
 // MARK: Hero carousel
 
-struct HomeHeroImage {
-    let image: UIImage
-    let pixelWidth: CGFloat
-    let landscape: Bool
-    let ambient: HomeHSB?
-    /// Too small (or landscape) to stretch full-bleed: show an inset card instead of a blurry crop.
-    var inset: Bool { pixelWidth < 500 || landscape }
-}
-
-/// HQ portrait / front-poster loading for the hero: quick list source first, then the
-/// bounded HQ upgrade (same VisibleHQ path the grids use) if it is sharper.
-enum HomeHeroImageLoader {
-    static let posterPixels = 1600
-
-    static func quick(_ movie: Movie) async -> HomeHeroImage? {
-        #if DEBUG
-        if let url = movie.coverURL, url.hasPrefix("fixture://poster/") {
-            return await make(fixture(url))
-        }
-        #endif
-        let original = FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number)
-        let sources = ListCoverPolicy.sources(movie: movie)
-        let wrapLead = sources.first.map(FrontPosterPolicy.isKnownWrap) == true
-        let crop = !original || wrapLead
-        var landscape: UIImage?
-        for source in sources.prefix(3) {
-            if Task.isCancelled { return nil }
-            let loaded = crop
-                ? await ImageLoader.shared.loadPoster(source, maxPixelSize: posterPixels)
-                : await ImageLoader.shared.load(source, maxPixelSize: posterPixels)
-            guard let loaded else { continue }
-            if loaded.size.width > loaded.size.height {
-                landscape = landscape ?? loaded
-                continue
-            }
-            return await make(loaded)
-        }
-        if let landscape { return await make(landscape) }
-        return nil
-    }
-
-    static func hq(_ movie: Movie) async -> HomeHeroImage? {
-        #if DEBUG
-        if movie.coverURL?.hasPrefix("fixture://") == true { return nil }
-        #endif
-        guard let url = VisibleHQPosterPolicy.upgradeURL(movie: movie) else { return nil }
-        guard let image = await VisibleHQPosterScheduler.shared.upgrade(
-            movie: movie, url: url, maxPixelSize: VisibleHQPosterPolicy.maxPixelCap) else { return nil }
-        return await make(image)
-    }
-
-    static func make(_ image: UIImage) async -> HomeHeroImage {
-        let width = image.cgImage.map { CGFloat($0.width) } ?? image.size.width * image.scale
-        let ambient = await Task.detached(priority: .utility) { HomeAmbientColor.base(from: image) }.value
-        return HomeHeroImage(image: image, pixelWidth: width,
-                             landscape: image.size.width > image.size.height, ambient: ambient)
-    }
-
-    #if DEBUG
-    /// Neutral portrait raster for UI fixtures (no network).
-    static func fixture(_ url: String) -> UIImage {
-        let size = CGSize(width: 700, height: 1000)
-        let digit = Double(Int(String(url.last ?? "1")) ?? 1)
-        let top = UIColor(hue: CGFloat((0.04 + digit * 0.09).truncatingRemainder(dividingBy: 1)),
-                          saturation: 0.55, brightness: 0.62, alpha: 1)
-        let bottom = UIColor(red: 0.10, green: 0.08, blue: 0.07, alpha: 1)
-        return UIGraphicsImageRenderer(size: size).image { context in
-            let colors = [top.cgColor, bottom.cgColor] as CFArray
-            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
-                context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
-            }
-            UIColor(white: 1, alpha: 0.16).setFill()
-            context.cgContext.fillEllipse(in: CGRect(x: 170, y: 150, width: 360, height: 360))
-            ("NEUTRAL " + (url.components(separatedBy: "/").last ?? "")).draw(
-                at: CGPoint(x: 60, y: 560),
-                withAttributes: [.font: UIFont.systemFont(ofSize: 48, weight: .bold), .foregroundColor: UIColor.white])
-        }
-    }
-    #endif
-}
-
 /// Synopsis is not in the list snapshot: fetched lazily from movieDetail (/api/v4/movies/{id})
 /// for the current and next hero items, cached for the session. Never blocks the hero.
 @MainActor
@@ -1160,8 +1090,8 @@ private struct HomeHeroCarousel: View {
     let onOpen: (Movie) -> Void
     let onPast: () -> Void
 
+    @ObservedObject private var covers = HeroCoverStore.shared
     @State private var index = 0
-    @State private var images: [String: HomeHeroImage] = [:]
     @State private var synopses: [String: String] = [:]
     @State private var touching = false
     @State private var dragging = false
@@ -1187,9 +1117,38 @@ private struct HomeHeroCarousel: View {
         return movies[(min(max(index, 0), movies.count - 1) + offset) % movies.count]
     }
 
+    private func cover(_ movie: Movie) -> HeroCoverPresentation {
+        covers.presentation(for: movie.id)
+    }
+
+    private var currentCover: HeroCoverPresentation {
+        current.map(cover) ?? HeroCoverPresentation()
+    }
+
+    /// Autoplay only advances to pages already finalized as A/B. It pauses on
+    /// C-tier or blur pages (manual swipe still reaches them) and is off when
+    /// no A/B page exists.
+    private var hasABPage: Bool { movies.contains { cover($0).isAB } }
+
     private var autoplayEnabled: Bool {
         movies.count > 1 && isActive && !touching && !dragging && scenePhase == .active
             && !reduceMotion && !voiceOver && scroll.up < height * 0.85
+            && currentCover.isAB && hasABPage
+    }
+
+    private func nextABIndex() -> Int? {
+        guard !movies.isEmpty else { return nil }
+        let start = min(max(index, 0), movies.count - 1)
+        for step in 1..<movies.count {
+            let i = (start + step) % movies.count
+            if cover(movies[i]).isAB { return i }
+        }
+        return nil
+    }
+
+    /// Global empty: every item finished with no even-quick image. Height stays full.
+    private var showCoverFailure: Bool {
+        !movies.isEmpty && movies.allSatisfy { let p = cover($0); return p.finished && !p.hasQuick }
     }
 
     /// Fade text / dots / chip over the first 120 pt of scroll-up.
@@ -1241,20 +1200,37 @@ private struct HomeHeroCarousel: View {
                 .padding(.leading, padding)
                 .padding(.top, metrics.safeTop + 13)
                 .opacity(chromeOpacity)
+
+            if showCoverFailure {
+                Text("高清封面加载失败，下拉刷新重试")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.86))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, padding)
+                    .frame(width: width, height: height)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
         }
         .frame(width: width, height: height)
-        .onAppear { publishAmbient() }
-        .onChange(of: movies.map(\.id)) { _, _ in
-            index = 0
+        .onAppear {
+            covers.setCurrentIndex(index, movies: movies)
             publishAmbient()
         }
+        .onChange(of: movies.map(\.id)) { _, _ in
+            index = 0
+            covers.setCurrentIndex(0, movies: movies)
+            publishAmbient()
+        }
+        .onChange(of: index) { _, new in
+            covers.setCurrentIndex(new, movies: movies)
+        }
         .onChange(of: ambientKey) { _, _ in publishAmbient() }
-        // Current first, then prefetch the next two.
-        .task(id: loadKey) {
-            for offset in 0..<min(3, movies.count) {
-                guard let movie = heroMovie(at: offset), !Task.isCancelled else { return }
-                await ensureImage(movie)
-            }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { covers.retryOnForeground() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .heroCoverNetworkRecovered)) { _ in
+            covers.noteNetworkRecovered()
         }
         // Synopsis for current + next, lazily; never blocks the hero.
         .task(id: current?.id) {
@@ -1265,12 +1241,12 @@ private struct HomeHeroCarousel: View {
                 }
             }
         }
-        // Autoplay: restarts on every page change (incl. manual swipes) and pause change.
+        // Autoplay: 5s interval; only advances onto finalized A/B pages.
         .task(id: autoplayKey) {
             guard autoplayEnabled else { return }
             try? await Task.sleep(nanoseconds: 5_000_000_000)
-            guard !Task.isCancelled, autoplayEnabled else { return }
-            go(1, slide: false)
+            guard !Task.isCancelled, autoplayEnabled, let next = nextABIndex() else { return }
+            go(to: next, slide: false, delta: 1)
         }
     }
 
@@ -1278,7 +1254,7 @@ private struct HomeHeroCarousel: View {
     private var imageLayer: some View {
         ZStack {
             if let movie = current {
-                HomeHeroPage(image: images[movie.id], metrics: metrics, kenBurns: !reduceMotion)
+                HomeHeroPage(presentation: cover(movie), metrics: metrics, kenBurns: !reduceMotion)
                     .id(movie.id)
                     .transition(pageTransition)
             }
@@ -1381,8 +1357,14 @@ private struct HomeHeroCarousel: View {
     private func go(_ delta: Int, slide: Bool) {
         guard movies.count > 1 else { return }
         let next = (min(max(index, 0), movies.count - 1) + delta + movies.count) % movies.count
+        go(to: next, slide: slide, delta: delta)
+    }
+
+    private func go(to next: Int, slide: Bool, delta: Int? = nil) {
+        guard movies.count > 1, next != index else { return }
+        let inferred = delta ?? (next > index ? 1 : -1)
         if slide {
-            slideEdge = delta > 0 ? .trailing : .leading
+            slideEdge = inferred > 0 ? .trailing : .leading
             withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
                 index = next
                 dragX = 0
@@ -1395,31 +1377,18 @@ private struct HomeHeroCarousel: View {
         }
     }
 
-    private var loadKey: String {
-        (0..<min(3, movies.count)).compactMap { heroMovie(at: $0)?.id }.joined(separator: "|")
+    private var autoplayKey: String {
+        "\(index)|\(autoplayEnabled)|\(movies.count)|\(currentCover.isAB)|\(hasABPage)"
     }
-
-    private var autoplayKey: String { "\(index)|\(autoplayEnabled)|\(movies.count)" }
 
     private var ambientKey: String {
         guard let movie = current else { return "" }
-        return movie.id + (images[movie.id]?.ambient == nil ? "#" : "#hsb")
+        return movie.id + (cover(movie).ambient == nil ? "#" : "#hsb")
     }
 
     private func publishAmbient() {
         guard let movie = current else { return }
-        ambient.show(images[movie.id]?.ambient, id: movie.id)
-    }
-
-    private func ensureImage(_ movie: Movie) async {
-        if images[movie.id] == nil, let quick = await HomeHeroImageLoader.quick(movie), !Task.isCancelled {
-            images[movie.id] = quick
-        }
-        guard !Task.isCancelled, let existing = images[movie.id], existing.inset || existing.pixelWidth < 900 else { return }
-        if let hq = await HomeHeroImageLoader.hq(movie), !Task.isCancelled,
-           hq.pixelWidth > existing.pixelWidth || (existing.landscape && !hq.landscape) {
-            images[movie.id] = hq
-        }
+        ambient.show(cover(movie).ambient, id: movie.id)
     }
 
     private func headline(_ movie: Movie) -> String {
@@ -1450,10 +1419,12 @@ private struct HeroTouchStyle: ButtonStyle {
     }
 }
 
-/// One hero page: full-bleed aspect-fill (anchored ~22% from the top to keep faces), or an
-/// inset card (blurred fill + aspect-fit poster) when the source is too small to stretch.
+/// One hero page: four states only, always full-bleed, never an inset card.
+/// 0 empty: ambient fallback color (scrim + title/date/synopsis/dots sit on top).
+/// 1 blur: quick image aspectFill + blur 28 + brightness × 0.85, full-bleed.
+/// 2 provisional sharp / 3 finalized sharp: 0.45s easeOut crossfade, no spinner.
 private struct HomeHeroPage: View {
-    let image: HomeHeroImage?
+    let presentation: HeroCoverPresentation
     let metrics: HomeMetrics
     let kenBurns: Bool
     @State private var zoomed = false
@@ -1461,29 +1432,20 @@ private struct HomeHeroPage: View {
     var body: some View {
         let size = CGSize(width: metrics.width, height: metrics.heroHeight)
         ZStack {
-            if let image {
-                if image.inset {
-                    HomeAnchoredFill(image: image.image, size: size)
-                        .blur(radius: 30, opaque: true)
-                        .overlay { Color.black.opacity(0.22) }
-                    Image(uiImage: image.image)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
-                        .padding(.horizontal, metrics.padding)
-                        .padding(.top, metrics.safeTop + 70)
-                        .padding(.bottom, 128)
-                        .frame(width: size.width, height: size.height)
-                } else {
-                    HomeAnchoredFill(image: image.image, size: size)
-                }
-            } else {
-                HomeShimmer()
+            // State 0: ambient default color. Blur (state 1) and sharp (2/3) crossfade
+            // over it at 0.45s easeOut. Never an inset card, spinner, or shimmer.
+            HomeTheme.fallbackBase
+            if let blur = presentation.blurImage {
+                HomeAnchoredFill(image: blur, size: size)
+                    .blur(radius: 28, opaque: true)
+                    .colorMultiply(Color(white: 0.85)) // brightness × 0.85
+            }
+            if let sharp = presentation.sharpImage {
+                HomeAnchoredFill(image: sharp, size: size)
             }
         }
         .frame(width: size.width, height: size.height)
+        .animation(.easeOut(duration: HeroCoverPolicy.crossfadeDuration), value: presentation.token)
         .scaleEffect(zoomed ? 1.05 : 1.0)
         .onAppear {
             guard kenBurns else { return }
