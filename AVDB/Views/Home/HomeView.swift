@@ -1828,8 +1828,7 @@ private struct HomePlaceholderView: View {
             .accessibilityLabel(failed ? "載入失敗，點按重試" : "載入中")
             .accessibilityAddTraits(failed ? .isButton : [])
         case .rail(let m):
-            let cols = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: 3)
-            LazyVGrid(columns: cols, spacing: 16) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: 3), spacing: 16) {
                 ForEach(0..<3, id: \.self) { _ in
                     VStack(alignment: .leading, spacing: 6) {
                         ZStack {

@@ -735,6 +735,7 @@ public struct JavDBImage: View {
         }
     }
 
+    @ViewBuilder
     private var placeholder: some View {
         let kind = RailPosterPlaceholder.kind(hasURL: !imageURLs.isEmpty, failed: loadFailed)
         ZStack {
