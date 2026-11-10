@@ -137,6 +137,18 @@ final class AppState: ObservableObject {
         JavDBSDK.shared.logout()
     }
 
+    /// Same-person credential rejection: keep the stored token, drop the cached
+    /// profile presentation, and do not automatically retry the dead token.
+    /// Does not call logout() or setToken(nil), and is not an identity change.
+    func markNeedsReauth() {
+        guard let token = (activeToken ?? readToken()).flatMap({ $0.isEmpty ? nil : $0 }) else { return }
+        restoreTask?.cancel(); restoreTask = nil
+        defaults.removeObject(forKey: key(token))
+        currentUser = nil
+        isLoggedIn = false
+        sessionStatus = .needsReauth
+    }
+
     func restoreLogin() {
         #if targetEnvironment(simulator)
         guard !JavVerseReleaseProbe.enabled else { return }

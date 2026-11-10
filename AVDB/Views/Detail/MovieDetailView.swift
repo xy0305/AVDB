@@ -71,6 +71,8 @@ struct MovieDetailView: View {
     @State private var showSearch = false
     @Environment(\.availableLayoutSize) private var layoutSize
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
+    @State private var showLogin = false
 
     init(movieID: String, seed: Movie? = nil, autoLaunch: PlaybackAutoLaunch? = nil) {
         self.movieID = movieID
@@ -95,6 +97,17 @@ struct MovieDetailView: View {
         model.movie = fixture
         _vm = StateObject(wrappedValue: model)
     }
+
+    init(authErrorFixture message: String, isAuth: Bool) {
+        movieID = "auth-fixture"
+        posterSeed = nil
+        autoLaunch = nil
+        let model = MovieDetailViewModel(movieID: "auth-fixture")
+        model.errorMessage = message
+        model.isAuthError = isAuth
+        model.isLoading = false
+        _vm = StateObject(wrappedValue: model)
+    }
     #endif
 
     var body: some View {
@@ -107,10 +120,21 @@ struct MovieDetailView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 40)).foregroundColor(.orange)
-                    Text(err).foregroundStyle(.white)
-                    Button("重试") { Task { await vm.load() } }
+                    Text(err)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .accessibilityIdentifier("detail-error-message")
+                    Button("重试") { Task { await reloadDetail() } }
                         .buttonStyle(.borderedProminent)
+                    if vm.isAuthError {
+                        Button("去登录") { showLogin = true }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("detail-error-login")
+                    }
                 }
+                .foregroundStyle(.primary)
+                .colorScheme(.dark)
                 .padding(.top, 120)
             }
         }
@@ -121,7 +145,9 @@ struct MovieDetailView: View {
                 if let movie = vm.movie {
                     detailBackground(movie)
                 } else {
-                    Color(.systemBackground)
+                    // Same dark page treatment as a successful detail load, so a
+                    // failed request does not flash a white system background.
+                    detailPageBackground
                 }
             }
             .ignoresSafeArea()
@@ -169,7 +195,11 @@ struct MovieDetailView: View {
             var transaction = Transaction(animation: nil); transaction.disablesAnimations = true
             withTransaction(transaction) { posterAccountEpoch = UUID(); posterPresentation = nil }
             showOnlinePlayback = false; onlinePlaybackModel.reset()
-            Task { await vm.reloadReviewForAccount() }
+            Task { await reloadDetail() }
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginView()
+                .environmentObject(appState)
         }
         .alert("操作未完成", isPresented: Binding(
             get: { vm.movie != nil && vm.errorMessage != nil },
@@ -240,8 +270,9 @@ struct MovieDetailView: View {
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { return }
+            if ProcessInfo.processInfo.arguments.contains("--detail-auth-fixture") { return }
             #endif
-            await vm.load()
+            await reloadDetail()
             // Build 281: the detail payload feeds the on-device recommender (no extra request).
             if let movie = vm.movie { RecommendationIngest.remember(movie) }
             if let autoLaunch, !autoLaunchDone, let movie = vm.movie {
@@ -323,7 +354,7 @@ struct MovieDetailView: View {
         return AnyView(legacyDetailBackground(movie))
     }
 
-    private func legacyDetailBackground(_ movie: Movie) -> some View {
+    private var detailPageBackground: some View {
         // 进详情时不要对整屏封面做实时 blur，否则 push 转场会掉帧。
         ZStack {
             Color(red: 0.12, green: 0.12, blue: 0.14)
@@ -342,6 +373,17 @@ struct MovieDetailView: View {
             )
         }
         .ignoresSafeArea()
+    }
+
+    private func legacyDetailBackground(_ movie: Movie) -> some View {
+        detailPageBackground
+    }
+
+    private func reloadDetail() async {
+        await vm.load()
+        if vm.isAuthError, APIClient.shared.hasToken {
+            appState.markNeedsReauth()
+        }
     }
 
     private func detailContent(_ movie: Movie) -> some View {
@@ -1276,15 +1318,18 @@ final class MovieDetailViewModel: ObservableObject {
     @Published var loadingMagnets = false
     @Published var loadingLists = false
     @Published var errorMessage: String?
+    @Published var isAuthError = false
     private var listsPage = 1
     private var listsHasMore = true
 
-    private let sdk = JavDBSDK.shared
+    private let sdk: JavDBSDK
 
     init(movieID: String? = nil,
-         updateReview: ((String, String?) async throws -> String?)? = nil) {
+         updateReview: ((String, String?) async throws -> String?)? = nil,
+         sdk: JavDBSDK = .shared) {
         self.movieID = movieID ?? ""
-        self.updateReview = updateReview ?? { try await JavDBSDK.shared.updateMovieReview($0, status: $1) }
+        self.sdk = sdk
+        self.updateReview = updateReview ?? { try await sdk.updateMovieReview($0, status: $1) }
         reviewLoaded = updateReview != nil
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") { reviewLoaded = true }
@@ -1298,6 +1343,8 @@ final class MovieDetailViewModel: ObservableObject {
         loadGeneration = generation
         let account = APIClient.shared.token
         isLoading = true
+        errorMessage = nil
+        isAuthError = false
         defer { if loadGeneration == generation { isLoading = false } }
         do {
             let full = try await sdk.movieDetailFull(movieID, onNative: { native in
@@ -1323,6 +1370,7 @@ final class MovieDetailViewModel: ObservableObject {
         } catch {
             guard !Task.isCancelled, loadGeneration == generation, APIClient.shared.token == account else { return }
             errorMessage = error.localizedDescription
+            isAuthError = JavDBError.isAuthenticationFailure(error)
         }
     }
 

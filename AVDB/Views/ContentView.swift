@@ -26,6 +26,14 @@ struct ContentView: View {
             OnlineSubtitleFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("--detail-hero-fixture") {
             NavigationStack { DetailHeroFixtureGallery() }.modifier(SceneLayoutReader())
+        } else if ProcessInfo.processInfo.arguments.contains("--detail-auth-fixture") {
+            let isAuth = !ProcessInfo.processInfo.arguments.contains("--detail-auth-network")
+            NavigationStack {
+                MovieDetailView(
+                    authErrorFixture: isAuth ? "請登錄帳號" : "服务器错误",
+                    isAuth: isAuth
+                )
+            }.modifier(SceneLayoutReader())
         } else if ProcessInfo.processInfo.arguments.contains("--catalog-navigation-fixture") {
             NavigationStack { CatalogListView(title: "近期磁鏈更新", source: .magnets) }
                 .modifier(SceneLayoutReader())

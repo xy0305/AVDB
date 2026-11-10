@@ -1664,4 +1664,36 @@ extension PosterNavigationTests {
         XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed, "Tap after scrolling must select")
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = baseline ? "233-baseline-scrolled-language" : "234-scrolled-language"; shot.lifetime = .keepAlways; add(shot)
     }
+
+
+    /// Build 327: auth/network error copy is visible; no color-contrast assertion.
+    func test327DetailAuthErrorMessageVisible() {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-auth-fixture"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        defer { app.terminate() }
+        let message = app.staticTexts["detail-error-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 15))
+        XCTAssertFalse(message.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    /// Build 327: 去登录 is present for auth-class errors and absent for other errors.
+    func test327DetailAuthLoginButtonPresence() {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-auth-fixture"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        XCTAssertTrue(app.staticTexts["detail-error-message"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["detail-error-login"].exists)
+        app.terminate()
+
+        app.launchArguments = ["--poster-navigation-fixture", "--detail-auth-fixture", "--detail-auth-network"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.staticTexts["detail-error-message"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["detail-error-login"].exists)
+    }
 }

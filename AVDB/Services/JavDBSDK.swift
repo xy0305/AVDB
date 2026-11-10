@@ -243,10 +243,21 @@ public final class JavDBSDK {
         return metadata.map { movie.withCatalogueMetadata($0) } ?? movie
     }
 
+    /// Authenticated detail reads ignore URLCache when a token is present so a
+    /// previously cached anonymous body cannot be reused after login.
+    /// Anonymous calls keep the default cache policy.
+    private func movieDetailCachePolicy() -> URLRequest.CachePolicy {
+        if let token = client.token, !token.isEmpty {
+            return .reloadIgnoringLocalCacheData
+        }
+        return .useProtocolCachePolicy
+    }
+
     /// 影片详情（GET /api/v4/movies/{id}）
     public func movieDetail(_ id: String, fromRankings: Bool = false) async throws -> Movie {
         let resp: JavDBResponse<MovieDetailData> = try await client.get(
-            "/api/v4/movies/\(id)", query: ["from_rankings": fromRankings ? "true" : "false"])
+            "/api/v4/movies/\(id)", query: ["from_rankings": fromRankings ? "true" : "false"],
+            useToken: true, cachePolicy: movieDetailCachePolicy())
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
@@ -260,7 +271,8 @@ public final class JavDBSDK {
     public func movieDetailFull(_ id: String, fromRankings: Bool = false,
                                 onNative: ((MovieDetailData) async -> Void)? = nil) async throws -> MovieDetailData {
         let resp: JavDBResponse<MovieDetailData> = try await client.get(
-            "/api/v4/movies/\(id)", query: ["from_rankings": fromRankings ? "true" : "false"])
+            "/api/v4/movies/\(id)", query: ["from_rankings": fromRankings ? "true" : "false"],
+            useToken: true, cachePolicy: movieDetailCachePolicy())
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }

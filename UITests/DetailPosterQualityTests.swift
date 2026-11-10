@@ -548,3 +548,104 @@ extension OnlineSubtitleModelTests {
         XCTAssertNil(model.selected); XCTAssertTrue(model.cues.isEmpty); XCTAssertEqual(model.status, "字幕已关闭")
     }
 }
+
+final class DetailAuth327Tests: XCTestCase {
+    // Keep in sync with scripts/fixtures/detail-auth-jwt-error.json
+    // Production shape: HTTP 200 + success:0 + action:JWTVerificationError + message:請登錄帳號
+    private static let jwtFailurePayload = Data(#"{"success":0,"action":"JWTVerificationError","message":"請登錄帳號"}"#.utf8)
+
+    private func session() -> (URLSession, () -> Void) {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [Playback235URLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        return (session, { session.invalidateAndCancel(); Playback235URLProtocol.handler = nil })
+    }
+
+    @MainActor func test327MovieDetailAuthorizationAndCachePolicy() async throws {
+        let (session, cleanup) = session()
+        defer { cleanup() }
+        var recorded: [URLRequest] = []
+        Playback235URLProtocol.handler = { request in
+            recorded.append(request)
+            return Data(#"{"success":1,"data":{"movie":{"id":"m327","type":"1","number":"TEST-327","title":"Neutral fixture"}}}"#.utf8)
+        }
+
+        let anonymous = JavDBSDK(client: APIClient(session: session, token: nil))
+        _ = try await anonymous.movieDetail("m327")
+        _ = try await anonymous.movieDetailFull("m327")
+        XCTAssertEqual(recorded.count, 2)
+        for request in recorded {
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            XCTAssertEqual(request.cachePolicy, .useProtocolCachePolicy)
+            XCTAssertTrue(request.url?.path.hasPrefix("/api/v4/movies/m327") == true)
+        }
+
+        recorded.removeAll()
+        let token = "neutral-fixture-327"
+        let signedIn = JavDBSDK(client: APIClient(session: session, token: token))
+        _ = try await signedIn.movieDetail("m327")
+        _ = try await signedIn.movieDetailFull("m327")
+        XCTAssertEqual(recorded.count, 2)
+        for request in recorded {
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(token)")
+            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+            XCTAssertTrue(request.url?.path.hasPrefix("/api/v4/movies/m327") == true)
+        }
+    }
+
+    func test327ProductionJWTPayloadIsAuthAndNotSuccess() throws {
+        let data = Self.jwtFailurePayload
+        let decoded = try JSONDecoder().decode(JavDBResponse<MovieDetailData>.self, from: data)
+        XCTAssertEqual(decoded.success, 0)
+        XCTAssertFalse(decoded.isSuccess)
+        XCTAssertEqual(decoded.action, "JWTVerificationError")
+        XCTAssertEqual(decoded.message, "請登錄帳號")
+        let error = JavDBError.apiError(action: decoded.action, message: decoded.message)
+        XCTAssertTrue(JavDBError.isAuthenticationFailure(error), "HTTP 200 business failure must be classified as auth")
+        XCTAssertFalse(JavDBError.isAuthenticationFailure(JavDBError.httpError(500, "服务器错误")))
+        XCTAssertFalse(JavDBError.isAuthenticationFailure(JavDBError.decodeError("truncated")))
+        XCTAssertTrue(JavDBError.isAuthenticationFailure(JavDBError.httpError(401, "鉴权失败或无访问权限，请检查登录状态")))
+        XCTAssertTrue(JavDBError.isAuthenticationFailure(JavDBError.apiError(action: nil, message: "请登录帐号")))
+    }
+
+    @MainActor func test327MovieDetailHTTP200JWTIsAuthError() async throws {
+        let (session, cleanup) = session()
+        defer { cleanup() }
+        Playback235URLProtocol.handler = { _ in Self.jwtFailurePayload }
+        let sdk = JavDBSDK(client: APIClient(session: session, token: nil))
+        do {
+            _ = try await sdk.movieDetail("m327")
+            XCTFail("HTTP 200 + success:0 must not be treated as success")
+        } catch {
+            XCTAssertTrue(JavDBError.isAuthenticationFailure(error), "must be auth, not a generic error")
+            guard case JavDBError.apiError(let action, let message) = error else {
+                return XCTFail("expected apiError, got \(error)")
+            }
+            XCTAssertEqual(action, "JWTVerificationError")
+            XCTAssertEqual(message, "請登錄帳號")
+        }
+        do {
+            _ = try await sdk.movieDetailFull("m327")
+            XCTFail("HTTP 200 + success:0 must not be treated as success")
+        } catch {
+            XCTAssertTrue(JavDBError.isAuthenticationFailure(error))
+        }
+    }
+
+    @MainActor func test327ViewModelLoadsMovieWhenTokenPresent() async throws {
+        let (session, cleanup) = session()
+        defer { cleanup() }
+        let token = "neutral-fixture-327"
+        Playback235URLProtocol.handler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(token)")
+            return Data(#"{"success":1,"data":{"movie":{"id":"m327","type":"1","number":"TEST-327","title":"Neutral fixture"}}}"#.utf8)
+        }
+        let sdk = JavDBSDK(client: APIClient(session: session, token: token))
+        let vm = MovieDetailViewModel(movieID: "m327", sdk: sdk)
+        await vm.load()
+        XCTAssertEqual(vm.movie?.id, "m327")
+        XCTAssertEqual(vm.movie?.number, "TEST-327")
+        XCTAssertNil(vm.errorMessage)
+        XCTAssertFalse(vm.isAuthError)
+    }
+}

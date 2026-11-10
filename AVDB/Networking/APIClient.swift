@@ -88,6 +88,9 @@ public final class APIClient: @unchecked Sendable {
         } else {
             UserDefaults.standard.removeObject(forKey: Self.tokenKey)
         }
+        // Identity change only: new token, logout, or account switch.
+        // Marking needsReauth keeps the credential and must not clear the cache.
+        URLCache.shared.removeAllCachedResponses()
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .avdbCatalogAccountChanged, object: nil)
         }
@@ -242,5 +245,50 @@ public final class APIClient: @unchecked Sendable {
                 request.setValue("Bearer \(t)", forHTTPHeaderField: "authorization")
             }
         }
+    }
+}
+
+extension JavDBError {
+    /// Auth-class failures: login required or the stored credential was rejected.
+    /// HTTP 200 + success:0 + action JWTVerificationError is auth, not success and not a generic error.
+    public static func isAuthenticationFailure(_ error: Error) -> Bool {
+        if let error = error as? JavDBError {
+            switch error {
+            case .httpError(let code, let message):
+                return code == 401 || isAuthenticationMessage(message)
+            case .notLoggedIn:
+                return true
+            case .apiError(let action, let message):
+                return isAuthenticationAction(action) || isAuthenticationMessage(message)
+            default:
+                return isAuthenticationMessage(error.errorDescription)
+            }
+        }
+        return isAuthenticationMessage(error.localizedDescription)
+    }
+
+    public static func isAuthenticationAction(_ action: String?) -> Bool {
+        action == "JWTVerificationError"
+    }
+
+    public static func isAuthenticationMessage(_ message: String?) -> Bool {
+        guard var text = message, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        for (from, to) in [
+            ("錄", "录"), ("録", "录"),
+            ("帳", "帐"), ("賬", "帐"),
+            ("號", "号"),
+            ("登陸", "登录"),
+        ] {
+            text = text.replacingOccurrences(of: from, with: to)
+        }
+        let lower = text.lowercased()
+        if lower.contains("请登录") || lower.contains("请先登录")
+            || lower.contains("需要登录") || lower.contains("请重新登录") {
+            return true
+        }
+        if lower.contains("please log in") || lower.contains("please login") || lower.contains("login required") {
+            return true
+        }
+        return false
     }
 }
