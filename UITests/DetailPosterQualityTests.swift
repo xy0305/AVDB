@@ -649,3 +649,104 @@ final class DetailAuth327Tests: XCTestCase {
         XCTAssertFalse(vm.isAuthError)
     }
 }
+
+final class HomeHot328Tests: XCTestCase {
+    /// Kai's seven-row arbitration table, as a pure function (no SwiftUI gestures).
+    func test328ArbitratorAcceptanceTable() {
+        // 1. Pinned, slow upward drag ≥ 56 pt, not last item: exactly one page change.
+        var session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 0, count: 5)
+        XCTAssertEqual(session.mode, .hero)
+        _ = session.changed(dx: 0, dy: -14)
+        XCTAssertEqual(session.axis, .vertical)
+        XCTAssertEqual(session.changed(dx: 0, dy: -56), .trackVertical(-56))
+        let first = session.ended(dx: 0, dy: -56, velocityX: 0, velocityY: -10, predictedX: 0)
+        XCTAssertEqual(first, .pageVertical(delta: 1))
+        XCTAssertTrue(session.consumedPageChange)
+        // The rest of the same gesture is ignored (no multi-page chain).
+        XCTAssertEqual(session.changed(dx: 0, dy: -120), .locked)
+        XCTAssertEqual(session.ended(dx: 0, dy: -120, velocityX: 0, velocityY: -800, predictedX: 0), .locked)
+
+        // 2. Pinned, last item upward: passthrough (page scrolls, no item change).
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 4, count: 5)
+        _ = session.changed(dx: 0, dy: -20)
+        XCTAssertEqual(session.changed(dx: 0, dy: -80), .passthrough)
+        XCTAssertEqual(session.ended(dx: 0, dy: -80, velocityX: 0, velocityY: -600, predictedX: 0), .passthrough)
+        XCTAssertFalse(session.consumedPageChange)
+
+        // 3. Pinned, first item downward: passthrough so system pull-to-refresh can run.
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 0, count: 5)
+        _ = session.changed(dx: 0, dy: 20)
+        XCTAssertEqual(session.changed(dx: 0, dy: 80), .passthrough)
+        XCTAssertEqual(session.ended(dx: 0, dy: 80, velocityX: 0, velocityY: 400, predictedX: 0), .passthrough)
+        XCTAssertFalse(session.consumedPageChange)
+
+        // 4. Gesture started at ~300 pt scroll, dragged back to top: only scrolls.
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 300, index: 2, count: 5)
+        XCTAssertEqual(session.mode, .scrollView)
+        XCTAssertEqual(session.changed(dx: 0, dy: 300), .passthrough)
+        XCTAssertEqual(session.ended(dx: 0, dy: 300, velocityX: 0, velocityY: 400, predictedX: 0), .passthrough)
+        XCTAssertFalse(session.consumedPageChange)
+
+        // 5. 30° diagonal: dominant axis wins (30° from horizontal is horizontal).
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 1, count: 5)
+        let dx: CGFloat = 80
+        let dy = dx * 0.57735026919 // tan(30°)
+        XCTAssertEqual(session.changed(dx: dx, dy: dy), .trackHorizontal(dx * HeroSwipePolicy.horizontalRubber))
+        XCTAssertEqual(session.axis, .horizontal)
+        // Vertical 30° from the vertical axis (i.e. 60° from horizontal) is vertical.
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 1, count: 5)
+        let vdy: CGFloat = -80
+        let vdx = abs(vdy) * 0.57735026919 // tan(30°)
+        XCTAssertEqual(session.changed(dx: vdx, dy: vdy), .trackVertical(vdy))
+        XCTAssertEqual(session.axis, .vertical)
+
+        // 6. Rapid vertical flick: translation ≥ 24 and velocity ≥ 500, at most one change.
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 2, count: 5)
+        _ = session.changed(dx: 0, dy: -24)
+        XCTAssertEqual(session.ended(dx: 0, dy: -24, velocityX: 0, velocityY: -500, predictedX: 0), .pageVertical(delta: 1))
+        XCTAssertTrue(session.consumedPageChange)
+        XCTAssertEqual(session.ended(dx: 0, dy: -80, velocityX: 0, velocityY: -900, predictedX: 0), .locked)
+
+        // Below the line: spring back, no page change.
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 2, count: 5)
+        _ = session.changed(dx: 0, dy: -30)
+        XCTAssertEqual(session.ended(dx: 0, dy: -30, velocityX: 0, velocityY: -100, predictedX: 0), .springVertical)
+
+        // Vertical down + not first item → previous.
+        session = HeroSwipePolicy.Session.begin(scrollOffset: 0, index: 2, count: 5)
+        _ = session.changed(dx: 0, dy: 56)
+        XCTAssertEqual(session.ended(dx: 0, dy: 56, velocityX: 0, velocityY: 10, predictedX: 0), .pageVertical(delta: -1))
+    }
+
+    /// MIDE-991 stand-in: a hanging CDN URL plus a usable DTO thumb must not sit
+    /// on brand-brown #2A2019. The per-item deadline forces a terminal state
+    /// (blur / floor), and the thumb is not promoted to a finalized A/B sharp.
+    @MainActor
+    func test328StuckSourceDeadlinePaintsFloorNotBrown() async throws {
+        HeroCoverPolicy.overallBudgetOverride = 0.3
+        defer { HeroCoverPolicy.overallBudgetOverride = nil }
+        HeroCoverStore.shared.resetForTests()
+        let movie = Movie(
+            id: "stuck-328",
+            number: "STUCK-328",
+            title: "Stuck CDN stand-in",
+            thumbURL: "fixture://poster/portrait-floor",
+            coverURL: "fixture://hang/cdn"
+        )
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        let deadline = Date().addingTimeInterval(2.5)
+        var presentation = HeroCoverStore.shared.presentation(for: "stuck-328")
+        while Date() < deadline, !presentation.finished {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "stuck-328")
+        }
+        XCTAssertTrue(presentation.finished, "per-item deadline must force a terminal state")
+        XCTAssertTrue(presentation.hasQuick, "DTO thumb must paint as the floor/blur, not an empty field")
+        XCTAssertNotEqual(presentation.phase, .empty)
+        XCTAssertFalse(presentation.isAB, "sub-tier / thumb floor must not become a finalized A/B hero")
+        XCTAssertNotEqual(presentation.phase, .finalized, "or if finalized, it would be from a ≥C sharp, which a hanging CDN must not provide")
+        // The visible empty floor token is no longer #2A2019.
+        XCTAssertNotEqual(HomeTheme.heroLoadingFloor, HomeTheme.fallbackBase)
+    }
+}
+

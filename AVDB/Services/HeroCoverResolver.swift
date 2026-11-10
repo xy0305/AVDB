@@ -15,6 +15,13 @@ enum HeroCoverPolicy {
     static let decodeCap = 2048
     static let sourceTimeout: TimeInterval = 4
     static let overallBudget: TimeInterval = 6
+    #if DEBUG
+    /// Tests inject a shorter per-item deadline (MIDE-991 stand-in).
+    static var overallBudgetOverride: TimeInterval?
+    static var effectiveOverallBudget: TimeInterval { overallBudgetOverride ?? overallBudget }
+    #else
+    static var effectiveOverallBudget: TimeInterval { overallBudget }
+    #endif
     static let graceWindow: TimeInterval = 0.4
     static let crossfadeDuration: TimeInterval = 0.45
     static let prefetchConcurrency = 3
@@ -445,7 +452,10 @@ final class HeroCoverStore: ObservableObject {
     private func resolve(_ movie: Movie, isCurrent: Bool, isAdjacent: Bool, generation: UUID) async {
         lastAttempt[movie.id] = ProcessInfo.processInfo.systemUptime
         #if DEBUG
-        if let url = movie.coverURL, url.hasPrefix("fixture://") {
+        // Instant B-tier for screenshot fixtures. Hanging / stuck CDN fixtures
+        // (fixture://hang) must go through the race so the per-item deadline can
+        // force a terminal state instead of a brown empty field.
+        if let url = movie.coverURL, url.hasPrefix("fixture://"), !url.hasPrefix("fixture://hang") {
             let image = HeroCoverFixture.portrait(url)
             if let candidate = HeroCoverClassifier.classify(image: image, source: url, kind: .javdb, verifiedFrontCrop: true) {
                 applySharp(candidate, movie: movie, provisional: false)
@@ -477,8 +487,9 @@ final class HeroCoverStore: ObservableObject {
             HeroCoverDisk.storeAccepted(candidate.image, number: movie.number, source: candidate.source)
             HeroCoverSRHook.scheduleIdleUpscaleIfNeeded(movie: movie, image: candidate.image, tier: candidate.tier)
         case .blurOnly:
-            // A disk C-tier (or other provisional sharp) must not be discarded if the
-            // remaining sources miss — finalize whatever ≥ C is already on screen.
+            // Per-item hard deadline: budget expired. Force a terminal state
+            // (show ≥C if any, else blur/quick if any). The DTO floor is painted
+            // by the page even if the store never got a blur bitmap.
             if let existing = presentations[movie.id], existing.tier >= .c {
                 var kept = existing
                 kept.phase = .finalized
@@ -614,10 +625,10 @@ enum HeroCoverRace {
         _ = keepBitmaps
         let sources = HeroCoverSources.sharp(movie: movie)
         let blurSources = HeroCoverSources.blur(movie: movie)
-        let deadline = ProcessInfo.processInfo.systemUptime + HeroCoverPolicy.overallBudget
+        let deadline = ProcessInfo.processInfo.systemUptime + HeroCoverPolicy.effectiveOverallBudget
         return await withTaskGroup(of: RaceMessage.self) { group in
             group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(HeroCoverPolicy.overallBudget * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(HeroCoverPolicy.effectiveOverallBudget * 1_000_000_000))
                 return Task.isCancelled ? .miss : .budget
             }
             // Quick blur in parallel with the HQ race; thumbs are OK because they stay blurred.

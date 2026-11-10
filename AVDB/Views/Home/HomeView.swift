@@ -2,8 +2,8 @@
 //  HomeView.swift
 //  AVDB
 //
-//  首页（Build 325 沉浸式改版）：全出血大图轮播（佳片推薦）、暖色氛围背景、
-//  玻璃快捷入口、横向海报栏（最新上架 / TOP250 / 近期磁鏈 / 我的關注）、悬浮玻璃搜索钮。
+//  首页（Build 328）：全出血大图轮播（看熱播日榜）、竖滑换条、往期推薦栏、
+//  浅色栏区与详情页一致；英雄图管线仍是 Build 326 HQ。
 //
 
 import SwiftUI
@@ -52,9 +52,6 @@ struct HomeView: View {
             GeometryReader { proxy in
                 homeRoot(HomeMetrics(width: proxy.size.width, safeTop: proxy.safeAreaInsets.top))
             }
-            // Home is a dark, poster-led surface; pushed screens keep the app's light look
-            // (destinations are declared outside this environment override).
-            .environment(\.colorScheme, .dark)
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
             .task {
@@ -69,7 +66,9 @@ struct HomeView: View {
                 RankingsView(embedded: true, initialTab: .top250)
             }
             .navigationDestination(isPresented: $goHot) {
-                RankingsView(embedded: true, initialTab: .playback)
+                RankingsView(embedded: true, initialTab: .playback,
+                             initialPlaybackFilter: "high_score",
+                             initialPlaybackPeriod: .daily)
             }
             .navigationDestination(isPresented: $goLatest) {
                 CatalogListView(title: "最新上架", source: .latest)
@@ -104,13 +103,9 @@ struct HomeView: View {
                 homeMovieDestination(movie)
             }
         }
-        // Light status bar over the full-bleed hero, only while home's root is visible.
-        // Emitted from a background so toggling never changes the stack's identity.
-        .background {
-            if immersiveActive {
-                Color.clear.preferredColorScheme(.dark)
-            }
-        }
+        // Status bar style is applied inside homeRoot (light content over the
+        // hero image, dark content over the light rails) without forcing the
+        // page color scheme dark.
     }
 
     @ViewBuilder
@@ -132,40 +127,54 @@ struct HomeView: View {
 
     private func homeRoot(_ m: HomeMetrics) -> some View {
         ZStack(alignment: .top) {
-            HomeAmbientBackground(ambient: ambient)
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            // Ambient color only behind the hero itself and the top overscroll
+            // area. It must not paint #14100D / #2A2019 under the rails.
+            HomeAmbientBackground(ambient: ambient, heroHeight: m.heroHeight, scroll: scroll)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    heroSection(m)
+            ScrollViewReader { proxy in
+                ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        quickActionRow(m)
-                            .padding(.top, 18)
-                        latestSection(m)
-                            .padding(.top, 22)
-                        top250Banner(m)
-                            .padding(.top, 26)
-                        magnetSection(m)
-                            .padding(.top, 26)
-                        followingSection(m)
-                            .padding(.top, 26)
+                        heroSection(m, scrollToShortcuts: {
+                            withAnimation(.easeInOut(duration: 0.38)) {
+                                proxy.scrollTo("home-shortcuts", anchor: .top)
+                            }
+                        })
+                        VStack(alignment: .leading, spacing: 0) {
+                            quickActionRow(m)
+                                .padding(.top, 18)
+                                .id("home-shortcuts")
+                            pastRecommendSection(m)
+                                .padding(.top, 22)
+                            latestSection(m)
+                                .padding(.top, 22)
+                            top250Banner(m)
+                                .padding(.top, 26)
+                            magnetSection(m)
+                                .padding(.top, 26)
+                            followingSection(m)
+                                .padding(.top, 26)
+                        }
+                        .background(Color(.systemBackground))
+                        // iPad: sections capped at 1100 and centered; the hero stays full width.
+                        .frame(maxWidth: m.contentWidth, alignment: .leading)
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 28)
                     }
-                    // iPad: sections capped at 1100 and centered; the hero stays full width.
-                    .frame(maxWidth: m.contentWidth, alignment: .leading)
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 28)
                 }
-            }
-            .scrollIndicators(.hidden)
-            .coordinateSpace(.named(HomeScrollState.space))
-            .onPreferenceChange(HomeScrollOffsetKey.self) { value in
-                scroll.update(value)
-            }
-            // Full-bleed: the hero runs under the status bar. Bottom safe area (floating
-            // tab bar inset) is kept so the last rail scrolls clear of the bar.
-            .ignoresSafeArea(.container, edges: .top)
-            .refreshable {
-                HeroCoverStore.shared.clearNegativesAndRetry()
-                await vm.initialLoad()
+                .scrollIndicators(.hidden)
+                .coordinateSpace(.named(HomeScrollState.space))
+                .onPreferenceChange(HomeScrollOffsetKey.self) { value in
+                    scroll.update(value)
+                }
+                // Full-bleed: the hero runs under the status bar. Bottom safe area (floating
+                // tab bar inset) is kept so the last rail scrolls clear of the bar.
+                .ignoresSafeArea(.container, edges: .top)
+                .refreshable {
+                    HeroCoverStore.shared.clearNegativesAndRetry()
+                    await vm.initialLoad()
+                }
             }
 
             HomeTopScrim(scroll: scroll, start: max(0, m.heroHeight - m.safeTop - 90))
@@ -180,6 +189,9 @@ struct HomeView: View {
             .padding(.top, 6)
             .padding(.trailing, m.padding)
             .frame(maxWidth: .infinity, alignment: .trailing)
+
+            HomeStatusBarObserver(scroll: scroll, active: immersiveActive,
+                                  cutoff: max(40, m.heroHeight - m.safeTop - 80))
         }
         .foregroundStyle(HomeTheme.primary)
     }
@@ -187,29 +199,29 @@ struct HomeView: View {
     // MARK: Hero
 
     @ViewBuilder
-    private func heroSection(_ m: HomeMetrics) -> some View {
+    private func heroSection(_ m: HomeMetrics, scrollToShortcuts: @escaping () -> Void) -> some View {
         Group {
-            if !vm.recommended.isEmpty {
+            if !vm.playback.isEmpty {
                 HomeHeroCarousel(
-                    movies: vm.recommended,
+                    movies: vm.playback,
                     metrics: m,
-                    periodLabel: vm.periodLabel,
                     scroll: scroll,
                     ambient: ambient,
                     isActive: immersiveActive,
                     onOpen: { openMovie = $0 },
-                    onPast: { goPast = true }
+                    onHot: { goHot = true },
+                    onMore: scrollToShortcuts
                 )
-            } else if vm.recommendedState == .loading || vm.recommendedState == .failed {
-                homeListStatus(vm.recommendedState, hasItems: !vm.recommended.isEmpty, placeholder: .hero(m)) {
-                    Task { await vm.retry(.recommended) }
+            } else if vm.playbackState == .loading || vm.playbackState == .failed {
+                homeListStatus(vm.playbackState, hasItems: !vm.playback.isEmpty, placeholder: .hero(m)) {
+                    Task { await vm.retry(.playback) }
                 }
             } else {
-                // Empty recommend list: keep the full hero height (never collapse to a
-                // short strip). Ambient background + 往期 chip; no sharp thumbs.
+                // Empty playback list: keep the full hero height (never collapse).
+                // Neutral systemGray floor — never brand brown #2A2019.
                 ZStack(alignment: .topLeading) {
-                    HomeTheme.fallbackBase
-                    HomePastChip(periodLabel: vm.periodLabel) { goPast = true }
+                    HomeTheme.heroLoadingFloor
+                    HomeHotChip { goHot = true }
                         .padding(.leading, m.padding)
                         .padding(.top, m.safeTop + 13)
                 }
@@ -256,12 +268,12 @@ struct HomeView: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.92))
+                    .foregroundStyle(Color.primary)
                     .frame(width: m.quickCircle, height: m.quickCircle)
-                    .homeGlass(in: Circle())
+                    .background(Circle().fill(Color(.secondarySystemBackground)))
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.86))
+                    .foregroundStyle(Color.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -273,6 +285,20 @@ struct HomeView: View {
     }
 
     // MARK: Rails
+
+    private func pastRecommendSection(_ m: HomeMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HomeRailHeader(title: "往期推薦", padding: m.padding,
+                           titleIdentifier: "home-past-header",
+                           more: { goPast = true })
+            if !vm.recommended.isEmpty {
+                HomePosterRail(upgradesVisibleHQ: true, movies: vm.recommended, metrics: m) { openMovie = $0 }
+            }
+            homeListStatus(vm.recommendedState, hasItems: !vm.recommended.isEmpty, placeholder: .rail(m)) {
+                Task { await vm.retry(.recommended) }
+            }
+        }
+    }
 
     private func latestSection(_ m: HomeMetrics) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -372,7 +398,7 @@ struct HomeView: View {
                             .foregroundStyle(HomeTheme.secondary)
                     }
                     Spacer(minLength: 8)
-                    HomeChevronCircle()
+                    HomeChevronCircle(onDark: true)
                 }
                 .padding(.horizontal, 16)
             }
@@ -458,10 +484,10 @@ struct HomeView: View {
                             } label: {
                                 Text(tag.displayName)
                                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                                    .foregroundStyle(selected ? Color.white : Color.white.opacity(0.78))
+                                    .foregroundStyle(selected ? Color.white : Color.primary)
                                     .padding(.horizontal, 12)
                                     .frame(height: 30)
-                                    .background(Capsule().fill(selected ? HomeTheme.accent : Color.white.opacity(0.10)))
+                                    .background(Capsule().fill(selected ? HomeTheme.accent : Color(.systemGray5)))
                                     .contentShape(Capsule().inset(by: -7))
                             }
                             .buttonStyle(HomePressStyle(scale: 0.94))
@@ -546,13 +572,17 @@ private struct HomeMovieSnapshot: Codable {
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var recommended: [Movie] = []
+    @Published var playback: [Movie] = []
     @Published var latest: [Movie] = []
     @Published var magnets: [Movie] = []
     @Published private(set) var recommendedState: HomeListState = .loading
+    @Published private(set) var playbackState: HomeListState = .loading
     @Published private(set) var latestState: HomeListState = .loading
     @Published private(set) var magnetsState: HomeListState = .loading
-    enum Section: CaseIterable { case recommended, latest, magnets }
+    enum Section: CaseIterable { case recommended, playback, latest, magnets }
+    static let playbackHeroCap = 10
     private let recommendedLoader = HomeListLoader<HomeMovieSnapshot>()
+    private let playbackLoader = HomeListLoader<HomeMovieSnapshot>()
     private let latestLoader = HomeListLoader<HomeMovieSnapshot>()
     private let magnetsLoader = HomeListLoader<HomeMovieSnapshot>()
     private var loadGeneration = UUID()
@@ -579,13 +609,18 @@ final class HomeViewModel: ObservableObject {
             latest = (1...9).map { Movie(id: "fixture-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)") }
             magnets = (1...9).map { Movie(id: "magnet-\($0)", number: "TEST-M\($0)", title: "Neutral magnet \($0)", coverURL: "fixture://poster/\($0)") }
             latestState = .loaded; magnetsState = .loaded; recommendedState = .empty
+            playbackState = .empty
             if ProcessInfo.processInfo.arguments.contains("--home326-fixture")
-                || ProcessInfo.processInfo.arguments.contains("--home325-fixture") {
-                // Build 326 screenshots: neutral 700×1000 B-tier portrait rasters (no network).
-                recommended = (1...5).map { Movie(id: "hero-\($0)", number: "TEST-H\($0)", title: "Neutral hero film \($0)", coverURL: "fixture://poster/portrait-hero-\($0)") }
+                || ProcessInfo.processInfo.arguments.contains("--home325-fixture")
+                || ProcessInfo.processInfo.arguments.contains("--home328-fixture") {
+                // Neutral 700×1000 B-tier portrait rasters (no network). Hero is the
+                // playback array; 往期推薦 keeps the recommend fixtures as a rail.
+                playback = (1...5).map { Movie(id: "hero-\($0)", number: "TEST-H\($0)", title: "Neutral hero film \($0)", coverURL: "fixture://poster/portrait-hero-\($0)") }
+                playbackState = .loaded
+                recommended = (1...5).map { Movie(id: "past-\($0)", number: "TEST-P\($0)", title: "Neutral past film \($0)", coverURL: "fixture://poster/\($0)") }
                 recommendedState = .loaded
                 periodLabel = "2026-11-09"
-                HeroCoverStore.shared.start(movies: recommended, currentIndex: 0)
+                HeroCoverStore.shared.start(movies: playback, currentIndex: 0)
             }
             return
         }
@@ -596,12 +631,13 @@ final class HomeViewModel: ObservableObject {
         let changedContext = context != scope
         context = scope
         recommendedLoader.cancel(clear: changedContext)
+        playbackLoader.cancel(clear: changedContext)
         latestLoader.cancel(clear: changedContext)
         magnetsLoader.cancel(clear: changedContext)
         if changedContext {
             for task in hqPrefetchTasks.values { task.cancel() }
             hqPrefetchTasks = [:]
-            recommended = []; latest = []; magnets = []
+            recommended = []; playback = []; latest = []; magnets = []
         }
         latestPage = 1
         magnetPage = 2
@@ -654,10 +690,12 @@ final class HomeViewModel: ObservableObject {
         let loader: HomeListLoader<HomeMovieSnapshot>
         switch section {
         case .recommended: loader = recommendedLoader
+        case .playback: loader = playbackLoader
         case .latest: loader = latestLoader
         case .magnets: loader = magnetsLoader
         }
         let query = section == .recommended ? "/movies/recommend?page=1" :
+            section == .playback ? "/rankings/playback?filter_by=high_score&period=daily&page=1" :
             "/movies?page=\(page)&limit=9&type=all&filter_by=can_play&sort_by=update&home=\(section == .magnets ? "magnets" : "latest")"
         let key = HomeListKey(base: JavDBConstants.baseURL,
                               accountID: cacheAccountID, query: query)
@@ -668,6 +706,10 @@ final class HomeViewModel: ObservableObject {
             let result: [Movie]
             switch section {
             case .recommended: result = try await sdk.recommendMovies(page: 1)
+            case .playback:
+                // Must match the 看熱播 tab defaults (high_score + daily), not the
+                // SDK's filterBy: "all" default. Cap the carousel at 10 titles.
+                result = Array((try await sdk.playbackRankings(filterBy: "high_score", period: "daily", page: 1)).prefix(Self.playbackHeroCap))
             case .latest, .magnets:
                 result = try await sdk.latestMovies(page: page, limit: 9, type: "all", filterBy: "can_play", sortBy: "update")
             }
@@ -683,7 +725,12 @@ final class HomeViewModel: ObservableObject {
                 previous = self.recommended
                 self.recommended = movies
                 self.recommendedState = state
-                // Prefetch starts when the recommend list returns. Image success/failure
+                // 往期推薦 rail only. Image success/failure never mutates this array.
+            case .playback:
+                previous = self.playback
+                self.playback = movies
+                self.playbackState = state
+                // Prefetch starts when the playback list returns. Image success/failure
                 // never mutates this array (dot count stays fixed).
                 HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
             case .latest: previous = self.latest; self.latest = movies; self.latestState = state
@@ -776,18 +823,23 @@ final class HomeViewModel: ObservableObject {
 
 // MARK: - Build 325 immersive home: theme, metrics, glass
 
-/// Home-only palette: warm dark surface, one accent (#FF8A3D), white text tiers.
+/// Home palette (Build 328): rails follow system appearance like the detail sheet;
+/// on-image hero chrome stays white on dark scrims. Accent is unchanged.
 enum HomeTheme {
     static let accent = Color(red: 1.0, green: 138.0 / 255.0, blue: 61.0 / 255.0)          // #FF8A3D
     static let accentPressed = Color(red: 229.0 / 255.0, green: 119.0 / 255.0, blue: 42.0 / 255.0) // #E5772A
+    /// Kept for the TOP250 dark-island banner only — not the page floor.
     static let floor = Color(red: 20.0 / 255.0, green: 16.0 / 255.0, blue: 13.0 / 255.0)     // #14100D
+    /// Historical 326 empty-hero fill. Must not be used as a visible empty floor in 328.
     static let fallbackBase = Color(red: 42.0 / 255.0, green: 32.0 / 255.0, blue: 25.0 / 255.0) // #2A2019
-    /// Glass fill rgba(20,16,13,0.32).
+    /// Loading / empty hero floor when no blur or DTO image is available.
+    static let heroLoadingFloor = Color(.systemGray)
+    /// Glass fill rgba(20,16,13,0.32) for on-image chrome (search, 看熱播 chip, 更多).
     static let glassFill = Color(red: 20.0 / 255.0, green: 16.0 / 255.0, blue: 13.0 / 255.0).opacity(0.32)
-    static let primary = Color.white
-    static let secondary = Color.white.opacity(0.62)
-    static let tertiary = Color.white.opacity(0.40)
-    static let separator = Color.white.opacity(0.10)
+    static let primary = Color.primary
+    static let secondary = Color.secondary
+    static let tertiary = Color.secondary.opacity(0.70)
+    static let separator = Color.primary.opacity(0.10)
 }
 
 /// Scene-width driven metrics (never UIScreen): P, hero height, rail card size.
@@ -927,22 +979,24 @@ final class HomeAmbient: ObservableObject {
     }
 }
 
-/// 0 → base, 0.45 → base with B × 0.55, 0.75 → #14100D. Crossfades 0.8 s on page change;
-/// Reduce Transparency → solid #14100D.
+/// Ambient wash clipped to the hero + top overscroll. Never paints #14100D / #2A2019 under the rails.
 private struct HomeAmbientBackground: View {
     @ObservedObject var ambient: HomeAmbient
+    var heroHeight: CGFloat
+    @ObservedObject var scroll: HomeScrollState
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
+        let height = max(0, heroHeight - scroll.up) + scroll.pull
         ZStack {
-            HomeTheme.floor
-            if !reduceTransparency {
+            if reduceTransparency {
+                ambient.base.topColor
+            } else {
                 LinearGradient(
                     stops: [
                         .init(color: ambient.base.topColor, location: 0),
-                        .init(color: ambient.base.deepColor, location: 0.45),
-                        .init(color: HomeTheme.floor, location: 0.75),
-                        .init(color: HomeTheme.floor, location: 1)
+                        .init(color: ambient.base.deepColor, location: 0.55),
+                        .init(color: ambient.base.deepColor.opacity(0), location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -951,10 +1005,13 @@ private struct HomeAmbientBackground: View {
                 .transition(.opacity)
             }
         }
+        .frame(height: height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .offset(y: 0)
         .animation(.easeInOut(duration: 0.8), value: ambient.key)
-        .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        .clipped()
     }
 }
 
@@ -989,7 +1046,7 @@ private struct HomeTopScrim: View {
     let start: CGFloat
 
     var body: some View {
-        LinearGradient(colors: [HomeTheme.floor.opacity(0.94), HomeTheme.floor.opacity(0)],
+        LinearGradient(colors: [Color(.systemBackground).opacity(0.94), Color(.systemBackground).opacity(0)],
                        startPoint: .top, endPoint: .bottom)
             .frame(height: 30)
             .ignoresSafeArea(.container, edges: .top)
@@ -999,9 +1056,9 @@ private struct HomeTopScrim: View {
     }
 }
 
-/// 往期 entry: small glass chip, top-left of the hero.
-private struct HomePastChip: View {
-    let periodLabel: String
+/// 看熱播 · 日榜 identity chip: dark glass over the hero image. Tapping opens
+/// RankingsView playback with the same filters as the hero (high_score + daily).
+private struct HomeHotChip: View {
     let action: () -> Void
 
     var body: some View {
@@ -1010,11 +1067,8 @@ private struct HomePastChip: View {
             action()
         } label: {
             HStack(spacing: 5) {
-                Text("往期")
+                Text("看熱播 · 日榜")
                     .font(.system(size: 12, weight: .semibold))
-                Text(periodLabel)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.7))
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .bold))
             }
@@ -1026,18 +1080,19 @@ private struct HomePastChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(HomePressStyle(scale: 0.94))
-        .accessibilityLabel("往期推薦，\(periodLabel)")
-        .accessibilityIdentifier("home-past-recommend")
+        .accessibilityLabel("看熱播，日榜")
+        .accessibilityIdentifier("home-hot-daily")
     }
 }
 
 private struct HomeChevronCircle: View {
+    var onDark: Bool = false
     var body: some View {
         Image(systemName: "chevron.right")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Color.white)
+            .foregroundStyle(onDark ? Color.white : Color.primary.opacity(0.55))
             .frame(width: 26, height: 26)
-            .background(Circle().fill(Color.white.opacity(0.10)))
+            .background(Circle().fill(onDark ? Color.white.opacity(0.10) : Color.primary.opacity(0.08)))
     }
 }
 
@@ -1077,18 +1132,18 @@ final class HomeHeroSynopsisStore {
     }
 }
 
-/// 官方首页「佳片推薦」：全出血沉浸式大图轮播（Build 325）。
+/// 看熱播日榜全出血轮播（Build 328）。横滑保留，竖滑换条；芯片是「看熱播 · 日榜」。
 /// 宽 = 屏宽、无圆角无边距、延伸到状态栏下；底部 / 顶部 scrim；左下文字块 + 独立圆点层；
 /// 5 s 自动交叉淡入 + Ken Burns，手动翻页弹簧；下拉拉伸、上滑视差、文字随滚动淡出。
 private struct HomeHeroCarousel: View {
     let movies: [Movie]
     let metrics: HomeMetrics
-    let periodLabel: String
     @ObservedObject var scroll: HomeScrollState
     let ambient: HomeAmbient
     let isActive: Bool
     let onOpen: (Movie) -> Void
-    let onPast: () -> Void
+    let onHot: () -> Void
+    let onMore: () -> Void
 
     @ObservedObject private var covers = HeroCoverStore.shared
     @State private var index = 0
@@ -1096,6 +1151,7 @@ private struct HomeHeroCarousel: View {
     @State private var touching = false
     @State private var dragging = false
     @State private var dragX: CGFloat = 0
+    @State private var dragY: CGFloat = 0
     @State private var lastDragAt = Date.distantPast
     @State private var slideEdge: Edge?
     @Environment(\.scenePhase) private var scenePhase
@@ -1146,9 +1202,20 @@ private struct HomeHeroCarousel: View {
         return nil
     }
 
-    /// Global empty: every item finished with no even-quick image. Height stays full.
+    /// Global empty is judged from per-item terminal state (the 6 s deadline
+    /// forces `finished`). A title that still has a DTO cover/thumb is not empty
+    /// — the page paints that floor — so the banner stays off.
     private var showCoverFailure: Bool {
-        !movies.isEmpty && movies.allSatisfy { let p = cover($0); return p.finished && !p.hasQuick }
+        !movies.isEmpty && movies.allSatisfy { movie in
+            let p = cover(movie)
+            return p.finished && !p.hasQuick && !Self.hasDTOFloor(movie)
+        }
+    }
+
+    private static func hasDTOFloor(_ movie: Movie) -> Bool {
+        let cover = (movie.coverURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let thumb = (movie.thumbURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return !cover.isEmpty || !thumb.isEmpty
     }
 
     /// Fade text / dots / chip over the first 120 pt of scroll-up.
@@ -1157,14 +1224,55 @@ private struct HomeHeroCarousel: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Button {
-                // A horizontal swipe must not also open the detail page.
+                // A horizontal or vertical swipe must not also open the detail page.
                 guard Date().timeIntervalSince(lastDragAt) > 0.35, let movie = current else { return }
                 onOpen(movie)
             } label: {
                 imageLayer
             }
             .buttonStyle(HeroTouchStyle(touching: $touching))
-            .simultaneousGesture(swipe)
+            .overlay {
+                HeroSwipeOverlay(
+                    scrollOffset: { scroll.offset },
+                    index: { index },
+                    count: { movies.count },
+                    onTrackHorizontal: { value in
+                        lastDragAt = Date()
+                        dragging = true
+                        dragX = value
+                    },
+                    onTrackVertical: { value in
+                        lastDragAt = Date()
+                        dragging = true
+                        dragY = value
+                    },
+                    onPageHorizontal: { delta in
+                        lastDragAt = Date()
+                        dragging = false
+                        go(delta, slide: true, vertical: false)
+                    },
+                    onPageVertical: { delta in
+                        lastDragAt = Date()
+                        dragging = false
+                        go(delta, slide: true, vertical: true)
+                    },
+                    onSpringHorizontal: {
+                        dragging = false
+                        withAnimation(.spring(response: HeroSwipePolicy.pageSpringResponse,
+                                              dampingFraction: HeroSwipePolicy.pageSpringDamping)) { dragX = 0 }
+                    },
+                    onSpringVertical: {
+                        dragging = false
+                        withAnimation(.spring(response: HeroSwipePolicy.pageSpringResponse,
+                                              dampingFraction: HeroSwipePolicy.pageSpringDamping)) { dragY = 0 }
+                    },
+                    onTouch: { down in
+                        touching = down
+                        if down { lastDragAt = Date() }
+                    }
+                )
+                .accessibilityHidden(true)
+            }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
             .accessibilityHint("打開詳情")
@@ -1196,9 +1304,14 @@ private struct HomeHeroCarousel: View {
                     .accessibilityHidden(true)
             }
 
-            HomePastChip(periodLabel: periodLabel, action: onPast)
+            HomeHotChip(action: onHot)
                 .padding(.leading, padding)
                 .padding(.top, metrics.safeTop + 13)
+                .opacity(chromeOpacity)
+
+            HomeHeroMoreButton(action: onMore)
+                .padding(.bottom, 8)
+                .frame(width: width, height: height, alignment: .bottom)
                 .opacity(chromeOpacity)
 
             if showCoverFailure {
@@ -1254,13 +1367,13 @@ private struct HomeHeroCarousel: View {
     private var imageLayer: some View {
         ZStack {
             if let movie = current {
-                HomeHeroPage(presentation: cover(movie), metrics: metrics, kenBurns: !reduceMotion)
+                HomeHeroPage(presentation: cover(movie), movie: movie, metrics: metrics, kenBurns: !reduceMotion)
                     .id(movie.id)
                     .transition(pageTransition)
             }
         }
         .frame(width: width, height: height)
-        .offset(x: dragX)
+        .offset(x: dragX, y: dragY)
         // Pull-down stretch (anchored at the bottom so it fills the gap above) + scroll-up parallax.
         .scaleEffect(1 + min(scroll.pull, 120) / height, anchor: .bottom)
         .offset(y: scroll.up * 0.45)
@@ -1325,54 +1438,50 @@ private struct HomeHeroCarousel: View {
         .opacity(chromeOpacity)
     }
 
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .onChanged { value in
-                let dx = value.translation.width, dy = value.translation.height
-                guard movies.count > 1, dragging || abs(dx) > abs(dy) * 1.2 else { return }
-                dragging = true
-                lastDragAt = Date()
-                dragX = dx * 0.85
-            }
-            .onEnded { value in
-                guard dragging else { return }
-                lastDragAt = Date()
-                let dx = value.translation.width
-                let predicted = value.predictedEndTranslation.width
-                dragging = false
-                if abs(dx) > 60 || abs(predicted) > 140 {
-                    go(dx < 0 ? 1 : -1, slide: true)
-                } else {
-                    withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) { dragX = 0 }
-                }
-            }
-    }
-
     private var pageTransition: AnyTransition {
         guard let edge = slideEdge else { return .opacity }
+        if edge == .top || edge == .bottom {
+            return .asymmetric(insertion: .move(edge: edge),
+                               removal: .move(edge: edge == .bottom ? .top : .bottom))
+        }
         return .asymmetric(insertion: .move(edge: edge),
                            removal: .move(edge: edge == .trailing ? .leading : .trailing))
     }
 
-    private func go(_ delta: Int, slide: Bool) {
+    private func go(_ delta: Int, slide: Bool, vertical: Bool = false) {
         guard movies.count > 1 else { return }
-        let next = (min(max(index, 0), movies.count - 1) + delta + movies.count) % movies.count
-        go(to: next, slide: slide, delta: delta)
+        let currentIndex = min(max(index, 0), movies.count - 1)
+        let next: Int
+        if vertical {
+            next = currentIndex + delta
+            guard movies.indices.contains(next) else { return }
+        } else {
+            next = (currentIndex + delta + movies.count) % movies.count
+        }
+        go(to: next, slide: slide, delta: delta, vertical: vertical)
     }
 
-    private func go(to next: Int, slide: Bool, delta: Int? = nil) {
-        guard movies.count > 1, next != index else { return }
+    private func go(to next: Int, slide: Bool, delta: Int? = nil, vertical: Bool = false) {
+        guard movies.count > 1, next != index, movies.indices.contains(next) else { return }
         let inferred = delta ?? (next > index ? 1 : -1)
         if slide {
-            slideEdge = inferred > 0 ? .trailing : .leading
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+            if vertical {
+                slideEdge = inferred > 0 ? .bottom : .top
+            } else {
+                slideEdge = inferred > 0 ? .trailing : .leading
+            }
+            withAnimation(.spring(response: HeroSwipePolicy.pageSpringResponse,
+                                  dampingFraction: HeroSwipePolicy.pageSpringDamping)) {
                 index = next
                 dragX = 0
+                dragY = 0
             }
         } else {
             slideEdge = nil
             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.6)) {
                 index = next
+                dragX = 0
+                dragY = 0
             }
         }
     }
@@ -1404,7 +1513,7 @@ private struct HomeHeroCarousel: View {
     }
 
     private var accessibilityText: String {
-        guard let movie = current else { return "佳片推薦" }
+        guard let movie = current else { return "看熱播日榜" }
         let date = movie.releaseDate?.trimmingCharacters(in: .whitespaces) ?? ""
         return date.isEmpty ? headline(movie) : "\(movie.displayNumber) \(movie.displayTitle), \(date)"
     }
@@ -1419,22 +1528,28 @@ private struct HeroTouchStyle: ButtonStyle {
     }
 }
 
-/// One hero page: four states only, always full-bleed, never an inset card.
-/// 0 empty: ambient fallback color (scrim + title/date/synopsis/dots sit on top).
-/// 1 blur: quick image aspectFill + blur 28 + brightness × 0.85, full-bleed.
-/// 2 provisional sharp / 3 finalized sharp: 0.45s easeOut crossfade, no spinner.
+/// One hero page: layered full-bleed paint, never an inset card.
+/// Floor is always the best available image: finalized HQ sharp ?? quick/blur ??
+/// DTO list cover/thumb loaded directly. Sub-tier / thumb images stay a floor
+/// (never a finalized sharp A/B). Loading floor is a blur of that image, or a
+/// neutral systemGray — never brand brown #2A2019.
 private struct HomeHeroPage: View {
     let presentation: HeroCoverPresentation
+    let movie: Movie
     let metrics: HomeMetrics
     let kenBurns: Bool
     @State private var zoomed = false
+    @State private var floorImage: UIImage?
 
     var body: some View {
         let size = CGSize(width: metrics.width, height: metrics.heroHeight)
         ZStack {
-            // State 0: ambient default color. Blur (state 1) and sharp (2/3) crossfade
-            // over it at 0.45s easeOut. Never an inset card, spinner, or shimmer.
-            HomeTheme.fallbackBase
+            HomeTheme.heroLoadingFloor
+            if presentation.blurImage == nil, presentation.sharpImage == nil, let floor = floorImage {
+                HomeAnchoredFill(image: floor, size: size)
+                    .blur(radius: 28, opaque: true)
+                    .colorMultiply(Color(white: 0.85))
+            }
             if let blur = presentation.blurImage {
                 HomeAnchoredFill(image: blur, size: size)
                     .blur(radius: 28, opaque: true)
@@ -1447,10 +1562,46 @@ private struct HomeHeroPage: View {
         .frame(width: size.width, height: size.height)
         .animation(.easeOut(duration: HeroCoverPolicy.crossfadeDuration), value: presentation.token)
         .scaleEffect(zoomed ? 1.05 : 1.0)
+        .task(id: movie.id) {
+            // DTO floor is a mandatory paint even if HeroCoverStore is stuck.
+            guard presentation.blurImage == nil, presentation.sharpImage == nil else { return }
+            for url in [movie.coverURL, movie.thumbURL] {
+                guard let url, !url.isEmpty, !url.hasPrefix("fixture://hang") else { continue }
+                if let image = await ImageLoader.shared.load(url, maxPixelSize: 640, timeout: 4) {
+                    floorImage = image
+                    return
+                }
+            }
+        }
         .onAppear {
             guard kenBurns else { return }
             withAnimation(.linear(duration: 5.6)) { zoomed = true }
         }
+    }
+}
+
+/// 44 pt hit target, bottom-center of the hero (chevron.down + 「更多」), over the scrim.
+private struct HomeHeroMoreButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            GlassHaptic.tap()
+            action()
+        } label: {
+            VStack(spacing: 1) {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("更多")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(Color.white.opacity(0.92))
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(HomePressStyle(scale: 0.94))
+        .accessibilityLabel("更多")
+        .accessibilityIdentifier("home-hero-more")
     }
 }
 
@@ -1638,7 +1789,7 @@ private struct HomePlaceholderView: View {
         case .hero(let m):
             ZStack {
                 if failed {
-                    Color.white.opacity(0.04)
+                    Color(.systemGray5)
                     failedBadge(size: 26)
                 } else {
                     HomeShimmer()
@@ -1656,7 +1807,7 @@ private struct HomePlaceholderView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ZStack {
                             if failed {
-                                Color.white.opacity(0.05)
+                                Color(.systemGray5)
                                 failedBadge(size: 20)
                             } else {
                                 HomeShimmer()
@@ -1666,11 +1817,11 @@ private struct HomePlaceholderView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
                         }
                         VStack(alignment: .leading, spacing: 5) {
-                            Capsule().fill(Color.white.opacity(0.08)).frame(width: m.cardWidth * 0.8, height: 9)
-                            Capsule().fill(Color.white.opacity(0.06)).frame(width: m.cardWidth * 0.45, height: 8)
+                            Capsule().fill(Color.primary.opacity(0.10)).frame(width: m.cardWidth * 0.8, height: 9)
+                            Capsule().fill(Color.primary.opacity(0.07)).frame(width: m.cardWidth * 0.45, height: 8)
                         }
                         .frame(width: m.cardWidth, height: 34, alignment: .topLeading)
                     }
@@ -1703,7 +1854,7 @@ private struct HomePlaceholderView: View {
     }
 }
 
-/// Dark shimmer for loading placeholders on the warm surface.
+/// Light shimmer for loading placeholders on the system background.
 private struct HomeShimmer: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: CGFloat = -1
@@ -1711,9 +1862,9 @@ private struct HomeShimmer: View {
     var body: some View {
         GeometryReader { geo in
             let w = max(geo.size.width, 1)
-            Color.white.opacity(0.06)
+            Color(.systemGray5)
                 .overlay {
-                    LinearGradient(colors: [.clear, .white.opacity(0.08), .clear],
+                    LinearGradient(colors: [.clear, Color.white.opacity(0.45), .clear],
                                    startPoint: .leading, endPoint: .trailing)
                         .frame(width: w * 0.6)
                         .offset(x: phase * w * 1.3)
@@ -1898,5 +2049,49 @@ struct PeriodMoviesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
+    }
+}
+
+private struct HomeStatusBarObserver: View {
+    @ObservedObject var scroll: HomeScrollState
+    var active: Bool
+    var cutoff: CGFloat
+    var body: some View {
+        HomeStatusBarStyle(lightContent: active && scroll.up < cutoff)
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Isolated status-bar style: light content over the hero image, dark content
+/// over the light rails. Does not force the page color scheme.
+private struct HomeStatusBarStyle: UIViewControllerRepresentable {
+    var lightContent: Bool
+
+    func makeUIViewController(context: Context) -> Controller {
+        Controller()
+    }
+
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.lightContent = lightContent
+        controller.setNeedsStatusBarAppearanceUpdate()
+        controller.propagate()
+    }
+
+    final class Controller: UIViewController {
+        var lightContent = true
+        override var preferredStatusBarStyle: UIStatusBarStyle {
+            lightContent ? .lightContent : .darkContent
+        }
+        override var childForStatusBarStyle: UIViewController? { nil }
+        func propagate() {
+            setNeedsStatusBarAppearanceUpdate()
+            var current = parent
+            while let viewController = current {
+                viewController.setNeedsStatusBarAppearanceUpdate()
+                current = viewController.parent
+            }
+        }
     }
 }

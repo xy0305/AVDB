@@ -323,6 +323,18 @@ public actor ImageLoader {
               let url = URL(string: urlString) else {
             return nil
         }
+        #if DEBUG
+        // Build 328: hanging CDN stand-in (MIDE-991). Sleeps for the caller timeout
+        // or until cancelled so the hero race budget can force a terminal state.
+        if urlString.hasPrefix("fixture://hang") {
+            let nanos = UInt64(max(timeout, 0.05) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanos)
+            return nil
+        }
+        if urlString.hasPrefix("fixture://poster/") {
+            return Self.fixturePoster(urlString)
+        }
+        #endif
         let pixelSize = max(320, maxPixelSize)
         let tag = JavDBCoverEnhance.cacheTag
         let cacheKey = "\(urlString)#\(pixelSize)#\(tag)" as NSString
@@ -359,6 +371,26 @@ public actor ImageLoader {
         }
         return image
     }
+
+    #if DEBUG
+    nonisolated static func fixturePoster(_ urlString: String) -> UIImage {
+        let name = urlString.components(separatedBy: "/").last ?? "neutral"
+        let size: CGSize = name.contains("portrait") ? CGSize(width: 700, height: 1000)
+            : name.contains("square") ? CGSize(width: 700, height: 700)
+            : name.contains("wide") ? CGSize(width: 1200, height: 500)
+            : CGSize(width: 800, height: 538)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            ("NEUTRAL " + name).draw(at: CGPoint(x: 40, y: size.height * 0.45),
+                withAttributes: [.font: UIFont.systemFont(ofSize: 36, weight: .bold),
+                                 .foregroundColor: UIColor.white])
+        }
+    }
+    #endif
 
     /// Decoded source cache stays separate from bounded list-only derivatives.
     public func loadPoster(_ source: String, maxPixelSize: Int) async -> UIImage? {

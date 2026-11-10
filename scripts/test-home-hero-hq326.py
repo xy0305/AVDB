@@ -9,21 +9,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '327' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 327;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '328' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 328;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 # Release wiring.
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 327' in wf and 'feat/home-hero-hq-326' in wf
+assert 'Home HQ posters App 328' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf and 'test-home-immersive325.py' not in wf
-assert 'scripts/package-lut327.py' in wf and 'AVDB-327-release' in wf and 'AVDB-325-' not in wf
-assert 'AVDB-327-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
+assert 'scripts/package-lut328.py' in wf and 'AVDB-328-release' in wf and 'AVDB-325-' not in wf
+assert 'AVDB-328-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'home-hero-hq-screenshots' in wf
 assert 'llama|SherpaOnnxC' in wf  # screenshot job still drops device-only xcframeworks
 assert not (r/'scripts/test-home-immersive325.py').exists() and not (r/'scripts/package-lut325.py').exists()
-pkg = (r/'scripts/package-lut327.py').read_text()
-assert "=='327'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-327-detail-auth.ipa' in pkg
+pkg = (r/'scripts/package-lut328.py').read_text()
+assert "=='328'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-328-home-hot.ipa' in pkg
 doc = (r/'Build326-HomeHeroHQ.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '326' in doc
 
@@ -95,7 +95,8 @@ assert '.aspectRatio(contentMode: .fit)' not in page
 assert 'HomeShimmer()' not in page
 assert '.blur(radius: 28, opaque: true)' in page
 assert 'colorMultiply(Color(white: 0.85))' in page
-assert 'HomeTheme.fallbackBase' in page
+assert 'HomeTheme.heroLoadingFloor' in page
+assert 'HomeTheme.fallbackBase' not in page  # 328: never paint #2A2019 as the empty floor
 assert '.easeOut(duration: HeroCoverPolicy.crossfadeDuration)' in page
 assert 'HeroCoverStore.shared' in hero
 assert 'presentation: cover(movie)' in hero or 'presentation: cover(movie)' in home
@@ -106,7 +107,7 @@ assert 'showCoverFailure' in hero
 assert 'clearNegativesAndRetry' in view
 assert 'retryOnForeground' in hero
 assert 'heroCoverNetworkRecovered' in hero
-assert 'm.heroHeight' in view.split('Empty recommend list')[1] if 'Empty recommend list' in view else True
+assert 'm.heroHeight' in view
 assert 'frame(height: 220' not in home and 'height: 220' not in home
 assert 'accessibilityIdentifier("home-hero")' in hero
 assert '--home326-fixture' in home
@@ -117,7 +118,7 @@ assert 'enum RailCoverFloor' in loader and 'static let minWidth = 360' in loader
 assert 'RailCoverFloor.rejects' in loader
 assert 'pics.dmm.co.jp' in loader.split('enum RailCoverFloor')[1].split('public enum ListCoverPolicy')[0]
 assert loader.count('HomePosterRail(upgradesVisibleHQ: true') == 0  # that's in HomeView
-assert view.count('HomePosterRail(upgradesVisibleHQ: true') == 3
+assert view.count('HomePosterRail(upgradesVisibleHQ: true') == 4  # 328 adds 往期推薦
 assert 'static let maxPixelCap = 900' in loader
 
 # --- Detail write-back ---
@@ -144,9 +145,11 @@ assert 'Task.sleep(nanoseconds: 5_000_000_000)' in hero and '.easeInOut(duration
 assert 'zoomed ? 1.05 : 1.0' in page and '.linear(duration: 5.6)' in page
 for cond in ['!touching', '!dragging', 'scenePhase == .active', '!reduceMotion', '!voiceOver', 'movies.count > 1']:
     assert cond in hero, cond
-assert '.spring(response: 0.38, dampingFraction: 0.88)' in hero
-assert 'PastRecommendView()' in view and 'HomePastChip(' in hero
-assert 'HomeAmbientBackground(ambient: ambient)' in view
+assert 'HeroSwipePolicy.pageSpringResponse' in hero or '.spring(response: 0.38, dampingFraction: 0.88)' in hero
+assert 'pageSpringResponse: Double = 0.38' in (r/'AVDB/Views/Home/HeroSwipePolicy.swift').read_text()
+assert 'PastRecommendView()' in view and 'HomeHotChip(' in hero and 'HomePastChip' not in home
+assert '看熱播 · 日榜' in home
+assert 'HomeAmbientBackground(ambient: ambient' in view
 assert 'static let accent = Color(red: 1.0, green: 138.0 / 255.0, blue: 61.0 / 255.0)' in home
 assert 'shortcutRow' not in home
 qa = view.split('private func quickActionRow')[1].split('// MARK: Rails')[0]
@@ -166,4 +169,4 @@ assert 'home-hero' in ui.split('func test326HomeHeroHQScreenshots()')[1].split('
 assert 'hero.frame.width, window.frame.width' in ui
 
 print('PASS home-hero-hq326 source contracts: independent HQ resolver, A/B/C tiers, no inset, '
-      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 327')
+      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 328')

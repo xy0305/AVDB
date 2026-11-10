@@ -38,10 +38,12 @@ struct AVDBNativeTabBar: View {
         }.padding(.horizontal,6)
     }
 
-    /// Over the dark home the recipe's 0.32 warm fill; over light tabs a denser fill keeps
-    /// the white labels legible. Reduce Transparency → solid.
+    /// The bar stays the same dark warm glass on every tab. Build 325 used 0.32
+    /// over a dark home; Build 328's light home makes that fill unreadable
+    /// (white 55% labels on a mostly-transparent bar over systemBackground),
+    /// so home uses the existing non-home 0.66 fill. Nothing else changes.
     private var fillOpacity: Double {
-        reduceTransparency ? 1 : (selection == .home ? 0.32 : 0.66)
+        reduceTransparency ? 1 : 0.66
     }
 
     var body: some View {

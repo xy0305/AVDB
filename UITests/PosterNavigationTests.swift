@@ -215,6 +215,31 @@ final class PosterNavigationTests: XCTestCase {
         let bottom = XCTAttachment(screenshot: app.screenshot()); bottom.name = "326-home-hero-hq-bottom"; bottom.lifetime = .keepAlways; add(bottom)
     }
 
+    func test328HomeHotChrome() {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--home326-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate() }
+        let hero = app.buttons["home-hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 30))
+        let chip = app.buttons["home-hot-daily"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "hero identity chip is 看熱播 · 日榜")
+        XCTAssertFalse(app.buttons["home-past-recommend"].exists, "往期 chip must leave the hero")
+        let more = app.buttons["home-hero-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(more.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(more.frame.height, 44)
+        let pastHeader = app.staticTexts["home-past-header"]
+        // 更多 scrolls the shortcuts (and the 往期推薦 rail below them) into view.
+        let before = pastHeader.exists ? pastHeader.frame.minY : app.windows.firstMatch.frame.height
+        more.tap()
+        sleep(1)
+        XCTAssertTrue(pastHeader.waitForExistence(timeout: 5))
+        XCTAssertLessThan(pastHeader.frame.minY, before, "更多 must scroll the home page toward the shortcut row")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "328-home-hot-chrome"; shot.lifetime = .keepAlways; add(shot)
+    }
+
     func test236HomeEmbeddedHeaderDoesNotOwnNavigation() {
         continueAfterFailure = true
         let app = XCUIApplication()

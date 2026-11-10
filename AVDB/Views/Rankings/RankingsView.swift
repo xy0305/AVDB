@@ -26,10 +26,12 @@ enum RankingTab: String, CaseIterable, Identifiable {
 struct RankingsView: View {
     var embedded: Bool = false
     var initialTab: RankingTab = .top250
+    var initialPlaybackFilter: String = "high_score"
+    var initialPlaybackPeriod: RankPeriod = .daily
     @State private var tab: RankingTab
     @State private var period: RankPeriod = .daily
-    @State private var playbackFilter: String = "high_score"
-    @State private var playbackPeriod: RankPeriod = .daily
+    @State private var playbackFilter: String
+    @State private var playbackPeriod: RankPeriod
     @State private var rankingKind: String = "movies"
     @StateObject private var vm = RankingsViewModel()
     @State private var showSearch = false
@@ -42,10 +44,16 @@ struct RankingsView: View {
         var id: String { rawValue }
     }
 
-    init(embedded: Bool = false, initialTab: RankingTab = .top250) {
+    init(embedded: Bool = false, initialTab: RankingTab = .top250,
+         initialPlaybackFilter: String = "high_score",
+         initialPlaybackPeriod: RankPeriod = .daily) {
         self.embedded = embedded
         self.initialTab = initialTab
+        self.initialPlaybackFilter = initialPlaybackFilter
+        self.initialPlaybackPeriod = initialPlaybackPeriod
         _tab = State(initialValue: initialTab)
+        _playbackFilter = State(initialValue: initialPlaybackFilter)
+        _playbackPeriod = State(initialValue: initialPlaybackPeriod)
     }
 
     var body: some View {

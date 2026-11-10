@@ -105,6 +105,7 @@
 		D1830000000000000000000C /* DetailPosterCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18300000000000000000002 /* DetailPosterCache.swift */; };
 		D1830000000000000000000D /* DetailPosterResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18300000000000000000003 /* DetailPosterResolver.swift */; };
 		HERO32600000000000001B /* HeroCoverResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = HERO32600000000000001F /* HeroCoverResolver.swift */; };
+		HERO32800000000000001B /* HeroSwipePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = HERO32800000000000001F /* HeroSwipePolicy.swift */; };
 		D1860000000000000000000B /* TenhowPoster.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18600000000000000000001 /* TenhowPoster.swift */; };
 		D1860000000000000000000C /* TenhowActorLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18600000000000000000002 /* TenhowActorLinks.swift */; };
 		D2130000000000000000000B /* JavBusPoster.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21300000000000000000001 /* JavBusPoster.swift */; };
@@ -231,6 +232,7 @@
 		B17900000000000000000002 /* JAVLibraryRankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JAVLibraryRankingView.swift; sourceTree = "<group>"; };
 		BB0CA06C662C216213639A15 /* ImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoader.swift; sourceTree = "<group>"; };
 		BB59A308766B79E1C4EB955B /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		HERO32800000000000001F /* HeroSwipePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroSwipePolicy.swift; sourceTree = "<group>"; };
 		BOOKFLIP0000000000000002 /* GlassBookFlipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassBookFlipView.swift; sourceTree = "<group>"; };
 		D18300000000000000000001 /* DetailPosterPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPosterPolicy.swift; sourceTree = "<group>"; };
 		D18300000000000000000002 /* DetailPosterCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPosterCache.swift; sourceTree = "<group>"; };
@@ -537,6 +539,7 @@
 			isa = PBXGroup;
 			children = (
 				BB59A308766B79E1C4EB955B /* HomeView.swift */,
+				HERO32800000000000001F /* HeroSwipePolicy.swift */,
 				DRAWVIEW0000000000000002 /* DailyDrawView.swift */,
 			);
 			name = Home;
@@ -711,6 +714,7 @@
 				D1830000000000000000000C /* DetailPosterCache.swift in Sources */,
 				D1830000000000000000000D /* DetailPosterResolver.swift in Sources */,
 				HERO32600000000000001B /* HeroCoverResolver.swift in Sources */,
+				HERO32800000000000001B /* HeroSwipePolicy.swift in Sources */,
 				EFF87D779EDE9E4D336E6CFF /* ImageLoader.swift in Sources */,
 				4D50D96B24BA7948B5C9B6BF /* JavDBSDK.swift in Sources */,
 				50C5F8E12604888FA0983B17 /* MovieListViewModel.swift in Sources */,
@@ -799,7 +803,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 327;
+				CURRENT_PROJECT_VERSION = 328;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -822,7 +826,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 327;
+				CURRENT_PROJECT_VERSION = 328;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
