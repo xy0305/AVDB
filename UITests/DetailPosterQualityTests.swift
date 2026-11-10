@@ -736,11 +736,11 @@ final class HomeHot328Tests: XCTestCase {
         HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
         let deadline = Date().addingTimeInterval(2.5)
         var presentation = HeroCoverStore.shared.presentation(for: "stuck-328")
-        while Date() < deadline, !presentation.finished {
+        while Date() < deadline, !presentation.settled {
             try await Task.sleep(nanoseconds: 50_000_000)
             presentation = HeroCoverStore.shared.presentation(for: "stuck-328")
         }
-        XCTAssertTrue(presentation.finished, "per-item deadline must force a terminal state")
+        XCTAssertTrue(presentation.settled, "6s (overridden) deadline provisionally settles — 已定案（可升级）")
         XCTAssertTrue(presentation.hasQuick, "DTO thumb must paint as the floor/blur, not an empty field")
         XCTAssertNotEqual(presentation.phase, .empty)
         XCTAssertFalse(presentation.isAB, "sub-tier / thumb floor must not become a finalized A/B hero")
@@ -750,3 +750,123 @@ final class HomeHot328Tests: XCTestCase {
     }
 }
 
+
+final class HomeHot329Tests: XCTestCase {
+    override func tearDown() async throws {
+        await MainActor.run { HeroCoverStore.shared.resetForTests() }
+        HeroCoverPolicy.overallBudgetOverride = nil
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        try await super.tearDown()
+    }
+
+    func test329RailFloorAccepts147ThumbAnd360IsPreferenceOnly() {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let thumb = UIGraphicsImageRenderer(size: CGSize(width: 147, height: 200), format: format).image { ctx in
+            UIColor.gray.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 147, height: 200))
+        }
+        let jacket = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 538), format: format).image { ctx in
+            UIColor.darkGray.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 800, height: 538))
+        }
+        let dmmThumb = "https://pics.dmm.co.jp/digital/video/ipx00706/ipx00706ps.jpg"
+        // VisibleHQ may still reject a sub-360 upgrade, but the *floor* never discards.
+        XCTAssertTrue(RailCoverFloor.rejects(source: dmmThumb, image: thumb))
+        XCTAssertFalse(RailCoverFloor.prefers(thumb, source: dmmThumb, to: jacket, currentSource: "https://example/jacket.jpg"))
+        XCTAssertTrue(RailCoverFloor.prefers(jacket, source: "https://example/jacket.jpg", to: thumb, currentSource: dmmThumb))
+        // A lonely 147×200 is paintable as the floor: prefers is only among candidates.
+        XCTAssertEqual(RailPosterPlaceholder.kind(hasURL: true, failed: false), .loading)
+        XCTAssertEqual(RailPosterPlaceholder.kind(hasURL: true, failed: true), .retry)
+        XCTAssertEqual(RailPosterPlaceholder.kind(hasURL: false, failed: false), .filmIcon)
+        XCTAssertEqual(RailPosterPlaceholder.kind(hasURL: false, failed: true), .filmIcon)
+    }
+
+    /// (i) CDN delayed 15s → sharp unblurred floor at t0, auto-upgrade at 15s.
+    @MainActor
+    func test329DelayedCDNPaintsSharpFloorThenUpgrades() async throws {
+        HeroCoverStore.shared.resetForTests()
+        let movie = Movie(
+            id: "delay-329",
+            number: "DELAY-329",
+            title: "Delayed CDN stand-in",
+            thumbURL: "fixture://poster/thumb147-floor",
+            coverURL: "fixture://delay/15/poster/portrait-hero-a"
+        )
+        let t0 = Date()
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        var presentation = HeroCoverStore.shared.presentation(for: "delay-329")
+        let floorDeadline = Date().addingTimeInterval(2.0)
+        while Date() < floorDeadline, presentation.blurImage == nil && presentation.sharpImage == nil {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "delay-329")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(t0), 3, "floor must paint well before the delayed HQ")
+        XCTAssertNotNil(presentation.blurImage, "DTO 147×200 thumb must be the unblurred floor at t0")
+        XCTAssertFalse(presentation.isAB, "15s HQ must not already be the sharp hero")
+        XCTAssertNotEqual(presentation.tier, .a)
+
+        let upgradeDeadline = Date().addingTimeInterval(18)
+        while Date() < upgradeDeadline, presentation.isAB == false {
+            try await Task.sleep(nanoseconds: 200_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "delay-329")
+        }
+        XCTAssertTrue(presentation.isAB, "late A/B must upgrade after the 6s settle, at ~15s")
+        XCTAssertEqual(presentation.tier, .a)
+        XCTAssertNotNil(presentation.sharpImage)
+        XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(t0), 14.5)
+    }
+
+    /// (ii) Preheat DTO thumbs for 我的關注 so a fast scroll does not film-flash.
+    func test329PreheatFollowingDTOThumbs() async throws {
+        await ImageLoader.shared.resetCachesForTests()
+        let following = (1...9).map {
+            Movie(id: "follow-\($0)", number: "TEST-F\($0)", title: "Follow \($0)",
+                  coverURL: "fixture://poster/thumb147-\($0)")
+        }
+        let recommended = (1...3).map {
+            Movie(id: "past-\($0)", number: "TEST-P\($0)", title: "Past \($0)",
+                  coverURL: "fixture://poster/\($0)")
+        }
+        let loaded = await HomeRailThumbPreheat.preheat(sections: [recommended, [], [], following])
+        XCTAssertGreaterThanOrEqual(loaded, 9)
+        let t0 = Date()
+        let again = await ImageLoader.shared.load(following[0].coverURL, maxPixelSize: 900, timeout: 2)
+        XCTAssertNotNil(again)
+        XCTAssertLessThan(Date().timeIntervalSince(t0), 0.25, "second load must be a memory-cache hit, not a film flash")
+        XCTAssertEqual(RailPosterPlaceholder.kind(hasURL: following[0].coverURL != nil, failed: false), .loading)
+    }
+
+    /// (iii) Offline cold start → sharp floor from disk, not a smear.
+    @MainActor
+    func test329OfflineColdStartRestoresSharpFloor() async throws {
+        HeroCoverStore.shared.resetForTests()
+        let image = ImageLoader.fixturePoster("fixture://poster/portrait-hero-a")
+        HeroCoverDisk.storeAccepted(image, number: "OFF-329", source: "hero-disk")
+        let movie = Movie(
+            id: "off-329",
+            number: "OFF-329",
+            title: "Offline sharp",
+            coverURL: "fixture://hang/offline"
+        )
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        var presentation = HeroCoverStore.shared.presentation(for: "off-329")
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, presentation.sharpImage == nil {
+            try await Task.sleep(nanoseconds: 40_000_000)
+            presentation = HeroCoverStore.shared.presentation(for: "off-329")
+        }
+        XCTAssertNotNil(presentation.sharpImage, "HeroCoverDisk / HQPosterDiskCache must restore a sharp unblurred floor offline")
+        XCTAssertTrue(presentation.tier.isAB || presentation.tier == .c)
+        XCTAssertNotEqual(HomeTheme.heroLoadingFloor, HomeTheme.fallbackBase)
+    }
+
+    func test329HeroCIDMapReadsDTOAndCache() {
+        let url = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00706/ipx00706ps.jpg"
+        let movie = Movie(id: "cid-329", number: "IPX-706", title: "CID", coverURL: url)
+        XCTAssertEqual(HeroCIDMap.cid(from: movie), "ipx00706")
+        XCTAssertTrue(HeroCIDMap.learn(from: movie))
+        let bare = Movie(id: "cid-329b", number: "IPX-706", title: "CID cached")
+        XCTAssertEqual(HeroCIDMap.cid(from: bare), "ipx00706")
+    }
+}

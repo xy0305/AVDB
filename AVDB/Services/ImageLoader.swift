@@ -331,6 +331,27 @@ public actor ImageLoader {
             try? await Task.sleep(nanoseconds: nanos)
             return nil
         }
+        // Build 329: delayed CDN stand-in, e.g. fixture://delay/15/poster/portrait-hero-a
+        // The declared delay is honored even past the hero's 6s provisional settle.
+        if urlString.hasPrefix("fixture://delay/") {
+            let rest = String(urlString.dropFirst("fixture://delay/".count))
+            let parts = rest.split(separator: "/", maxSplits: 1)
+            let seconds = Double(parts.first.map(String.init) ?? "") ?? 0
+            if seconds > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            }
+            if Task.isCancelled { return nil }
+            let tail = parts.count > 1 ? String(parts[1]) : "poster/portrait"
+            let poster: String
+            if tail.hasPrefix("fixture://") {
+                poster = tail
+            } else if tail.hasPrefix("poster/") {
+                poster = "fixture://" + tail
+            } else {
+                poster = "fixture://poster/" + tail
+            }
+            return Self.fixturePoster(poster)
+        }
         if urlString.hasPrefix("fixture://poster/") {
             return Self.fixturePoster(urlString)
         }
@@ -375,10 +396,22 @@ public actor ImageLoader {
     #if DEBUG
     nonisolated static func fixturePoster(_ urlString: String) -> UIImage {
         let name = urlString.components(separatedBy: "/").last ?? "neutral"
-        let size: CGSize = name.contains("portrait") ? CGSize(width: 700, height: 1000)
-            : name.contains("square") ? CGSize(width: 700, height: 700)
-            : name.contains("wide") ? CGSize(width: 1200, height: 500)
-            : CGSize(width: 800, height: 538)
+        // portrait-hero-a is an A-tier hero raster (≥1000 px wide); a name
+        // containing "thumb147" is the typical JavDB 147×200 small_cover.
+        let size: CGSize
+        if name.contains("thumb147") || name.contains("small147") {
+            size = CGSize(width: 147, height: 200)
+        } else if name.contains("hero-a") || name.contains("portrait-a") {
+            size = CGSize(width: 1200, height: 1800)
+        } else if name.contains("portrait") {
+            size = CGSize(width: 700, height: 1000)
+        } else if name.contains("square") {
+            size = CGSize(width: 700, height: 700)
+        } else if name.contains("wide") {
+            size = CGSize(width: 1200, height: 500)
+        } else {
+            size = CGSize(width: 800, height: 538)
+        }
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = true
@@ -546,6 +579,8 @@ public struct JavDBImage: View {
     @State private var image: UIImage?
     @State private var imageProvenance: PosterProvenance?
     @State private var imageIdentity: String?
+    @State private var loadFailed = false
+    @State private var retryTick = 0
 
     private var requestIdentity: String {
         imageURLs.joined(separator: "|") + "#\(frontPoster)#\(maxPixelSize)"
@@ -623,16 +658,28 @@ public struct JavDBImage: View {
                 transaction.disablesAnimations = true
             }
             .contentShape(Rectangle())
-            .allowsHitTesting(false)
-            .task(id: requestIdentity) {
+            // Retry is the only interactive affordance; a painted image never steals the card tap.
+            .allowsHitTesting(loadFailed && image == nil)
+            .task(id: requestIdentity + "#" + String(retryTick)) {
             let identity = requestIdentity
+            loadFailed = false
             #if DEBUG
             if let url, url.hasPrefix("fixture://poster/") {
                 let name = url.components(separatedBy: "/").last ?? "neutral"
-                let size: CGSize = name.contains("portrait") ? CGSize(width: 700, height: 1000)
-                    : name.contains("square") ? CGSize(width: 700, height: 700)
-                    : name.contains("wide") ? CGSize(width: 1200, height: 500)
-                    : CGSize(width: 800, height: 538)
+                let size: CGSize
+                if name.contains("thumb147") || name.contains("small147") {
+                    size = CGSize(width: 147, height: 200)
+                } else if name.contains("hero-a") || name.contains("portrait-a") {
+                    size = CGSize(width: 1200, height: 1800)
+                } else if name.contains("portrait") {
+                    size = CGSize(width: 700, height: 1000)
+                } else if name.contains("square") {
+                    size = CGSize(width: 700, height: 700)
+                } else if name.contains("wide") {
+                    size = CGSize(width: 1200, height: 500)
+                } else {
+                    size = CGSize(width: 800, height: 538)
+                }
                 let renderer = UIGraphicsImageRenderer(size: size)
                 var fixtureImage = renderer.image { context in
                     UIColor.systemTeal.setFill()
@@ -649,6 +696,11 @@ public struct JavDBImage: View {
             }
             #endif
             // 不先清空 image。LazyVGrid 滚动时 task 会被取消，先清空会让中间封面变空白。
+            // Build 329: the floor paints the first available source immediately,
+            // including typical JavDB 147×200 small_covers. 360 px is only a
+            // preference among already-decoded candidates, never a discard gate.
+            var best: UIImage?
+            var bestSource: String?
             var landscapeFallback: (image: UIImage, source: String)?
             for candidate in imageURLs {
                 guard !Task.isCancelled else { return }
@@ -657,41 +709,72 @@ public struct JavDBImage: View {
                     : await ImageLoader.shared.load(candidate, maxPixelSize: maxPixelSize)
                 if let img = loaded {
                     guard !Task.isCancelled else { return }
-                    // Build 326 rail floor: never finalize a source narrower than 360 px
-                    // or a pics.dmm.co.jp 147×200 thumb. VisibleHQ can still upgrade.
-                    if RailCoverFloor.rejects(source: candidate, image: img) {
-                        continue
-                    }
                     if frontPoster, img.size.width > img.size.height {
                         landscapeFallback = landscapeFallback ?? (img, candidate)
                         continue
                     }
+                    if let current = best, let currentSource = bestSource,
+                       !RailCoverFloor.prefers(img, source: candidate, to: current, currentSource: currentSource) {
+                        continue
+                    }
+                    best = img
+                    bestSource = candidate
                     publish(img, identity: identity, source: candidate)
-                    return
+                    // Keep looking only if a later candidate might be preferred (≥360 / wider).
+                    if RailCoverFloor.pixelWidth(img) >= RailCoverFloor.minWidth { break }
                 }
             }
-            if !Task.isCancelled, let landscapeFallback,
-               !RailCoverFloor.rejects(source: landscapeFallback.source, image: landscapeFallback.image) {
+            if best == nil, !Task.isCancelled, let landscapeFallback {
+                best = landscapeFallback.image
+                bestSource = landscapeFallback.source
                 publish(landscapeFallback.image, identity: identity, source: landscapeFallback.source)
+            }
+            if best == nil, !Task.isCancelled, !imageURLs.isEmpty, identity == requestIdentity {
+                loadFailed = true
             }
         }
     }
 
     private var placeholder: some View {
+        let kind = RailPosterPlaceholder.kind(hasURL: !imageURLs.isEmpty, failed: loadFailed)
         ZStack {
             LinearGradient(
                 colors: [Color(.systemGray6), Color(.systemGray5).opacity(0.7)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            Circle()
-                .fill(.white.opacity(0.42))
-                .frame(width: 48, height: 48)
-            Image(systemName: "film.stack")
-                .font(.system(size: 20, weight: .medium))
+            switch kind {
+            case .filmIcon:
+                // Only when there is no cover/thumb URL at all.
+                ZStack {
+                    Circle()
+                        .fill(.white.opacity(0.42))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "film.stack")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            case .retry:
+                VStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("點按重試")
+                        .font(.system(size: 11, weight: .medium))
+                }
                 .foregroundStyle(.secondary)
+                .padding(8)
+                .contentShape(Rectangle())
+                .onTapGesture { retryTick += 1 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("封面載入失敗，點按重試")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("rail-cover-retry")
+            case .loading:
+                // URL exists and is in flight: plain gray, never a film.stack flash.
+                EmptyView()
+            }
         }
-        .accessibilityHidden(true)
+        .accessibilityHidden(kind != .retry)
     }
 }
 
@@ -1138,19 +1221,98 @@ enum HomeHQPosterPrefetch {
 }
 #endif
 
-/// Build 326 rail floor only. ListCoverPolicy + VisibleHQ are otherwise unchanged.
-/// A finalized rail image must be ≥ 360 px wide; pics.dmm.co.jp 147×200 must never
-/// be the finalized rail image — VisibleHQ can still upgrade a short source.
+/// Build 329: start immediate list-thumb / JavDBImage loads when home data
+/// returns, in section order. This is not VisibleHQ disk warm — it fetches the
+/// DTO cover/thumb so a fast scroll to 我的關注 does not flash film icons on
+/// cards that already have a URL. VisibleHQ stays on the 2/5 scheduler.
+enum HomeRailThumbPreheat {
+    static let cap = 9
+    static let maxPixelSize = 900
+
+    @discardableResult
+    static func preheat(_ movies: [Movie]) async -> Int {
+        var loaded = 0
+        for movie in movies.prefix(cap) {
+            if Task.isCancelled { break }
+            guard let url = ListCoverPolicy.sources(movie: movie).first, !url.isEmpty else { continue }
+            if let image = await ImageLoader.shared.load(url, maxPixelSize: maxPixelSize, timeout: 8) {
+                loaded += 1
+                _ = image
+            }
+        }
+        return loaded
+    }
+
+    /// Preheat several home sections in the given order (往期推薦, 最新上架,
+    /// 近期磁鏈更新, 我的關注). Starts each section without waiting for the
+    /// previous section to fully finish, but enqueues earlier sections first.
+    @discardableResult
+    static func preheat(sections: [[Movie]]) async -> Int {
+        var total = 0
+        await withTaskGroup(of: Int.self) { group in
+            for movies in sections where !movies.isEmpty {
+                group.addTask { await preheat(movies) }
+                // Yield so earlier sections start their first requests first.
+                await Task.yield()
+            }
+            for await count in group { total += count }
+        }
+        return total
+    }
+}
+
+/// Build 329 rail floor: 360 px is a preference among candidates, never a
+/// discard gate. A 147×200 JavDB / pics.dmm thumb is a legal floor image.
 enum RailCoverFloor {
     static let minWidth = 360
+
+    static func pixelWidth(_ image: UIImage) -> Int {
+        image.cgImage?.width ?? Int((image.size.width * image.scale).rounded())
+    }
+
+    static func pixelHeight(_ image: UIImage) -> Int {
+        image.cgImage?.height ?? Int((image.size.height * image.scale).rounded())
+    }
+
+    /// VisibleHQ still uses this to refuse a sub-360 "upgrade". The rail *floor*
+    /// path must not call this — use `prefers` instead.
     static func rejects(source: String, image: UIImage) -> Bool {
-        let width = image.cgImage?.width ?? Int((image.size.width * image.scale).rounded())
-        let height = image.cgImage?.height ?? Int((image.size.height * image.scale).rounded())
+        let width = pixelWidth(image)
+        let height = pixelHeight(image)
         if width < minWidth { return true }
         if width == 147 && height == 200 && source.contains("pics.dmm.co.jp") { return true }
         if let url = URL(string: source), url.host?.lowercased() == "pics.dmm.co.jp",
            url.path.lowercased().hasSuffix("ps.jpg") { return true }
         return false
+    }
+
+    /// Among already-decoded floor candidates, prefer ≥360 when one exists,
+    /// otherwise the wider raster. Never discards the only available image.
+    static func prefers(_ incoming: UIImage, source incomingSource: String,
+                        to current: UIImage, currentSource: String) -> Bool {
+        let inW = pixelWidth(incoming)
+        let curW = pixelWidth(current)
+        let inOK = inW >= minWidth
+        let curOK = curW >= minWidth
+        if inOK != curOK { return inOK }
+        return inW > curW
+    }
+}
+
+/// Rail / list placeholder policy. film.stack only when no cover or thumb URL
+/// exists at all. A URL that failed to load is a gray field with tap-to-retry,
+/// never an infinite film icon with no affordance.
+enum RailPosterPlaceholder {
+    enum Kind: String, Equatable {
+        case filmIcon
+        case retry
+        case loading
+    }
+
+    static func kind(hasURL: Bool, failed: Bool) -> Kind {
+        if !hasURL { return .filmIcon }
+        if failed { return .retry }
+        return .loading
     }
 }
 

@@ -8,19 +8,19 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '328' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 328;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '329' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 329;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HERO32800000000000001B' in pbx
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 328' in wf and 'feat/home-hot-328' in wf
+assert 'Home HQ posters App 329' in wf and 'feat/home-hot-328' in wf
 assert 'feat/detail-auth-327' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf
 assert 'python3 scripts/test-detail-auth327.py' in wf
-assert 'scripts/package-lut328.py' in wf and 'AVDB-328-release' in wf
-assert 'AVDB-unsigned-1.0.2-328-home-hot.ipa' in (r/'scripts/package-lut328.py').read_text()
+assert 'scripts/package-lut329.py' in wf and 'AVDB-329-release' in wf
+assert 'AVDB-unsigned-1.0.2-329-home-hot.ipa' in (r/'scripts/package-lut329.py').read_text()
 assert 'home-hero-hq-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'detail-auth-327' in wf and 'test327DetailAuthErrorMessageVisible' in wf
 assert 'home-hot-328' in wf
@@ -64,7 +64,7 @@ assert 'Task.sleep(nanoseconds: 5_000_000_000)' in hero
 assert 'zoomed ? 1.05 : 1.0' in home and '.linear(duration: 5.6)' in home
 assert 'accessibilityIdentifier("home-hero")' in hero
 assert '高清封面加载失败，下拉刷新重试' in hero
-assert 'p.finished && !p.hasQuick' in hero
+assert 'p.settled && !p.hasQuick' in hero
 assert 'hasDTOFloor' in hero
 
 # Chip is 看熱播 · 日榜, not 往期, and opens the same filters as the hero.
@@ -85,8 +85,8 @@ assert root.find('pastRecommendSection') < root.find('latestSection')
 assert 'title: "往期推薦"' in home
 assert 'titleIdentifier: "home-past-header"' in home
 assert 'PastRecommendView()' in home
-assert home.count('HomePosterRail(upgradesVisibleHQ: true') == 4
-assert home.count('upgradesVisibleHQ: true') == 5  # 4 rails + PeriodMoviesView
+assert home.count('HomePosterGrid(upgradesVisibleHQ: true') == 4
+assert home.count('upgradesVisibleHQ: true') == 5  # 4 home grids + PeriodMoviesView
 
 # --- Blank hero fix: ungated floor, no #2A2019 visible empty, per-item deadline ---
 page = home.split('private struct HomeHeroPage: View {')[1].split('private struct HomeHeroMoreButton')[0]
@@ -94,12 +94,12 @@ assert 'HomeTheme.heroLoadingFloor' in page
 assert 'HomeTheme.fallbackBase' not in page
 assert 'floorImage' in page
 assert 'movie.coverURL' in page and 'movie.thumbURL' in page
-assert '.blur(radius: 28, opaque: true)' in page
-assert 'colorMultiply(Color(white: 0.85))' in page
+assert '.blur(' not in page  # 329: hero main layer is never blurred
+assert 'colorMultiply' not in page
 assert 'HeroCoverPolicy.effectiveOverallBudget' in resolver
 assert 'static let overallBudget: TimeInterval = 6' in resolver
 assert 'fixture://hang' in resolver and 'fixture://hang' in (r/'AVDB/Services/ImageLoader.swift').read_text()
-assert 'Force a terminal state' in resolver or 'per-item' in resolver.lower() or 'Per-item hard deadline' in resolver
+assert 'settled' in resolver and ('provisional settle' in resolver.lower() or '已定案' in resolver)
 
 # Do not promote the DTO floor to a finalized A/B sharp (326 tier/race kept).
 assert 'static let tierAWidth = 1000' in resolver
@@ -186,4 +186,4 @@ assert 'home-past-header' in nearby
 
 print('PASS home-hot328 source contracts: playback high_score+daily cap 10, '
       'DTO floor + per-item deadline, 往期 rail, light tokens, vertical arbitrator, '
-      '327 auth + 326 HQ intact, release 328')
+      '327 auth + 326 HQ intact, release 329')

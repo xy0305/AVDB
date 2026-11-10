@@ -7,8 +7,8 @@ home = (r/'AVDB/Views/Home/HomeView.swift').read_text()
 loader = r/'AVDB/Services/HomeListLoading.swift'
 s = loader.read_text()
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion'] == '328'
-assert pbx.count('CURRENT_PROJECT_VERSION = 328;') == 2
+assert plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())['CFBundleVersion'] == '329'
+assert pbx.count('CURRENT_PROJECT_VERSION = 329;') == 2
 assert pbx.count('HomeListLoading.swift in Sources') == 2
 initial = home.split('    func initialLoad() async {')[1].split('    private var cacheAccountID:')[0]
 assert 'withTaskGroup' in initial and 'for section in Section.allCases' in initial
@@ -24,7 +24,7 @@ assert 'withTaskCancellationHandler' in s and 'ticket == generation' in s
 assert 'options: .atomic' in s and 'snapshot.key == key' in s
 assert 'snapshot.version == 1' in s and 'dropFirst(24)' in s
 assert 'accountID: cacheAccountID' in home
-assert 'if !movies.isEmpty, movies != previous { self.startHQPrefetch(movies, section:' in home
+assert 'self.startHQPrefetch(movies, section:' in home and 'self.startThumbPreheat(movies, section:' in home
 # The original URL strings are serialized untouched; no thumbnail/downsample policy edits.
 assert 'thumb_url = movie.thumbURL' in home and 'cover_url = movie.coverURL' in home
 assert 'new_magnets = movie.hasNewMagnets' in home and 'score = movie.score' in home

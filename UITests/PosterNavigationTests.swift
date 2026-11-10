@@ -240,6 +240,47 @@ final class PosterNavigationTests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "328-home-hot-chrome"; shot.lifetime = .keepAlways; add(shot)
     }
 
+
+    func test329HomeHotChrome() {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["--poster-navigation-fixture", "--home329-fixture"]
+        XCUIDevice.shared.orientation = .portrait; app.launch()
+        defer { app.terminate() }
+        let hero = app.buttons["home-hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 30))
+        let more = app.buttons["home-hero-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        sleep(1)
+        let pastHeader = app.staticTexts["home-past-header"]
+        XCTAssertTrue(pastHeader.waitForExistence(timeout: 5))
+        // 3×3 cap: first 9 past posters exist; the 10th+ of the 12-item fixture do not.
+        XCTAssertTrue(app.buttons["poster-past-1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["poster-past-9"].exists)
+        XCTAssertFalse(app.buttons["poster-past-10"].exists)
+        XCTAssertFalse(app.buttons["poster-past-12"].exists)
+        // 換一組 only on 最新上架 and 近期磁鏈更新.
+        XCTAssertTrue(app.buttons["home-shuffle-最新上架"].exists)
+        XCTAssertTrue(app.buttons["home-shuffle-近期磁鏈更新"].exists)
+        XCTAssertFalse(app.buttons["home-shuffle-往期推薦"].exists)
+        XCTAssertFalse(app.buttons["home-shuffle-我的關注"].exists)
+        // Scroll toward 我的關注 and confirm the 全部 chevron and DTO-backed cards.
+        let followingMore = app.buttons["home-following-more"]
+        for _ in 0..<8 {
+            if followingMore.exists && followingMore.isHittable { break }
+            let window = app.windows.firstMatch
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.82))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        XCTAssertTrue(followingMore.waitForExistence(timeout: 5), "我的關注 must have a 更多 / > control")
+        XCTAssertTrue(app.staticTexts["home-following-header"].exists)
+        XCTAssertTrue(app.buttons["poster-follow-1"].waitForExistence(timeout: 5))
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "329-home-hot-grid"; shot.lifetime = .keepAlways; add(shot)
+    }
+
+
     func test236HomeEmbeddedHeaderDoesNotOwnNavigation() {
         continueAfterFailure = true
         let app = XCUIApplication()

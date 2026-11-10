@@ -9,21 +9,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '328' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 328;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '329' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 329;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 # Release wiring.
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 328' in wf and 'feat/home-hero-hq-326' in wf
+assert 'Home HQ posters App 329' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf and 'test-home-immersive325.py' not in wf
-assert 'scripts/package-lut328.py' in wf and 'AVDB-328-release' in wf and 'AVDB-325-' not in wf
-assert 'AVDB-328-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
+assert 'scripts/package-lut329.py' in wf and 'AVDB-329-release' in wf and 'AVDB-325-' not in wf
+assert 'AVDB-329-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'home-hero-hq-screenshots' in wf
 assert 'llama|SherpaOnnxC' in wf  # screenshot job still drops device-only xcframeworks
 assert not (r/'scripts/test-home-immersive325.py').exists() and not (r/'scripts/package-lut325.py').exists()
-pkg = (r/'scripts/package-lut328.py').read_text()
-assert "=='328'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-328-home-hot.ipa' in pkg
+pkg = (r/'scripts/package-lut329.py').read_text()
+assert "=='329'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-329-home-hot.ipa' in pkg
 doc = (r/'Build326-HomeHeroHQ.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '326' in doc
 
@@ -93,8 +93,8 @@ assert 'pixelWidth < 500' not in home
 assert 'cornerRadius: 20' not in page
 assert '.aspectRatio(contentMode: .fit)' not in page
 assert 'HomeShimmer()' not in page
-assert '.blur(radius: 28, opaque: true)' in page
-assert 'colorMultiply(Color(white: 0.85))' in page
+assert '.blur(' not in page  # 329: hero main layer is never blurred
+assert 'colorMultiply' not in page
 assert 'HomeTheme.heroLoadingFloor' in page
 assert 'HomeTheme.fallbackBase' not in page  # 328: never paint #2A2019 as the empty floor
 assert '.easeOut(duration: HeroCoverPolicy.crossfadeDuration)' in page
@@ -118,7 +118,7 @@ assert 'enum RailCoverFloor' in loader and 'static let minWidth = 360' in loader
 assert 'RailCoverFloor.rejects' in loader
 assert 'pics.dmm.co.jp' in loader.split('enum RailCoverFloor')[1].split('public enum ListCoverPolicy')[0]
 assert loader.count('HomePosterRail(upgradesVisibleHQ: true') == 0  # that's in HomeView
-assert view.count('HomePosterRail(upgradesVisibleHQ: true') == 4  # 328 adds 往期推薦
+assert view.count('HomePosterGrid(upgradesVisibleHQ: true') == 4  # 329 3×3 grids; 328 added 往期推薦
 assert 'static let maxPixelCap = 900' in loader
 
 # --- Detail write-back ---
@@ -155,7 +155,7 @@ assert 'shortcutRow' not in home
 qa = view.split('private func quickActionRow')[1].split('// MARK: Rails')[0]
 assert qa.count('quickAction("') == 12
 assert 'MoviePosterGrid(' not in view
-assert 'min(max(usable / 2.75, 108), 132)' in metrics
+assert 'usable / 3' in metrics  # 329: 3-column grid card width
 sb = home.split('private struct HomeSearchButton: View {')[1].split('private struct HomeTopScrim')[0]
 assert 'width: 58, height: 58' in sb
 bar = (r/'AVDB/Views/AVDBNativeTabBar.swift').read_text()
@@ -169,4 +169,4 @@ assert 'home-hero' in ui.split('func test326HomeHeroHQScreenshots()')[1].split('
 assert 'hero.frame.width, window.frame.width' in ui
 
 print('PASS home-hero-hq326 source contracts: independent HQ resolver, A/B/C tiers, no inset, '
-      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 328')
+      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 329')

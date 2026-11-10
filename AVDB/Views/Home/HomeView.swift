@@ -2,12 +2,22 @@
 //  HomeView.swift
 //  AVDB
 //
-//  首页（Build 328）：全出血大图轮播（看熱播日榜）、竖滑换条、往期推薦栏、
-//  浅色栏区与详情页一致；英雄图管线仍是 Build 326 HQ。
+//  首页（Build 329）：英雄地板层有图就清晰画出（不施加 blur）；栏位改为
+//  三列上下浏览、每栏最多 9 张；往期推薦 / 我的關注无「換一組」。
 //
 
 import SwiftUI
 import UIKit
+
+
+#if DEBUG
+extension FollowingTag {
+    /// Neutral home fixture for Build 329 UI tests (3×3 我的關注 grid).
+    static var fixtureHome: FollowingTag {
+        FollowingTag(id: 329, name: "字幕", value: "0:t:fixture:", priority: 0)
+    }
+}
+#endif
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
@@ -33,13 +43,14 @@ struct HomeView: View {
     @State private var goChallenge = false
     @State private var goPast = false
     @State private var goFollowManage = false
+    @State private var goFollowing = false
     @State private var openMovie: Movie?
 
     /// Home root is on screen (nothing pushed from it).
     private var atRoot: Bool {
         openMovie == nil && ![goSearch, goRankings, goHot, goLatest, goMagnets, goArticles, goReviews,
                               goSeries, goMakers, goDirectors, goDailyDraw, goWatchLater, goUpdates,
-                              goChallenge, goPast, goFollowManage].contains(true)
+                              goChallenge, goPast, goFollowManage, goFollowing].contains(true)
     }
 
     /// Immersive dark home is the visible screen: home tab selected and at its root.
@@ -99,6 +110,13 @@ struct HomeView: View {
             .navigationDestination(isPresented: $goChallenge) { TripleDrawView() }
             .navigationDestination(isPresented: $goPast) { PastRecommendView() }
             .navigationDestination(isPresented: $goFollowManage) { FollowingTagsView() }
+            .navigationDestination(isPresented: $goFollowing) {
+                if let tag = vm.selectedFollowTag {
+                    FollowingTagDestination(tag: tag)
+                } else {
+                    FollowingTagsView()
+                }
+            }
             .navigationDestination(item: $openMovie) { movie in
                 homeMovieDestination(movie)
             }
@@ -292,7 +310,7 @@ struct HomeView: View {
                            titleIdentifier: "home-past-header",
                            more: { goPast = true })
             if !vm.recommended.isEmpty {
-                HomePosterRail(upgradesVisibleHQ: true, movies: vm.recommended, metrics: m) { openMovie = $0 }
+                HomePosterGrid(upgradesVisibleHQ: true, movies: vm.recommended, metrics: m) { openMovie = $0 }
             }
             homeListStatus(vm.recommendedState, hasItems: !vm.recommended.isEmpty, placeholder: .rail(m)) {
                 Task { await vm.retry(.recommended) }
@@ -307,7 +325,7 @@ struct HomeView: View {
                            shuffle: { Task { await vm.shuffleLatest() } },
                            more: { goLatest = true })
             if !vm.latest.isEmpty {
-                HomePosterRail(upgradesVisibleHQ: true, movies: vm.latest, metrics: m) { openMovie = $0 }
+                HomePosterGrid(upgradesVisibleHQ: true, movies: vm.latest, metrics: m) { openMovie = $0 }
             }
             homeListStatus(vm.latestState, hasItems: !vm.latest.isEmpty, placeholder: .rail(m)) {
                 Task { await vm.retry(.latest) }
@@ -321,7 +339,7 @@ struct HomeView: View {
                            shuffle: { Task { await vm.shuffleMagnets() } },
                            more: { goMagnets = true })
             if !vm.magnets.isEmpty {
-                HomePosterRail(upgradesVisibleHQ: true, movies: vm.magnets, metrics: m) { openMovie = $0 }
+                HomePosterGrid(upgradesVisibleHQ: true, movies: vm.magnets, metrics: m) { openMovie = $0 }
             }
             homeListStatus(vm.magnetsState, hasItems: !vm.magnets.isEmpty, placeholder: .rail(m)) {
                 Task { await vm.retry(.magnets) }
@@ -420,6 +438,7 @@ struct HomeView: View {
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(HomeTheme.primary)
                     .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("home-following-header")
                 Spacer(minLength: 8)
                 Menu {
                     ForEach([CatalogSort.releaseDesc, CatalogSort.updateDesc]) { item in
@@ -461,6 +480,17 @@ struct HomeView: View {
                     .contentShape(Rectangle().inset(by: -9))
                 }
                 .buttonStyle(HomePressStyle(scale: 0.94))
+                Button {
+                    GlassHaptic.tap()
+                    goFollowing = true
+                } label: {
+                    HomeChevronCircle()
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle().inset(by: -9))
+                }
+                .buttonStyle(HomePressStyle(scale: 0.9))
+                .accessibilityLabel("我的關注 全部")
+                .accessibilityIdentifier("home-following-more")
             }
             .padding(.horizontal, m.padding)
             .frame(minHeight: 26)
@@ -507,7 +537,7 @@ struct HomeView: View {
                         .padding(.horizontal, m.padding)
                         .padding(.bottom, 12)
                 } else {
-                    HomePosterRail(upgradesVisibleHQ: true, movies: vm.following, metrics: m) { openMovie = $0 }
+                    HomePosterGrid(upgradesVisibleHQ: true, movies: vm.following, metrics: m) { openMovie = $0 }
                 }
             }
         }
@@ -581,6 +611,8 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var magnetsState: HomeListState = .loading
     enum Section: CaseIterable { case recommended, playback, latest, magnets }
     static let playbackHeroCap = 10
+    /// Home page poster grids are 3×3; full lists are opened via 「>」 / 更多.
+    static let homeGridCap = 9
     private let recommendedLoader = HomeListLoader<HomeMovieSnapshot>()
     private let playbackLoader = HomeListLoader<HomeMovieSnapshot>()
     private let latestLoader = HomeListLoader<HomeMovieSnapshot>()
@@ -612,14 +644,22 @@ final class HomeViewModel: ObservableObject {
             playbackState = .empty
             if ProcessInfo.processInfo.arguments.contains("--home326-fixture")
                 || ProcessInfo.processInfo.arguments.contains("--home325-fixture")
-                || ProcessInfo.processInfo.arguments.contains("--home328-fixture") {
+                || ProcessInfo.processInfo.arguments.contains("--home328-fixture")
+                || ProcessInfo.processInfo.arguments.contains("--home329-fixture") {
                 // Neutral 700×1000 B-tier portrait rasters (no network). Hero is the
-                // playback array; 往期推薦 keeps the recommend fixtures as a rail.
+                // playback array; 往期推薦 / 栏位 keep recommend fixtures as a 3×3 grid.
                 playback = (1...5).map { Movie(id: "hero-\($0)", number: "TEST-H\($0)", title: "Neutral hero film \($0)", coverURL: "fixture://poster/portrait-hero-\($0)") }
                 playbackState = .loaded
                 recommended = (1...5).map { Movie(id: "past-\($0)", number: "TEST-P\($0)", title: "Neutral past film \($0)", coverURL: "fixture://poster/\($0)") }
                 recommendedState = .loaded
                 periodLabel = "2026-11-09"
+                recommended = (1...12).map { Movie(id: "past-\($0)", number: "TEST-P\($0)", title: "Neutral past film \($0)", coverURL: "fixture://poster/\($0)") }
+                latest = (1...9).map { Movie(id: "fixture-\($0)", number: "TEST-\($0)", title: "Neutral film \($0)", coverURL: "fixture://poster/\($0)") }
+                magnets = (1...9).map { Movie(id: "magnet-\($0)", number: "TEST-M\($0)", title: "Neutral magnet \($0)", coverURL: "fixture://poster/\($0)") }
+                followTags = [FollowingTag.fixtureHome]
+                selectedFollowTag = followTags.first
+                following = (1...9).map { Movie(id: "follow-\($0)", number: "TEST-F\($0)", title: "Neutral follow film \($0)", coverURL: "fixture://poster/thumb147-\($0)") }
+                latestState = .loaded; magnetsState = .loaded
                 HeroCoverStore.shared.start(movies: playback, currentIndex: 0)
             }
             return
@@ -736,7 +776,10 @@ final class HomeViewModel: ObservableObject {
             case .latest: previous = self.latest; self.latest = movies; self.latestState = state
             case .magnets: previous = self.magnets; self.magnets = movies; self.magnetsState = state
             }
-            if !movies.isEmpty, movies != previous { self.startHQPrefetch(movies, section: String(describing: section)) }
+            if !movies.isEmpty, movies != previous {
+                self.startHQPrefetch(movies, section: String(describing: section))
+                self.startThumbPreheat(movies, section: String(describing: section))
+            }
         })
     }
 
@@ -759,6 +802,7 @@ final class HomeViewModel: ObservableObject {
         defer { followLoading = false }
         following = await movies(for: tag)
         startHQPrefetch()
+        startThumbPreheat(following, section: "following")
     }
 
     func selectFollowSort(_ sort: CatalogSort) async {
@@ -769,6 +813,7 @@ final class HomeViewModel: ObservableObject {
             defer { followLoading = false }
             following = await movies(for: tag)
             startHQPrefetch()
+            startThumbPreheat(following, section: "following")
         }
     }
 
@@ -809,6 +854,13 @@ final class HomeViewModel: ObservableObject {
     /// following). Warms VisibleHQ + HQPosterDiskCache for the first ~2 screens;
     /// scroll-ahead is handled by MoviePosterGrid. Bump hqRevision when a new
     /// URL is learned so synchronous ListCoverPolicy can lead with it.
+    /// Immediate DTO thumb/cover loads (not VisibleHQ). Called in section order
+    /// so a fast scroll to 我的關注 does not flash film icons on cards with a URL.
+    private func startThumbPreheat(_ movies: [Movie], section: String) {
+        guard !movies.isEmpty else { return }
+        Task { await HomeRailThumbPreheat.preheat(movies) }
+    }
+
     private func startHQPrefetch(_ sectionMovies: [Movie]? = nil, section: String = "following") {
         let movies = sectionMovies ?? following
         guard !movies.isEmpty else { return }
@@ -855,10 +907,10 @@ struct HomeMetrics {
     var heroHeight: CGFloat { isPadWidth ? 600 : min(max(width * 1.15, 430), 560) }
     /// Sections are capped at 1100 and centered.
     var contentWidth: CGFloat { min(width, AdaptiveLayout.contentMaxWidth) }
-    /// Rail card: clamp((CW-2P-24)/2.75, 108, 132) phone, clamp((CW-2P-24)/4.6, 132, 156) iPad; height = width * 1.5.
+    /// 3-column grid card width for loading placeholders (actual cells are flexible).
     var cardWidth: CGFloat {
         let usable = contentWidth - 2 * padding - 24
-        return isPadWidth ? min(max(usable / 4.6, 132), 156) : min(max(usable / 2.75, 108), 132)
+        return max(usable / 3, 1)
     }
     var cardHeight: CGFloat { (cardWidth * 1.5).rounded() }
     var quickItem: CGFloat { width <= 375 ? 56 : 60 }
@@ -1202,13 +1254,13 @@ private struct HomeHeroCarousel: View {
         return nil
     }
 
-    /// Global empty is judged from per-item terminal state (the 6 s deadline
-    /// forces `finished`). A title that still has a DTO cover/thumb is not empty
-    /// — the page paints that floor — so the banner stays off.
+    /// Global empty is judged from per-item 已定案（可升级） with no floor.
+    /// A title that still has a DTO cover/thumb is not empty — the page paints
+    /// that unblurred floor — so the banner stays off.
     private var showCoverFailure: Bool {
         !movies.isEmpty && movies.allSatisfy { movie in
             let p = cover(movie)
-            return p.finished && !p.hasQuick && !Self.hasDTOFloor(movie)
+            return p.settled && !p.hasQuick && !Self.hasDTOFloor(movie)
         }
     }
 
@@ -1529,10 +1581,10 @@ private struct HeroTouchStyle: ButtonStyle {
 }
 
 /// One hero page: layered full-bleed paint, never an inset card.
-/// Floor is always the best available image: finalized HQ sharp ?? quick/blur ??
-/// DTO list cover/thumb loaded directly. Sub-tier / thumb images stay a floor
-/// (never a finalized sharp A/B). Loading floor is a blur of that image, or a
-/// neutral systemGray — never brand brown #2A2019.
+/// Floor = the sharpest available list/DTO cover, painted unblurred (no radius,
+/// no brightness dim). Quality rules never gate this layer. HQ sharp (A/B)
+/// crossfades in (plain fade ≤ 0.45s) when it arrives. Brand brown #2A2019 is
+/// never the visible empty floor.
 private struct HomeHeroPage: View {
     let presentation: HeroCoverPresentation
     let movie: Movie
@@ -1545,15 +1597,12 @@ private struct HomeHeroPage: View {
         let size = CGSize(width: metrics.width, height: metrics.heroHeight)
         ZStack {
             HomeTheme.heroLoadingFloor
+            // Main image layer: never apply blur or a dim multiply.
             if presentation.blurImage == nil, presentation.sharpImage == nil, let floor = floorImage {
                 HomeAnchoredFill(image: floor, size: size)
-                    .blur(radius: 28, opaque: true)
-                    .colorMultiply(Color(white: 0.85))
             }
-            if let blur = presentation.blurImage {
-                HomeAnchoredFill(image: blur, size: size)
-                    .blur(radius: 28, opaque: true)
-                    .colorMultiply(Color(white: 0.85)) // brightness × 0.85
+            if let quick = presentation.blurImage, presentation.sharpImage == nil {
+                HomeAnchoredFill(image: quick, size: size)
             }
             if let sharp = presentation.sharpImage {
                 HomeAnchoredFill(image: sharp, size: size)
@@ -1563,13 +1612,23 @@ private struct HomeHeroPage: View {
         .animation(.easeOut(duration: HeroCoverPolicy.crossfadeDuration), value: presentation.token)
         .scaleEffect(zoomed ? 1.05 : 1.0)
         .task(id: movie.id) {
-            // DTO floor is a mandatory paint even if HeroCoverStore is stuck.
-            guard presentation.blurImage == nil, presentation.sharpImage == nil else { return }
-            for url in [movie.coverURL, movie.thumbURL] {
-                guard let url, !url.isEmpty, !url.hasPrefix("fixture://hang") else { continue }
-                if let image = await ImageLoader.shared.load(url, maxPixelSize: 640, timeout: 4) {
-                    floorImage = image
-                    return
+            // DTO floor is a mandatory unblurred paint even if HeroCoverStore is stuck.
+            // Prefer the first immediately available URL; skip hanging / delayed
+            // stand-ins so a slow HQ source cannot block the floor.
+            if presentation.blurImage != nil || presentation.sharpImage != nil { return }
+            await withTaskGroup(of: UIImage?.self) { group in
+                for url in [movie.thumbURL, movie.coverURL] {
+                    guard let url, !url.isEmpty else { continue }
+                    if url.hasPrefix("fixture://hang") || url.hasPrefix("fixture://delay") { continue }
+                    group.addTask { await ImageLoader.shared.load(url, maxPixelSize: 640, timeout: 4) }
+                }
+                var best: UIImage?
+                for await image in group {
+                    guard let image else { continue }
+                    if best == nil || RailCoverFloor.prefers(image, source: "", to: best!, currentSource: "") {
+                        best = image
+                        floorImage = image
+                    }
                 }
             }
         }
@@ -1679,6 +1738,8 @@ private struct HomeRailHeader: View {
                     .contentShape(Rectangle().inset(by: -9))
                 }
                 .buttonStyle(HomePressStyle(scale: 0.94))
+                .accessibilityLabel("" + title + " 換一組")
+                .accessibilityIdentifier("home-shuffle-" + title)
             }
             if let more {
                 Button {
@@ -1699,79 +1760,44 @@ private struct HomeRailHeader: View {
     }
 }
 
-/// Horizontal 2:3 poster rail (replaces the home 3-column grids).
-private struct HomePosterRail: View {
+/// 3-column vertical poster grid (Build 329). Reuses MoviePosterGrid cells
+/// (`MoviePosterCard`). Caps at 9 posters (3×3) on the home page. There is no
+/// horizontal cover-rail swipe; 「>」 / 更多 opens the existing full list.
+private struct HomePosterGrid: View {
     var upgradesVisibleHQ = true
     let movies: [Movie]
     let metrics: HomeMetrics
     let open: (Movie) -> Void
 
+    private static let columns = 3
+
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(alignment: .top, spacing: 12) {
-                ForEach(Array(movies.enumerated()), id: \.element.id) { idx, movie in
-                    Button {
-                        open(movie)
-                    } label: {
-                        HomePosterCard(movie: movie, width: metrics.cardWidth, height: metrics.cardHeight,
-                                       upgradesVisibleHQ: upgradesVisibleHQ)
-                    }
-                    .buttonStyle(HomePressStyle(scale: 0.97, spring: true))
-                    .accessibilityIdentifier("poster-\(movie.id)")
-                    .onAppear {
-                        // Same HQ/portrait crops as the grids: warm a few covers ahead.
-                        if upgradesVisibleHQ {
-                            HomeHQPosterPrefetch.scheduleAhead(movies: movies, around: idx)
-                        }
+        let items = Array(movies.prefix(HomeViewModel.homeGridCap))
+        let cols = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: Self.columns)
+        LazyVGrid(columns: cols, spacing: 16) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, movie in
+                Button {
+                    open(movie)
+                } label: {
+                    MoviePosterCard(movie: movie, upgradesVisibleHQ: upgradesVisibleHQ)
+                }
+                .buttonStyle(HomePressStyle(scale: 0.97, spring: true))
+                .accessibilityIdentifier("poster-" + movie.id)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+                .contentShape(Rectangle())
+                .clipped()
+                .onAppear {
+                    if upgradesVisibleHQ {
+                        HomeHQPosterPrefetch.scheduleAhead(movies: items, around: idx)
                     }
                 }
             }
-            .scrollTargetLayout()
-            // Room for the card shadow inside the horizontal scroller's clip.
-            .padding(.vertical, 8)
         }
-        .contentMargins(.horizontal, metrics.padding, for: .scrollContent)
-        .scrollTargetBehavior(.viewAligned)
-        .padding(.vertical, -8)
+        .padding(.horizontal, metrics.padding)
+        .accessibilityIdentifier("home-poster-grid")
     }
 }
 
-private struct HomePosterCard: View {
-    let movie: Movie
-    let width: CGFloat
-    let height: CGFloat
-    var upgradesVisibleHQ = true
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        VStack(alignment: .leading, spacing: 6) {
-            MoviePosterImage(movie: movie, maxPixelSize: 900, upgradesVisibleHQ: upgradesVisibleHQ)
-                .frame(width: width, height: height)
-                .clipShape(shape)
-                .overlay { shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5) }
-                .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(cardTitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(HomeTheme.primary)
-                    .lineLimit(1)
-                Text(movie.releaseDate ?? "")
-                    .font(.system(size: 11))
-                    .foregroundStyle(HomeTheme.secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: width, height: 34, alignment: .topLeading)
-        }
-        .frame(width: width)
-        .contentShape(Rectangle())
-    }
-
-    private var cardTitle: String {
-        let number = movie.displayNumber
-        guard let title = movie.title, !title.isEmpty, title != number else { return number }
-        return number + " " + title
-    }
-}
 
 enum HomePlaceholder {
     case hero(HomeMetrics)
@@ -1802,8 +1828,9 @@ private struct HomePlaceholderView: View {
             .accessibilityLabel(failed ? "載入失敗，點按重試" : "載入中")
             .accessibilityAddTraits(failed ? .isButton : [])
         case .rail(let m):
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(0..<railCount(m), id: \.self) { _ in
+            let cols = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: 3)
+            LazyVGrid(columns: cols, spacing: 16) {
+                ForEach(0..<3, id: \.self) { _ in
                     VStack(alignment: .leading, spacing: 6) {
                         ZStack {
                             if failed {
@@ -1813,17 +1840,18 @@ private struct HomePlaceholderView: View {
                                 HomeShimmer()
                             }
                         }
-                        .frame(width: m.cardWidth, height: m.cardHeight)
+                        .frame(maxWidth: .infinity)
+                        .aspectRatio(2.0/3.0, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
                         }
                         VStack(alignment: .leading, spacing: 5) {
-                            Capsule().fill(Color.primary.opacity(0.10)).frame(width: m.cardWidth * 0.8, height: 9)
-                            Capsule().fill(Color.primary.opacity(0.07)).frame(width: m.cardWidth * 0.45, height: 8)
+                            Capsule().fill(Color.primary.opacity(0.10)).frame(height: 9)
+                            Capsule().fill(Color.primary.opacity(0.07)).frame(width: 60, height: 8)
                         }
-                        .frame(width: m.cardWidth, height: 34, alignment: .topLeading)
+                        .frame(height: 34, alignment: .topLeading)
                     }
                 }
             }
@@ -1836,10 +1864,6 @@ private struct HomePlaceholderView: View {
             .accessibilityLabel(failed ? "載入失敗，點按重試" : "載入中")
             .accessibilityAddTraits(failed ? .isButton : [])
         }
-    }
-
-    private func railCount(_ m: HomeMetrics) -> Int {
-        max(3, Int((m.contentWidth - m.padding) / (m.cardWidth + 12)) + 1)
     }
 
     private func failedBadge(size: CGFloat) -> some View {
