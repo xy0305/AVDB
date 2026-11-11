@@ -28,7 +28,7 @@ for banned in ('URLSession', 'URLRequest', 'import SwiftUI', 'import UIKit', 'Ja
     assert banned not in code(core), f'core must stay pure/local: {banned}'
 assert 'URLSession' not in code(store) and 'upload' not in code(store).lower()
 assert 'login' not in code(source).lower() and 'signIn' not in code(source), 'recommender must never prompt for login'
-assert 'requestSpacing: Double { 1.0 }' in source, 'JavDB requests are spaced'
+assert 'requestSpacing: Double { Double.random(in: 2.5...5.0) }' in source, 'JavDB requests are spaced by a fresh random draw (Build 337)'
 assert 'RecommendationLimits.requestBudget' in store and 'RecommendationLimits.detailBudget' in store
 assert 'maxConsecutiveFailures' in store, 'network back-off'
 assert 'Task.detached' in store, 'profile / ranking computed off the main thread'

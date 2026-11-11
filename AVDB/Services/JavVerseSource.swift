@@ -183,7 +183,7 @@ enum JavVerseIdentity {
                     guard index < batch.count else { return }
                     let entry = batch[index]
                     index += 1
-                    group.addTask { @MainActor in await self.verify(entry, epoch: epoch, token: token) }
+                    group.addTask { @MainActor in await self.verify(entry, epoch: epoch, token: token, throttled: !retry) }
                 }
                 startNext(); startNext(); startNext(); startNext()
                 while await group.next() != nil {
@@ -194,7 +194,7 @@ enum JavVerseIdentity {
         }
         return task
     }
-    private func verify(_ entry: JavVerseEntry, epoch: UUID, token: String?) async {
+    private func verify(_ entry: JavVerseEntry, epoch: UUID, token: String?, throttled: Bool) async {
         var choices: [Actor] = []
         let started = Date()
         do {
@@ -207,6 +207,15 @@ enum JavVerseIdentity {
             var movie = cached?.movie; var actor = cached?.actor
             choices = cached?.candidates ?? []
             if cached == nil {
+                // Build 337: automatic page verifications pass the shared
+                // throttle; retry taps (throttled == false) are the user's
+                // own action and go straight through.
+                var gateHeld = false
+                if throttled {
+                    guard await VerificationThrottle.acquire() else { return }
+                    gateHeld = true
+                }
+                defer { if gateHeld { VerificationThrottle.release() } }
                 if entry.kind == "movie" {
                     guard let source = entry.code else { throw JavVerseFailure.message("原始完整番号不可核验") }
                     if preferExactMovie {

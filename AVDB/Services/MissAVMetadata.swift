@@ -60,7 +60,7 @@ import Combine
         results[request.key] = Result(); pending.append(request); pump()
     }
     private func pump() {
-        while tasks.count < 2 && !pending.isEmpty {
+        while tasks.count < 1 && !pending.isEmpty {
             let request = pending.removeFirst(), token = epoch
             let owner = account, sourceEpoch = originGeneration
             tasks[request.key] = Task { @MainActor [weak self] in
@@ -68,7 +68,12 @@ import Combine
                 var result: Result
                 do {
                     if let resolver = self.resolver { result = try await resolver(request) }
-                    else { result = try await self.resolve(request) }
+                    else {
+                        // Build 337: automatic verifications pass the shared throttle.
+                        guard await VerificationThrottle.acquire() else { throw CancellationError() }
+                        defer { VerificationThrottle.release() }
+                        result = try await self.resolve(request)
+                    }
                 } catch {
                     result = Result(message: error.localizedDescription, loading: false)
                 }

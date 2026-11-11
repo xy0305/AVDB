@@ -54,6 +54,7 @@
 		1FCC523DAF4878448C890BF3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB59A308766B79E1C4EB955B /* HomeView.swift */; };
 		26F8C24EF56C128165FFC52A /* JavDBSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B79CC321EF31656B46018AF /* JavDBSignature.swift */; };
 		33136AA2770006FEACFADEE1 /* JavVersePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 450A8F7803A4C0CFA750A829 /* JavVersePolicy.swift */; };
+		D2E744DF0C578C2882AA1F88 /* VerificationThrottle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F68672CD386CC334CA6547F /* VerificationThrottle.swift */; };
 		36911BA2DB310B86238FD29F /* Movie.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2983B5FE03DB5129649F2FCD /* Movie.swift */; };
 		3AD549DF754E6E22C53A8B20 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21E8365384D35AB1B1B4C52 /* ContentView.swift */; };
 		28800000000000000000A001 /* DetailPlayPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28800000000000000000A002 /* DetailPlayPill.swift */; };
@@ -190,6 +191,7 @@
 		380FFE9F6E4CF01F277CD7BD /* AVDBApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVDBApp.swift; sourceTree = "<group>"; };
 		3B79CC321EF31656B46018AF /* JavDBSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavDBSignature.swift; sourceTree = "<group>"; };
 		450A8F7803A4C0CFA750A829 /* JavVersePolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JavVersePolicy.swift; sourceTree = "<group>"; };
+		2F68672CD386CC334CA6547F /* VerificationThrottle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VerificationThrottle.swift; sourceTree = "<group>"; };
 		4FD2D4F5DD8440D59ECADE97 /* MovieGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieGridView.swift; sourceTree = "<group>"; };
 		5DA12BD3F4184DF7144A2684 /* MovieListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieListViewModel.swift; sourceTree = "<group>"; };
 		7231C462DD413E8C76270418 /* JavDBSDK.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavDBSDK.swift; sourceTree = "<group>"; };
@@ -470,6 +472,7 @@
 				B00BB00CDE000D10DE000001 /* DownloadLinkDetector.swift */,
 				93251B289069D6793D7D2AA0 /* JavVerseSource.swift */,
 				450A8F7803A4C0CFA750A829 /* JavVersePolicy.swift */,
+				2F68672CD386CC334CA6547F /* VerificationThrottle.swift */,
 				A24300000000000000000004 /* ActorAliasCatalog.swift */,
 				A24300000000000000000006 /* ExternalActorResolver.swift */,
 			);
@@ -777,6 +780,7 @@
 				A115C11E7A7B115C11E7A007 /* Pan115PlayerView.swift in Sources */,
 				A260FA56C9E849806C494C71 /* JavVerseSource.swift in Sources */,
 				33136AA2770006FEACFADEE1 /* JavVersePolicy.swift in Sources */,
+				D2E744DF0C578C2882AA1F88 /* VerificationThrottle.swift in Sources */,
 				A24300000000000000000003 /* ActorAliasCatalog.swift in Sources */,
 				A24300000000000000000005 /* ExternalActorResolver.swift in Sources */,
 			);
@@ -791,7 +795,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 336;
+				CURRENT_PROJECT_VERSION = 337;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -814,7 +818,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 336;
+				CURRENT_PROJECT_VERSION = 337;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

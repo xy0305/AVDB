@@ -8,21 +8,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '336' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 336;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '337' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 337;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 336' in wf and 'feat/detail-auth-327' in wf
+assert 'Home HQ posters App 337' in wf and 'feat/detail-auth-327' in wf
 assert 'python3 scripts/test-detail-auth327.py' in wf
-assert 'scripts/package-lut336.py' in wf and 'AVDB-336-release' in wf
-assert 'AVDB-unsigned-1.0.2-336-remove-javverse.ipa' in (r/'scripts/package-lut336.py').read_text()
+assert 'scripts/package-lut337.py' in wf and 'AVDB-337-release' in wf
+assert 'AVDB-unsigned-1.0.2-337-recommender-throttle.ipa' in (r/'scripts/package-lut337.py').read_text()
 assert 'detail-auth-327' in wf
 assert 'DetailAuth327Tests' in wf
 assert 'test327DetailAuthErrorMessageVisible' in wf
 assert 'test327DetailAuthLoginButtonPresence' in wf
 # 326 hero screenshot path stays intact.
 assert 'home-hero-hq-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
-assert 'AVDB-336-home-screenshots' in wf
+assert 'AVDB-337-home-screenshots' in wf
 
 doc = (r/'Build327-DetailAuth.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '327' in doc and 'jointly' in doc.lower()
@@ -107,4 +107,4 @@ assert 'contrast' not in auth_ui.lower() and 'foregroundColor' not in auth_ui an
 
 print('PASS detail-auth327 source contracts: token on detail fetch, cache policy, '
       'setToken cache clear, needsReauth retains token, visible paired error styling, '
-      'login entry, account-change reload, tests wired, release 336')
+      'login entry, account-change reload, tests wired, release 337')

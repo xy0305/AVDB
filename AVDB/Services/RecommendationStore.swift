@@ -52,10 +52,13 @@ enum RecommendationLimits {
     static let feedbackCap = 500
     static let shownCap = 300
     static let poolTTL: TimeInterval = 12 * 3600
-    static let autoRefreshInterval: TimeInterval = 6 * 3600
+    // Build 337: appearing never fetches. Only a manual pull-to-refresh may
+    // use the network, and one run is capped at 10 requests in total across
+    // seed details, sourcing lists and top-of-feed hydration.
+    static let totalRequestBudget = 10
     static let maxConsecutiveFailures = 3
-    static func requestBudget(manual: Bool) -> Int { manual ? 10 : 7 }
-    static func detailBudget(manual: Bool) -> Int { manual ? 10 : 6 }
+    static func requestBudget(manual: Bool) -> Int { manual ? 6 : 0 }
+    static func detailBudget(manual: Bool) -> Int { manual ? 6 : 0 }
 
     /// LRU by fetchedAt, but never evict items the user interacted with.
     static func capMetadata(_ items: [String: RecItem], keep: Set<String>, cap: Int = metadataCap) -> [String: RecItem] {
@@ -126,9 +129,10 @@ final class RecommendationStore: ObservableObject {
 
     var hasContent: Bool { hero != nil }
 
-    /// Called on appear (cached result reused for 6 h) and by pull-to-refresh (manual).
+    /// Called on appear (local recompute from cache only — Build 337 removed
+    /// the automatic network refresh) and by pull-to-refresh (manual, the
+    /// only path allowed to fetch).
     func refresh(manual: Bool) {
-        if !manual, let updatedAt, Date().timeIntervalSince(updatedAt) < RecommendationLimits.autoRefreshInterval, hasContent { return }
         guard task == nil else { return }
         isRefreshing = true
         status = manual ? "正在更新推荐…" : nil
@@ -158,6 +162,7 @@ final class RecommendationStore: ObservableObject {
         let needDetail = snapshot.seedItems.filter { cache.items[$0.id]?.detailed != true }.prefix(RecommendationLimits.detailBudget(manual: manual))
         for seed in needDetail where failures < RecommendationLimits.maxConsecutiveFailures {
             if Task.isCancelled { return }
+            guard requests < RecommendationLimits.totalRequestBudget else { break }
             await spaced(); requests += 1
             do { let d = try await source.detail(seed.id); cache.items[d.id] = (cache.items[d.id].map { $0.merged(with: d) }) ?? d; failures = 0 }
             catch { failures += 1 }
@@ -172,7 +177,7 @@ final class RecommendationStore: ObservableObject {
         for request in plan where failures < RecommendationLimits.maxConsecutiveFailures {
             if Task.isCancelled { return }
             if let pool = cache.pools[request.key], now.timeIntervalSince(pool.fetchedAt) < RecommendationLimits.poolTTL, !manual { continue }
-            guard listCalls < RecommendationLimits.requestBudget(manual: manual) else { break }
+            guard listCalls < RecommendationLimits.requestBudget(manual: manual), requests < RecommendationLimits.totalRequestBudget else { break }
             await spaced(); requests += 1; listCalls += 1
             do {
                 let found = try await source.list(request)
@@ -202,6 +207,7 @@ final class RecommendationStore: ObservableObject {
         var hydrated = false
         for r in top where failures < RecommendationLimits.maxConsecutiveFailures {
             if Task.isCancelled { return }
+            guard requests < RecommendationLimits.totalRequestBudget else { break }
             await spaced(); requests += 1
             do { let d = try await source.detail(r.id); cache.items[d.id] = (cache.items[d.id].map { $0.merged(with: d) }) ?? d; failures = 0; hydrated = true }
             catch { failures += 1 }

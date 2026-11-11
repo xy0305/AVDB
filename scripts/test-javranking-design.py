@@ -35,7 +35,7 @@ assert '.preferredColorScheme(.dark)' in backend and 'overrideUserInterfaceStyle
 assert 'WKWebView' not in view
 assert 'sourcePath: entity.sourcePath' not in backend # source identities never become native movie IDs
 assert '.init(name: "path", value: entity.sourcePath)' in backend
-assert 'while !interactive && self.activeMatches >= 3' in source
+assert 'VerificationThrottle.acquire(deadline: deadline)' in source and 'activeMatches' not in source  # Build 337 shared throttle replaces the 3-wide queue
 if not shutil.which('swiftc'):
  print('PASS native visual source invariants; SKIP production Swift route-label runtime (macOS CI)');raise SystemExit(0)
 swift=r'''

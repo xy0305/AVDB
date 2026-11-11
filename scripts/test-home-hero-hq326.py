@@ -9,21 +9,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '336' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 336;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '337' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 337;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 # Release wiring.
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 336' in wf and 'feat/home-hero-hq-326' in wf
+assert 'Home HQ posters App 337' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf and 'test-home-immersive325.py' not in wf
-assert 'scripts/package-lut336.py' in wf and 'AVDB-336-release' in wf and 'AVDB-325-' not in wf
-assert 'AVDB-336-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
+assert 'scripts/package-lut337.py' in wf and 'AVDB-337-release' in wf and 'AVDB-325-' not in wf
+assert 'AVDB-337-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'home-hero-hq-screenshots' in wf
 assert 'llama|SherpaOnnxC' in wf  # screenshot job still drops device-only xcframeworks
 assert not (r/'scripts/test-home-immersive325.py').exists() and not (r/'scripts/package-lut325.py').exists()
-pkg = (r/'scripts/package-lut336.py').read_text()
-assert "=='336'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-336-remove-javverse.ipa' in pkg
+pkg = (r/'scripts/package-lut337.py').read_text()
+assert "=='337'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-337-recommender-throttle.ipa' in pkg
 doc = (r/'Build326-HomeHeroHQ.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '326' in doc
 
@@ -171,4 +171,4 @@ assert 'home-hero' in ui.split('func test326HomeHeroHQScreenshots()')[1].split('
 assert 'hero.frame.width, window.frame.width' in ui
 
 print('PASS home-hero-hq326 source contracts: independent HQ resolver, A/B/C tiers, no inset, '
-      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 336')
+      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 337')

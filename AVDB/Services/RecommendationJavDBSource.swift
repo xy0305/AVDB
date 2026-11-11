@@ -14,7 +14,9 @@ enum RecommendationSourceRegistry {
 }
 
 final class JavDBRecommendationSource: RecommendationSource {
-    var requestSpacing: Double { 1.0 }
+    // Build 337: no metronome. Each gap is a fresh random 2.5–5 s draw —
+    // a fixed 1 s interval is a machine signature, not a human one.
+    var requestSpacing: Double { Double.random(in: 2.5...5.0) }
 
     @MainActor func snapshot(feedback: [RecSignal], playCounts: [String: Int], since: Date?) -> RecSnapshot {
         let floor = since ?? .distantPast

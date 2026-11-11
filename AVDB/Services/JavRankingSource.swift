@@ -94,7 +94,6 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private var matches: [String: Match] = [:]
     private var matchFlights: [String: Task<Movie?, Error>] = [:]
     private var matchTokens: [String: UUID] = [:]
-    private var activeMatches = 0
     private var matchAccount: String?
     private func updateMatchScope() {
         let account = APIClient.shared.token
@@ -123,13 +122,14 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         let epoch = generation, token = UUID(), account = matchAccount
         let flight = Task<Movie?, Error>(priority: interactive ? .userInitiated : .utility) {
             let deadline = Date().addingTimeInterval(12)
-            while !interactive && self.activeMatches >= 3 {
-                guard Date() < deadline else { throw JRError.message("核验队列繁忙，请重试") }
-                try await Task.sleep(nanoseconds: 50_000_000)
+            // Build 337: automatic verifications pass the shared throttle
+            // (one at a time, random spacing, 20 per minute). Interactive
+            // taps keep bypassing the queue — they are the user's own action.
+            if !interactive {
+                guard await VerificationThrottle.acquire(deadline: deadline) else { throw JRError.message("核验队列繁忙，请重试") }
+                defer { VerificationThrottle.release() }
             }
             try Task.checkCancellation()
-            self.activeMatches += 1
-            defer { self.activeMatches -= 1 }
             let movie = try await withThrowingTaskGroup(of: Movie?.self) { group in
                 group.addTask { try await JavDBSDK.shared.exactMovie(code: code, refresh: refresh) }
                 group.addTask {
