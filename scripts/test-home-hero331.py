@@ -11,20 +11,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '332' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 332;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '333' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 333;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 332' in wf and 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
+assert 'Home HQ posters App 333' in wf and 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
 assert 'feat/home-hero-color-332' in wf
 assert wf.count('python3 scripts/test-home-hero331.py') == 2  # zzt-ranking job + release regressions
-assert 'scripts/package-lut332.py' in wf and 'AVDB-332-release' in wf and 'AVDB-331-release' not in wf
-pkg = (r/'scripts/package-lut332.py').read_text()
-assert "=='332'" in pkg and 'AVDB-unsigned-1.0.2-332-home-hero-color.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut333.py' in wf and 'AVDB-333-release' in wf and 'AVDB-331-release' not in wf
+pkg = (r/'scripts/package-lut333.py').read_text()
+assert "=='333'" in pkg and 'AVDB-unsigned-1.0.2-333-home-hero-detail.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 job = wf.split('  home-hero-331:')[1].split('  home-hero-332:')[0]
 assert '-only-testing:DetailPosterQualityTests/HomeHero331Tests' in job
 assert 'test330EnrichMergedDetailCoverIsMiddleStep' in job
-assert 'AVDB-332-home-hero-tests' in job
+assert 'AVDB-333-home-hero-tests' in job
 assert 'home-chrome-330:' in wf and 'home-hot-329:' in wf and 'home-hot-328:' in wf
 
 doc = (r/'Build331-HomeHeroCrop.md').read_text()
@@ -63,7 +63,7 @@ assert 'enum HeroFillAnchor' in home and 'iw > ih ? (w - dw) : (w - dw) / 2' in 
 assert 'HeroFillAnchor.x(' in resolver
 # No AICover on the hero.
 assert 'AICoverEnhanceModel' not in resolver and 'AICoverEnhanceModel' not in home
-assert 'art.rawImage ?? art.image' in resolver
+assert 'art.image' in resolver.split('static func primaryImage(from art: DetailPosterArtwork) -> UIImage {')[1].split('}')[0], 'Build 333: hero sharp layer must be the detail display image (art.image)'
 
 # --- 2. Two-level floor ---
 assert 'var floorSource: String?' in resolver and 'var floorPixelWidth: Int = 0' in resolver
@@ -148,4 +148,4 @@ assert 'final class HomeChrome330Tests' in unit and 'final class HomeHot329Tests
 
 print('PASS home-hero331 source contracts: original-bitmap hero + display-time front window, two-level floor, '
       'arrival-time keep/evict + disk-only restore, field-level merge, per-item pipeline cap 2 / 8s, '
-      'by-id winner sharing, release 332')
+      'by-id winner sharing, release 333')

@@ -393,7 +393,7 @@ struct HeroCoverPresentation: Equatable {
     var floorPixelWidth: Int = 0
     /// Official DetailPosterResolver winner (the iPhone detail portraitHero).
     /// Overrides the floor on arrival. nil when evicted outside current ±1.
-    /// The bitmap is the uncropped original (`art.rawImage`).
+    /// Build 333: the bitmap is the detail page's display image (`art.image`).
     var sharpImage: UIImage?
     /// Winner URL of the sharp layer; with `sharpOnDisk` it restores from
     /// HeroCoverDisk after eviction without a resolver rerun or any network.
@@ -445,10 +445,16 @@ enum HeroCoverSRHook {
 
 /// Official portrait from DetailPosterResolver is the primary sharp layer.
 /// `hdBackdrop` / `pl` jackets must not be chosen over that winner, and the
-/// home hero never uses the artwork backdrop or AICover-enhanced display raster.
+/// home hero never uses the artwork backdrop. Build 333: it paints the same
+/// display raster the detail page shows (see primaryImage below).
 enum HeroResolverSharp {
+    /// Build 333 (user, 2026-11-11: 「直接用详情页大图」): the hero's sharp layer
+    /// paints the very image the detail page's portraitHero shows — `art.image`.
+    /// For a PS winner that is the official portrait; for a jacket-sourced winner
+    /// it is the resolver's colour-preserving front display raster, never the
+    /// uncropped envelope. (Build 332 painted `art.rawImage`; superseded.)
     static func primaryImage(from art: DetailPosterArtwork) -> UIImage {
-        art.rawImage ?? art.image
+        art.image
     }
 
     static func isBackdropOrJacket(_ source: String) -> Bool {

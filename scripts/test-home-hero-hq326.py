@@ -9,21 +9,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '332' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 332;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '333' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 333;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 # Release wiring.
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 332' in wf and 'feat/home-hero-hq-326' in wf
+assert 'Home HQ posters App 333' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf and 'test-home-immersive325.py' not in wf
-assert 'scripts/package-lut332.py' in wf and 'AVDB-332-release' in wf and 'AVDB-325-' not in wf
-assert 'AVDB-332-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
+assert 'scripts/package-lut333.py' in wf and 'AVDB-333-release' in wf and 'AVDB-325-' not in wf
+assert 'AVDB-333-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'home-hero-hq-screenshots' in wf
 assert 'llama|SherpaOnnxC' in wf  # screenshot job still drops device-only xcframeworks
 assert not (r/'scripts/test-home-immersive325.py').exists() and not (r/'scripts/package-lut325.py').exists()
-pkg = (r/'scripts/package-lut332.py').read_text()
-assert "=='332'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-332-home-hero-color.ipa' in pkg
+pkg = (r/'scripts/package-lut333.py').read_text()
+assert "=='333'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-333-home-hero-detail.ipa' in pkg
 doc = (r/'Build326-HomeHeroHQ.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '326' in doc
 
@@ -129,8 +129,9 @@ assert 'title-scoped hero key' in detail or 'priority 1' in detail
 # --- 325 immersive contracts kept (typography, scrims, glass, rails, search, tabs) ---
 assert '.ignoresSafeArea(.container, edges: .top)' in view
 assert 'HomeHeroCarousel(' in view
-for stop in ['.init(color: .black.opacity(0), location: 0.35)', '.init(color: .black.opacity(0.18), location: 0.62)',
-             '.init(color: .black.opacity(0.45), location: 0.82)', '.init(color: .black.opacity(0.66), location: 1.0)']:
+for stop in ['.init(color: .black.opacity(0), location: 0.35)', '.init(color: .black.opacity(0.18), location: 0.56)',
+             '.init(color: .black.opacity(0.45), location: 0.70)', '.init(color: .black.opacity(0.62), location: 0.80)',
+             '.init(color: .black.opacity(0), location: edge)']:  # Build 333: scrim hands off inside the fade band
     assert stop in hero, stop
 assert '.black.opacity(0.28)' in hero and '.frame(height: 110)' in hero
 text = hero.split('private var textBlock: some View {')[1].split('private var swipe')[0]
@@ -170,4 +171,4 @@ assert 'home-hero' in ui.split('func test326HomeHeroHQScreenshots()')[1].split('
 assert 'hero.frame.width, window.frame.width' in ui
 
 print('PASS home-hero-hq326 source contracts: independent HQ resolver, A/B/C tiers, no inset, '
-      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 332')
+      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 333')

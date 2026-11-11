@@ -9,18 +9,18 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '332' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 332;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '333' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 333;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HeroCoverResolver.swift' in pbx and 'DetailPosterResolver.swift' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 332' in wf and 'feat/home-chrome-330' in wf
+assert 'Home HQ posters App 333' in wf and 'feat/home-chrome-330' in wf
 assert 'feat/home-hot-329' in wf and 'feat/home-hot-328' in wf
 assert 'python3 scripts/test-home-chrome330.py' in wf
 assert 'python3 scripts/test-home-hot329.py' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
-assert 'scripts/package-lut332.py' in wf and 'AVDB-332-release' in wf
-assert 'AVDB-unsigned-1.0.2-332-home-hero-color.ipa' in (r/'scripts/package-lut332.py').read_text()
+assert 'scripts/package-lut333.py' in wf and 'AVDB-333-release' in wf
+assert 'AVDB-unsigned-1.0.2-333-home-hero-detail.ipa' in (r/'scripts/package-lut333.py').read_text()
 assert 'home-chrome-330' in wf
 assert 'HomeChrome330Tests' in wf
 assert 'test330CleanTapOpensDetailAndPageCommitDoesNot' in wf
@@ -102,7 +102,7 @@ assert 'small_covers' in movie.split('func mergingHeroDetail')[1].split('public 
 assert 'enrichImage' not in resolver
 assert 'HeroResolverSharp' in resolver
 assert 'primaryImage(from art: DetailPosterArtwork)' in resolver
-assert 'art.rawImage ?? art.image' in resolver
+assert 'art.image' in resolver.split('static func primaryImage(from art: DetailPosterArtwork) -> UIImage {')[1].split('}')[0], 'Build 333: hero sharp layer must be the detail display image (art.image)'
 assert 'isBackdropOrJacket' in resolver
 assert 'pl.jpg' in resolver
 assert 'DetailPosterResolver.resolveShared' in resolver
@@ -161,4 +161,4 @@ assert 'final class HomeHot328Tests' in unit
 
 print('PASS home-chrome330 source contracts: 44 pt liquid-glass search, overlay-tap '
       'navigation, official DetailPosterResolver portrait, three-step floor, '
-      'scheduler cap 2, iPhone-only LiquidGlassContainer shortcuts, release 332')
+      'scheduler cap 2, iPhone-only LiquidGlassContainer shortcuts, release 333')

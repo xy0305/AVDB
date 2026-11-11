@@ -1,7 +1,7 @@
-name: Home HQ posters App 332
+name: Home HQ posters App 333
 on:
   push:
-    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332]
+    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332, feat/home-hero-detail-333]
 permissions:
   contents: read
 jobs:
@@ -34,6 +34,7 @@ jobs:
       - run: python3 scripts/test-home-chrome330.py
       - run: python3 scripts/test-home-hero331.py
       - run: python3 scripts/test-home-hero332.py
+      - run: python3 scripts/test-home-hero333.py
   models:
     runs-on: macos-26
     timeout-minutes: 60
@@ -84,7 +85,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence-release
-          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; python3 scripts/test-zzt-ranking319.py; python3 scripts/test-zzt-ranking320.py; python3 scripts/test-zzt-ranking321.py; python3 scripts/test-zzt-ranking322.py; python3 scripts/test-player-chrome323.py; python3 scripts/test-home-hero-hq326.py; python3 scripts/test-detail-auth327.py; python3 scripts/test-home-hot328.py; python3 scripts/test-home-hot329.py; python3 scripts/test-home-chrome330.py; python3 scripts/test-home-hero331.py; python3 scripts/test-home-hero332.py; } 2>&1 | tee evidence-release/regressions.log
+          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; python3 scripts/test-zzt-ranking319.py; python3 scripts/test-zzt-ranking320.py; python3 scripts/test-zzt-ranking321.py; python3 scripts/test-zzt-ranking322.py; python3 scripts/test-player-chrome323.py; python3 scripts/test-home-hero-hq326.py; python3 scripts/test-detail-auth327.py; python3 scripts/test-home-hot328.py; python3 scripts/test-home-hot329.py; python3 scripts/test-home-chrome330.py; python3 scripts/test-home-hero331.py; python3 scripts/test-home-hero332.py; python3 scripts/test-home-hero333.py; } 2>&1 | tee evidence-release/regressions.log
       - name: Install actual pinned MediaPipe SDK
         run: |
           gem install cocoapods -v 1.16.2 --no-document
@@ -110,7 +111,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$app" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
-          python3 scripts/package-lut332.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
+          python3 scripts/package-lut333.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
           file "$app/AVDB" | tee evidence-release/macho.txt
           xcrun vtool -show-build "$app/AVDB" | tee -a evidence-release/macho.txt
           codesign -dv "$app" 2> evidence-release/codesign.txt || true
@@ -131,7 +132,7 @@ jobs:
           test "$bytes" -gt 500000000
       - uses: actions/upload-artifact@v4
         with:
-          name: AVDB-332-release
+          name: AVDB-333-release
           path: |
             AVDB-unsigned-*.ipa
             evidence-release/*
@@ -141,7 +142,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: AVDB-332-release-logs
+          name: AVDB-333-release-logs
           path: |
             evidence-release/*
             fetch-live289.log
@@ -162,7 +163,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-cloud-tests
+          name: AVDB-333-cloud-tests
           path: evidence-cloud290/*
           if-no-files-found: warn
   ai-cover-settings-screenshots:
@@ -178,7 +179,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-ai-cover-cloud-screenshots
+          name: AVDB-333-ai-cover-cloud-screenshots
           path: |
             evidence-ai290ui/shots/*
             evidence-ai290ui/status.json
@@ -197,7 +198,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-live-subtitle-screenshots
+          name: AVDB-333-live-subtitle-screenshots
           path: |
             evidence-live287/ui/shots/*
             evidence-live287/ui/status.json
@@ -218,7 +219,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-production-controller-HLS
+          name: AVDB-333-production-controller-HLS
           path: |
             evidence-hls-app/*.json
             evidence-hls-app/*.log
@@ -246,7 +247,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-strict-runtime
+          name: AVDB-333-strict-runtime
           path: |
             evidence-hls-runtime/*.json
             evidence-hls-runtime/*.log
@@ -263,7 +264,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-home-hq-simulator
+          name: AVDB-333-home-hq-simulator
           path: evidence-homehq298/*
           if-no-files-found: warn
   home-hero-hq-screenshots:
@@ -317,7 +318,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-home-screenshots
+          name: AVDB-333-home-screenshots
           path: |
             evidence-home326/*
             home326-ui.log
@@ -365,7 +366,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-detail-auth-tests
+          name: AVDB-333-detail-auth-tests
           path: |
             detail327-ui.log
           if-no-files-found: warn
@@ -412,7 +413,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-home-hot-tests
+          name: AVDB-333-home-hot-tests
           path: |
             home328-ui.log
           if-no-files-found: warn
@@ -460,7 +461,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-home-hot-tests
+          name: AVDB-333-home-hot-tests
           path: |
             home329-ui.log
           if-no-files-found: warn
@@ -508,7 +509,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-home-chrome-tests
+          name: AVDB-333-home-chrome-tests
           path: |
             home330-ui.log
           if-no-files-found: warn
@@ -556,7 +557,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-home-hero-tests
+          name: AVDB-333-home-hero-tests
           path: |
             home331-ui.log
           if-no-files-found: warn
@@ -604,7 +605,54 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-332-home-hero-color-tests
+          name: AVDB-333-home-hero-color-tests
           path: |
             home332-ui.log
+          if-no-files-found: warn
+  home-hero-333:
+    # Build 333: home hero paints the detail page display image (art.image) with a detail-style bottom gradient (floor transition kept)
+    # HomeHero333Tests: test333SharpLayerIsDetailDisplayImageNotRawEnvelope, test333JacketWinnerShowsFrontDisplayRaster, test333DiskRestoreReturnsDisplayImage, test333BottomChromeInsetsAboveFadeBand
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
+        run: |
+          set -euo pipefail
+          mkdir -p AVDB/Resources/LiveModels
+          gem install xcodeproj --no-document
+          ruby -e 'require "xcodeproj"; p = Xcodeproj::Project.open("AVDB.xcodeproj"); app = p.targets.find { |t| t.name == "AVDB" }; app.build_phases.each { |ph| next unless ph.respond_to?(:files); ph.files.select { |f| f.file_ref && f.file_ref.path.to_s =~ /(llama|SherpaOnnxC)\.xcframework/ }.each { |f| puts "drop #{f.file_ref.path} from #{ph.display_name}"; ph.remove_build_file(f) } }; p.save'
+      - name: Install dependencies and the generated PosterNavigation UI-test scheme
+        run: |
+          gem install cocoapods -v 1.16.2 --no-document
+          ruby scripts/setup-poster-uitests.rb
+          pod install --repo-update
+      - name: Compile simulator Metal resource
+        run: |
+          xcrun -sdk iphonesimulator metal -fcikernel -c AVDB/Resources/Enhancement.metal -o "$RUNNER_TEMP/Enhancement.air"
+          xcrun -sdk iphonesimulator metallib -cikernel "$RUNNER_TEMP/Enhancement.air" -o AVDB/Resources/Enhancement.metallib
+      - name: Choose an iPhone simulator
+        run: |
+          xcrun simctl list devices available -j > devices.json
+          python3 - <<'PY'
+          import json,os
+          devices=json.load(open('devices.json'))['devices']
+          phones=[d for ds in devices.values() for d in ds if d['name'].startswith('iPhone')]
+          assert phones, 'No available iPhone simulator'
+          pref=[d for d in phones if 'Pro' in d['name'] and 'Max' not in d['name']]
+          chosen=(pref or phones)[0]
+          print(chosen)
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('IPHONE_UDID='+chosen['udid']+'\n')
+          PY
+      - name: Home 333 hero detail unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test -workspace AVDB.xcworkspace -scheme PosterNavigation -configuration Debug -destination "platform=iOS Simulator,id=$IPHONE_UDID" -derivedDataPath "$RUNNER_TEMP/HomeHero333Derived" -resultBundlePath "$RUNNER_TEMP/HomeHero333.xcresult" CODE_SIGNING_ALLOWED=NO -only-testing:DetailPosterQualityTests/HomeHero333Tests 2>&1 | tee home333-ui.log | grep -E "error:|Test Case|passed|failed|BUILD" || true
+          grep -q "Test Suite 'Selected tests' passed\|TEST SUCCEEDED" home333-ui.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AVDB-333-home-hero-detail-tests
+          path: |
+            home333-ui.log
           if-no-files-found: warn

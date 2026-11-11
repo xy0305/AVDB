@@ -1390,7 +1390,7 @@ private struct HomeHeroCarousel: View {
             if showsDots {
                 HomeHeroDots(count: movies.count, index: min(index, movies.count - 1))
                     .padding(.leading, padding)
-                    .padding(.bottom, 16 + HomeMetrics.heroContentOverlap)
+                    .padding(.bottom, 46 + HomeMetrics.heroContentOverlap)
                     .frame(width: width, height: height, alignment: .bottomLeading)
                     .opacity(chromeOpacity)
                     .allowsHitTesting(false)
@@ -1403,7 +1403,7 @@ private struct HomeHeroCarousel: View {
                 .opacity(chromeOpacity)
 
             HomeHeroMoreButton(action: onMore)
-                .padding(.bottom, 8 + HomeMetrics.heroContentOverlap)
+                .padding(.bottom, 38 + HomeMetrics.heroContentOverlap)
                 .frame(width: width, height: height, alignment: .bottom)
                 .opacity(chromeOpacity)
 
@@ -1477,16 +1477,36 @@ private struct HomeHeroCarousel: View {
         .contentShape(Rectangle())
     }
 
-    /// Bottom scrim over 35%–100% (0.35→0, 0.62→0.18, 0.82→0.45, 1.0→0.66 black) and a top
-    /// scrim (black 0.28 → 0 over 110 pt) for the status bar. Not parallaxed.
+    /// Bottom scrim for text legibility, then — Build 333, mirroring the detail
+    /// page's portraitHero — the image bottom *graduates* into the page
+    /// background instead of being hard-cut by the shortcuts sheet: the black
+    /// scrim hands off inside the fade band and a systemBackground gradient
+    /// reaches full opacity exactly at the sheet's top edge (hero height minus
+    /// the content overlap), so the seam disappears and the shortcut buttons
+    /// sit on the poster's faded foot. Plus a top scrim (black 0.28 → 0 over
+    /// 110 pt) for the status bar. Not parallaxed.
     private var scrims: some View {
-        ZStack(alignment: .top) {
+        // Visible fade band above the sheet's top edge.
+        let band: CGFloat = 56
+        let edge = max(0, (height - HomeMetrics.heroContentOverlap) / max(height, 1))
+        let bandTop = max(0, (height - HomeMetrics.heroContentOverlap - band) / max(height, 1))
+        return ZStack(alignment: .top) {
             LinearGradient(
                 stops: [
                     .init(color: .black.opacity(0), location: 0.35),
-                    .init(color: .black.opacity(0.18), location: 0.62),
-                    .init(color: .black.opacity(0.45), location: 0.82),
-                    .init(color: .black.opacity(0.66), location: 1.0)
+                    .init(color: .black.opacity(0.18), location: 0.56),
+                    .init(color: .black.opacity(0.45), location: 0.70),
+                    .init(color: .black.opacity(0.62), location: 0.80),
+                    .init(color: .black.opacity(0), location: edge)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            LinearGradient(
+                stops: [
+                    .init(color: Color(.systemBackground).opacity(0), location: bandTop),
+                    .init(color: Color(.systemBackground), location: edge),
+                    .init(color: Color(.systemBackground), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -1525,9 +1545,11 @@ private struct HomeHeroCarousel: View {
             }
         }
         .padding(.leading, padding)
-        // Text block sits 10 pt above the dots (dots: 6 pt tall, 16 pt above the bottom,
-        // plus the Build 332 content overlap so the typography stays fully visible).
-        .padding(.bottom, (showsDots ? 32 : 16) + HomeMetrics.heroContentOverlap)
+        // Build 333: the whole bottom chrome rides above the detail-style fade
+        // band (dots: 6 pt tall at 46 pt above the bottom edge, plus the Build
+        // 332 content overlap), so the typography stays on the dark scrim and
+        // fully visible — never inside the graduated foot of the poster.
+        .padding(.bottom, (showsDots ? 66 : 50) + HomeMetrics.heroContentOverlap)
         .frame(width: width, height: height, alignment: .bottomLeading)
         .opacity(chromeOpacity)
     }

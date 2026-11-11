@@ -1872,3 +1872,138 @@ final class HomeHero332Tests: XCTestCase {
         XCTAssertGreaterThan(delta.meanDB, -2, "JPEG restore yellow-loss Δb* \(delta.meanDB)")
     }
 }
+
+// MARK: - Build 333 home hero detail image
+
+/// Build 333 (user, 2026-11-11: 「直接用详情页大图」 — the 332 hero still showed
+/// the windowed jacket floor, not the detail page's big image): the hero's
+/// sharp layer is the detail page's display image itself (`art.image`); for a
+/// jacket-sourced winner that is the resolver's front display raster, never
+/// the uncropped raw envelope (`art.rawImage`, the Build 332 choice). The
+/// jacket floor stays as the transition (the user's pick) and the winner swaps
+/// in automatically. Bottom chrome rides above the detail-style fade band.
+final class HomeHero333Tests: XCTestCase {
+    override func tearDown() async throws {
+        await MainActor.run { HeroCoverStore.shared.resetForTests() }
+        HeroCoverPolicy.overallBudgetOverride = nil
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        try await super.tearDown()
+    }
+
+    @MainActor
+    private func poll(_ seconds: Double, _ id: String, until done: (HeroCoverPresentation) -> Bool) async throws -> HeroCoverPresentation {
+        var p = HeroCoverStore.shared.presentation(for: id)
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline, !done(p) {
+            try await Task.sleep(nanoseconds: 20_000_000)
+            p = HeroCoverStore.shared.presentation(for: id)
+        }
+        return p
+    }
+
+    private static func solid(_ w: Int, _ h: Int, _ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> UIImage {
+        HomeHero331Tests.render(width: w, height: h) { ctx, width, height in
+            ctx.setFillColor(UIColor(red: r, green: g, blue: b, alpha: 1).cgColor)
+            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
+    }
+
+    /// Artwork whose display image and raw original are DIFFERENT bitmaps, so a
+    /// test can tell exactly which one the hero painted.
+    private static func distinctArt(display: UIImage, raw: UIImage, source: String) -> DetailPosterArtwork {
+        DetailPosterArtwork(image: display, backdrop: display, tint: .black,
+                            provenance: PosterProvenance(source: source),
+                            sourceURL: source,
+                            nativeWidth: Int(display.size.width), nativeHeight: Int(display.size.height),
+                            rawImage: raw)
+    }
+
+    /// PS winner: the hero paints art.image (745×1081), not the raw original.
+    @MainActor
+    func test333SharpLayerIsDetailDisplayImageNotRawEnvelope() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        HeroCoverStore.testDetailProvider = { $0 }
+        let display = Self.solid(745, 1081, 0.85, 0.55, 0.35)
+        let raw = Self.solid(1000, 1500, 0.20, 0.30, 0.80)
+        let ps = "https://pics.dmm.co.jp/digital/video/abf00333/abf00333ps.jpg"
+        let art = Self.distinctArt(display: display, raw: raw, source: ps)
+        HeroCoverStore.testResolverProvider = { _ in art }
+        let movie = HomeHero331Tests.heroMovie(id: "hero-333-a", number: "ABF-333", title: "333 portrait",
+                                               cover: "", thumb: "")
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        let p = try await poll(6, movie.id) { $0.sharpImage != nil }
+        let sharp = try XCTUnwrap(p.sharpImage, "the resolver winner must reach the hero")
+        XCTAssertTrue(sharp === display, "hero sharp layer must be art.image — the detail page's display image")
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(sharp), 745)
+        XCTAssertEqual(p.winnerURL, ps)
+    }
+
+    /// Jacket-sourced winner (FNS-267-like): the hero paints the resolver's
+    /// front display raster, never the uncropped envelope.
+    @MainActor
+    func test333JacketWinnerShowsFrontDisplayRaster() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        HeroCoverStore.testDetailProvider = { $0 }
+        let front = Self.solid(398, 568, 0.90, 0.72, 0.58)
+        let envelope = Self.solid(840, 568, 0.82, 0.10, 0.18)
+        let pl = "https://pics.dmm.co.jp/digital/video/fns00267/fns00267pl.jpg"
+        let art = Self.distinctArt(display: front, raw: envelope, source: pl)
+        HeroCoverStore.testResolverProvider = { _ in art }
+        let movie = HomeHero331Tests.heroMovie(id: "hero-333-b", number: "FNS-267", title: "333 jacket",
+                                               cover: "", thumb: "")
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        let p = try await poll(6, movie.id) { $0.sharpImage != nil }
+        let sharp = try XCTUnwrap(p.sharpImage, "the resolver winner must reach the hero")
+        XCTAssertTrue(sharp === front, "jacket-sourced winner: hero paints the front display raster, not the envelope")
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(sharp), 398)
+    }
+
+    /// Eviction + disk restore: the bitmap that comes back is the display
+    /// image (745 wide), not the raw original (1000 wide).
+    @MainActor
+    func test333DiskRestoreReturnsDisplayImage() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        HeroCoverStore.testDetailProvider = { $0 }
+        let display = Self.solid(745, 1081, 0.85, 0.55, 0.35)
+        let raw = Self.solid(1000, 1500, 0.20, 0.30, 0.80)
+        let ps = "https://pics.dmm.co.jp/digital/video/abf00334/abf00334ps.jpg"
+        let art = Self.distinctArt(display: display, raw: raw, source: ps)
+        HeroCoverStore.testResolverProvider = { _ in art }
+        let movies = (0..<7).map { i in
+            HomeHero331Tests.heroMovie(id: "hero-333-r\(i)", number: "ABF-334", title: "333 restore \(i)",
+                                       cover: "", thumb: "")
+        }
+        HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
+        let settled = try await poll(6, movies[0].id) { $0.sharpImage != nil }
+        XCTAssertEqual(settled.sharpImage.map(HeroCoverPolicy.pixelWidth), 745)
+        try await Task.sleep(nanoseconds: 800_000_000)
+        HeroCoverStore.shared.setCurrentIndex(3, movies: movies)
+        let evicted = try await poll(3, movies[0].id) { $0.sharpImage == nil }
+        XCTAssertNil(evicted.sharpImage, "an out-of-window winner bitmap must be evicted")
+        XCTAssertTrue(evicted.sharpOnDisk, "the winner must survive on HeroCoverDisk")
+        HeroCoverStore.shared.setCurrentIndex(0, movies: movies)
+        let back = try await poll(6, movies[0].id) { $0.sharpImage != nil }
+        let restored = try XCTUnwrap(back.sharpImage, "swiping back must restore the winner from disk")
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(restored), 745,
+                       "the restored bitmap is the detail display image, not the raw original")
+    }
+
+    /// Documented bottom insets (dots / text-with-dots / more button): all ride
+    /// above the strong part of the 56 pt detail-style fade band, which ends at
+    /// the shortcuts sheet's top edge (hero height − overlap).
+    @MainActor
+    func test333BottomChromeInsetsAboveFadeBand() {
+        let overlap = HomeMetrics.heroContentOverlap
+        XCTAssertEqual(overlap, 32)
+        XCTAssertEqual(46 + overlap, 78)
+        XCTAssertEqual(66 + overlap, 98)
+        XCTAssertEqual(38 + overlap, 70)
+    }
+}

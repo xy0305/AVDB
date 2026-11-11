@@ -11,20 +11,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '332' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 332;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '333' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 333;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 332' in wf and 'feat/home-hero-color-332' in wf
+assert 'Home HQ posters App 333' in wf and 'feat/home-hero-color-332' in wf
 assert 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
 assert wf.count('python3 scripts/test-home-hero332.py') == 2  # zzt-ranking job + release regressions
 assert 'python3 scripts/test-home-hero331.py' in wf
-assert 'scripts/package-lut332.py' in wf and 'AVDB-332-release' in wf and 'AVDB-331-release' not in wf
-pkg = (r/'scripts/package-lut332.py').read_text()
-assert "=='332'" in pkg and 'AVDB-unsigned-1.0.2-332-home-hero-color.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut333.py' in wf and 'AVDB-333-release' in wf and 'AVDB-331-release' not in wf
+pkg = (r/'scripts/package-lut333.py').read_text()
+assert "=='333'" in pkg and 'AVDB-unsigned-1.0.2-333-home-hero-detail.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 job = wf.split('  home-hero-332:')[1]
 assert '-only-testing:DetailPosterQualityTests/HomeHero332Tests' in job
-assert 'AVDB-332-home-hero-tests' in job or 'AVDB-332-home-hero-color-tests' in job
+assert 'AVDB-333-home-hero-tests' in job or 'AVDB-333-home-hero-color-tests' in job
 assert '  home-hero-331:' in wf and 'home-chrome-330:' in wf and 'home-hot-329:' in wf
 
 doc = (r/'Build332-HomeHeroColor.md').read_text()
@@ -66,9 +66,9 @@ assert 'cover_url preferred' in resolver or 'cover_url' in store
 # --- 2. Overlap 32 pt; bottom UI insets grow; overlap is not in the gesture hit area ---
 assert 'static let heroContentOverlap: CGFloat = 32' in home
 assert '.padding(.top, -HomeMetrics.heroContentOverlap)' in home
-assert '16 + HomeMetrics.heroContentOverlap' in hero  # dots
-assert '(showsDots ? 32 : 16) + HomeMetrics.heroContentOverlap' in hero  # title / date
-assert '8 + HomeMetrics.heroContentOverlap' in hero  # 更多
+assert '46 + HomeMetrics.heroContentOverlap' in hero  # dots (Build 333: raised above the fade band)
+assert '(showsDots ? 66 : 50) + HomeMetrics.heroContentOverlap' in hero  # title / date (Build 333)
+assert '38 + HomeMetrics.heroContentOverlap' in hero  # 更多 (Build 333)
 assert 'height - HomeMetrics.heroContentOverlap' in hero  # gesture hit area
 # 看熱播 stays top-left (safe-top inset, not a bottom inset).
 assert 'metrics.safeTop + 13' in hero
@@ -93,7 +93,7 @@ assert 'static let enrichTimeout: TimeInterval = 8' in resolver
 assert 'static let resolverConcurrency = 2' in resolver
 assert 'current → +1 → −1 → +2 → −2' in store
 assert 'enum DetailPosterWinners' in detail
-assert 'art.rawImage ?? art.image' in resolver
+assert 'art.image' in resolver.split('static func primaryImage(from art: DetailPosterArtwork) -> UIImage {')[1].split('}')[0], 'Build 333: hero sharp layer must be the detail display image (art.image)'
 assert 'static let liveSREnabled = false' in resolver
 assert 'width: 44, height: 44' in home.split('private struct HomeSearchButton: View {')[1].split('private struct HomeTopScrim')[0]
 assert 'liquidGlassCircle(interactive: true)' in home
@@ -116,4 +116,4 @@ assert 'final class HomeHero331Tests' in unit
 assert 'final class HomeChrome330Tests' in unit
 
 print('PASS home-hero332 source contracts: original-bitmap hero + display-time front window, '
-      '32 pt overlap, sRGB 32 bpp translate-redraw crop, ICC-preserving JPEG, release 332')
+      '32 pt overlap, sRGB 32 bpp translate-redraw crop, ICC-preserving JPEG, release 333')
