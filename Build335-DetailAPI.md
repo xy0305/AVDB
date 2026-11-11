@@ -1,0 +1,18 @@
+# Build 335 — Detail glass + API auth change (search fixed, 猜你喜欢 restored)
+
+Base: Build 334 / `e1f9d06`, `feat/home-hero-parity-334`, plus the unpushed 333 disk-test scaffolding fix (`f72d307`, tests only). MARKETING 1.0.2, build 335. Branch `feat/detail-api-335`. Unsigned IPA: `AVDB-unsigned-1.0.2-335-detail-api.ipa` (CI artifact `AVDB-335-release`).
+
+Planned and implemented jointly with Muse and Kai. Requested by the user on 2026-11-11 after installing Build 334: the detail page's play button and icon group should use the home page's liquid glass (「详情页播放等按钮改成和首页一样的液态玻璃效果」); 「Ta 还出演过」and 「相似推荐」should use HD thumbnails (「也用高清缩略图」); 「猜你喜欢怎么没了」; and 「搜索也不行」 — searching ROE-580 returned an empty page. The user supplied the official client IPA (`jdb_official_v1.9.29.ipa`) and asked to check whether its API had changed and to add the 猜你喜欢 interface (「我使用的是这个 ipa 的接口，查看是否改变了，把猜你喜欢接口补上」).
+
+## What the API check found (verified live, 2026-11-11)
+
+The official v1.9.29 binary was unpacked and its endpoint table extracted: same base host, same paths AVDB already uses (`/api/v2/search`, `/api/v1/movies/may_also_like`, `/api/v4/movies/{id}` …). The change is server-side **auth**, not addresses: anonymous calls to `/api/v2/search` and `/api/v1/movies/may_also_like` now return HTTP 200 with `success=0, action=JWTVerificationError, message=請登錄帳號` (probed with the app's own signing). AVDB's search family never sent the token, so every search silently rendered as an empty result — the same failure shape as the Build 327 detail change. `recommend`, `latest`, `recommend_periods`, `lists/related` and `search_magnet` still answer anonymously. The official binary contains no 猜你喜欢-named endpoint; its detail page's recommendation rail (「你可能也喜歡」) is the `may_also_like` feed, which AVDB's detail page never called — it only rendered the detail payload's `relative_movies`, which often carry just a 147×200 thumb and few entries.
+
+## Locked changes (implemented exactly)
+
+1. **Search sends the token.** `JavDBSDK.search`, `searchActors`, `searchNamed`, `searchLists` and `searchImage` now pass `useToken: true` (the token rides along when logged in; when logged out the server's auth error surfaces). `SearchMovieResultView` now displays `MovieListViewModel.errorMessage` when a search fails empty instead of a silent blank page. `exactMovie` inherits the fix through `search`.
+2. **猜你喜欢 restored on the detail page.** `mayAlsoLike` sends the token, and the detail view model merges its list-grade results (HD `cover_url`) ahead of the payload relatives (deduplicated by id, capped at 18). The section is retitled 「猜你喜欢」 (was 「相似推荐」). The Build 281 recommender's `mayAlsoLike` source is fixed by the same SDK change.
+3. **「Ta 还出演过」 in HD.** The view model upgrades the rail from the actor endpoint the official detail page uses (`actorMovies`, list-grade movies with HD covers; primary actor = first female, else first cast member; catalog type follows the current movie), merging payload entries as extras and dropping the current movie. Failures keep the payload list.
+4. **Liquid glass hero buttons.** `DetailPlayPill` and the portrait action group drop the clear capsule + white outline (a deliberate pre-335 style) for the home chrome's `.liquidGlass` capsule — interactive on the play pill, plain on the icon-group container. Layout, sizes, the resume progress underline and all actions are unchanged.
+
+Out of scope (not touched): the landscape detail layout and its buttons, home page, ONE, Tangxin, playback, the 331–334 hero pipeline. Note the search fix means search now requires a logged-in account — that is the server's new rule, matching the official client; logged-out search shows the server's 「請登錄帳號」 message instead of results.

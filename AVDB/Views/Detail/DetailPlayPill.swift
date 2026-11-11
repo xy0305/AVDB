@@ -19,9 +19,10 @@ struct DetailPlayPill: View {
         .shadow(color: .black.opacity(0.65), radius: 2, y: 1)
         .padding(.horizontal, 12)
         .frame(minWidth: 96, idealWidth: 112, maxWidth: .infinity, minHeight: 48)
-        // Intentionally no material, glass or white fill on play.
-        .background(.clear, in: Capsule())
-        .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5).allowsHitTesting(false))
+        // Build 335: home-style Liquid Glass capsule. Through Build 334 this
+        // was intentionally a clear capsule with a white outline; the user
+        // asked for the same liquid glass as the home floating chrome.
+        .liquidGlass(interactive: true)
         .overlay(alignment: .bottom) {
             if let p = progress {
                 GeometryReader { g in

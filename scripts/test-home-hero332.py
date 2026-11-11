@@ -11,20 +11,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '334' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 334;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '335' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 335;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 334' in wf and 'feat/home-hero-color-332' in wf
+assert 'Home HQ posters App 335' in wf and 'feat/home-hero-color-332' in wf
 assert 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
 assert wf.count('python3 scripts/test-home-hero332.py') == 2  # zzt-ranking job + release regressions
 assert 'python3 scripts/test-home-hero331.py' in wf
-assert 'scripts/package-lut334.py' in wf and 'AVDB-334-release' in wf and 'AVDB-331-release' not in wf
-pkg = (r/'scripts/package-lut334.py').read_text()
-assert "=='334'" in pkg and 'AVDB-unsigned-1.0.2-334-home-hero-parity.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut335.py' in wf and 'AVDB-335-release' in wf and 'AVDB-331-release' not in wf
+pkg = (r/'scripts/package-lut335.py').read_text()
+assert "=='335'" in pkg and 'AVDB-unsigned-1.0.2-335-detail-api.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 job = wf.split('  home-hero-332:')[1]
 assert '-only-testing:DetailPosterQualityTests/HomeHero332Tests' in job
-assert 'AVDB-334-home-hero-tests' in job or 'AVDB-334-home-hero-color-tests' in job
+assert 'AVDB-335-home-hero-tests' in job or 'AVDB-335-home-hero-color-tests' in job
 assert '  home-hero-331:' in wf and 'home-chrome-330:' in wf and 'home-hot-329:' in wf
 
 doc = (r/'Build332-HomeHeroColor.md').read_text()
@@ -116,4 +116,4 @@ assert 'final class HomeHero331Tests' in unit
 assert 'final class HomeChrome330Tests' in unit
 
 print('PASS home-hero332 source contracts: original-bitmap hero + display-time front window, '
-      '32 pt overlap, sRGB 32 bpp translate-redraw crop, ICC-preserving JPEG, release 334')
+      '32 pt overlap, sRGB 32 bpp translate-redraw crop, ICC-preserving JPEG, release 335')

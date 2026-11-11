@@ -440,6 +440,15 @@ struct SearchMovieResultView: View {
             MoviePosterGrid(movies: vm.movies, onAppearLast: { movie in
                 vm.loadMoreIfNeeded(current: movie)
             })
+            if vm.movies.isEmpty, !vm.isLoading, let error = vm.errorMessage {
+                // Build 335: a failed search (e.g. the API's new login gate)
+                // must not render as a silent empty result page.
+                Text(error)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            }
             if vm.isLoading { ProgressView().padding() }
         }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }

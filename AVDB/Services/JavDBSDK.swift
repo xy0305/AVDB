@@ -112,6 +112,11 @@ public final class JavDBSDK {
     // MARK: - 搜索类
 
     /// 主搜索（GET /api/v2/search）
+    /// Build 335: the API now rejects anonymous search outright (success=0,
+    /// JWTVerificationError「請登錄帳號」— verified live; the official v1.9.29
+    /// client sends its token here too). Search therefore uses the account
+    /// token like the detail calls have since Build 327; a missing/expired
+    /// token surfaces the auth error instead of a silent empty result.
     public func search(
         keyword: String,
         page: Int = 1,
@@ -136,7 +141,7 @@ public final class JavDBSDK {
         if movieType != .all {
             query["movie_type"] = movieType.rawValue
         }
-        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v2/search", query: query)
+        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v2/search", query: query, useToken: true)
         try Task.checkCancellation()
         guard requestAccount == client.token else { throw CancellationError() }
         guard resp.isSuccess else {
@@ -182,7 +187,7 @@ public final class JavDBSDK {
         let query: [String: String] = [
             "q": keyword, "page": "\(page)", "type": "actor", "limit": "\(min(limit, 50))",
         ]
-        let resp: JavDBResponse<ActorListData> = try await client.get("/api/v2/search", query: query)
+        let resp: JavDBResponse<ActorListData> = try await client.get("/api/v2/search", query: query, useToken: true)
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
@@ -195,7 +200,7 @@ public final class JavDBSDK {
         let query: [String: String] = [
             "q": keyword, "page": "\(page)", "type": type, "limit": "\(min(limit, 50))",
         ]
-        let resp: JavDBResponse<NamedListData> = try await client.get("/api/v2/search", query: query)
+        let resp: JavDBResponse<NamedListData> = try await client.get("/api/v2/search", query: query, useToken: true)
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
@@ -208,7 +213,7 @@ public final class JavDBSDK {
         let query: [String: String] = [
             "q": keyword, "page": "\(page)", "type": "list", "limit": "\(min(limit, 50))",
         ]
-        let resp: JavDBResponse<ListData> = try await client.get("/api/v2/search", query: query)
+        let resp: JavDBResponse<ListData> = try await client.get("/api/v2/search", query: query, useToken: true)
         guard resp.isSuccess else {
             throw JavDBError.apiError(action: resp.action, message: resp.message)
         }
@@ -218,7 +223,7 @@ public final class JavDBSDK {
     /// 以图搜图（GET /api/v2/search_image）
     public func searchImage(_ imageURL: String) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v2/search_image", query: ["image_url": imageURL])
+            "/api/v2/search_image", query: ["image_url": imageURL], useToken: true)
         let movies = resp.data?.movies ?? []
         rememberMovies(movies)
         return movies
@@ -434,9 +439,12 @@ public final class JavDBSDK {
     }
 
     /// 相似推荐（GET /api/v1/movies/may_also_like）
+    /// Build 335: this endpoint joined search behind the JWT gate (anonymous
+    /// calls now return JWTVerificationError), so it sends the token too. The
+    /// detail page's「猜你喜欢」rail is fed from here.
     public func mayAlsoLike(_ id: String) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
-            "/api/v1/movies/may_also_like", query: ["id": id, "limit": "9"])
+            "/api/v1/movies/may_also_like", query: ["id": id, "limit": "9"], useToken: true)
         let movies = resp.data?.movies ?? []
         rememberMovies(movies)
         return movies

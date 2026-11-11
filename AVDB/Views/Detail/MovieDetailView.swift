@@ -670,9 +670,9 @@ struct MovieDetailView: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 6).padding(.vertical, 2)
-        // Match play: a truly clear capsule, not glass or a material fill.
-        .background(.clear, in: Capsule())
-        .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1.5).allowsHitTesting(false))
+        // Build 335: match play — the home-style Liquid Glass capsule
+        // replaces the clear capsule with a white outline.
+        .liquidGlass(interactive: false)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("portrait-hero-actions")
     }
@@ -1206,7 +1206,7 @@ struct MovieDetailView: View {
 
     private func relatedSection(_ movies: [Movie]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            GlassSectionHeader(title: "相似推荐", icon: "sparkles", trailingTitle: nil)
+            GlassSectionHeader(title: "猜你喜欢", icon: "sparkles", trailingTitle: nil)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(movies) { movie in
@@ -1367,6 +1367,40 @@ final class MovieDetailViewModel: ObservableObject {
                   reviewRevision == revision, !reviewPending else { return }
             reviewStatus = authenticatedStatus
             reviewLoaded = true
+            // Build 335: 「猜你喜欢」 is fed by the may_also_like endpoint
+            // (list-grade movies with HD covers), not only by the detail
+            // payload's relatives, which often carry just a small thumb.
+            // Payload relatives stay as fallback/extras; any failure keeps
+            // the payload list untouched.
+            if let liked = try? await sdk.mayAlsoLike(movieID), !liked.isEmpty {
+                guard !Task.isCancelled, loadGeneration == generation,
+                      APIClient.shared.token == account else { return }
+                var seen = Set<String>()
+                var merged: [Movie] = []
+                for item in liked + relatedMovies where seen.insert(item.id).inserted {
+                    merged.append(item)
+                }
+                relatedMovies = Array(merged.prefix(18))
+            }
+            // Build 335: 「Ta 还出演过」 upgrades to the actor endpoint the
+            // official detail page uses (list-grade movies, HD covers);
+            // payload entries remain as extras, the current movie is dropped.
+            let payloadMovie = full.movie
+            if let primary = payloadMovie?.actors?.first(where: { $0.gender == 0 })
+                ?? payloadMovie?.actors?.first {
+                let catalogType = payloadMovie?.type.flatMap { ["0", "1", "2", "3", "4"].contains($0) ? $0 : nil } ?? "0"
+                if let list = try? await sdk.actorMovies(primary.id, page: 1, limit: 21, type: catalogType),
+                   !list.isEmpty {
+                    guard !Task.isCancelled, loadGeneration == generation,
+                          APIClient.shared.token == account else { return }
+                    var seen = Set<String>()
+                    var merged: [Movie] = []
+                    for item in list + actorMovies where item.id != movieID && seen.insert(item.id).inserted {
+                        merged.append(item)
+                    }
+                    if !merged.isEmpty { actorMovies = Array(merged.prefix(18)) }
+                }
+            }
         } catch {
             guard !Task.isCancelled, loadGeneration == generation, APIClient.shared.token == account else { return }
             errorMessage = error.localizedDescription
