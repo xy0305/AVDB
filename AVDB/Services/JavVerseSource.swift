@@ -1,204 +1,11 @@
 import Foundation
 import Combine
 
-// Simulator-only Release acceptance: real bundle data, no account or image network.
-enum JavVerseReleaseProbe {
-    static var enabled: Bool {
-        #if targetEnvironment(simulator)
-        return ProcessInfo.processInfo.arguments.contains("--javverse-release-bundle-ui")
-        #else
-        return false
-        #endif
-    }
-}
-
-struct JavVerseSnapshot: Decodable {
-    let schemaVersion: Int
-    let mode: String
-    let origin: String
-    let preparedAt: String
-    let boards: [JavVerseBoard]
-    let grok: JavVerseGrokSnapshot?
-    // Informational stamp only; bundle replacement is not a decoding strategy.
-    // The field is optional and is not a rank or source signal.
-    let resourceRevision: Int?
-    enum CodingKeys: String, CodingKey {
-        case schemaVersion, mode, origin, preparedAt, boards, grok, resourceRevision
-    }
-    init(schemaVersion: Int, mode: String, origin: String, preparedAt: String,
-         boards: [JavVerseBoard], grok: JavVerseGrokSnapshot?, resourceRevision: Int? = nil) {
-        self.schemaVersion = schemaVersion
-        self.mode = mode
-        self.origin = origin
-        self.preparedAt = preparedAt
-        self.boards = boards
-        self.grok = grok
-        self.resourceRevision = resourceRevision
-    }
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
-        mode = try container.decode(String.self, forKey: .mode)
-        origin = try container.decode(String.self, forKey: .origin)
-        preparedAt = try container.decode(String.self, forKey: .preparedAt)
-        boards = try container.decode([JavVerseBoard].self, forKey: .boards)
-        grok = try container.decodeIfPresent(JavVerseGrokSnapshot.self, forKey: .grok)
-        resourceRevision = try container.decodeIfPresent(Int.self, forKey: .resourceRevision)
-        // Keys outside CodingKeys are not decoded, so an extra stamp cannot reject the snapshot.
-    }
-    // Resource decoding is independent from image/network mapping; warm navigation reuses metadata.
-    private static var cachedBundle: Self?
-    static func bundled(in bundle: Bundle = .main) throws -> Self {
-        if bundle == .main, let cachedBundle { return cachedBundle }
-        guard let url = bundle.url(forResource: "JavVerseSnapshot", withExtension: "json") else {
-            throw JavVerseFailure.missingResource
-        }
-        let data: Data
-        do { data = try Data(contentsOf: url) }
-        catch { throw JavVerseFailure.unreadableResource }
-        let value = try decode(data)
-        if bundle == .main { cachedBundle = value }
-        return value
-    }
-    static func decode(_ data: Data) throws -> Self {
-        // JSONDecoder ignores unknown keys but preserves precise DecodingError paths.
-        let value = try JSONDecoder().decode(Self.self, from: data)
-        try value.validate()
-        return value
-    }
-    func validate() throws {
-        guard [1, 2].contains(schemaVersion), ["staticSnapshot", "liveFetch"].contains(mode), origin == "https://javverse.com",
-              Self.timestamp(preparedAt), !boards.isEmpty,
-              Set(boards.map(\.id)).count == boards.count else {
-            throw JavVerseFailure.message("不支持的快照格式或时间")
-        }
-        if let grok {
-            guard Self.timestamp(grok.capturedAt), Self.sourceURL(grok.sourceURL),
-                  grok.people.count == 250, Set(grok.people.map(\.id)).count == 250,
-                  grok.people.allSatisfy({ !$0.nameJa.isEmpty && !$0.nameZh.isEmpty && ["现役", "引退", "已故"].contains($0.status) && $0.actressId > 0 && Set($0.scores.keys) == Set(["total", "works", "pop", "face", "body", "award", "years"]) && $0.scores.values.allSatisfy({ (0...10000).contains($0) }) }) else {
-                throw JavVerseFailure.message("Grok公开快照不完整；拒绝推测名次")
-            }
-        }
-        for board in boards {
-            guard !board.id.isEmpty, !board.title.isEmpty, !board.period.isEmpty,
-                  board.coverage == "complete", Self.timestamp(board.capturedAt),
-                  Self.sourceURL(board.sourceURL), !board.entries.isEmpty,
-                  board.entries.map(\.rank) == Array(1...board.entries.count),
-                  Set(board.entries.map(\.id)).count == board.entries.count else {
-                throw JavVerseFailure.message("快照来源、时间或名次无效；拒绝补位")
-            }
-            for entry in board.entries {
-                guard ["movie", "actor", "series"].contains(entry.kind), !entry.label.isEmpty,
-                      Self.sourceURL(entry.sourceURL),
-                      entry.kind != "movie" || entry.code.flatMap(JavVerseIdentity.code) != nil else {
-                    throw JavVerseFailure.message("快照条目身份或来源无效")
-                }
-            }
-        }
-    }
-    private static func timestamp(_ text: String) -> Bool {
-        // 243 rejected fractional offsets such as 2026-10-24T03:58:55.413884+00:00.
-        // Fractional or whole seconds are valid with Z or ±HH:MM. A zone is required.
-        guard let separator = text.firstIndex(of: "T") else { return false }
-        let clock = text[text.index(after: separator)...]
-        guard clock.contains(":") else { return false }
-        let zone = clock.suffix(6)
-        let numericZone = zone.count == 6 && (zone.hasPrefix("+") || zone.hasPrefix("-"))
-            && zone.dropFirst(1).dropLast(3).allSatisfy(\.isNumber)
-            && zone.dropFirst(3).first == ":"
-            && zone.suffix(2).allSatisfy(\.isNumber)
-        guard clock.hasSuffix("Z") || numericZone else { return false }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if formatter.date(from: text) != nil { return true }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: text) != nil
-    }
-    private static func sourceURL(_ text: String) -> Bool {
-        guard let url = URLComponents(string: text) else { return false }
-        return url.scheme == "https" && url.host == "javverse.com" && url.user == nil
-            && url.password == nil && url.port == nil
-    }
-}
-struct JavVerseBoard: Decodable, Identifiable {
-    let id: String
-    let title: String
-    let period: String
-    let capturedAt: String
-    let sourceURL: String
-    let coverage: String
-    let entries: [JavVerseEntry]
-    var term: String? = nil
-    var periodKey: String? = nil
-    var periodEnd: String? = nil
-    var selectionTitle: String? = nil
-    // Includes all source dimensions; mapping cache remains separately account/backend scoped.
-    var selectionKey: String { "javverse|sales|sales|\(term ?? id)|\(periodKey ?? period)|all" }
-}
-
-enum JavVerseGrokMetric: String, CaseIterable, Identifiable {
-    case total, works, pop, face, body
-    var id: String { rawValue }
-    var title: String {
-        switch self { case .total: return "综合"; case .works: return "作品"; case .pop: return "人气"; case .face: return "颜值"; case .body: return "身材" }
-    }
-}
-enum JavVerseGrokStatus: String, CaseIterable, Identifiable {
-    case all, active, retired
-    var id: String { rawValue }
-    var title: String { self == .all ? "全部" : self == .active ? "现役" : "引退" }
-}
-struct JavVerseGrokPerson: Decodable, Identifiable {
-    let id: String
-    let nameJa: String
-    let nameZh: String
-    let years: String
-    let status: String
-    let scores: [String: Int]
-    let scoreText: [String: String]
-    let actressId: Int
-    func entry(rank: Int) -> JavVerseEntry {
-        // Japanese stays the visible source label. Chinese is evidence, not a rewritten rank row.
-        JavVerseEntry(rank: rank, kind: "actor", label: nameJa, sourceURL: "https://javverse.com/actress/\(actressId)", code: nil, aliases: nameZh == nameJa ? [] : [nameZh])
-    }
-}
-struct JavVerseGrokRow: Identifiable {
-    let person: JavVerseGrokPerson
-    let rank: Int
-    var id: String { person.id }
-    var entry: JavVerseEntry { person.entry(rank: rank) }
-}
-struct JavVerseGrokSnapshot: Decodable {
-    let capturedAt: String
-    let sourceURL: String
-    let sortEvidence: String
-    let people: [JavVerseGrokPerson]
-    // Exact comparator from public 1958-5dff65ae7b330f9f.js function S.
-    // JS < compares UTF-16 code units, not locale-aware name collation.
-    private static func jsLess(_ lhs: String, _ rhs: String) -> Bool {
-        lhs.utf16.lexicographicallyPrecedes(rhs.utf16)
-    }
-    func rows(metric: JavVerseGrokMetric, status: JavVerseGrokStatus) -> [JavVerseGrokRow] {
-        let sorted = people.filter { status == .all || $0.status == status.title }.sorted { lhs, rhs in
-            let a = lhs.scores[metric.rawValue] ?? -1, b = rhs.scores[metric.rawValue] ?? -1
-            if a != b { return a > b }
-            if metric == .total {
-                let x = lhs.scores["works"] ?? -1, y = rhs.scores["works"] ?? -1
-                if x != y { return x > y }
-            }
-            if lhs.nameJa != rhs.nameJa { return Self.jsLess(lhs.nameJa, rhs.nameJa) }
-            return Self.jsLess(lhs.id, rhs.id)
-        }
-        var previous: Int?; var rank = 0
-        return sorted.enumerated().map { index, person in
-            let score = person.scores[metric.rawValue]
-            // Comprehensive ranks are unique. Submetrics use competition ranking (1,1,3).
-            if metric == .total || score != previous { rank = index + 1 }
-            previous = score
-            return JavVerseGrokRow(person: person, rank: rank)
-        }
-    }
-}
+// Ranked-entry resolution shared by the external ranking sources (DMM):
+// entries are matched to AVDB movies/actors by exact identity only.
+// Build 336 removed the JavVerse ranking itself (view, live client,
+// snapshot boards, Grok board, release probe); this resolution layer
+// stays because DMMRankingView builds its rows on it.
 struct JavVerseEntry: Decodable, Identifiable {
     let rank: Int
     let kind: String
@@ -224,7 +31,6 @@ extension JavVerseEntry {
 }
 enum JavVerseFailure: LocalizedError {
     case message(String)
-    case missingResource, unreadableResource
     static func diagnostic(_ error: Error) -> String {
         func path(_ keys: [CodingKey]) -> String {
             var result = ""
@@ -243,10 +49,6 @@ enum JavVerseFailure: LocalizedError {
             return "快照字段为空 [valueNotFound]：\(path(c.codingPath))"
         case DecodingError.dataCorrupted(let c):
             return "快照JSON或字段损坏 [dataCorrupted]：\(path(c.codingPath))"
-        case JavVerseFailure.missingResource:
-            return "快照资源不存在 [resourceMissing]：JavVerseSnapshot.json"
-        case JavVerseFailure.unreadableResource:
-            return "快照资源读取失败 [resourceRead]：JavVerseSnapshot.json"
         case let failure as JavVerseFailure:
             return "快照业务校验 [validation]：\(failure.localizedDescription)"
         default:
@@ -359,7 +161,6 @@ enum JavVerseIdentity {
     }
     @discardableResult
     func resolve(_ entries: [JavVerseEntry], retry: Bool = false) -> Task<Void, Never>? {
-        guard !JavVerseReleaseProbe.enabled else { return nil }
         guard !busy else { return nil }
         if account != accountProvider() { clear() }
         let epoch = generation, token = account
@@ -485,18 +286,3 @@ enum JavVerseIdentity {
 }
 
 // Diagnostic only, never interpreted as a live data API. No cookies, authentication or challenge solver.
-enum JavVerseHTTPProbe {
-    static func status() async throws -> Int {
-        let config = URLSessionConfiguration.ephemeral
-        config.httpCookieStorage = nil
-        config.httpShouldSetCookies = false
-        config.timeoutIntervalForRequest = 15
-        let session = URLSession(configuration: config)
-        defer { session.invalidateAndCancel() }
-        var request = URLRequest(url: URL(string: "https://javverse.com/rankings")!)
-        request.httpShouldHandleCookies = false
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw JavVerseFailure.message("非HTTP响应") }
-        return http.statusCode
-    }
-}

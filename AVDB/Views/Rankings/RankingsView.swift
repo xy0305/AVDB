@@ -40,7 +40,7 @@ struct RankingsView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private enum RankingSourceDestination: String, Identifiable, Hashable {
-        case javRankingHome, javRankingTopics, missAV, javLibrary, javVerse, dmm, zhongZhiTong
+        case javRankingHome, javRankingTopics, missAV, javLibrary, dmm, zhongZhiTong
         var id: String { rawValue }
     }
 
@@ -177,7 +177,6 @@ struct RankingsView: View {
             case .javRankingTopics: JRBackendView(route: "topics", title: "全部榜单")
             case .missAV: MissAVRankingView()
             case .javLibrary: JAVLibraryRankingView()
-            case .javVerse: JavVerseView()
             case .dmm: DMMRankingView()
             case .zhongZhiTong: ZhongZhiTongRankingView()
             }
@@ -253,12 +252,6 @@ struct RankingsView: View {
             Section("DMM") {
                 Button { sourceDestination = .dmm } label: { Label("日/周/月/女优 · 导入 / 受限预览", systemImage: "list.number") }
                     .accessibilityIdentifier("dmm-ranking-entry")
-            }
-            Section("JavVerse") {
-                Button { sourceDestination = .javVerse } label: {
-                    Label("原站名单 · 实时优先", systemImage: "list.number")
-                }
-                .accessibilityIdentifier("javverse-source-entry")
             }
             Section("MissAV") {
                 Button { sourceDestination = .missAV } label: {
