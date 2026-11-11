@@ -1644,9 +1644,9 @@ final class HomeHero332Tests: XCTestCase {
         XCTAssertEqual(HeroCoverPolicy.pixelHeight(floor), 568)
         XCTAssertEqual(p.floorPixelWidth, 398, "visible window width is the 0.70·h front")
         XCTAssertEqual(p.floorSource, movie.coverURL)
-        XCTAssertTrue(HomeHero331Tests.isFront(floor, source: p.floorSource))
+        XCTAssertTrue(Self.windowIsFront332(floor, source: p.floorSource))
         XCTAssertTrue(HomeHero331Tests.isPortrait(floor, source: p.floorSource))
-        XCTAssertFalse(HomeHero331Tests.isFront(floor, source: nil), "sampling the raw envelope must still see the red back")
+        XCTAssertFalse(Self.windowIsFront332(floor, source: nil), "sampling the raw envelope must still see the red back")
         XCTAssertNil(p.sharpImage)
     }
 
@@ -1680,8 +1680,8 @@ final class HomeHero332Tests: XCTestCase {
         let jacket = Self.abfJacket()
         let jRect = try XCTUnwrap(HeroFrontWindow.cropRect(image: jacket, source: Self.jacketURL))
         XCTAssertEqual(Int(jRect.width.rounded()), 398)
-        XCTAssertTrue(HomeHero331Tests.isFront(jacket, source: Self.jacketURL))
-        XCTAssertFalse(HomeHero331Tests.isFront(jacket, source: nil))
+        XCTAssertTrue(Self.windowIsFront332(jacket, source: Self.jacketURL))
+        XCTAssertFalse(Self.windowIsFront332(jacket, source: nil))
         let jPlace = HeroFrontWindow.placement(image: jacket, source: Self.jacketURL, container: size)
         // The visible window starts at the front origin; the back (x=0) stays off-screen.
         XCTAssertGreaterThan(jPlace.window.minX, 100)
@@ -1702,7 +1702,42 @@ final class HomeHero332Tests: XCTestCase {
         XCTAssertEqual(cRect.origin.x, 950, accuracy: 0.5)
         // Front is green, back is blue: sampling the window must be green (G > B and G > R).
         XCTAssertTrue(Self.isMostlyGreen(critical, source: cURL))
-        XCTAssertTrue(Self.isMostlyBlue(critical, source: nil))
+        // The raw envelope mixes both halves (blue back ≈ 58 % of the width), so blue
+        // only leads green by ~23 — dominance, not the window's +80 margin.
+        XCTAssertTrue(Self.isMostlyBlue(critical, source: nil, margin: 0))
+    }
+
+    /// Average RGB of the visible window (the full bitmap when no jacket window applies).
+    static func windowAverageRGB(_ image: UIImage, source: String?) -> (r: Int, g: Int, b: Int)? {
+        guard let cg = image.cgImage else { return nil }
+        let crop = HeroFrontWindow.cropRect(image: image, source: source)
+            ?? CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+        var px = [UInt8](repeating: 0, count: 4)
+        let ok: Bool = px.withUnsafeMutableBytes { buf in
+            guard let ctx = CGContext(data: buf.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.interpolationQuality = .medium
+            let sx = 1 / max(crop.width, 1), sy = 1 / max(crop.height, 1)
+            ctx.draw(cg, in: CGRect(x: -crop.origin.x * sx, y: -crop.origin.y * sy,
+                                    width: CGFloat(cg.width) * sx, height: CGFloat(cg.height) * sy))
+            return true
+        }
+        guard ok else { return nil }
+        return (Int(px[0]), Int(px[1]), Int(px[2]))
+    }
+
+    /// The 332 ABF fixture's front is skin-peach (0.90, 0.72, 0.58) and its back is
+    /// crimson (0.82, 0.10, 0.18). `HomeHero331Tests.isFront` is a blue-dominance
+    /// check written for the 331 fixture (blue front) and cannot judge this one.
+    /// True when the visible window's average colour is closer to the front than to the back.
+    static func windowIsFront332(_ image: UIImage, source: String?) -> Bool {
+        guard let avg = windowAverageRGB(image, source: source) else { return false }
+        func d2(_ c: (r: Int, g: Int, b: Int)) -> Int {
+            let dr = avg.r - c.r, dg = avg.g - c.g, db = avg.b - c.b
+            return dr * dr + dg * dg + db * db
+        }
+        return d2((r: 230, g: 184, b: 148)) < d2((r: 209, g: 26, b: 46))
     }
 
     static func isMostlyGreen(_ image: UIImage, source: String?) -> Bool {
@@ -1721,7 +1756,7 @@ final class HomeHero332Tests: XCTestCase {
         return ok && Int(px[1]) > Int(px[0]) + 80 && Int(px[1]) > Int(px[2]) + 80
     }
 
-    static func isMostlyBlue(_ image: UIImage, source: String?) -> Bool {
+    static func isMostlyBlue(_ image: UIImage, source: String?, margin: Int = 80) -> Bool {
         guard let cg = image.cgImage else { return false }
         let crop = HeroFrontWindow.cropRect(image: image, source: source)
             ?? CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
@@ -1734,7 +1769,7 @@ final class HomeHero332Tests: XCTestCase {
                                     width: CGFloat(cg.width) * sx, height: CGFloat(cg.height) * sy))
             return true
         }
-        return ok && Int(px[2]) > Int(px[0]) + 80 && Int(px[2]) > Int(px[1]) + 80
+        return ok && Int(px[2]) > Int(px[0]) + margin && Int(px[2]) > Int(px[1]) + margin
     }
 
     /// Floor → winner crossfade of the same official bitmap must not shift color temperature.

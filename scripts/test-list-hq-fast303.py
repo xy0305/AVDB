@@ -22,7 +22,7 @@ assert 'return Array(result.prefix(1))' in policy
 
 sched = loader.split('actor VisibleHQPosterScheduler', 1)[1].split('enum ListHQCoverCache', 1)[0]
 assert 'quantizePixels(maxPixelSize)' in sched
-assert 'FrontPosterPolicy.cropRect' in sched and 'Task.detached' in sched
+assert 'PosterColorCrop.cropIfNeeded' in sched and 'Task.detached' in sched
 assert 'currentConcurrency()' in sched
 
 # Disk cache still keyed via ImageLoader flightKey (url + pixel size)
