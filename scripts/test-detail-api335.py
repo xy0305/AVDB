@@ -65,6 +65,15 @@ assert 'Capsule().stroke(.white.opacity(0.72)' not in pill
 search = (r/'AVDB/Views/Search/SearchView.swift').read_text()
 assert 'vm.movies.isEmpty, !vm.isLoading, let error = vm.errorMessage' in search
 
+# --- 6. Rail HD for original-type items: catalogue portrait poster upgrade ---
+loader = (r/'AVDB/Services/ImageLoader.swift').read_text()
+policy = loader.split('enum VisibleHQPosterPolicy')[1].split('actor VisibleHQPosterScheduler')[0]
+assert 'movie.catalogueMetadata?.poster' in policy
+assert 'poster != movie.thumbURL' in policy
+assert '!original || movie.catalogueMetadata?.poster != nil' in loader
+assert 'enrichRailCovers' in detail and 'sdk.catalogueEnriched(item)' in detail
+assert detail.count('await enrichRailCovers(') == 2  # both rails
+
 print('PASS test-detail-api335: search family + mayAlsoLike send the token, detail 猜你喜欢 fed by '
       'may_also_like with payload fallback, Ta 还出演过 via the actor endpoint, portrait hero buttons '
       'on Liquid Glass, search errors surfaced, release 335')

@@ -904,7 +904,17 @@ enum VisibleHQPosterPolicy {
     /// and never adds a host. Cache hits win; otherwise the first safe public
     /// candidate ListCoverPolicy already built.
     static func upgradeURL(movie: Movie) -> String? {
-        guard !FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number) else { return nil }
+        if FrontPosterPolicy.usesOriginal(type: movie.type, number: movie.number) {
+            // Build 335: originals stay thumb-only UNLESS a catalogue poster
+            // (a genuine portrait, never the landscape wrap) was resolved for
+            // this movie. The detail rails enrich their items with catalogue
+            // metadata, so their cards upgrade to that HD portrait instead of
+            // sitting on the 147x200 thumb.
+            guard let poster = movie.catalogueMetadata?.poster,
+                  poster != movie.thumbURL,
+                  let url = URL(string: poster), isSafeUpgradeHost(url) else { return nil }
+            return poster
+        }
         if let cached = ListHQCoverCache.url(for: movie.number),
            let url = URL(string: cached), isSafeUpgradeHost(url) { return cached }
         for source in boundedCandidates(movie: movie) {
@@ -1455,7 +1465,7 @@ public struct MoviePosterImage: View {
                    secondFallbackURL: sources.dropFirst(2).first,
                    contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original || wrapLead)
             .overlay {
-                if upgradesVisibleHQ, !original {
+                if upgradesVisibleHQ, !original || movie.catalogueMetadata?.poster != nil {
                     VisibleHQPosterUpgrade(movie: movie)
                 }
             }

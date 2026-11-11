@@ -1401,11 +1401,40 @@ final class MovieDetailViewModel: ObservableObject {
                     if !merged.isEmpty { actorMovies = Array(merged.prefix(18)) }
                 }
             }
+            // Build 335: both rails get catalogue enrichment so items whose
+            // cards would otherwise sit on the small thumb (original-type
+            // titles — VR / uncensored / unknown prefixes — and items with
+            // no cover) gain the HD catalogue poster their cards upgrade
+            // to. The rails already show the merged lists while this runs.
+            relatedMovies = await enrichRailCovers(relatedMovies, generation: generation, account: account)
+            actorMovies = await enrichRailCovers(actorMovies, generation: generation, account: account)
         } catch {
             guard !Task.isCancelled, loadGeneration == generation, APIClient.shared.token == account else { return }
             errorMessage = error.localizedDescription
             isAuthError = JavDBError.isAuthenticationFailure(error)
         }
+    }
+
+    /// Build 335: best-effort catalogue enrichment for rail items that have
+    /// no HD-capable cover yet (original-type titles and cover-less items).
+    /// Bounded to the first few items that need it; any failure or account
+    /// change keeps the items already shown.
+    private func enrichRailCovers(_ movies: [Movie], generation: UUID, account: String?) async -> [Movie] {
+        var result = movies
+        var enrichedCount = 0
+        for index in result.indices where enrichedCount < 12 {
+            let item = result[index]
+            let original = FrontPosterPolicy.usesOriginal(type: item.type, number: item.number)
+            let missingCover = item.coverURL?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false
+            guard original || missingCover else { continue }
+            guard !Task.isCancelled, loadGeneration == generation,
+                  APIClient.shared.token == account else { return result }
+            enrichedCount += 1
+            if let enriched = try? await sdk.catalogueEnriched(item) {
+                result[index] = enriched
+            }
+        }
+        return result
     }
 
     func loadMagnets() async {
