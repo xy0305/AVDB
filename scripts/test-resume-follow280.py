@@ -83,7 +83,7 @@ assert 'FollowToggleButton(kind: .maker, tagID: makerID, name: title, type: type
 assert 'followStore.toggle(.actor, tagID: actorID, name: actor.displayName)' in actors
 assert 'if appState.isLoggedIn, vm.hasFollowed != next { Task { await vm.toggleFollow() } }' in actors
 assert '.badge(feed.unreadCount)' in followUI and 'struct FollowManageView' in followUI and 'struct ReleaseFeedView' in followUI
-assert 'Task.sleep(nanoseconds: UInt64(FollowUpdatePolicy.requestSpacingSeconds' in follow
+assert 'VerificationThrottle.acquire()' in follow and 'requestSpacingSeconds' not in follow  # Build 337 shared throttle
 
 # ---- Feature 3 presets + hold-to-original wiring (engine behaviour is in test-native-lut.py)
 for s in ['case off, natural, standard, enhanced', 'static let storageKey = "avdb.lut.preset.v1"', 'func selectPreset(', 'func holdOriginal(']:

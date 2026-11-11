@@ -69,8 +69,9 @@ enum FollowUpdatePolicy {
     static let knownCap = 80
     static let feedCap = 300
     static let fetchLimit = 12
-    /// Gap between two JavDB requests in one run.
-    static let requestSpacingSeconds = 1.2
+    // Build 337: no fixed in-run gap — every check passes the shared
+    // VerificationThrottle, whose random post-check pause replaces the
+    // old 1.2 s metronome.
     /// Abort a run after this many consecutive failures (offline / rate-limited / session problem).
     static let maxConsecutiveFailures = 3
     static let individualNotificationLimit = 3
@@ -317,11 +318,15 @@ final class FollowUpdateChecker: ObservableObject {
         status = "正在检查 \(due.count) 个关注…"
         var found: [ReleaseFeedItem] = []
         var failures = 0, checked = 0
-        for (index, target) in due.enumerated() {
+        for target in due {
             if Task.isCancelled { break }
-            if index > 0 { try? await Task.sleep(nanoseconds: UInt64(FollowUpdatePolicy.requestSpacingSeconds * 1_000_000_000)) }
+            // Build 337: follow checks are automatic JavDB traffic too, so
+            // they pass the shared throttle (one at a time, 20/min global,
+            // random 1.5–3.5 s pause after each) whatever the run reason.
+            guard await VerificationThrottle.acquire() else { break }
             do {
                 let movies = try await Self.fetch(target)
+                VerificationThrottle.release()
                 failures = 0; checked += 1
                 let fetched = movies.map { FollowFetchedMovie(id: $0.id, number: $0.displayNumber, title: $0.title ?? "",
                                                               coverURL: $0.coverURL ?? $0.thumbURL, releaseDate: $0.releaseDate) }
@@ -332,6 +337,7 @@ final class FollowUpdateChecker: ObservableObject {
                                                      releaseDate: $0.releaseDate, followID: target.id, followName: target.name,
                                                      kind: target.kind, foundAt: Date()) }
             } catch {
+                VerificationThrottle.release()
                 failures += 1
                 if failures >= FollowUpdatePolicy.maxConsecutiveFailures { break }
             }

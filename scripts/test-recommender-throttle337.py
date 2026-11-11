@@ -59,6 +59,9 @@ assert 'VerificationThrottle.acquire()' in miss and 'tasks.count < 1' in miss
 mapper = (r/'AVDB/Services/JavVerseSource.swift').read_text()
 assert 'throttled: !retry' in mapper and 'VerificationThrottle.acquire()' in mapper
 
+follow = (r/'AVDB/Services/FollowUpdates.swift').read_text()
+assert 'VerificationThrottle.acquire()' in follow and 'requestSpacingSeconds' not in follow
+
 print('PASS test-recommender-throttle337: recommender is manual-only, randomly slow-spaced, '
       'hard-capped at 10 requests per run; all ranking verifications pass the shared '
       '1-wide / 20-per-minute / random-gap throttle, release 337')

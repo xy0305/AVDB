@@ -22,4 +22,8 @@ The same audit found the same pattern in all remaining external ranking sources:
 
 User-initiated checks never pass the gate: JAV Ranking's interactive match taps, DMM rows' 「精确核对AVDB」 retry, and the MissAV verification sheet keep their direct path — they are the user's own actions. Existing caches are untouched (JAV Ranking keeps its 6 h match cache; the mapper keeps its shared cache), so re-opening a board still costs almost nothing; only a cold scroll advances at human pace now.
 
+## Follow updates too (user, 2026-11-12, later the same night)
+
+`FollowUpdates` （关注更新） was the last automatic fetcher: foreground/background runs checked every followed actor/series/maker for new works, one request per target (per-run caps 8/20/40 by reason, each target at most every 6 h) with a fixed 1.2 s gap. Its checks now pass the same `VerificationThrottle` whatever the run reason — the fixed sleep is deleted — so follow checks share the global 20/min budget and the random 1.5–3.5 s pauses with the ranking verifications. The 6 h per-target interval, the run caps and the notification behaviour are unchanged.
+
 Planned and implemented jointly with Muse and Kai.
