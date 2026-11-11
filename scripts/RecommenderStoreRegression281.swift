@@ -44,9 +44,10 @@ final class FixtureRecSource: RecommendationSource {
     check(src.detailCalls <= 2 * RecommendationLimits.detailBudget(manual: true), "detail budget \(src.detailCalls)")
     check(!store.summary.actors.isEmpty && store.summary.actors.first?.name == "三上悠亚", "preference summary")
     check(!store.results.contains { ["w0", "w1", "w2", "w3"].contains($0.id) }, "watched items not recommended")
-    let calls = src.listCalls
-    store.refresh(manual: false)                                         // fresh cache: no new run
-    check(src.listCalls == calls && !store.isRefreshing, "auto refresh reuses cache")
+    let calls = src.listCalls, detailCalls = src.detailCalls
+    store.refresh(manual: false)                                         // Build 337: appearing never fetches — local cache recompute only
+    for _ in 0..<300 where store.isRefreshing { try? await Task.sleep(nanoseconds: 10_000_000) }
+    check(!store.isRefreshing && src.listCalls == calls && src.detailCalls == detailCalls && store.hero != nil, "auto refresh reuses cache without network")
     let target = store.results.first { $0.item.primaryActor != nil }!
     let actorKey = target.item.primaryActor!.key
     store.feedback(.lessActor, on: target)
