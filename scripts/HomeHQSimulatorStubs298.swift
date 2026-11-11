@@ -11,7 +11,13 @@ public struct Movie: Identifiable, Hashable {
     public var coverURL: String?
     public var score: Double?
     public var catalogueMetadata: Meta?
-    public struct Meta: Hashable { public var images: [String]; public init(images: [String]) { self.images = images } }
+    public struct Meta: Hashable {
+        public var images: [String]
+        // Build 335: ImageLoader's original-poster upgrade reads `poster`;
+        // the stub stays inert (no poster is ever resolved in the host).
+        public var poster: String? = nil
+        public init(images: [String]) { self.images = images }
+    }
     public init(id: String, type: String? = nil, number: String? = nil, thumbURL: String? = nil, coverURL: String? = nil, catalogueMetadata: Meta? = nil) {
         self.id = id; self.type = type; self.number = number; self.thumbURL = thumbURL; self.coverURL = coverURL
         self.catalogueMetadata = catalogueMetadata
