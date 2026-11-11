@@ -309,6 +309,69 @@ enum HeroCoverSources {
     }
 }
 
+/// Build 332: the visible window of a hero layer. Landscape jackets are shown
+/// only through a view-level scale / offset / clip equal to `FrontPosterPolicy.cropRect`
+/// (same origin and size). The bitmap itself is the loader's decoded original —
+/// no new raster is generated for the hero. Non-jacket images keep the existing
+/// passthrough / fill (portraits center; residual landscape right-anchors).
+enum HeroFrontWindow {
+    /// Crop in CGImage pixel space, if this source is a FrontPosterPolicy jacket.
+    static func cropRect(image: UIImage, source: String?, validatedJacket: Bool = false) -> CGRect? {
+        guard let source, let cg = image.cgImage else { return nil }
+        return FrontPosterPolicy.cropRect(width: cg.width, height: cg.height,
+                                          source: source, validatedJacket: validatedJacket)
+    }
+
+    /// Visible front size in pixels (the crop size, or the full raster).
+    static func pixelSize(image: UIImage, source: String?, validatedJacket: Bool = false) -> (width: Int, height: Int) {
+        if let rect = cropRect(image: image, source: source, validatedJacket: validatedJacket) {
+            return (Int(rect.width.rounded()), Int(rect.height.rounded()))
+        }
+        return (HeroCoverPolicy.pixelWidth(image), HeroCoverPolicy.pixelHeight(image))
+    }
+
+    struct Placement: Equatable {
+        var drawnSize: CGSize
+        var offset: CGSize
+        /// Visible window in UIImage point space (top-left origin).
+        var window: CGRect
+    }
+
+    /// Aspect-fill the visible window (front crop, or the full image) into `container`.
+    static func placement(image: UIImage, source: String?, container: CGSize,
+                          anchorY: CGFloat = 0.22, validatedJacket: Bool = false) -> Placement {
+        let iw = max(image.size.width, 1)
+        let ih = max(image.size.height, 1)
+        let pw = max(CGFloat(image.cgImage?.width ?? Int((iw * image.scale).rounded())), 1)
+        let ph = max(CGFloat(image.cgImage?.height ?? Int((ih * image.scale).rounded())), 1)
+        let sx = iw / pw
+        let sy = ih / ph
+        let window: CGRect
+        let jacket: Bool
+        if let rect = cropRect(image: image, source: source, validatedJacket: validatedJacket) {
+            // CGImage y is bottom-left; SwiftUI Image y is top-left.
+            let uiY = (ph - rect.origin.y - rect.height) * sy
+            window = CGRect(x: rect.origin.x * sx, y: uiY, width: rect.width * sx, height: rect.height * sy)
+            jacket = true
+        } else {
+            window = CGRect(x: 0, y: 0, width: iw, height: ih)
+            jacket = false
+        }
+        let scale = max(container.width / max(window.width, 1), container.height / max(window.height, 1))
+        let drawn = CGSize(width: iw * scale, height: ih * scale)
+        let dww = window.width * scale
+        let dwh = window.height * scale
+        let x: CGFloat
+        if jacket {
+            x = -window.minX * scale + (container.width - dww) / 2
+        } else {
+            x = HeroFillAnchor.x(imageWidth: iw, imageHeight: ih, drawnWidth: drawn.width, containerWidth: container.width)
+        }
+        let y = -window.minY * scale - (dwh - container.height) * anchorY
+        return Placement(drawnSize: drawn, offset: CGSize(width: x, height: y), window: window)
+    }
+}
+
 enum HeroCoverPhase: String, Equatable, Sendable {
     case empty
     case blur
@@ -318,16 +381,19 @@ enum HeroCoverPhase: String, Equatable, Sendable {
 
 struct HeroCoverPresentation: Equatable {
     var phase: HeroCoverPhase = .empty
-    /// Build 331 two-level floor (field name kept from 326): the sharpest image
-    /// available in the movie's current record, painted sharp — front-cropped
-    /// cover_url preferred, DTO thumb fallback. Always produced by
-    /// `ImageLoader.loadPoster` (FrontPosterPolicy crop-or-passthrough), so it
-    /// is never an uncropped DVD jacket. Re-evaluated when enrich merges a better cover.
+    /// Build 331/332 two-level floor (field name kept from 326): the sharpest
+    /// *original* decoded bitmap in the movie's current record — cover_url
+    /// preferred, DTO thumb fallback. The hero paints this bitmap with zero
+    /// pixel reprocessing; landscape jackets are windowed at display time
+    /// (`HeroFrontWindow`). Re-evaluated when enrich merges a better cover.
     var blurImage: UIImage?
     var floorSource: String?
+    /// Visible front width (the FrontPosterPolicy crop width for a jacket,
+    /// otherwise the bitmap width).
     var floorPixelWidth: Int = 0
     /// Official DetailPosterResolver winner (the iPhone detail portraitHero).
     /// Overrides the floor on arrival. nil when evicted outside current ±1.
+    /// The bitmap is the uncropped original (`art.rawImage`).
     var sharpImage: UIImage?
     /// Winner URL of the sharp layer; with `sharpOnDisk` it restores from
     /// HeroCoverDisk after eviction without a resolver rerun or any network.
@@ -336,7 +402,7 @@ struct HeroCoverPresentation: Equatable {
     var tier: HeroCoverTier = .none
     var pixelWidth: Int = 0
     /// Ambient wash colour, always sampled from the currently displayed
-    /// (cropped) bitmap — never from a separate full-jacket fetch.
+    /// (front) region — never from a separate full-jacket fetch.
     var ambient: HomeHSB?
     /// 已定案（可升级）：the 6s budget has provisionally settled. Late A/B may
     /// still replace the floor. Keyed with the rest of the presentation by movie id.
@@ -349,6 +415,9 @@ struct HeroCoverPresentation: Equatable {
     var hasQuick: Bool { blurImage != nil || sharpImage != nil }
     /// Top-most painted bitmap (sharp over floor).
     var displayedImage: UIImage? { sharpImage ?? blurImage }
+    /// Source URL of the top-most painted bitmap, for the display-time window
+    /// and for sampling ambient from the visible front region only.
+    var displayedSource: String? { sharpImage != nil ? winnerURL : floorSource }
 
     var token: String {
         "\(phase.rawValue)#\(tier.rawValue)#\(pixelWidth)#\(blurImage != nil)#\(floorPixelWidth)#\(sharpImage != nil)#\(winnerURL ?? "")#\(settled)"
@@ -390,10 +459,11 @@ enum HeroResolverSharp {
     }
 }
 
-/// Main-actor façade the hero carousel reads. Build 331: per-item pipeline
+/// Main-actor façade the hero carousel reads. Build 331/332: per-item pipeline
 /// enrich → DetailPosterResolver (current → +1 → −1 → +2 → −2, cap 2), a
-/// two-level floor (front-cropped cover_url / thumb, then the official winner),
-/// keep/evict decided at result-arrival time, and disk-only restores.
+/// two-level floor (original cover_url / thumb, then the official winner;
+/// jackets are windowed at display time), keep/evict decided at result-arrival
+/// time, and disk-only restores.
 @MainActor
 final class HeroCoverStore: ObservableObject {
     static let shared = HeroCoverStore()
@@ -637,7 +707,7 @@ final class HeroCoverStore: ObservableObject {
                 changed = true
             }
             if changed {
-                presentation.ambient = presentation.displayedImage.flatMap(HomeAmbientColor.base(from:)) ?? presentation.ambient
+                presentation.ambient = presentation.displayedImage.flatMap { HomeAmbientColor.base(from: $0, source: presentation.displayedSource) } ?? presentation.ambient
                 presentations[id] = presentation
             }
         }
@@ -653,7 +723,7 @@ final class HeroCoverStore: ObservableObject {
         if current.blurImage == nil, let floor = floorCache[id] {
             current.blurImage = floor
             if current.phase == .empty { current.phase = .blur }
-            if current.sharpImage == nil { current.ambient = HomeAmbientColor.base(from: floor) ?? current.ambient }
+            if current.sharpImage == nil { current.ambient = HomeAmbientColor.base(from: floor, source: current.floorSource) ?? current.ambient }
             presentations[id] = current
         }
         guard current.sharpImage == nil, isInWindow(id) else { return }
@@ -687,7 +757,7 @@ final class HeroCoverStore: ObservableObject {
             if let image {
                 guard isInWindow(id) else { return }
                 current.sharpImage = image
-                current.ambient = HomeAmbientColor.base(from: image) ?? current.ambient
+                current.ambient = HomeAmbientColor.base(from: image, source: winnerURL ?? current.winnerURL) ?? current.ambient
                 presentations[id] = current
             } else {
                 // Disk purged under storage pressure: no longer sharp, so it may
@@ -754,7 +824,7 @@ final class HeroCoverStore: ObservableObject {
             let key = id + "#" + source
             if floorLoaded.contains(key) || floorInFlight.contains(key) { return false }
             if let failed = floorFailedAt[key], now - failed < 30 { return false }
-            // A cropped cover already on screen beats the 166 px thumb.
+            // A cover already on screen (display-windowed at paint time) beats the 166 px thumb.
             if floorIsCover, !Self.isCoverSource(source, movie: movie) { return false }
             return true
         }
@@ -769,7 +839,8 @@ final class HeroCoverStore: ObservableObject {
                 await withTaskGroup(of: (String, UIImage?).self) { group in
                     for (source, size) in zip(todo, sizes) {
                         group.addTask {
-                            let image = await ImageLoader.shared.loadPoster(source, maxPixelSize: size, timeout: 6)
+                            // Original decoded bitmap; HomeAnchoredFill windows jackets at display time.
+                            let image = await ImageLoader.shared.load(source, maxPixelSize: size, timeout: 6)
                             return (source, image)
                         }
                     }
@@ -784,7 +855,7 @@ final class HeroCoverStore: ObservableObject {
                         self?.floorInFlight.remove(id + "#" + source)
                         continue
                     }
-                    let image = await ImageLoader.shared.loadPoster(source, maxPixelSize: size, timeout: 6)
+                    let image = await ImageLoader.shared.load(source, maxPixelSize: size, timeout: 6)
                     self?.finishFloor(image, source: source, movieID: id)
                     done = image != nil
                 }
@@ -804,21 +875,24 @@ final class HeroCoverStore: ObservableObject {
     }
 
     /// Portrait (front) beats landscape; then the wider raster wins.
-    nonisolated static func floorRank(_ image: UIImage) -> Int {
-        let width = HeroCoverPolicy.pixelWidth(image)
-        let height = HeroCoverPolicy.pixelHeight(image)
+    /// Jacket fronts are ranked by the visible crop window, not the raw envelope.
+    nonisolated static func floorRank(_ image: UIImage, source: String? = nil) -> Int {
+        let size = HeroFrontWindow.pixelSize(image: image, source: source)
+        let width = size.width
+        let height = size.height
         return (height >= width ? 1_000_000 : 0) + width
     }
 
     private func applyFloor(_ image: UIImage, source: String, movieID: String) {
         var current = presentations[movieID] ?? HeroCoverPresentation()
-        if let existing = current.blurImage, Self.floorRank(existing) >= Self.floorRank(image) { return }
+        if let existing = current.blurImage,
+           Self.floorRank(existing, source: current.floorSource) >= Self.floorRank(image, source: source) { return }
         floorCache[movieID] = image
         current.blurImage = image
         current.floorSource = source
-        current.floorPixelWidth = HeroCoverPolicy.pixelWidth(image)
+        current.floorPixelWidth = HeroFrontWindow.pixelSize(image: image, source: source).width
         if current.phase == .empty { current.phase = .blur }
-        if current.sharpImage == nil { current.ambient = HomeAmbientColor.base(from: image) ?? current.ambient }
+        if current.sharpImage == nil { current.ambient = HomeAmbientColor.base(from: image, source: source) ?? current.ambient }
         presentations[movieID] = current
     }
 
@@ -1129,7 +1203,7 @@ final class HeroCoverStore: ObservableObject {
         current.pixelWidth = candidate.pixelWidth
         current.phase = provisional ? .provisional : .finalized
         if !provisional, candidate.tier.isAB { current.settled = true }
-        current.ambient = HomeAmbientColor.base(from: candidate.image) ?? current.ambient
+        current.ambient = HomeAmbientColor.base(from: candidate.image, source: candidate.source) ?? current.ambient
         presentations[id] = current
     }
 
@@ -1349,8 +1423,8 @@ enum HeroCoverRace {
         if shouldCrop,
            let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: source.url,
                                                  validatedJacket: source.kind == .javdb && cg.width > cg.height),
-           let front = cg.cropping(to: rect) {
-            image = UIImage(cgImage: front)
+           let front = PosterColorCrop.crop(loaded, to: rect) {
+            image = front
             verified = true
         } else if cg.width > cg.height {
             // Landscape that we could not crop is never a sharp hero.

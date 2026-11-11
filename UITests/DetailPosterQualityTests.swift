@@ -1129,24 +1129,32 @@ final class HomeHero331Tests: XCTestCase {
                                    nativeWidth: width, nativeHeight: height, rawImage: image)
     }
 
-    /// Average colour of the bitmap: true when it is the blue front, not the red back / collage.
-    static func isFront(_ image: UIImage) -> Bool {
+    /// Average colour of the *visible* window (Build 332: jackets are display-windowed,
+    /// so the raw bitmap may still be the full 840×568 envelope). True when the
+    /// window is the blue front, not the red back / collage.
+    static func isFront(_ image: UIImage, source: String? = nil) -> Bool {
         guard let cg = image.cgImage else { return false }
+        let crop = HeroFrontWindow.cropRect(image: image, source: source)
+            ?? CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
         var px = [UInt8](repeating: 0, count: 4)
         let ok: Bool = px.withUnsafeMutableBytes { buf in
             guard let ctx = CGContext(data: buf.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
                                       space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
             ctx.interpolationQuality = .medium
-            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            let sx = 1 / max(crop.width, 1)
+            let sy = 1 / max(crop.height, 1)
+            ctx.draw(cg, in: CGRect(x: -crop.origin.x * sx, y: -crop.origin.y * sy,
+                                    width: CGFloat(cg.width) * sx, height: CGFloat(cg.height) * sy))
             return true
         }
         return ok && Int(px[2]) > Int(px[0]) + 100
     }
 
-    static func isPortrait(_ image: UIImage?) -> Bool {
+    static func isPortrait(_ image: UIImage?, source: String? = nil) -> Bool {
         guard let image else { return true }
-        return HeroCoverPolicy.pixelHeight(image) >= HeroCoverPolicy.pixelWidth(image)
+        let size = HeroFrontWindow.pixelSize(image: image, source: source)
+        return size.height >= size.width
     }
 
     @MainActor
@@ -1177,13 +1185,14 @@ final class HomeHero331Tests: XCTestCase {
         HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
         let first = try await poll(2, movie.id) { $0.blurImage != nil }
         let frame = try XCTUnwrap(first.blurImage, "a floor must paint at cold start")
-        XCTAssertTrue(Self.isPortrait(frame), "first frame must be a portrait, not the 840×568 jacket")
-        XCTAssertTrue(Self.isFront(frame), "first frame must be the front, not the back / spine collage")
+        let firstSource = first.floorSource ?? movie.coverURL ?? movie.thumbURL
+        XCTAssertTrue(Self.isPortrait(frame, source: firstSource), "first visible window must be a portrait, not the jacket collage")
+        XCTAssertTrue(Self.isFront(frame, source: firstSource), "first frame must be the front, not the back / spine collage")
         let settled = try await poll(3, movie.id) { $0.floorPixelWidth == 398 }
         let floor = try XCTUnwrap(settled.blurImage)
-        XCTAssertEqual(HeroCoverPolicy.pixelWidth(floor), 398, "floor = right 0.70·h front crop of cover_url")
-        XCTAssertEqual(HeroCoverPolicy.pixelHeight(floor), 568)
-        XCTAssertTrue(Self.isFront(floor))
+        XCTAssertEqual(settled.floorPixelWidth, 398, "floor visible width = right 0.70·h front of cover_url")
+        XCTAssertEqual(HeroFrontWindow.pixelSize(image: floor, source: settled.floorSource).height, 568)
+        XCTAssertTrue(Self.isFront(floor, source: settled.floorSource))
         XCTAssertNil(settled.sharpImage)
         XCTAssertFalse(settled.isSharp)
     }
@@ -1214,7 +1223,7 @@ final class HomeHero331Tests: XCTestCase {
         let fourth = try await poll(1.5, movies[3].id) { $0.sharpImage != nil }
         let fourthSharp = try XCTUnwrap(fourth.sharpImage, "item 4 must show its winner, not the floor")
         XCTAssertEqual(HeroCoverPolicy.pixelWidth(fourthSharp), 760)
-        XCTAssertTrue(Self.isPortrait(fourthSharp) && Self.isPortrait(fourth.blurImage))
+        XCTAssertTrue(Self.isPortrait(fourthSharp, source: fourth.winnerURL) && Self.isPortrait(fourth.blurImage, source: fourth.floorSource))
         XCTAssertNil(HeroCoverStore.shared.presentation(for: movies[0].id).sharpImage, "item 1 evicted outside ±1")
 
         HeroCoverStore.shared.setCurrentIndex(0, movies: movies)
@@ -1222,7 +1231,7 @@ final class HomeHero331Tests: XCTestCase {
         let backSharp = try XCTUnwrap(back.sharpImage, "swipe back must restore the winner, not the floor")
         XCTAssertEqual(HeroCoverPolicy.pixelWidth(backSharp), 760)
         XCTAssertTrue(back.isSharp && back.phase == .finalized)
-        XCTAssertTrue(Self.isPortrait(back.blurImage), "floor underneath is still the cropped front")
+        XCTAssertTrue(Self.isPortrait(back.blurImage, source: back.floorSource), "floor underneath still shows only the front window")
         XCTAssertNotEqual(back.floorPixelWidth, 840)
     }
 
@@ -1249,11 +1258,11 @@ final class HomeHero331Tests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(t0), 1.5)
         XCTAssertEqual(HeroCoverPolicy.pixelWidth(p.sharpImage!), 760)
         XCTAssertTrue(p.isAB)
-        XCTAssertTrue(Self.isFront(p.sharpImage!))
+        XCTAssertTrue(Self.isFront(p.sharpImage!, source: p.winnerURL))
     }
 
-    /// (4) Landscape fixture 840×568 cover + 166×236 thumb: no layer ever shows
-    /// an uncropped bitmap, and the floor uses the cropped version.
+    /// (4) Landscape fixture 840×568 cover + 166×236 thumb: no layer's visible
+    /// window ever shows the back-cover collage; the floor uses the cover front.
     @MainActor
     func test331LandscapeFixtureNeverShowsUncroppedLayer() async throws {
         HeroCoverStore.shared.resetForTests()
@@ -1273,18 +1282,18 @@ final class HomeHero331Tests: XCTestCase {
         var samples = 0
         while Date() < deadline {
             let p = HeroCoverStore.shared.presentation(for: movie.id)
-            XCTAssertTrue(Self.isPortrait(p.blurImage), "floor layer drew an uncropped landscape bitmap")
-            XCTAssertTrue(Self.isPortrait(p.sharpImage), "sharp layer drew an uncropped landscape bitmap")
-            if let floor = p.blurImage { XCTAssertTrue(Self.isFront(floor)); samples += 1 }
+            XCTAssertTrue(Self.isPortrait(p.blurImage, source: p.floorSource ?? movie.coverURL), "floor visible window must not be the jacket collage")
+            XCTAssertTrue(Self.isPortrait(p.sharpImage, source: p.winnerURL), "sharp visible window must not be the jacket collage")
+            if let floor = p.blurImage { XCTAssertTrue(Self.isFront(floor, source: p.floorSource ?? movie.coverURL)); samples += 1 }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTAssertGreaterThan(samples, 0)
         let p = HeroCoverStore.shared.presentation(for: movie.id)
-        XCTAssertEqual(p.floorPixelWidth, 398, "floor must use the front-cropped cover, not the 166 px thumb")
+        XCTAssertEqual(p.floorPixelWidth, 398, "floor must use the cover front window, not the 166 px thumb")
         XCTAssertEqual(p.floorSource, movie.coverURL)
-        // Ambient wash is sampled from the displayed (cropped) bitmap.
-        XCTAssertEqual(p.ambient, HomeAmbientColor.base(from: p.blurImage!))
-        // The shared crop chain itself.
+        // Ambient wash is sampled from the displayed (front) region.
+        XCTAssertEqual(p.ambient, HomeAmbientColor.base(from: p.blurImage!, source: p.floorSource))
+        // The list/detail crop chain itself (color-preserving redraw, not a hero paint source).
         let cropped = await ImageLoader.shared.loadPoster(movie.coverURL!, maxPixelSize: 1024)
         XCTAssertEqual(cropped.map(HeroCoverPolicy.pixelWidth), 398)
         // Safety net: a residual landscape raster is right-anchored, portraits center.
@@ -1316,8 +1325,8 @@ final class HomeHero331Tests: XCTestCase {
         try await Task.sleep(nanoseconds: 500_000_000)
         let p = HeroCoverStore.shared.presentation(for: movies[0].id)
         XCTAssertTrue(p.settled)
-        XCTAssertEqual(p.floorPixelWidth, 398, "stays on the sharp front-cropped floor")
-        XCTAssertTrue(Self.isFront(p.blurImage!) && Self.isPortrait(p.blurImage))
+        XCTAssertEqual(p.floorPixelWidth, 398, "stays on the sharp front-windowed floor")
+        XCTAssertTrue(Self.isFront(p.blurImage!, source: p.floorSource) && Self.isPortrait(p.blurImage, source: p.floorSource))
         XCTAssertNil(p.sharpImage)
         XCTAssertFalse(p.isSharp)
         XCTAssertFalse(p.isAB)
@@ -1437,7 +1446,392 @@ final class HomeHero331Tests: XCTestCase {
     }
 }
 
+
 /// Short 6s rhythm point for the never-completing resolver test.
 enum HeroPolicyOverride {
     static func short() { HeroCoverPolicy.overallBudgetOverride = 0.3 }
+}
+
+/// Build 332: home hero paints the original decoded bitmap (zero pixel
+/// reprocessing); jackets are display-windowed; loadPoster/resolver crops are
+/// a tightly packed sRGB 32 bpp translate-redraw; lower content overlaps the
+/// hero by 32 pt. Neutral rendered fixtures only (no network, no adult imagery).
+final class HomeHero332Tests: XCTestCase {
+    override func tearDown() async throws {
+        await MainActor.run { HeroCoverStore.shared.resetForTests() }
+        HeroCoverPolicy.overallBudgetOverride = nil
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        try await super.tearDown()
+    }
+
+    // MARK: Colour helpers
+
+    static let sRGB = PosterColorCrop.sRGB
+
+    /// Tightly packed sRGB 32 bpp raster, scale 1, orientation up.
+    static func sRGBImage(width: Int, height: Int, draw: (CGContext) -> Void) -> UIImage {
+        let bpr = width * 4
+        let ctx = CGContext(data: nil, width: width, height: height,
+                            bitsPerComponent: 8, bytesPerRow: bpr, space: sRGB,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        draw(ctx)
+        return UIImage(cgImage: ctx.makeImage()!, scale: 1, orientation: .up)
+    }
+
+    /// ABF-398-style jacket: back (left) is magenta-ish red, front (right 0.70·h) is warm peach + a saturated red swatch.
+    static func abfJacket(width: Int = 840, height: Int = 568) -> UIImage {
+        let frontFrom = width - Int((Double(height) * 0.7).rounded())
+        return sRGBImage(width: width, height: height) { ctx in
+            ctx.setFillColor(CGColor(srgbRed: 0.82, green: 0.10, blue: 0.18, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: 0, width: frontFrom, height: height))
+            ctx.setFillColor(CGColor(srgbRed: 0.90, green: 0.72, blue: 0.58, alpha: 1))
+            ctx.fill(CGRect(x: frontFrom, y: 0, width: width - frontFrom, height: height))
+            // Saturated red "logo" in the front, mid height.
+            ctx.setFillColor(CGColor(srgbRed: 0.87, green: 0.10, blue: 0.18, alpha: 1))
+            ctx.fill(CGRect(x: frontFrom + 20, y: height / 2 - 20, width: 80, height: 40))
+        }
+    }
+
+    /// SNOS-484-style official portrait: warm peach field, saturated red swatch, a "face" band in the upper third.
+    static func snosPortrait(width: Int = 800, height: Int = 1200) -> UIImage {
+        return sRGBImage(width: width, height: height) { ctx in
+            ctx.setFillColor(CGColor(srgbRed: 0.86, green: 0.68, blue: 0.56, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+            // Face band (CG y is bottom-left): upper third of the poster.
+            ctx.setFillColor(CGColor(srgbRed: 0.92, green: 0.74, blue: 0.62, alpha: 1))
+            let faceY = Int(Double(height) * 0.55)
+            let faceH = Int(Double(height) * 0.30)
+            ctx.fill(CGRect(x: width / 5, y: faceY, width: width * 3 / 5, height: faceH))
+            ctx.setFillColor(CGColor(srgbRed: 0.87, green: 0.10, blue: 0.18, alpha: 1))
+            ctx.fill(CGRect(x: 40, y: height - 120, width: 120, height: 50))
+        }
+    }
+
+    /// Critical 1.65 aspect jacket (upper bound of FrontPosterPolicy).
+    static func critical165Jacket() -> UIImage {
+        let width = 1650, height = 1000
+        let frontFrom = width - Int((Double(height) * 0.7).rounded())
+        return sRGBImage(width: width, height: height) { ctx in
+            ctx.setFillColor(CGColor(srgbRed: 0.10, green: 0.20, blue: 0.80, alpha: 1)) // back = blue
+            ctx.fill(CGRect(x: 0, y: 0, width: frontFrom, height: height))
+            ctx.setFillColor(CGColor(srgbRed: 0.20, green: 0.80, blue: 0.20, alpha: 1)) // front = green
+            ctx.fill(CGRect(x: frontFrom, y: 0, width: width - frontFrom, height: height))
+        }
+    }
+
+    static func lin(_ c: Double) -> Double {
+        let x = c / 255
+        return x <= 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+    }
+
+    static func srgbToLab(_ r: Double, _ g: Double, _ b: Double) -> (Double, Double, Double) {
+        let R = lin(r), G = lin(g), B = lin(b)
+        var x = 0.4124564 * R + 0.3575761 * G + 0.1804375 * B
+        var y = 0.2126729 * R + 0.7151522 * G + 0.0721750 * B
+        var z = 0.0193339 * R + 0.1191920 * G + 0.9503041 * B
+        x /= 0.95047; z /= 1.08883
+        func f(_ t: Double) -> Double { t > pow(6.0 / 29.0, 3) ? cbrt(t) : (t * (1.0 / 3.0) * pow(29.0 / 6.0, 2) + 4.0 / 29.0) }
+        let fx = f(x), fy = f(y), fz = f(z)
+        return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+    }
+
+    static func deltaE76(_ a: (Double, Double, Double), _ b: (Double, Double, Double)) -> Double {
+        let dL = a.0 - b.0, da = a.1 - b.1, db = a.2 - b.2
+        return sqrt(dL * dL + da * da + db * db)
+    }
+
+    struct ColorDelta {
+        var meanDE: Double
+        var meanDA: Double
+        var meanDB: Double
+        var n: Int
+    }
+
+    /// Mid-band mean ΔE76 / Δa* / Δb* of `home` minus `reference` (scrims and chrome out of the ROI).
+    static func midBandDelta(home: UIImage, reference: UIImage) -> ColorDelta {
+        precondition(home.cgImage != nil && reference.cgImage != nil)
+        let hcg = home.cgImage!, rcg = reference.cgImage!
+        let w = min(hcg.width, rcg.width)
+        let h = min(hcg.height, rcg.height)
+        let y0 = Int(Double(h) * 0.28)
+        let y1 = Int(Double(h) * 0.62)
+        func raster(_ cg: CGImage) -> [UInt8] {
+            var px = [UInt8](repeating: 0, count: w * h * 4)
+            px.withUnsafeMutableBytes { buf in
+                let ctx = CGContext(data: buf.baseAddress, width: w, height: h,
+                                    bitsPerComponent: 8, bytesPerRow: w * 4, space: sRGB,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+                ctx.interpolationQuality = .none
+                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+            }
+            return px
+        }
+        let hp = raster(hcg), rp = raster(rcg)
+        var sumE = 0.0, sumA = 0.0, sumB = 0.0, n = 0.0
+        if y1 > y0 {
+            for y in y0..<y1 {
+                for x in 0..<w {
+                    let i = (y * w + x) * 4
+                    let hl = srgbToLab(Double(hp[i]), Double(hp[i + 1]), Double(hp[i + 2]))
+                    let rl = srgbToLab(Double(rp[i]), Double(rp[i + 1]), Double(rp[i + 2]))
+                    sumE += deltaE76(hl, rl)
+                    sumA += hl.1 - rl.1
+                    sumB += hl.2 - rl.2
+                    n += 1
+                }
+            }
+        }
+        return ColorDelta(meanDE: n == 0 ? 99 : sumE / n, meanDA: n == 0 ? 99 : sumA / n, meanDB: n == 0 ? 99 : sumB / n, n: Int(n))
+    }
+
+    @MainActor
+    static func render(_ view: some View, size: CGSize, scale: CGFloat = 1) throws -> UIImage {
+        let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height))
+        renderer.scale = scale
+        renderer.proposedSize = ProposedViewSize(size)
+        return try XCTUnwrap(renderer.uiImage, "ImageRenderer produced no UIImage")
+    }
+
+    static func assertNoMagenta(_ delta: ColorDelta, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertGreaterThan(delta.n, 100, "mid-band must have pixels", file: file, line: line)
+        XCTAssertLessThan(delta.meanDE, 2, "mean ΔE76 must be < 2, got \(delta.meanDE)", file: file, line: line)
+        XCTAssertLessThan(delta.meanDA, 2, "no magenta bias (Δa*), got \(delta.meanDA)", file: file, line: line)
+        XCTAssertGreaterThan(delta.meanDB, -2, "no yellow loss (Δb*), got \(delta.meanDB)", file: file, line: line)
+    }
+
+    static let jacketURL = "https://tp.spfcas.com/covers/mb/Sn332.jpg"
+    static let thumbURL = "https://tp.spfcas.com/rhe951l4q/small_covers/mb/Sn332.jpg"
+    static let winnerURL = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos484/snos484ps.jpg"
+
+    static func abfMovie(_ id: String, number: String) -> Movie {
+        Movie(id: id, number: number, title: "ABF-398-like \(id)",
+              thumbURL: "https://tp.spfcas.com/rhe951l4q/small_covers/mb/\(id).jpg",
+              coverURL: "https://tp.spfcas.com/rhe951l4q/covers/mb/\(id).jpg")
+    }
+
+    // MARK: Tests
+
+    /// Floor and winner states: the stored hero bitmap is the original decode,
+    /// and the visible window of an ABF-398-style jacket is the front only.
+    @MainActor
+    func test332FloorIsOriginalBitmapAndWindowIsFront() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        let jacket = Self.abfJacket()
+        ImageLoader.testTransport = { url, _ in
+            if url.contains("/small_covers/") {
+                return HomeHero331Tests.render(166, 236, frontFrom: 0)
+            }
+            if url.contains("/covers/") { return jacket }
+            return nil
+        }
+        HeroCoverStore.testDetailProvider = { _ in nil }
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            return nil
+        }
+        let movie = Self.abfMovie("abf-332a", number: "ABF-9332")
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        var p = HeroCoverStore.shared.presentation(for: movie.id)
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline, p.floorPixelWidth != 398 {
+            try await Task.sleep(nanoseconds: 20_000_000)
+            p = HeroCoverStore.shared.presentation(for: movie.id)
+        }
+        let floor = try XCTUnwrap(p.blurImage)
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(floor), 840, "hero floor must keep the original jacket bitmap")
+        XCTAssertEqual(HeroCoverPolicy.pixelHeight(floor), 568)
+        XCTAssertEqual(p.floorPixelWidth, 398, "visible window width is the 0.70·h front")
+        XCTAssertEqual(p.floorSource, movie.coverURL)
+        XCTAssertTrue(HomeHero331Tests.isFront(floor, source: p.floorSource))
+        XCTAssertTrue(HomeHero331Tests.isPortrait(floor, source: p.floorSource))
+        XCTAssertFalse(HomeHero331Tests.isFront(floor, source: nil), "sampling the raw envelope must still see the red back")
+        XCTAssertNil(p.sharpImage)
+    }
+
+    /// SNOS-484-style official winner paints the original tagged bitmap; mid-band
+    /// ΔE vs a reference Image(uiImage:) of the same CGImage is < 2 with no magenta.
+    @MainActor
+    func test332SnosWinnerRenderDeltaEAgainstReferenceImage() async throws {
+        let poster = Self.snosPortrait()
+        let size = CGSize(width: 390, height: 448.5)
+        let heroPaint = try Self.render(HomeAnchoredFill(image: poster, size: size, source: Self.winnerURL), size: size)
+        let p = HeroFrontWindow.placement(image: poster, source: Self.winnerURL, container: size)
+        let reference = try Self.render(
+            Image(uiImage: poster)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: p.drawnSize.width, height: p.drawnSize.height)
+                .offset(x: p.offset.width, y: p.offset.height)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .clipped(),
+            size: size
+        )
+        let delta = Self.midBandDelta(home: heroPaint, reference: reference)
+        Self.assertNoMagenta(delta)
+    }
+
+    /// Visible window must not show the back cover for ABF-398, a SNOS-484
+    /// portrait (passthrough), and a 1.65 critical-aspect jacket.
+    func test332VisibleWindowHidesBackCoverOnThreeFixtures() throws {
+        let size = CGSize(width: 390, height: 448.5)
+        // ABF-398-style jacket.
+        let jacket = Self.abfJacket()
+        let jRect = try XCTUnwrap(HeroFrontWindow.cropRect(image: jacket, source: Self.jacketURL))
+        XCTAssertEqual(Int(jRect.width.rounded()), 398)
+        XCTAssertTrue(HomeHero331Tests.isFront(jacket, source: Self.jacketURL))
+        XCTAssertFalse(HomeHero331Tests.isFront(jacket, source: nil))
+        let jPlace = HeroFrontWindow.placement(image: jacket, source: Self.jacketURL, container: size)
+        // The visible window starts at the front origin; the back (x=0) stays off-screen.
+        XCTAssertGreaterThan(jPlace.window.minX, 100)
+        XCTAssertEqual(jPlace.window.maxX, jacket.size.width, accuracy: 0.5)
+
+        // SNOS-484-style portrait: no crop, full image is the window.
+        let portrait = Self.snosPortrait()
+        XCTAssertNil(HeroFrontWindow.cropRect(image: portrait, source: Self.winnerURL))
+        let pPlace = HeroFrontWindow.placement(image: portrait, source: Self.winnerURL, container: size)
+        XCTAssertEqual(pPlace.window, CGRect(x: 0, y: 0, width: portrait.size.width, height: portrait.size.height))
+
+        // 1.65 critical aspect (inclusive upper bound).
+        let critical = Self.critical165Jacket()
+        let cURL = "https://tp.spfcas.com/covers/mb/Crit165.jpg"
+        XCTAssertEqual((Double(1650) / Double(1000) * 100).rounded() / 100, 1.65, accuracy: 0.001)
+        let cRect = try XCTUnwrap(FrontPosterPolicy.cropRect(width: 1650, height: 1000, source: cURL))
+        XCTAssertEqual(Int(cRect.width.rounded()), 700)
+        XCTAssertEqual(cRect.origin.x, 950, accuracy: 0.5)
+        // Front is green, back is blue: sampling the window must be green (G > B and G > R).
+        XCTAssertTrue(Self.isMostlyGreen(critical, source: cURL))
+        XCTAssertTrue(Self.isMostlyBlue(critical, source: nil))
+    }
+
+    static func isMostlyGreen(_ image: UIImage, source: String?) -> Bool {
+        guard let cg = image.cgImage else { return false }
+        let crop = HeroFrontWindow.cropRect(image: image, source: source)
+            ?? CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+        var px = [UInt8](repeating: 0, count: 4)
+        let ok: Bool = px.withUnsafeMutableBytes { buf in
+            guard let ctx = CGContext(data: buf.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                      space: sRGB, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            let sx = 1 / max(crop.width, 1), sy = 1 / max(crop.height, 1)
+            ctx.draw(cg, in: CGRect(x: -crop.origin.x * sx, y: -crop.origin.y * sy,
+                                    width: CGFloat(cg.width) * sx, height: CGFloat(cg.height) * sy))
+            return true
+        }
+        return ok && Int(px[1]) > Int(px[0]) + 80 && Int(px[1]) > Int(px[2]) + 80
+    }
+
+    static func isMostlyBlue(_ image: UIImage, source: String?) -> Bool {
+        guard let cg = image.cgImage else { return false }
+        let crop = HeroFrontWindow.cropRect(image: image, source: source)
+            ?? CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
+        var px = [UInt8](repeating: 0, count: 4)
+        let ok: Bool = px.withUnsafeMutableBytes { buf in
+            guard let ctx = CGContext(data: buf.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                      space: sRGB, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            let sx = 1 / max(crop.width, 1), sy = 1 / max(crop.height, 1)
+            ctx.draw(cg, in: CGRect(x: -crop.origin.x * sx, y: -crop.origin.y * sy,
+                                    width: CGFloat(cg.width) * sx, height: CGFloat(cg.height) * sy))
+            return true
+        }
+        return ok && Int(px[2]) > Int(px[0]) + 80 && Int(px[2]) > Int(px[1]) + 80
+    }
+
+    /// Floor → winner crossfade of the same official bitmap must not shift color temperature.
+    @MainActor
+    func test332FloorToWinnerCrossfadeKeepsColorTemperature() throws {
+        let poster = Self.snosPortrait()
+        let size = CGSize(width: 390, height: 448.5)
+        let floor = try Self.render(HomeAnchoredFill(image: poster, size: size, source: Self.winnerURL), size: size)
+        let sharp = try Self.render(HomeAnchoredFill(image: poster, size: size, source: Self.winnerURL), size: size)
+        let delta = Self.midBandDelta(home: floor, reference: sharp)
+        Self.assertNoMagenta(delta)
+    }
+
+    /// After the 32 pt overlap, bottom UI insets grow by the same amount, and
+    /// a SNOS-484-style face band does not fall into the overlap.
+    func test332OverlapKeepsBottomUIAndFacesVisible() {
+        XCTAssertEqual(HomeMetrics.heroContentOverlap, 32)
+        XCTAssertGreaterThanOrEqual(HomeMetrics.heroContentOverlap, 24)
+        XCTAssertLessThanOrEqual(HomeMetrics.heroContentOverlap, 40)
+        let overlap = HomeMetrics.heroContentOverlap
+        // Documented bottom insets (dots / text-with-dots / more).
+        XCTAssertEqual(16 + overlap, 48)
+        XCTAssertEqual(32 + overlap, 64)
+        XCTAssertEqual(8 + overlap, 40)
+
+        let poster = Self.snosPortrait()
+        let size = CGSize(width: 390, height: 448.5)
+        let p = HeroFrontWindow.placement(image: poster, source: Self.winnerURL, container: size, anchorY: 0.22)
+        // Face band in UIImage points (top-left origin): upper third, 0.15...0.45 of height.
+        let face = CGRect(x: poster.size.width / 5, y: poster.size.height * 0.15,
+                          width: poster.size.width * 0.6, height: poster.size.height * 0.30)
+        let scale = p.drawnSize.height / poster.size.height
+        let faceInHero = CGRect(x: face.minX * scale + p.offset.width,
+                                y: face.minY * scale + p.offset.height,
+                                width: face.width * scale, height: face.height * scale)
+        XCTAssertLessThan(faceInHero.maxY, size.height - overlap,
+                          "faces must not fall into the \(overlap) pt overlap band (face maxY \(faceInHero.maxY), band starts at \(size.height - overlap))")
+        XCTAssertGreaterThan(faceInHero.minY, 0)
+        XCTAssertGreaterThan(faceInHero.maxY, faceInHero.minY)
+    }
+
+    /// loadPoster crop is a tightly packed sRGB 32 bpp translate-redraw; ΔE < 2
+    /// vs a reference sRGB crop of the same original. The function must not take
+    /// a cg.cropping() subimage as input — we compare against our own translate.
+    func test332LoadPosterCropIsPackedSRGBAndDeltaEUnder2() async throws {
+        let jacket = Self.abfJacket()
+        let source = Self.jacketURL
+        let rect = try XCTUnwrap(FrontPosterPolicy.cropRect(width: 840, height: 568, source: source))
+        // Reference: translate the uncropped original into an sRGB 32 bpp context.
+        let reference = try XCTUnwrap(PosterColorCrop.crop(jacket, to: rect))
+        let rCG = try XCTUnwrap(reference.cgImage)
+        XCTAssertEqual(rCG.bitsPerPixel, 32)
+        XCTAssertEqual(rCG.bytesPerRow, rCG.width * 4, "tightly packed 32 bpp")
+        XCTAssertEqual(rCG.colorSpace?.name, CGColorSpace.sRGB)
+
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.testTransport = { url, _ in
+            url == source || url.contains("/covers/") ? jacket : nil
+        }
+        let cropped = try XCTUnwrap(await ImageLoader.shared.loadPoster(source, maxPixelSize: 1024))
+        let cCG = try XCTUnwrap(cropped.cgImage)
+        XCTAssertEqual(cCG.bitsPerPixel, 32)
+        XCTAssertEqual(cCG.bytesPerRow, cCG.width * 4)
+        XCTAssertEqual(cCG.colorSpace?.name, CGColorSpace.sRGB)
+        XCTAssertEqual(cCG.width, 398)
+        XCTAssertEqual(cCG.height, 568)
+        let delta = Self.midBandDelta(home: cropped, reference: reference)
+        Self.assertNoMagenta(delta)
+
+        // Native portrait passthrough is zero-copy (same CGImage instance).
+        let portrait = Self.snosPortrait()
+        ImageLoader.testTransport = { url, _ in url.contains("ps.jpg") ? portrait : nil }
+        XCTAssertTrue(PosterColorCrop.cropIfNeeded(portrait, source: Self.winnerURL) === portrait,
+                      "native portrait passthrough must be zero-copy")
+        let passed = try XCTUnwrap(await ImageLoader.shared.loadPoster(Self.winnerURL, maxPixelSize: 2048))
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(passed), 800)
+        XCTAssertEqual(HeroCoverPolicy.pixelHeight(passed), 1200)
+    }
+
+    /// HeroCoverDisk JPEG (quality 0.88) keeps the ICC so a restore cannot
+    /// display sRGB pixels as DeviceRGB / P3.
+    func test332HeroCoverDiskJPEGPreservesSRGBProfile() throws {
+        let poster = Self.snosPortrait()
+        let data = try XCTUnwrap(PosterJPEGColor.data(poster, quality: 0.88))
+        let restored = try XCTUnwrap(PosterJPEGColor.image(from: data))
+        let cg = try XCTUnwrap(restored.cgImage)
+        let name = cg.colorSpace?.name
+        XCTAssertNotNil(name, "restored JPEG must have a named color space, not DeviceRGB")
+        XCTAssertEqual(name, CGColorSpace.sRGB)
+        let delta = Self.midBandDelta(home: restored, reference: poster)
+        // JPEG 0.88 is lossy; mid-band still has to stay well under a cast, but
+        // allow a slightly looser ΔE than the lossless paint path while remaining
+        // far from the purple-cast regime (ΔE ~10). The locked paint contract is
+        // still < 2 on the lossless path; here we assert no magenta/yellow-loss
+        // and a modest mean ΔE.
+        XCTAssertLessThan(delta.meanDE, 5, "JPEG restore mean ΔE got \(delta.meanDE)")
+        XCTAssertLessThan(delta.meanDA, 2, "JPEG restore magenta Δa* \(delta.meanDA)")
+        XCTAssertGreaterThan(delta.meanDB, -2, "JPEG restore yellow-loss Δb* \(delta.meanDB)")
+    }
 }

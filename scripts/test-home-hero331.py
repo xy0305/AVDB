@@ -11,20 +11,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '331' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 331;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '332' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 332;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 331' in wf and 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
+assert 'Home HQ posters App 332' in wf and 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
+assert 'feat/home-hero-color-332' in wf
 assert wf.count('python3 scripts/test-home-hero331.py') == 2  # zzt-ranking job + release regressions
-assert 'scripts/package-lut331.py' in wf and 'AVDB-331-release' in wf and 'AVDB-330-' not in wf
-assert not (r/'scripts/package-lut330.py').exists()
-pkg = (r/'scripts/package-lut331.py').read_text()
-assert "=='331'" in pkg and 'AVDB-unsigned-1.0.2-331-home-hero-crop.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
-job = wf.split('  home-hero-331:')[1]
+assert 'scripts/package-lut332.py' in wf and 'AVDB-332-release' in wf and 'AVDB-331-release' not in wf
+pkg = (r/'scripts/package-lut332.py').read_text()
+assert "=='332'" in pkg and 'AVDB-unsigned-1.0.2-332-home-hero-color.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+job = wf.split('  home-hero-331:')[1].split('  home-hero-332:')[0]
 assert '-only-testing:DetailPosterQualityTests/HomeHero331Tests' in job
 assert 'test330EnrichMergedDetailCoverIsMiddleStep' in job
-assert 'AVDB-331-home-hero-tests' in job
+assert 'AVDB-332-home-hero-tests' in job
 assert 'home-chrome-330:' in wf and 'home-hot-329:' in wf and 'home-hot-328:' in wf
 
 doc = (r/'Build331-HomeHeroCrop.md').read_text()
@@ -39,24 +39,28 @@ movie = (r/'AVDB/Models/Movie.swift').read_text()
 sdk = (r/'AVDB/Services/JavDBSDK.swift').read_text()
 store = resolver.split('final class HeroCoverStore')[1].split('actor HeroCoverPrefetchGate')[0]
 page = home.split('private struct HomeHeroPage: View {')[1].split('private struct HomeHeroMoreButton')[0]
-fill = home.split('private struct HomeAnchoredFill: View {')[1].split('/// Independent dots layer')[0]
+fill = home.split('struct HomeAnchoredFill: View {')[1].split('/// Independent dots layer')[0]
 
-# --- 1. Invariant: every hero paint goes through loadPoster (crop-or-passthrough) ---
+# --- 1. Invariant (Build 332 mechanism): hero paints the original image;
+# the visible window is the front region only. Purpose unchanged: no layer may
+# show the back-cover collage. loadPoster remains for rails / detail, not the hero.
 assert 'public func loadPoster(_ source: String, maxPixelSize: Int, timeout: TimeInterval = 20)' in loader
-assert 'FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: source)' in loader
-assert 'ImageLoader.shared.loadPoster(' in store
-assert 'ImageLoader.shared.load(' not in store, 'hero store must never paint a raw (uncropped) load'
-assert 'ImageLoader.shared.loadPoster(' in page and 'ImageLoader.shared.load(' not in page
+assert 'FrontPosterPolicy.cropRect' in loader
+assert 'enum HeroFrontWindow' in resolver
+assert 'ImageLoader.shared.load(' in store
+assert 'ImageLoader.shared.loadPoster(' not in store, 'hero store paints the original decode, not a loadPoster crop'
+assert 'ImageLoader.shared.load(' in page and 'ImageLoader.shared.loadPoster(' not in page
+assert 'HeroFrontWindow.placement(' in fill
 assert 'RailCoverFloor.prefers' not in page
 assert 'enrichImage' not in resolver and 'enrichImage' not in home and 'loadEnrichCover' not in resolver
-# Ambient = the currently displayed bitmap, no separate jacket fetch.
+# Ambient = the currently displayed (front) region, no separate jacket fetch.
 assert 'var displayedImage: UIImage? { sharpImage ?? blurImage }' in resolver
-assert 'HomeAmbientColor.base(from: candidate.image)' in store
+assert 'HomeAmbientColor.base(from: candidate.image, source: candidate.source)' in store
 assert 'currently displayed' in resolver
 assert 'hsb.h' in home.split('private var ambientKey: String {')[1].split('private func publishAmbient')[0]
-# Safety net: residual landscape right-anchored.
+# Safety net: residual non-jacket landscape right-anchored (HeroFillAnchor).
 assert 'enum HeroFillAnchor' in home and 'iw > ih ? (w - dw) : (w - dw) / 2' in home
-assert 'HeroFillAnchor.x(' in fill
+assert 'HeroFillAnchor.x(' in resolver
 # No AICover on the hero.
 assert 'AICoverEnhanceModel' not in resolver and 'AICoverEnhanceModel' not in home
 assert 'art.rawImage ?? art.image' in resolver
@@ -142,6 +146,6 @@ mid = unit.split('func test330EnrichMergedDetailCoverIsMiddleStep()')[1].split('
 assert 'floorPixelWidth' in mid and 'enrichImage' not in mid
 assert 'final class HomeChrome330Tests' in unit and 'final class HomeHot329Tests' in unit
 
-print('PASS home-hero331 source contracts: loadPoster-only hero layers, two-level floor, '
+print('PASS home-hero331 source contracts: original-bitmap hero + display-time front window, two-level floor, '
       'arrival-time keep/evict + disk-only restore, field-level merge, per-item pipeline cap 2 / 8s, '
-      'by-id winner sharing, release 331')
+      'by-id winner sharing, release 332')

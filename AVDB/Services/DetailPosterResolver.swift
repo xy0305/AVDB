@@ -286,8 +286,12 @@ enum DetailPosterResolver {
             HeroCoverDisk.storeAccepted(selected.image, number: movie.number, source: winner.source)
             // No intermediate publication. The winner cache, not ImageLoader's
             // independently downsampled source cache, is the only warm fast path.
-            guard var art = await artwork(image: selected.image, source: winner.source, derive: false) else { return nil }
+            guard var art = await artwork(image: selected.image, source: winner.source, derive: false,
+                                           original: selected.originalImage) else { return nil }
             art.sourceURL = winner.source; art.nativeWidth = winner.width; art.nativeHeight = winner.height
+            // Persist the uncropped original for the home hero when it is an accepted portrait;
+            // the display raster is also stored so title-key fallback stays a usable front.
+            HeroCoverDisk.storeAccepted(art.rawImage ?? art.image, number: movie.number, source: winner.source)
             HeroCoverDisk.storeAccepted(art.image, number: movie.number, source: winner.source)
             // Build 331: share by movie id with the home hero (memory layer;
             // HeroCoverDisk above is the persistent layer).
@@ -420,6 +424,9 @@ enum DetailPosterResolver {
     struct DecodedPoster: @unchecked Sendable {
         let image: UIImage
         let quality: DetailPosterQuality
+        /// Uncropped ImageIO bitmap. The home hero paints this; `image` may be a
+        /// color-preserving front crop for the detail page.
+        let originalImage: UIImage
     }
 
     static func decode(data: Data, sourceURL: String, derive: Bool) -> DecodedPoster? {
@@ -443,11 +450,12 @@ enum DetailPosterResolver {
             DMMJacketOnly.shared.observe(source: sourceURL, width: rawWidth, height: rawHeight)
             return nil
         }
+        let originalImage = UIImage(cgImage: cg)
         var cropped = false
         let javbusJacket = URL(string: sourceURL).map(JavBusPoster.allowedImage) == true
         if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: sourceURL, validatedJacket: javbusJacket) {
-            guard let front = cg.cropping(to: rect) else { return nil }
-            cg = front; cropped = true
+            guard let front = PosterColorCrop.crop(originalImage, to: rect), let frontCG = front.cgImage else { return nil }
+            cg = frontCG; cropped = true
         }
         guard DetailPosterPolicy.eligible(width: cg.width, height: cg.height) else { return nil }
         let quality = DetailPosterQuality(source: sourceURL, width: cg.width, height: cg.height, originalPortrait: !cropped)
@@ -463,7 +471,7 @@ enum DetailPosterResolver {
             guard let resized = context.makeImage() else { return nil }
             cg = resized
         }
-        return DecodedPoster(image: UIImage(cgImage: cg), quality: quality)
+        return DecodedPoster(image: UIImage(cgImage: cg), quality: quality, originalImage: originalImage)
     }
 
     /// Build 284: one selection slot = the URL plus its same-image DMM alternates
@@ -533,12 +541,14 @@ enum DetailPosterResolver {
         }
     }
 
-    private static func artwork(image: UIImage, source: String, derive: Bool) async -> DetailPosterArtwork? {
+    private static func artwork(image: UIImage, source: String, derive: Bool, original: UIImage? = nil) async -> DetailPosterArtwork? {
         guard !Task.isCancelled else { return nil }
         return await Task.detached(priority: .utility) { () -> DetailPosterArtwork? in
-            guard var cg = image.cgImage else { return nil }
-            if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: source),
-               let front = cg.cropping(to: rect) { cg = front }
+            var display = image
+            if derive {
+                display = PosterColorCrop.cropIfNeeded(image, source: source)
+            }
+            guard let cg = display.cgImage else { return nil }
             guard DetailPosterPolicy.eligible(width: cg.width, height: cg.height) else { return nil }
             let space = CGColorSpaceCreateDeviceRGB()
             var pixel = [UInt8](repeating: 0, count: 4)
@@ -557,9 +567,11 @@ enum DetailPosterResolver {
             let backdrop = CIContext(options: [.cacheIntermediates: false]).createCGImage(blurred, from: input.extent).map { UIImage(cgImage: $0) } ?? UIImage(cgImage: cg)
             // Enhance only the displayed JavDB-native winner; quality score already used raw pixels.
             // Home hero uses rawImage (no AICover / JavDBCoverEnhance).
-            let raw = UIImage(cgImage: cg)
-            let display = JavDBCoverEnhance.maybeApply(raw, source: source)
-            return DetailPosterArtwork(image: display, backdrop: backdrop, tint: tint, provenance: PosterProvenance(source: source), rawImage: raw)
+            // Home hero paints the uncropped original (zero pixel reprocessing).
+            // The detail page uses the color-preserving cropped / enhanced display raster.
+            let raw = original ?? image
+            let enhanced = JavDBCoverEnhance.maybeApply(UIImage(cgImage: cg, scale: display.scale, orientation: display.imageOrientation), source: source)
+            return DetailPosterArtwork(image: enhanced, backdrop: backdrop, tint: tint, provenance: PosterProvenance(source: source), rawImage: raw)
         }.value
     }
 }

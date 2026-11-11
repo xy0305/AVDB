@@ -178,6 +178,8 @@ struct HomeView: View {
                         // iPad: sections capped at 1100 and centered; the hero stays full width.
                         .frame(maxWidth: m.contentWidth, alignment: .leading)
                         .frame(maxWidth: .infinity)
+                        // Build 332: pull the light shortcuts/rails block up to cover the hero's bottom edge.
+                        .padding(.top, -HomeMetrics.heroContentOverlap)
                         .padding(.bottom, 28)
                     }
                 }
@@ -915,6 +917,12 @@ struct HomeMetrics {
     var padding: CGFloat { isPadWidth ? 24 : (width < 380 ? 16 : 20) }
     /// clamp(W * 1.15, 430, 560) on phone; 600 on iPad.
     var heroHeight: CGFloat { isPadWidth ? 600 : min(max(width * 1.15, 430), 560) }
+    /// Build 332: the light shortcuts/rails block overlaps the hero bottom by this
+    /// amount, covering the poster edge. 32 pt was chosen after a SNOS-484 layout
+    /// check (faces stay well above the band; the allowed window was 24–40 pt).
+    /// Hero bottom UI insets grow by the same amount; the overlap is not in the
+    /// hero gesture hit area.
+    static let heroContentOverlap: CGFloat = 32
     /// Sections are capped at 1100 and centered.
     var contentWidth: CGFloat { min(width, AdaptiveLayout.contentMaxWidth) }
     /// 3-column grid card width for loading placeholders (actual cells are flexible).
@@ -1000,17 +1008,24 @@ struct HomeHSB: Equatable {
 
 enum HomeAmbientColor {
     /// Downscale to 32x32, average, convert to HSB, clamp S to [0.25, 0.45] and B to [0.16, 0.22].
-    static func base(from image: UIImage) -> HomeHSB? {
+    /// When `source` is a jacket, only the visible front window is sampled — this
+    /// is a 32×32 probe, never a replacement of the sharp-layer pixels.
+    static func base(from image: UIImage, source: String? = nil) -> HomeHSB? {
         guard let cg = image.cgImage else { return nil }
         let side = 32
         var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let crop = HeroFrontWindow.cropRect(image: image, source: source)
+            ?? CGRect(x: 0, y: 0, width: cg.width, height: cg.height)
         let drawn: Bool = pixels.withUnsafeMutableBytes { buffer -> Bool in
             guard let context = CGContext(data: buffer.baseAddress, width: side, height: side,
                                           bitsPerComponent: 8, bytesPerRow: side * 4,
                                           space: CGColorSpaceCreateDeviceRGB(),
                                           bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
             context.interpolationQuality = .medium
-            context.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+            let sx = CGFloat(side) / max(crop.width, 1)
+            let sy = CGFloat(side) / max(crop.height, 1)
+            context.draw(cg, in: CGRect(x: -crop.origin.x * sx, y: -crop.origin.y * sy,
+                                        width: CGFloat(cg.width) * sx, height: CGFloat(cg.height) * sy))
             return true
         }
         guard drawn else { return nil }
@@ -1358,7 +1373,10 @@ private struct HomeHeroCarousel: View {
                 },
                 lastPageCommitAt: { lastDragAt }
             )
-            .frame(width: width, height: height)
+            // Build 332: the overlap band (bottom heroContentOverlap) is not in the
+            // hero gesture hit area — shortcuts / rails own those taps.
+            .frame(width: width, height: max(0, height - HomeMetrics.heroContentOverlap))
+            .frame(width: width, height: height, alignment: .top)
             .accessibilityHidden(true)
 
             scrims
@@ -1372,7 +1390,7 @@ private struct HomeHeroCarousel: View {
             if showsDots {
                 HomeHeroDots(count: movies.count, index: min(index, movies.count - 1))
                     .padding(.leading, padding)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 16 + HomeMetrics.heroContentOverlap)
                     .frame(width: width, height: height, alignment: .bottomLeading)
                     .opacity(chromeOpacity)
                     .allowsHitTesting(false)
@@ -1385,7 +1403,7 @@ private struct HomeHeroCarousel: View {
                 .opacity(chromeOpacity)
 
             HomeHeroMoreButton(action: onMore)
-                .padding(.bottom, 8)
+                .padding(.bottom, 8 + HomeMetrics.heroContentOverlap)
                 .frame(width: width, height: height, alignment: .bottom)
                 .opacity(chromeOpacity)
 
@@ -1507,8 +1525,9 @@ private struct HomeHeroCarousel: View {
             }
         }
         .padding(.leading, padding)
-        // Text block sits 10 pt above the dots (dots: 6 pt tall, 16 pt above the bottom).
-        .padding(.bottom, showsDots ? 32 : 16)
+        // Text block sits 10 pt above the dots (dots: 6 pt tall, 16 pt above the bottom,
+        // plus the Build 332 content overlap so the typography stays fully visible).
+        .padding(.bottom, (showsDots ? 32 : 16) + HomeMetrics.heroContentOverlap)
         .frame(width: width, height: height, alignment: .bottomLeading)
         .opacity(chromeOpacity)
     }
@@ -1567,7 +1586,7 @@ private struct HomeHeroCarousel: View {
 
     private var ambientKey: String {
         guard let movie = current else { return "" }
-        // Build 331: follows the currently displayed (cropped) bitmap.
+        // Build 332: follows the currently displayed (front-windowed) bitmap.
         guard let hsb = cover(movie).ambient else { return movie.id + "#" }
         return movie.id + "#hsb#\(hsb.h)|\(hsb.s)|\(hsb.b)"
     }
@@ -1606,13 +1625,14 @@ private struct HeroTouchStyle: ButtonStyle {
 }
 
 /// One hero page: layered full-bleed paint, never an inset card.
-/// Build 331 two-level floor: level 1 = the sharpest image in the movie's
-/// current record (front-cropped cover_url preferred, thumb fallback), painted
-/// unblurred (no radius, no brightness dim); level 2 = the official
+/// Build 331/332 two-level floor: level 1 = the sharpest *original* decoded
+/// image in the movie's current record (cover_url preferred, thumb fallback),
+/// painted unblurred (no radius, no brightness dim); level 2 = the official
 /// DetailPosterResolver winner, cross-faded in (plain fade ≤ 0.45s) on arrival.
-/// Every layer goes through `ImageLoader.loadPoster` (FrontPosterPolicy
-/// crop-or-passthrough): no layer ever draws an uncropped DVD jacket. Brand
-/// brown #2A2019 is never the visible empty floor.
+/// The main layer paints the loader's decoded original bitmap with zero pixel
+/// reprocessing. Landscape jackets are shown only through a display-time window
+/// equal to `FrontPosterPolicy.cropRect` — no layer may show the back-cover
+/// collage. Brand brown #2A2019 is never the visible empty floor.
 private struct HomeHeroPage: View {
     let presentation: HeroCoverPresentation
     let movie: Movie
@@ -1620,6 +1640,7 @@ private struct HomeHeroPage: View {
     let kenBurns: Bool
     @State private var zoomed = false
     @State private var floorImage: UIImage?
+    @State private var floorSource: String?
 
     var body: some View {
         let size = CGSize(width: metrics.width, height: metrics.heroHeight)
@@ -1627,34 +1648,38 @@ private struct HomeHeroPage: View {
             HomeTheme.heroLoadingFloor
             // Level 1: floor. Level 2: official resolver winner on top.
             if let floor = presentation.blurImage ?? floorImage {
-                HomeAnchoredFill(image: floor, size: size)
+                HomeAnchoredFill(image: floor, size: size,
+                                 source: presentation.floorSource ?? floorSource)
             }
             if let sharp = presentation.sharpImage {
-                HomeAnchoredFill(image: sharp, size: size)
+                HomeAnchoredFill(image: sharp, size: size, source: presentation.winnerURL)
             }
         }
         .frame(width: size.width, height: size.height)
         .animation(.easeOut(duration: HeroCoverPolicy.crossfadeDuration), value: presentation.token)
         .scaleEffect(zoomed ? 1.05 : 1.0)
         .task(id: movie.id) {
-            // Safety net if HeroCoverStore is stuck: the same crop-or-passthrough
-            // chain as the store (front-cropped cover_url, then thumb). Skip
+            // Safety net if HeroCoverStore is stuck: load the original cover_url
+            // (then thumb). The paint path windows jackets at display time. Skip
             // hanging / delayed stand-ins so a slow source cannot block the floor.
             if presentation.blurImage != nil || presentation.sharpImage != nil { return }
-            await withTaskGroup(of: UIImage?.self) { group in
+            await withTaskGroup(of: (String, UIImage?).self) { group in
                 let cover = movie.coverURL.flatMap { $0.contains("/small_covers/") ? nil : $0 }
                 for url in [cover, movie.thumbURL] {
                     guard let url, !url.isEmpty else { continue }
                     if url.hasPrefix("fixture://hang") || url.hasPrefix("fixture://delay") { continue }
                     let size = url == cover ? 1024 : 640
-                    group.addTask { await ImageLoader.shared.loadPoster(url, maxPixelSize: size, timeout: 4) }
+                    group.addTask { (url, await ImageLoader.shared.load(url, maxPixelSize: size, timeout: 4)) }
                 }
                 var best: UIImage?
-                for await image in group {
+                var bestSource: String?
+                for await (url, image) in group {
                     guard let image else { continue }
-                    if best == nil || HeroCoverStore.floorRank(image) > HeroCoverStore.floorRank(best!) {
+                    if best == nil || HeroCoverStore.floorRank(image, source: url) > HeroCoverStore.floorRank(best!, source: bestSource) {
                         best = image
+                        bestSource = url
                         floorImage = image
+                        floorSource = url
                     }
                 }
             }
@@ -1691,7 +1716,7 @@ private struct HomeHeroMoreButton: View {
     }
 }
 
-/// Build 331: horizontal anchor of a hero layer. Portrait rasters center;
+/// Horizontal anchor of a non-jacket hero layer. Portrait rasters center;
 /// a residual landscape raster is right-anchored (trailing = DVD front).
 enum HeroFillAnchor {
     static func x(imageWidth iw: CGFloat, imageHeight ih: CGFloat, drawnWidth dw: CGFloat, containerWidth w: CGFloat) -> CGFloat {
@@ -1700,24 +1725,24 @@ enum HeroFillAnchor {
 }
 
 /// aspectFill with a vertical anchor (0 = top, 0.5 = center).
-/// Build 331 safety net: every hero layer is already front-cropped, but a
-/// residual landscape raster (w > h) is right-anchored (the DVD front is the
-/// right side of a jacket) instead of centered on the spine.
-private struct HomeAnchoredFill: View {
+/// Build 332: paints the original decoded bitmap (zero pixel reprocessing).
+/// Landscape jackets are shown only through a view-level scale / offset / clip
+/// equal to `FrontPosterPolicy.cropRect`. Non-jacket images keep the existing
+/// passthrough / fill. `.interpolation(.high)` stays — it now scales a pristine
+/// decoded image.
+struct HomeAnchoredFill: View {
     let image: UIImage
     let size: CGSize
+    var source: String? = nil
     var anchorY: CGFloat = 0.22
 
     var body: some View {
-        let iw = max(image.size.width, 1), ih = max(image.size.height, 1)
-        let scale = max(size.width / iw, size.height / ih)
-        let dw = iw * scale, dh = ih * scale
+        let p = HeroFrontWindow.placement(image: image, source: source, container: size, anchorY: anchorY)
         Image(uiImage: image)
             .resizable()
             .interpolation(.high)
-            .frame(width: dw, height: dh)
-            .offset(x: HeroFillAnchor.x(imageWidth: iw, imageHeight: ih, drawnWidth: dw, containerWidth: size.width),
-                    y: -(dh - size.height) * anchorY)
+            .frame(width: p.drawnSize.width, height: p.drawnSize.height)
+            .offset(x: p.offset.width, y: p.offset.height)
             .frame(width: size.width, height: size.height, alignment: .topLeading)
             .clipped()
     }

@@ -300,6 +300,95 @@ public enum FrontPosterPolicy {
     }
 }
 
+/// Build 332: color-preserving crop for `loadPoster` and resolver pixel-crop sites.
+/// Translates the *uncropped* original into a tightly packed sRGB 32 bpp bitmap
+/// sized to the crop rect (translate −origin). Never takes a `cg.cropping()`
+/// subimage as input. Redraw only when a crop actually happens; native portrait
+/// passthrough stays zero-copy. No filters, LUTs, or manual color correction.
+public enum PosterColorCrop {
+    public static let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
+
+    /// Tightly packed sRGB 32 bpp crop of `image` to `rect` (CGImage pixel space).
+    /// Preserves `scale` and `imageOrientation`.
+    public static func crop(_ image: UIImage, to rect: CGRect) -> UIImage? {
+        guard let cg = image.cgImage else { return nil }
+        let x = rect.origin.x.rounded(.towardZero)
+        let y = rect.origin.y.rounded(.towardZero)
+        let w = Int(rect.width.rounded())
+        let h = Int(rect.height.rounded())
+        guard w > 0, h > 0, x >= 0, y >= 0,
+              x + CGFloat(w) <= CGFloat(cg.width) + 0.5,
+              y + CGFloat(h) <= CGFloat(cg.height) + 0.5 else { return nil }
+        let bytesPerRow = w * 4
+        guard let ctx = CGContext(data: nil, width: w, height: h,
+                                  bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                                  space: sRGB,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        // 1:1 translate, no resample.
+        ctx.interpolationQuality = .none
+        ctx.translateBy(x: -x, y: -y)
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        guard let out = ctx.makeImage() else { return nil }
+        return UIImage(cgImage: out, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    /// Crop only when `FrontPosterPolicy` produces a rect; otherwise return `image` unchanged.
+    public static func cropIfNeeded(_ image: UIImage, source: String, validatedJacket: Bool = false) -> UIImage {
+        guard let cg = image.cgImage,
+              let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height,
+                                                    source: source, validatedJacket: validatedJacket) else {
+            return image
+        }
+        return crop(image, to: rect) ?? image
+    }
+}
+
+/// Build 332: JPEG encode / restore that keeps the ICC profile so a cached
+/// sRGB raster is not later displayed as DeviceRGB or Display P3.
+enum PosterJPEGColor {
+    static func data(_ image: UIImage, quality: CGFloat = 0.88) -> Data? {
+        guard var cg = image.cgImage else { return image.jpegData(compressionQuality: quality) }
+        if needsSRGBTag(cg), let tagged = retagSRGB(cg) { cg = tagged }
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else {
+            return image.jpegData(compressionQuality: quality)
+        }
+        let props: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
+        CGImageDestinationAddImage(dest, cg, props as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else {
+            return image.jpegData(compressionQuality: quality)
+        }
+        return data as Data
+    }
+
+    static func image(from data: Data) -> UIImage? {
+        guard let image = UIImage(data: data) else { return nil }
+        guard let cg = image.cgImage else { return image }
+        if needsSRGBTag(cg), let tagged = retagSRGB(cg) {
+            return UIImage(cgImage: tagged, scale: image.scale, orientation: image.imageOrientation)
+        }
+        return image
+    }
+
+    static func needsSRGBTag(_ cg: CGImage) -> Bool {
+        guard let space = cg.colorSpace, let name = space.name else { return true }
+        // Keep a real ICC / named space (sRGB, Display P3, …). Retag only DeviceRGB / generic.
+        if name == CGColorSpace.sRGB || name == CGColorSpace.displayP3 { return false }
+        let raw = name as String
+        if raw.contains("sRGB") || raw.contains("DisplayP3") || raw.contains("P3") { return false }
+        return true
+    }
+
+    static func retagSRGB(_ cg: CGImage) -> CGImage? {
+        guard let provider = cg.dataProvider else { return nil }
+        return CGImage(width: cg.width, height: cg.height,
+                       bitsPerComponent: cg.bitsPerComponent, bitsPerPixel: cg.bitsPerPixel,
+                       bytesPerRow: cg.bytesPerRow, space: PosterColorCrop.sRGB,
+                       bitmapInfo: cg.bitmapInfo, provider: provider, decode: nil,
+                       shouldInterpolate: cg.shouldInterpolate, intent: cg.renderingIntent)
+    }
+}
+
 /// 图片加载器（单例）：后台解密/降采样、请求合并、按内存压力自动淘汰。
 public actor ImageLoader {
     public static let shared = ImageLoader()
@@ -428,18 +517,15 @@ public actor ImageLoader {
     /// Decoded source cache stays separate from bounded list-only derivatives.
     public func loadPoster(_ source: String, maxPixelSize: Int, timeout: TimeInterval = 20) async -> UIImage? {
         let tag = JavDBCoverEnhance.cacheTag
-        let key = "front-v1#\(tag)#\(source)#\(maxPixelSize)"
+        let key = "front-v2#\(tag)#\(source)#\(maxPixelSize)"
         if let cached = posterCache.object(forKey: key as NSString) { return cached }
         if let flight = posterInFlight[key] { return await flight.value }
         let flight = Task { () -> UIImage? in
-            // load() already applies JavDB enhance when enabled; crop the enhanced raster.
+            // load() already applies JavDB enhance when enabled; crop the enhanced raster
+            // with a color-preserving translate-redraw (never cg.cropping).
             guard let original = await self.load(source, maxPixelSize: maxPixelSize, timeout: timeout) else { return nil }
             return await Task.detached(priority: .utility) {
-                guard let cg = original.cgImage,
-                      let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: source),
-                      let front = cg.cropping(to: rect) else { return original }
-                // ImageIO has already applied EXIF orientation before this operation.
-                return UIImage(cgImage: front)
+                PosterColorCrop.cropIfNeeded(original, source: source)
             }.value
         }
         posterInFlight[key] = flight
@@ -688,9 +774,9 @@ public struct JavDBImage: View {
                     context.fill(CGRect(x: 424, y: 0, width: 376, height: 538))
                     ("NEUTRAL " + url.components(separatedBy: "/").last!) .draw(at: CGPoint(x: 300, y: 260), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.white])
                 }
-                if frontPoster, let cg = fixtureImage.cgImage,
-                   let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: "https://tp.spfcas.com/covers/neutral.jpg"),
-                   let cropped = cg.cropping(to: rect) { fixtureImage = UIImage(cgImage: cropped) }
+                if frontPoster {
+                    fixtureImage = PosterColorCrop.cropIfNeeded(fixtureImage, source: "https://tp.spfcas.com/covers/neutral.jpg")
+                }
                 publish(fixtureImage, identity: identity, source: url)
                 return
             }
@@ -898,10 +984,7 @@ actor VisibleHQPosterScheduler {
             // Build 300: a learned DMM pl / store jacket is a landscape envelope; show its
             // front (Plan A crop) off the main thread. Portrait sources pass through.
             let image = await Task.detached(priority: .utility) { () -> UIImage in
-                guard let cg = loaded.cgImage,
-                      let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: url),
-                      let front = cg.cropping(to: rect) else { return loaded }
-                return UIImage(cgImage: front)
+                PosterColorCrop.cropIfNeeded(loaded, source: url)
             }.value
             if RailCoverFloor.rejects(source: url, image: image) { return nil }
             ListHQCoverCache.store(number: movie.number, source: url)
@@ -1102,7 +1185,7 @@ enum HQPosterDiskCache {
     static func image(forKey key: String) -> UIImage? {
         guard let file = fileURL(forKey: key),
               let data = try? Data(contentsOf: file),
-              let image = UIImage(data: data) else { return nil }
+              let image = PosterJPEGColor.image(from: data) else { return nil }
         // Touch so eviction stays least-recently-used.
         try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path)
         return image
@@ -1110,7 +1193,7 @@ enum HQPosterDiskCache {
 
     static func store(_ image: UIImage, forKey key: String) {
         guard let file = fileURL(forKey: key),
-              let data = image.jpegData(compressionQuality: 0.88) else { return }
+              let data = PosterJPEGColor.data(image, quality: 0.88) else { return }
         try? data.write(to: file, options: .atomic)
         evictIfNeeded()
     }

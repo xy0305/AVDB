@@ -8,19 +8,19 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '331' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 331;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '332' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 332;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HERO32800000000000001B' in pbx
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 331' in wf and 'feat/home-hot-328' in wf
+assert 'Home HQ posters App 332' in wf and 'feat/home-hot-328' in wf
 assert 'feat/detail-auth-327' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf
 assert 'python3 scripts/test-detail-auth327.py' in wf
-assert 'scripts/package-lut331.py' in wf and 'AVDB-331-release' in wf
-assert 'AVDB-unsigned-1.0.2-331-home-hero-crop.ipa' in (r/'scripts/package-lut331.py').read_text()
+assert 'scripts/package-lut332.py' in wf and 'AVDB-332-release' in wf
+assert 'AVDB-unsigned-1.0.2-332-home-hero-color.ipa' in (r/'scripts/package-lut332.py').read_text()
 assert 'home-hero-hq-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'detail-auth-327' in wf and 'test327DetailAuthErrorMessageVisible' in wf
 assert 'home-hot-328' in wf
@@ -128,7 +128,7 @@ assert 'accessibilityIdentifier("home-hero-more")' in home
 assert 'scrollTo("home-shortcuts"' in home
 assert 'id("home-shortcuts")' in home
 assert 'Text("更多")' in home
-assert 'frame(width: 44, height: 44)' in home.split('private struct HomeHeroMoreButton')[1].split('private struct HomeAnchoredFill')[0]
+assert 'frame(width: 44, height: 44)' in home.split('private struct HomeHeroMoreButton')[1].split('struct HomeAnchoredFill')[0]
 assert 'HeroSwipePolicy.pageSpringResponse' in hero
 assert 'pageSpringResponse: Double = 0.38' in policy
 assert 'pageSpringDamping: Double = 0.88' in policy
@@ -186,4 +186,4 @@ assert 'home-past-header' in nearby
 
 print('PASS home-hot328 source contracts: playback high_score+daily cap 10, '
       'DTO floor + per-item deadline, 往期 rail, light tokens, vertical arbitrator, '
-      '327 auth + 326 HQ intact, release 331')
+      '327 auth + 326 HQ intact, release 332')
