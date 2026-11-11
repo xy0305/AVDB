@@ -1794,7 +1794,8 @@ final class HomeHero332Tests: XCTestCase {
         ImageLoader.testTransport = { url, _ in
             url == source || url.contains("/covers/") ? jacket : nil
         }
-        let cropped = try XCTUnwrap(await ImageLoader.shared.loadPoster(source, maxPixelSize: 1024))
+        let croppedLoaded = await ImageLoader.shared.loadPoster(source, maxPixelSize: 1024)
+        let cropped = try XCTUnwrap(croppedLoaded)
         let cCG = try XCTUnwrap(cropped.cgImage)
         XCTAssertEqual(cCG.bitsPerPixel, 32)
         XCTAssertEqual(cCG.bytesPerRow, cCG.width * 4)
@@ -1809,7 +1810,8 @@ final class HomeHero332Tests: XCTestCase {
         ImageLoader.testTransport = { url, _ in url.contains("ps.jpg") ? portrait : nil }
         XCTAssertTrue(PosterColorCrop.cropIfNeeded(portrait, source: Self.winnerURL) === portrait,
                       "native portrait passthrough must be zero-copy")
-        let passed = try XCTUnwrap(await ImageLoader.shared.loadPoster(Self.winnerURL, maxPixelSize: 2048))
+        let passedLoaded = await ImageLoader.shared.loadPoster(Self.winnerURL, maxPixelSize: 2048)
+        let passed = try XCTUnwrap(passedLoaded)
         XCTAssertEqual(HeroCoverPolicy.pixelWidth(passed), 800)
         XCTAssertEqual(HeroCoverPolicy.pixelHeight(passed), 1200)
     }
