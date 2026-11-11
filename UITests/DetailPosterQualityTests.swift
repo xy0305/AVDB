@@ -982,7 +982,10 @@ final class HomeChrome330Tests: XCTestCase {
         XCTAssertTrue(presentation.tier.isAB || presentation.tier == .c)
     }
 
-    /// (d) Enrich-merged detail cover_url can appear as the middle step (not small_covers).
+    /// (d) Build 331 two-level semantics: there is no separate middle step any
+    /// more. The enrich-merged detail cover_url re-evaluates the *floor* (level 1)
+    /// and replaces the DTO thumb when it is sharper; the official resolver
+    /// winner (level 2) is still absent while the resolver is delayed.
     @MainActor
     func test330EnrichMergedDetailCoverIsMiddleStep() async throws {
         HeroCoverStore.shared.resetForTests()
@@ -1009,13 +1012,15 @@ final class HomeChrome330Tests: XCTestCase {
         }
         XCTAssertNotNil(presentation.blurImage, "DTO thumb floor must paint first")
         let midDeadline = Date().addingTimeInterval(3)
-        while Date() < midDeadline, presentation.enrichImage == nil {
+        while Date() < midDeadline, presentation.floorPixelWidth <= 147 {
             try await Task.sleep(nanoseconds: 40_000_000)
             presentation = HeroCoverStore.shared.presentation(for: "enrich-330")
         }
-        XCTAssertNotNil(presentation.enrichImage, "enrich-merged detail cover_url must appear as the middle step")
-        XCTAssertNotEqual(HeroCoverPolicy.pixelWidth(presentation.enrichImage!), 147)
+        XCTAssertEqual(presentation.floorPixelWidth, 700, "enrich-merged cover_url must re-evaluate and upgrade the floor itself")
+        XCTAssertNotEqual(HeroCoverPolicy.pixelWidth(presentation.blurImage!), 147)
+        XCTAssertEqual(presentation.floorSource, "fixture://poster/portrait-mid-cover")
         XCTAssertNil(presentation.sharpImage, "delayed resolver must not have won yet")
+        XCTAssertFalse(presentation.isSharp, "a floor never poses as the final winner")
     }
 
     /// (e) backdrop / pl is not chosen as the primary sharp over the official portrait winner.
@@ -1057,4 +1062,382 @@ final class HomeChrome330Tests: XCTestCase {
         XCTAssertEqual(HeroCoverPolicy.pixelWidth(presentation.sharpImage!), HeroCoverPolicy.pixelWidth(portrait),
                        "home hero sharp must be the official portrait, not the backdrop / pl jacket")
     }
+}
+
+/// Build 331: the home hero never shows the wide DVD jacket "collage".
+/// Neutral rendered fixtures only (no network, no adult imagery): the jacket's
+/// back half is red, its front (the right 0.70·h) is blue; the thumb is blue.
+final class HomeHero331Tests: XCTestCase {
+    override func tearDown() async throws {
+        await MainActor.run { HeroCoverStore.shared.resetForTests() }
+        HeroCoverPolicy.overallBudgetOverride = nil
+        await ImageLoader.shared.resetCachesForTests()
+        ImageLoader.resetTestTransport()
+        Self.offline.set(false)
+        try await super.tearDown()
+    }
+
+    final class Flag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        func set(_ v: Bool) { lock.lock(); value = v; lock.unlock() }
+        func get() -> Bool { lock.lock(); defer { lock.unlock() }; return value }
+    }
+    static let offline = Flag()
+
+    static func render(_ width: Int, _ height: Int, frontFrom: Int) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { ctx in
+            UIColor.red.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: frontFrom, height: height))
+            UIColor.blue.setFill(); ctx.fill(CGRect(x: frontFrom, y: 0, width: width - frontFrom, height: height))
+        }
+    }
+
+    /// 840×568 JavDB jacket: back cover left, front = right 398 px (0.70·568).
+    static let jacket = render(840, 568, frontFrom: 840 - 398)
+    /// 166×236 portrait small_cover: the front at low resolution.
+    static let thumb = render(166, 236, frontFrom: 0)
+
+    static func installJacketTransport(thumbDelay: Double = 0, coverDelay: Double = 0) {
+        ImageLoader.testTransport = { url, _ in
+            if HomeHero331Tests.offline.get() { return nil }
+            if url.contains("/small_covers/") {
+                if thumbDelay > 0 { try? await Task.sleep(nanoseconds: UInt64(thumbDelay * 1_000_000_000)) }
+                return HomeHero331Tests.thumb
+            }
+            if url.contains("/covers/") {
+                if coverDelay > 0 { try? await Task.sleep(nanoseconds: UInt64(coverDelay * 1_000_000_000)) }
+                return HomeHero331Tests.jacket
+            }
+            return nil
+        }
+    }
+
+    static func abfLike(_ id: String, number: String, slug: String) -> Movie {
+        Movie(id: id, number: number, title: "ABF-398-like \(id)",
+              thumbURL: "https://tp.spfcas.com/rhe951l4q/small_covers/mb/\(slug).jpg",
+              coverURL: "https://tp.spfcas.com/rhe951l4q/covers/mb/\(slug).jpg")
+    }
+
+    static func winnerArt(_ tag: String, width: Int = 760, height: Int = 1081) -> DetailPosterArtwork {
+        let image = render(width, height, frontFrom: 0)
+        let url = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/\(tag)/\(tag)ps.jpg"
+        return DetailPosterArtwork(image: image, backdrop: image, tint: .black,
+                                   provenance: PosterProvenance(source: url), sourceURL: url,
+                                   nativeWidth: width, nativeHeight: height, rawImage: image)
+    }
+
+    /// Average colour of the bitmap: true when it is the blue front, not the red back / collage.
+    static func isFront(_ image: UIImage) -> Bool {
+        guard let cg = image.cgImage else { return false }
+        var px = [UInt8](repeating: 0, count: 4)
+        let ok: Bool = px.withUnsafeMutableBytes { buf in
+            guard let ctx = CGContext(data: buf.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.interpolationQuality = .medium
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return true
+        }
+        return ok && Int(px[2]) > Int(px[0]) + 100
+    }
+
+    static func isPortrait(_ image: UIImage?) -> Bool {
+        guard let image else { return true }
+        return HeroCoverPolicy.pixelHeight(image) >= HeroCoverPolicy.pixelWidth(image)
+    }
+
+    @MainActor
+    func poll(_ seconds: Double, _ id: String, until done: (HeroCoverPresentation) -> Bool) async throws -> HeroCoverPresentation {
+        var p = HeroCoverStore.shared.presentation(for: id)
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline, !done(p) {
+            try await Task.sleep(nanoseconds: 20_000_000)
+            p = HeroCoverStore.shared.presentation(for: id)
+        }
+        return p
+    }
+
+    /// (1) Cold start, ABF-398-like DTO: the first painted frame is the single
+    /// front portrait (thumb or front crop), never the jacket collage; the
+    /// floor then settles on the 398×568 right-half front crop.
+    @MainActor
+    func test331ColdStartFirstFrameIsFrontPortrait() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.installJacketTransport()
+        HeroCoverStore.testDetailProvider = { _ in nil }
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            return nil
+        }
+        let movie = Self.abfLike("abf-331a", number: "ABF-9311", slug: "Mb331a")
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        let first = try await poll(2, movie.id) { $0.blurImage != nil }
+        let frame = try XCTUnwrap(first.blurImage, "a floor must paint at cold start")
+        XCTAssertTrue(Self.isPortrait(frame), "first frame must be a portrait, not the 840×568 jacket")
+        XCTAssertTrue(Self.isFront(frame), "first frame must be the front, not the back / spine collage")
+        let settled = try await poll(3, movie.id) { $0.floorPixelWidth == 398 }
+        let floor = try XCTUnwrap(settled.blurImage)
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(floor), 398, "floor = right 0.70·h front crop of cover_url")
+        XCTAssertEqual(HeroCoverPolicy.pixelHeight(floor), 568)
+        XCTAssertTrue(Self.isFront(floor))
+        XCTAssertNil(settled.sharpImage)
+        XCTAssertFalse(settled.isSharp)
+    }
+
+    /// (2) Swipe to item 4 and back: neither reverts to the jacket, and neither
+    /// sits on a low-res floor posing as final — the official winner is restored.
+    @MainActor
+    func test331SwipeToFourthAndBackKeepsSharpWinner() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.installJacketTransport()
+        HeroCoverStore.testDetailProvider = { _ in nil }
+        let movies = (0..<5).map { Self.abfLike("swipe-331-\($0)", number: "ABF-93\(20 + $0)", slug: "Sw331\($0)") }
+        HeroCoverStore.testResolverProvider = { movie in
+            Self.winnerArt("abf0\(movie.id.suffix(1))331")
+        }
+        HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
+        for movie in movies {
+            let p = try await poll(6, movie.id) { $0.isSharp }
+            XCTAssertTrue(p.isSharp, "\(movie.id) must hold a retrievable official winner")
+            XCTAssertEqual(p.tier, .b)
+        }
+        // Item 4 (index 3) was resolved while not adjacent: on disk, not in memory.
+        XCTAssertNil(HeroCoverStore.shared.presentation(for: movies[3].id).sharpImage)
+        XCTAssertTrue(HeroCoverStore.shared.presentation(for: movies[3].id).sharpOnDisk)
+
+        HeroCoverStore.shared.setCurrentIndex(3, movies: movies)
+        let fourth = try await poll(1.5, movies[3].id) { $0.sharpImage != nil }
+        let fourthSharp = try XCTUnwrap(fourth.sharpImage, "item 4 must show its winner, not the floor")
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(fourthSharp), 760)
+        XCTAssertTrue(Self.isPortrait(fourthSharp) && Self.isPortrait(fourth.blurImage))
+        XCTAssertNil(HeroCoverStore.shared.presentation(for: movies[0].id).sharpImage, "item 1 evicted outside ±1")
+
+        HeroCoverStore.shared.setCurrentIndex(0, movies: movies)
+        let back = try await poll(1.5, movies[0].id) { $0.sharpImage != nil }
+        let backSharp = try XCTUnwrap(back.sharpImage, "swipe back must restore the winner, not the floor")
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(backSharp), 760)
+        XCTAssertTrue(back.isSharp && back.phase == .finalized)
+        XCTAssertTrue(Self.isPortrait(back.blurImage), "floor underneath is still the cropped front")
+        XCTAssertNotEqual(back.floorPixelWidth, 840)
+    }
+
+    /// (3) Offline cold start with a cached detail-page winner: shown directly.
+    @MainActor
+    func test331OfflineColdStartShowsDetailWinner() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.offline.set(true)
+        Self.installJacketTransport()
+        HeroCoverStore.testDetailProvider = { _ in nil }
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            return nil
+        }
+        let art = Self.winnerArt("off00331")
+        // Exactly what DetailPosterResolver.resolve writes for the detail page.
+        XCTAssertTrue(HeroCoverDisk.storeAccepted(art.image, number: "OFF-9331", source: art.sourceURL))
+        let movie = Self.abfLike("off-331", number: "OFF-9331", slug: "Off331")
+        let t0 = Date()
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        let p = try await poll(1.5, movie.id) { $0.sharpImage != nil }
+        XCTAssertNotNil(p.sharpImage, "cached detail winner must paint offline")
+        XCTAssertLessThan(Date().timeIntervalSince(t0), 1.5)
+        XCTAssertEqual(HeroCoverPolicy.pixelWidth(p.sharpImage!), 760)
+        XCTAssertTrue(p.isAB)
+        XCTAssertTrue(Self.isFront(p.sharpImage!))
+    }
+
+    /// (4) Landscape fixture 840×568 cover + 166×236 thumb: no layer ever shows
+    /// an uncropped bitmap, and the floor uses the cropped version.
+    @MainActor
+    func test331LandscapeFixtureNeverShowsUncroppedLayer() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.installJacketTransport(thumbDelay: 0.05, coverDelay: 0.25)
+        let movie = Self.abfLike("land-331", number: "ABF-9341", slug: "Land331")
+        HeroCoverStore.testDetailProvider = { dto in
+            Movie(id: dto.id, type: "0", number: dto.number, title: dto.title,
+                  thumbURL: dto.thumbURL, coverURL: dto.coverURL)
+        }
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            return nil
+        }
+        HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
+        let deadline = Date().addingTimeInterval(2.5)
+        var samples = 0
+        while Date() < deadline {
+            let p = HeroCoverStore.shared.presentation(for: movie.id)
+            XCTAssertTrue(Self.isPortrait(p.blurImage), "floor layer drew an uncropped landscape bitmap")
+            XCTAssertTrue(Self.isPortrait(p.sharpImage), "sharp layer drew an uncropped landscape bitmap")
+            if let floor = p.blurImage { XCTAssertTrue(Self.isFront(floor)); samples += 1 }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertGreaterThan(samples, 0)
+        let p = HeroCoverStore.shared.presentation(for: movie.id)
+        XCTAssertEqual(p.floorPixelWidth, 398, "floor must use the front-cropped cover, not the 166 px thumb")
+        XCTAssertEqual(p.floorSource, movie.coverURL)
+        // Ambient wash is sampled from the displayed (cropped) bitmap.
+        XCTAssertEqual(p.ambient, HomeAmbientColor.base(from: p.blurImage!))
+        // The shared crop chain itself.
+        let cropped = await ImageLoader.shared.loadPoster(movie.coverURL!, maxPixelSize: 1024)
+        XCTAssertEqual(cropped.map(HeroCoverPolicy.pixelWidth), 398)
+        // Safety net: a residual landscape raster is right-anchored, portraits center.
+        XCTAssertEqual(HeroFillAnchor.x(imageWidth: 840, imageHeight: 568, drawnWidth: 668, containerWidth: 393), 393 - 668)
+        XCTAssertEqual(HeroFillAnchor.x(imageWidth: 398, imageHeight: 568, drawnWidth: 393, containerWidth: 393), 0)
+    }
+
+    /// (5) Network off and the resolver never completes: stays on the sharp front floor.
+    @MainActor
+    func test331ResolverNeverCompletesStaysOnSharpFrontFloor() async throws {
+        HeroPolicyOverride.short()
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.installJacketTransport()
+        HeroCoverStore.testDetailProvider = { _ in nil }
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 60_000_000_000)
+            return nil
+        }
+        let movies = (0..<3).map { Self.abfLike("off-floor-331-\($0)", number: "ABF-935\($0)", slug: "Nf331\($0)") }
+        HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
+        _ = try await poll(3, movies[0].id) { $0.floorPixelWidth == 398 }
+        _ = try await poll(3, movies[1].id) { $0.floorPixelWidth == 398 }
+        Self.offline.set(true)
+        _ = try await poll(2, movies[0].id) { $0.settled }
+        HeroCoverStore.shared.setCurrentIndex(1, movies: movies)
+        HeroCoverStore.shared.setCurrentIndex(0, movies: movies)
+        HeroCoverStore.shared.noteNetworkRecovered()
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let p = HeroCoverStore.shared.presentation(for: movies[0].id)
+        XCTAssertTrue(p.settled)
+        XCTAssertEqual(p.floorPixelWidth, 398, "stays on the sharp front-cropped floor")
+        XCTAssertTrue(Self.isFront(p.blurImage!) && Self.isPortrait(p.blurImage))
+        XCTAssertNil(p.sharpImage)
+        XCTAssertFalse(p.isSharp)
+        XCTAssertFalse(p.isAB)
+        XCTAssertNotEqual(p.phase, .finalized, "a floor never poses as final")
+    }
+
+    /// (6) Evict, then swipe back: restored from HeroCoverDisk by winner URL
+    /// with zero network requests and no resolver rerun.
+    @MainActor
+    func test331EvictedWinnerRestoresWithZeroNetwork() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.installJacketTransport()
+        HeroCoverStore.testDetailProvider = { _ in nil }
+        HeroCoverStore.testResolverProvider = { movie in
+            Self.winnerArt("evc0\(movie.id.suffix(1))331")
+        }
+        let movies = (0..<4).map { Self.abfLike("evict-331-\($0)", number: "ABF-936\($0)", slug: "Ev331\($0)") }
+        HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
+        for movie in movies {
+            _ = try await poll(6, movie.id) { $0.isSharp && $0.floorPixelWidth == 398 }
+        }
+        HeroCoverStore.shared.setCurrentIndex(2, movies: movies)
+        let evicted = HeroCoverStore.shared.presentation(for: movies[0].id)
+        XCTAssertNil(evicted.sharpImage, "item 1 bitmap evicted outside current ±1")
+        XCTAssertTrue(evicted.sharpOnDisk && evicted.isAB, "evicted winner stays retrievable from HeroCoverDisk")
+        try await Task.sleep(nanoseconds: 300_000_000)
+        ImageLoader.testTransportLock.lock()
+        let callsBefore = ImageLoader.testTransportCalls
+        ImageLoader.testTransportLock.unlock()
+        let runsBefore = HeroCoverStore.resolverRunCount
+
+        HeroCoverStore.shared.setCurrentIndex(0, movies: movies)
+        let back = try await poll(1.5, movies[0].id) { $0.sharpImage != nil }
+        XCTAssertNotNil(back.sharpImage, "swipe back restores the winner")
+        XCTAssertEqual(back.sharpImage.map(HeroCoverPolicy.pixelWidth), 760)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        ImageLoader.testTransportLock.lock()
+        let callsAfter = ImageLoader.testTransportCalls
+        ImageLoader.testTransportLock.unlock()
+        XCTAssertEqual(callsAfter, callsBefore, "restore must make zero network requests")
+        XCTAssertEqual(HeroCoverStore.resolverRunCount, runsBefore, "restore must not rerun the resolver")
+    }
+
+    /// (7) setCurrentIndex with raw ranking DTOs never drops enriched cover / type;
+    /// rank-level fields (title) follow the latest ranking; the resolver gets the merged record.
+    @MainActor
+    func test331SetCurrentIndexKeepsMergedFields() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.installJacketTransport()
+        let cover = "https://tp.spfcas.com/rhe951l4q/covers/mm/Merge331.jpg"
+        HeroCoverStore.testDetailProvider = { dto in
+            Movie(id: dto.id, type: "0", number: dto.number, title: dto.title, coverURL: cover)
+        }
+        final class Seen: @unchecked Sendable { var movies: [Movie] = [] }
+        let seen = Seen()
+        HeroCoverStore.testResolverProvider = { movie in
+            await MainActor.run { seen.movies.append(movie) }
+            return nil
+        }
+        let dto = Movie(id: "merge-331", number: "ABF-9371", title: "Old title",
+                        thumbURL: "https://tp.spfcas.com/rhe951l4q/small_covers/mm/Merge331.jpg")
+        HeroCoverStore.shared.start(movies: [dto], currentIndex: 0)
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline, seen.movies.isEmpty { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertEqual(seen.movies.first?.type, "0", "resolver must receive the enrich-merged record")
+        XCTAssertEqual(seen.movies.first?.coverURL, cover)
+
+        let refreshed = Movie(id: "merge-331", number: "ABF-9371", title: "New title",
+                              thumbURL: "https://tp.spfcas.com/rhe951l4q/small_covers/mm/Merge331.jpg")
+        HeroCoverStore.shared.setCurrentIndex(0, movies: [refreshed])
+        HeroCoverStore.shared.clearNegativesAndRetry()
+        let again = Date().addingTimeInterval(3)
+        while Date() < again, seen.movies.count < 2 { try await Task.sleep(nanoseconds: 20_000_000) }
+        let latest = try XCTUnwrap(seen.movies.last)
+        XCTAssertEqual(latest.type, "0", "enriched type is never overwritten by the raw DTO")
+        XCTAssertEqual(latest.coverURL, cover, "enriched cover is never overwritten by the raw DTO")
+        XCTAssertEqual(latest.title, "New title", "rank / title follow the latest ranking")
+        let merged = refreshed.preservingHeroEnrichment(from: Movie(id: "merge-331", type: "0", number: "ABF-9371", coverURL: cover))
+        XCTAssertEqual(merged.coverURL, cover)
+        XCTAssertEqual(merged.type, "0")
+        XCTAssertEqual(merged.title, "New title")
+    }
+
+    /// (8) Winner sharing by movie id between the detail page and home, both ways.
+    @MainActor
+    func test331DetailWinnerSharedByMovieID() async throws {
+        HeroCoverStore.shared.resetForTests()
+        await ImageLoader.shared.resetCachesForTests()
+        Self.installJacketTransport()
+        HeroCoverStore.testDetailProvider = { _ in nil }
+        HeroCoverStore.testResolverProvider = { _ in
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            return nil
+        }
+        let account = APIClient.shared.token
+        let dto = Self.abfLike("share-331", number: "ABF-9381", slug: "Share331")
+        HeroCoverStore.shared.start(movies: [dto], currentIndex: 0)
+        _ = try await poll(3, dto.id) { $0.floorPixelWidth == 398 }
+        XCTAssertNil(HeroCoverStore.shared.presentation(for: dto.id).sharpImage)
+
+        // Detail page resolves with its *full* record (type / different fields):
+        // returning home upgrades the hero immediately.
+        let art = Self.winnerArt("abf09381")
+        DetailPosterWinners.store(art, movieID: dto.id, account: account)
+        let upgraded = try await poll(1.5, dto.id) { $0.sharpImage != nil }
+        XCTAssertEqual(upgraded.sharpImage.map(HeroCoverPolicy.pixelWidth), 760, "detail winner overrides the floor on arrival")
+        XCTAssertEqual(upgraded.winnerURL, art.sourceURL)
+
+        // Home → detail: the detail page's full-record identity finds the same winner by id.
+        let full = Movie(id: dto.id, type: "0", number: dto.number, title: "Full detail record",
+                         thumbURL: dto.thumbURL, coverURL: "https://tp.spfcas.com/rhe951l4q/covers/mb/Share331-full.jpg")
+        let layout = DetailPosterResolver.initialLayout(movie: full, account: account)
+        XCTAssertEqual(layout.artwork?.sourceURL, art.sourceURL)
+        XCTAssertNil(DetailPosterWinners.winner(movieID: "other-331", account: account))
+    }
+}
+
+/// Short 6s rhythm point for the never-completing resolver test.
+enum HeroPolicyOverride {
+    static func short() { HeroCoverPolicy.overallBudgetOverride = 0.3 }
 }

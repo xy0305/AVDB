@@ -5,7 +5,7 @@ import json, plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '330' and pbx.count('CURRENT_PROJECT_VERSION = 330;') == 2
+assert plist['CFBundleVersion'] == '331' and pbx.count('CURRENT_PROJECT_VERSION = 331;') == 2
 data = json.loads((r/'AVDB/Resources/ZhongZhiTongMonthly.json').read_text())
 months = {m['month']: m for m in data['months']}
 added = ['2021-09','2021-12','2022-03','2022-06','2022-07','2022-08','2022-09']

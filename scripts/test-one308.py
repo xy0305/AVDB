@@ -6,7 +6,7 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '330' and pbx.count('CURRENT_PROJECT_VERSION = 330;') == 2
+assert plist['CFBundleVersion'] == '331' and pbx.count('CURRENT_PROJECT_VERSION = 331;') == 2
 
 # Bottom tab wiring: .one sits between tangxin and me, titled ONE.
 chrome = (r / 'AVDB/Views/TabBarChrome.swift').read_text()
@@ -65,11 +65,11 @@ assert 'OneHistoryDestinations' in library and 'OneDetailView(seed: OneArticle.s
 
 # Release wiring.
 workflow = (r / '.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 330' in workflow
+assert 'Home HQ posters App 331' in workflow
 assert 'python3 scripts/test-one308.py;' in workflow
-assert 'scripts/package-lut330.py' in workflow and 'AVDB-330-release' in workflow
-package = (r / 'scripts/package-lut330.py').read_text()
-assert "=='330'" in package and 'AVDB-unsigned-1.0.2-330-home-chrome.ipa' in package
+assert 'scripts/package-lut331.py' in workflow and 'AVDB-331-release' in workflow
+package = (r / 'scripts/package-lut331.py').read_text()
+assert "=='331'" in package and 'AVDB-unsigned-1.0.2-331-home-hero-crop.ipa' in package
 
 print('PASS one308: ONE is the 7th bottom tab; native protocol port (bootstrap/discovery/search/detail, '
       'AES+MD5, month-scan partitions, full-MP4 lines), history route, build 309 playback resilience '

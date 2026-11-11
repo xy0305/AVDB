@@ -173,6 +173,28 @@ public struct Movie: Decodable, Identifiable, Hashable {
         return copy
     }
 
+    /// Build 331: field-level merge by movie id. `self` is the latest raw
+    /// ranking DTO (rank / title / score etc. follow it); non-empty enriched
+    /// cover / thumb / actors / type / CID-bearing catalogue metadata from the
+    /// previously merged hero record are never overwritten by the sparse DTO.
+    func preservingHeroEnrichment(from enriched: Movie) -> Movie {
+        guard enriched.id == id else { return self }
+        var copy = self
+        if let cover = enriched.coverURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !cover.isEmpty, !cover.contains("/small_covers/") {
+            copy.coverURL = cover
+        }
+        if (copy.thumbURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let thumb = enriched.thumbURL, !thumb.isEmpty {
+            copy.thumbURL = thumb
+        }
+        if let actors = enriched.actors, !actors.isEmpty { copy.actors = actors }
+        if let names = enriched.actorNames, !names.isEmpty { copy.actorNames = names }
+        if let type = enriched.type, !type.isEmpty { copy.type = type }
+        if let meta = enriched.catalogueMetadata { copy.catalogueMetadata = meta }
+        return copy
+    }
+
     public var displayTitle: String { title ?? number ?? "未知影片" }
     public var displayNumber: String { number ?? id }
 

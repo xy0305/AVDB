@@ -9,18 +9,18 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '330' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 330;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '331' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 331;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HeroCoverResolver.swift' in pbx and 'DetailPosterResolver.swift' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 330' in wf and 'feat/home-chrome-330' in wf
+assert 'Home HQ posters App 331' in wf and 'feat/home-chrome-330' in wf
 assert 'feat/home-hot-329' in wf and 'feat/home-hot-328' in wf
 assert 'python3 scripts/test-home-chrome330.py' in wf
 assert 'python3 scripts/test-home-hot329.py' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
-assert 'scripts/package-lut330.py' in wf and 'AVDB-330-release' in wf
-assert 'AVDB-unsigned-1.0.2-330-home-chrome.ipa' in (r/'scripts/package-lut330.py').read_text()
+assert 'scripts/package-lut331.py' in wf and 'AVDB-331-release' in wf
+assert 'AVDB-unsigned-1.0.2-331-home-hero-crop.ipa' in (r/'scripts/package-lut331.py').read_text()
 assert 'home-chrome-330' in wf
 assert 'HomeChrome330Tests' in wf
 assert 'test330CleanTapOpensDetailAndPageCommitDoesNot' in wf
@@ -98,7 +98,8 @@ assert hero.find('HeroSwipeOverlay(') < hero.find('HomeHeroMoreButton(action: on
 # --- 3. Official DetailPosterResolver portrait; three-step floor; scheduler ---
 assert 'func mergingHeroDetail(' in movie
 assert 'small_covers' in movie.split('func mergingHeroDetail')[1].split('public var displayTitle')[0]
-assert 'enrichImage' in resolver
+# 331: two-level floor — the separate 330 middle step (enrichImage) is removed.
+assert 'enrichImage' not in resolver
 assert 'HeroResolverSharp' in resolver
 assert 'primaryImage(from art: DetailPosterArtwork)' in resolver
 assert 'art.rawImage ?? art.image' in resolver
@@ -111,7 +112,8 @@ assert 'var rawImage: UIImage?' in detail
 assert 'enqueueResolver' in resolver
 assert 'current → +1 → −1 → +2 → −2' in resolver or '+1 → −1 → +2 → −2' in resolver
 assert 'static let resolverConcurrency = 2' in resolver
-assert 'enrichThenResolve' in resolver
+# 331: per-item enrich → resolver pipeline replaces the 330 batch waterfall.
+assert 'enrichThenResolve' not in resolver and 'schedulePipelines' in resolver
 assert 'Merge cover / actors / CID' in resolver or 'cover / actors / CID' in resolver
 assert 'not a cancel' in resolver.lower() or '不是取消' in resolver
 assert 'no longer the authoritative sharp target' in resolver
@@ -123,9 +125,9 @@ assert 'Do not run AICover' in resolver or 'never uses the artwork backdrop or A
 assert 'cachedResolverPortrait' in resolver
 assert 'HeroCoverDisk.image(for:' in resolver
 
-# Three-step floor in the page.
+# 331: two-level floor in the page (floor → official winner).
 page = home.split('private struct HomeHeroPage: View {')[1].split('private struct HomeHeroMoreButton')[0]
-assert 'presentation.enrichImage' in page
+assert 'presentation.enrichImage' not in page
 assert 'presentation.sharpImage' in page
 assert 'presentation.blurImage' in page
 assert '.easeOut(duration: HeroCoverPolicy.crossfadeDuration)' in page
@@ -152,11 +154,11 @@ assert 'test330EnrichMergedDetailCoverIsMiddleStep' in unit
 assert 'test330BackdropPLIsNotPrimaryOverOfficialPortrait' in unit
 assert 'fixture://delay/15' in unit or '15_000_000_000' in unit
 assert 'HeroTapPolicy.shouldOpen' in unit
-assert 'enrichImage' in unit
+assert 'floorPixelWidth' in unit  # 331: middle-step test updated to the two-level floor
 assert 'isBackdropOrJacket' in unit
 assert 'final class HomeHot329Tests' in unit
 assert 'final class HomeHot328Tests' in unit
 
 print('PASS home-chrome330 source contracts: 44 pt liquid-glass search, overlay-tap '
       'navigation, official DetailPosterResolver portrait, three-step floor, '
-      'scheduler cap 2, iPhone-only LiquidGlassContainer shortcuts, release 330')
+      'scheduler cap 2, iPhone-only LiquidGlassContainer shortcuts, release 331')

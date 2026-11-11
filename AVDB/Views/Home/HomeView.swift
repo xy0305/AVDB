@@ -190,7 +190,7 @@ struct HomeView: View {
                 // tab bar inset) is kept so the last rail scrolls clear of the bar.
                 .ignoresSafeArea(.container, edges: .top)
                 .refreshable {
-                    HeroCoverStore.shared.clearNegativesAndRetry()
+                    if !HeroCoverStore.appCallsSuspended { HeroCoverStore.shared.clearNegativesAndRetry() }
                     await vm.initialLoad()
                 }
             }
@@ -670,7 +670,7 @@ final class HomeViewModel: ObservableObject {
                 selectedFollowTag = followTags.first
                 following = (1...9).map { Movie(id: "follow-\($0)", number: "TEST-F\($0)", title: "Neutral follow film \($0)", coverURL: "fixture://poster/thumb147-\($0)") }
                 latestState = .loaded; magnetsState = .loaded
-                HeroCoverStore.shared.start(movies: playback, currentIndex: 0)
+                if !HeroCoverStore.appCallsSuspended { HeroCoverStore.shared.start(movies: playback, currentIndex: 0) }
             }
             return
         }
@@ -782,7 +782,7 @@ final class HomeViewModel: ObservableObject {
                 self.playbackState = state
                 // Prefetch starts when the playback list returns. Image success/failure
                 // never mutates this array (dot count stays fixed).
-                HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
+                if !HeroCoverStore.appCallsSuspended { HeroCoverStore.shared.start(movies: movies, currentIndex: 0) }
             case .latest: previous = self.latest; self.latest = movies; self.latestState = state
             case .magnets: previous = self.magnets; self.magnets = movies; self.magnetsState = state
             }
@@ -1402,23 +1402,23 @@ private struct HomeHeroCarousel: View {
         }
         .frame(width: width, height: height)
         .onAppear {
-            covers.setCurrentIndex(index, movies: movies)
+            if !HeroCoverStore.appCallsSuspended { covers.setCurrentIndex(index, movies: movies) }
             publishAmbient()
         }
         .onChange(of: movies.map(\.id)) { _, _ in
             index = 0
-            covers.setCurrentIndex(0, movies: movies)
+            if !HeroCoverStore.appCallsSuspended { covers.setCurrentIndex(0, movies: movies) }
             publishAmbient()
         }
         .onChange(of: index) { _, new in
-            covers.setCurrentIndex(new, movies: movies)
+            if !HeroCoverStore.appCallsSuspended { covers.setCurrentIndex(new, movies: movies) }
         }
         .onChange(of: ambientKey) { _, _ in publishAmbient() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { covers.retryOnForeground() }
+            if phase == .active, !HeroCoverStore.appCallsSuspended { covers.retryOnForeground() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .heroCoverNetworkRecovered)) { _ in
-            covers.noteNetworkRecovered()
+            if !HeroCoverStore.appCallsSuspended { covers.noteNetworkRecovered() }
         }
         // Synopsis for current + next, lazily; never blocks the hero.
         .task(id: current?.id) {
@@ -1567,7 +1567,9 @@ private struct HomeHeroCarousel: View {
 
     private var ambientKey: String {
         guard let movie = current else { return "" }
-        return movie.id + (cover(movie).ambient == nil ? "#" : "#hsb")
+        // Build 331: follows the currently displayed (cropped) bitmap.
+        guard let hsb = cover(movie).ambient else { return movie.id + "#" }
+        return movie.id + "#hsb#\(hsb.h)|\(hsb.s)|\(hsb.b)"
     }
 
     private func publishAmbient() {
@@ -1604,10 +1606,13 @@ private struct HeroTouchStyle: ButtonStyle {
 }
 
 /// One hero page: layered full-bleed paint, never an inset card.
-/// Floor = the sharpest available list/DTO cover, painted unblurred (no radius,
-/// no brightness dim). Quality rules never gate this layer. HQ sharp (A/B)
-/// crossfades in (plain fade ≤ 0.45s) when it arrives. Brand brown #2A2019 is
-/// never the visible empty floor.
+/// Build 331 two-level floor: level 1 = the sharpest image in the movie's
+/// current record (front-cropped cover_url preferred, thumb fallback), painted
+/// unblurred (no radius, no brightness dim); level 2 = the official
+/// DetailPosterResolver winner, cross-faded in (plain fade ≤ 0.45s) on arrival.
+/// Every layer goes through `ImageLoader.loadPoster` (FrontPosterPolicy
+/// crop-or-passthrough): no layer ever draws an uncropped DVD jacket. Brand
+/// brown #2A2019 is never the visible empty floor.
 private struct HomeHeroPage: View {
     let presentation: HeroCoverPresentation
     let movie: Movie
@@ -1620,14 +1625,9 @@ private struct HomeHeroPage: View {
         let size = CGSize(width: metrics.width, height: metrics.heroHeight)
         ZStack {
             HomeTheme.heroLoadingFloor
-            // Three-step floor with cross-fades (≤0.45s): ranking DTO → enrich
-            // detail cover_url → DetailPosterResolver official portrait winner.
-            // Later layers sit on top; quality rules never gate the DTO floor.
+            // Level 1: floor. Level 2: official resolver winner on top.
             if let floor = presentation.blurImage ?? floorImage {
                 HomeAnchoredFill(image: floor, size: size)
-            }
-            if let mid = presentation.enrichImage {
-                HomeAnchoredFill(image: mid, size: size)
             }
             if let sharp = presentation.sharpImage {
                 HomeAnchoredFill(image: sharp, size: size)
@@ -1637,20 +1637,22 @@ private struct HomeHeroPage: View {
         .animation(.easeOut(duration: HeroCoverPolicy.crossfadeDuration), value: presentation.token)
         .scaleEffect(zoomed ? 1.05 : 1.0)
         .task(id: movie.id) {
-            // DTO floor is a mandatory unblurred paint even if HeroCoverStore is stuck.
-            // Prefer the first immediately available URL; skip hanging / delayed
-            // stand-ins so a slow HQ source cannot block the floor.
+            // Safety net if HeroCoverStore is stuck: the same crop-or-passthrough
+            // chain as the store (front-cropped cover_url, then thumb). Skip
+            // hanging / delayed stand-ins so a slow source cannot block the floor.
             if presentation.blurImage != nil || presentation.sharpImage != nil { return }
             await withTaskGroup(of: UIImage?.self) { group in
-                for url in [movie.thumbURL, movie.coverURL] {
+                let cover = movie.coverURL.flatMap { $0.contains("/small_covers/") ? nil : $0 }
+                for url in [cover, movie.thumbURL] {
                     guard let url, !url.isEmpty else { continue }
                     if url.hasPrefix("fixture://hang") || url.hasPrefix("fixture://delay") { continue }
-                    group.addTask { await ImageLoader.shared.load(url, maxPixelSize: 640, timeout: 4) }
+                    let size = url == cover ? 1024 : 640
+                    group.addTask { await ImageLoader.shared.loadPoster(url, maxPixelSize: size, timeout: 4) }
                 }
                 var best: UIImage?
                 for await image in group {
                     guard let image else { continue }
-                    if best == nil || RailCoverFloor.prefers(image, source: "", to: best!, currentSource: "") {
+                    if best == nil || HeroCoverStore.floorRank(image) > HeroCoverStore.floorRank(best!) {
                         best = image
                         floorImage = image
                     }
@@ -1689,7 +1691,18 @@ private struct HomeHeroMoreButton: View {
     }
 }
 
+/// Build 331: horizontal anchor of a hero layer. Portrait rasters center;
+/// a residual landscape raster is right-anchored (trailing = DVD front).
+enum HeroFillAnchor {
+    static func x(imageWidth iw: CGFloat, imageHeight ih: CGFloat, drawnWidth dw: CGFloat, containerWidth w: CGFloat) -> CGFloat {
+        iw > ih ? (w - dw) : (w - dw) / 2
+    }
+}
+
 /// aspectFill with a vertical anchor (0 = top, 0.5 = center).
+/// Build 331 safety net: every hero layer is already front-cropped, but a
+/// residual landscape raster (w > h) is right-anchored (the DVD front is the
+/// right side of a jacket) instead of centered on the spine.
 private struct HomeAnchoredFill: View {
     let image: UIImage
     let size: CGSize
@@ -1703,7 +1716,8 @@ private struct HomeAnchoredFill: View {
             .resizable()
             .interpolation(.high)
             .frame(width: dw, height: dh)
-            .offset(x: (size.width - dw) / 2, y: -(dh - size.height) * anchorY)
+            .offset(x: HeroFillAnchor.x(imageWidth: iw, imageHeight: ih, drawnWidth: dw, containerWidth: size.width),
+                    y: -(dh - size.height) * anchorY)
             .frame(width: size.width, height: size.height, alignment: .topLeading)
             .clipped()
     }

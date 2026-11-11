@@ -426,14 +426,14 @@ public actor ImageLoader {
     #endif
 
     /// Decoded source cache stays separate from bounded list-only derivatives.
-    public func loadPoster(_ source: String, maxPixelSize: Int) async -> UIImage? {
+    public func loadPoster(_ source: String, maxPixelSize: Int, timeout: TimeInterval = 20) async -> UIImage? {
         let tag = JavDBCoverEnhance.cacheTag
         let key = "front-v1#\(tag)#\(source)#\(maxPixelSize)"
         if let cached = posterCache.object(forKey: key as NSString) { return cached }
         if let flight = posterInFlight[key] { return await flight.value }
         let flight = Task { () -> UIImage? in
             // load() already applies JavDB enhance when enabled; crop the enhanced raster.
-            guard let original = await self.load(source, maxPixelSize: maxPixelSize) else { return nil }
+            guard let original = await self.load(source, maxPixelSize: maxPixelSize, timeout: timeout) else { return nil }
             return await Task.detached(priority: .utility) {
                 guard let cg = original.cgImage,
                       let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: source),

@@ -39,6 +39,64 @@ private final class PosterRedirectGuard: NSObject, URLSessionTaskDelegate {
     }
 }
 
+extension Notification.Name {
+    /// Build 331: a DetailPosterResolver winner landed (payload: movie id).
+    /// The home hero upgrades immediately when the user returns from detail.
+    static let detailPosterWinnerResolved = Notification.Name("avdb.detail.poster.winnerResolved")
+}
+
+/// Build 331: memory layer of the bidirectional detail ↔ home winner share,
+/// keyed by account scope + movie id (+ enhance tag / cache version), never by
+/// the full movie record. The detail page's full record and the hero's ranking
+/// / merged record therefore meet on the same winner. HeroCoverDisk is the
+/// persistent layer underneath.
+enum DetailPosterWinners {
+    private struct Entry { let art: DetailPosterArtwork; let expires: Date }
+    private static let lock = NSLock()
+    private static var entries: [String: Entry] = [:]
+    private static var order: [String] = []
+    static let capacity = 40
+    static let positiveTTL: TimeInterval = 30 * 60
+
+    static func key(movieID: String, account: String?) -> String {
+        let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
+        return scope + "#" + movieID + "#" + JavDBCoverEnhance.cacheTag + "#" + DetailPosterResolver.cacheVersion
+    }
+
+    static func winner(movieID: String, account: String?) -> DetailPosterArtwork? {
+        let key = key(movieID: movieID, account: account)
+        lock.lock(); defer { lock.unlock() }
+        guard let entry = entries[key] else { return nil }
+        guard entry.expires > Date() else { entries[key] = nil; order.removeAll { $0 == key }; return nil }
+        return entry.art
+    }
+
+    static func store(_ art: DetailPosterArtwork, movieID: String, account: String?) {
+        let key = key(movieID: movieID, account: account)
+        let ttl = art.provenance.label == "JavDB" ? DetailPosterResolver.fallbackTTL : positiveTTL
+        lock.lock()
+        entries[key] = Entry(art: art, expires: Date().addingTimeInterval(ttl))
+        order.removeAll { $0 == key }
+        order.append(key)
+        while order.count > capacity, let oldest = order.first {
+            order.removeFirst(); entries[oldest] = nil
+        }
+        lock.unlock()
+        let id = movieID
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .detailPosterWinnerResolved, object: nil, userInfo: ["movieID": id])
+        }
+    }
+
+    static func invalidate() {
+        lock.lock(); entries.removeAll(); order.removeAll(); lock.unlock()
+    }
+
+    #if DEBUG
+    static func resetForTests() { invalidate() }
+    #endif
+}
+
 enum DetailPosterResolver {
     // Build 284: a JavDB fallback winner is kept only briefly, so a later DMM success
     // (network/proxy recovered) replaces it on the next open instead of after 2 minutes.
@@ -96,6 +154,7 @@ enum DetailPosterResolver {
     /// Drop detail poster winners when the JavDB cover-enhance toggle flips.
     static func invalidateCoverCaches() {
         cache.invalidate()
+        DetailPosterWinners.invalidate()
     }
 
     static func validatedSources(_ movie: Movie) -> [String] {
@@ -134,6 +193,10 @@ enum DetailPosterResolver {
     static func initialLayout(movie: Movie, account: String?) -> DetailPosterLayout<DetailPosterArtwork> {
         let saved = cache.snapshot(key: identity(movie: movie, account: account))
         if case .resolving = saved {
+            // Build 331: the identity key includes the full movie record, so the
+            // detail page's full record and the home hero's ranking record never
+            // met. A winner for the same movie id (either side) is used directly.
+            if let shared = DetailPosterWinners.winner(movieID: movie.id, account: account) { return .portrait(shared) }
             // Definite unsupported/no eligible candidates: retain legacy immediately.
             if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty && !catalogueEligible(movie) { return .landscape }
         }
@@ -150,6 +213,9 @@ enum DetailPosterResolver {
         let id = movie.id
         if let cached = cache.snapshot(key: identity(movie: movie, account: account)).artwork {
             return cached
+        }
+        if let shared = DetailPosterWinners.winner(movieID: id, account: account) {
+            return shared
         }
         let task: Task<DetailPosterArtwork?, Never> = {
             idFlightLock.lock(); defer { idFlightLock.unlock() }
@@ -223,6 +289,9 @@ enum DetailPosterResolver {
             guard var art = await artwork(image: selected.image, source: winner.source, derive: false) else { return nil }
             art.sourceURL = winner.source; art.nativeWidth = winner.width; art.nativeHeight = winner.height
             HeroCoverDisk.storeAccepted(art.image, number: movie.number, source: winner.source)
+            // Build 331: share by movie id with the home hero (memory layer;
+            // HeroCoverDisk above is the persistent layer).
+            DetailPosterWinners.store(art, movieID: movie.id, account: account)
             return art
         }
     }
