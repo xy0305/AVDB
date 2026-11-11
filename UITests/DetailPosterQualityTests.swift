@@ -1976,7 +1976,7 @@ final class HomeHero333Tests: XCTestCase {
         // one number/artwork, which serializes the number-keyed winner path
         // and lands the first winner after this test's 6 s checkpoint.
         HeroCoverStore.testResolverProvider = { movie in
-            let digits = movie.number.filter { $0.isNumber }
+            let digits = (movie.number ?? "").filter { $0.isNumber }
             let ps = "https://pics.dmm.co.jp/digital/video/abf00\(digits)/abf00\(digits)ps.jpg"
             return Self.distinctArt(display: Self.solid(745, 1081, 0.85, 0.55, 0.35),
                                     raw: Self.solid(1000, 1500, 0.20, 0.30, 0.80), source: ps)
