@@ -1903,9 +1903,9 @@ final class HomeHero333Tests: XCTestCase {
     }
 
     private static func solid(_ w: Int, _ h: Int, _ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> UIImage {
-        HomeHero331Tests.render(width: w, height: h) { ctx, width, height in
-            ctx.setFillColor(UIColor(red: r, green: g, blue: b, alpha: 1).cgColor)
-            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        HomeHero332Tests.sRGBImage(width: w, height: h) { ctx in
+            ctx.setFillColor(CGColor(srgbRed: r, green: g, blue: b, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         }
     }
 
@@ -1931,8 +1931,8 @@ final class HomeHero333Tests: XCTestCase {
         let ps = "https://pics.dmm.co.jp/digital/video/abf00333/abf00333ps.jpg"
         let art = Self.distinctArt(display: display, raw: raw, source: ps)
         HeroCoverStore.testResolverProvider = { _ in art }
-        let movie = HomeHero331Tests.heroMovie(id: "hero-333-a", number: "ABF-333", title: "333 portrait",
-                                               cover: "", thumb: "")
+        let movie = Movie(id: "hero-333-a", number: "ABF-333", title: "333 portrait",
+                                               thumbURL: "", coverURL: "")
         HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
         let p = try await poll(6, movie.id) { $0.sharpImage != nil }
         let sharp = try XCTUnwrap(p.sharpImage, "the resolver winner must reach the hero")
@@ -1954,8 +1954,8 @@ final class HomeHero333Tests: XCTestCase {
         let pl = "https://pics.dmm.co.jp/digital/video/fns00267/fns00267pl.jpg"
         let art = Self.distinctArt(display: front, raw: envelope, source: pl)
         HeroCoverStore.testResolverProvider = { _ in art }
-        let movie = HomeHero331Tests.heroMovie(id: "hero-333-b", number: "FNS-267", title: "333 jacket",
-                                               cover: "", thumb: "")
+        let movie = Movie(id: "hero-333-b", number: "FNS-267", title: "333 jacket",
+                                               thumbURL: "", coverURL: "")
         HeroCoverStore.shared.start(movies: [movie], currentIndex: 0)
         let p = try await poll(6, movie.id) { $0.sharpImage != nil }
         let sharp = try XCTUnwrap(p.sharpImage, "the resolver winner must reach the hero")
@@ -1977,8 +1977,8 @@ final class HomeHero333Tests: XCTestCase {
         let art = Self.distinctArt(display: display, raw: raw, source: ps)
         HeroCoverStore.testResolverProvider = { _ in art }
         let movies = (0..<7).map { i in
-            HomeHero331Tests.heroMovie(id: "hero-333-r\(i)", number: "ABF-334", title: "333 restore \(i)",
-                                       cover: "", thumb: "")
+            Movie(id: "hero-333-r\(i)", number: "ABF-334", title: "333 restore \(i)",
+                                       thumbURL: "", coverURL: "")
         }
         HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
         let settled = try await poll(6, movies[0].id) { $0.sharpImage != nil }
@@ -2005,5 +2005,28 @@ final class HomeHero333Tests: XCTestCase {
         XCTAssertEqual(46 + overlap, 78)
         XCTAssertEqual(66 + overlap, 98)
         XCTAssertEqual(38 + overlap, 70)
+    }
+}
+
+// MARK: - Build 334 home hero detail parity
+
+/// Build 334 (user, 2026-11-11: 「英雄区拉高，和详情页同比例」): after 333 the
+/// hero painted the detail page's image but framed it in a much shorter box
+/// (width × 1.15), so the same poster was cropped top/bottom at home and on
+/// the sides in detail. The phone hero height now mirrors
+/// DetailPortraitGeometry.imageHeight exactly; iPad keeps its 600 pt hero.
+final class HomeHero334Tests: XCTestCase {
+    func test334HeroHeightMatchesDetailPortraitGeometry() {
+        let cases: [(CGFloat, CGFloat)] = [(390, 844), (375, 667), (430, 932), (360, 740), (414, 896)]
+        for (w, h) in cases {
+            let metrics = HomeMetrics(width: w, safeTop: 47, height: h)
+            let detail = DetailPortraitGeometry(availableSize: CGSize(width: w, height: h), isPad: false)
+            XCTAssertEqual(metrics.heroHeight, detail.imageHeight, accuracy: 0.5,
+                           "hero height must equal the detail portrait height at \(w)×\(h)")
+        }
+    }
+
+    func test334IPadHeroHeightUnchanged() {
+        XCTAssertEqual(HomeMetrics(width: 1024, safeTop: 24, height: 1366).heroHeight, 600, accuracy: 0.5)
     }
 }

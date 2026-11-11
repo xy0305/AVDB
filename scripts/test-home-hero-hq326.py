@@ -9,21 +9,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '333' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 333;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '334' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 334;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 # Release wiring.
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 333' in wf and 'feat/home-hero-hq-326' in wf
+assert 'Home HQ posters App 334' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf and 'test-home-immersive325.py' not in wf
-assert 'scripts/package-lut333.py' in wf and 'AVDB-333-release' in wf and 'AVDB-325-' not in wf
-assert 'AVDB-333-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
+assert 'scripts/package-lut334.py' in wf and 'AVDB-334-release' in wf and 'AVDB-325-' not in wf
+assert 'AVDB-334-home-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'home-hero-hq-screenshots' in wf
 assert 'llama|SherpaOnnxC' in wf  # screenshot job still drops device-only xcframeworks
 assert not (r/'scripts/test-home-immersive325.py').exists() and not (r/'scripts/package-lut325.py').exists()
-pkg = (r/'scripts/package-lut333.py').read_text()
-assert "=='333'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-333-home-hero-detail.ipa' in pkg
+pkg = (r/'scripts/package-lut334.py').read_text()
+assert "=='334'" in pkg and "MinimumOSVersion']=='17.0'" in pkg and 'AVDB-unsigned-1.0.2-334-home-hero-parity.ipa' in pkg
 doc = (r/'Build326-HomeHeroHQ.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '326' in doc
 
@@ -112,7 +112,7 @@ assert 'm.heroHeight' in view
 assert 'frame(height: 220' not in home and 'height: 220' not in home
 assert 'accessibilityIdentifier("home-hero")' in hero
 assert '--home326-fixture' in home
-assert 'var heroHeight: CGFloat { isPadWidth ? 600 : min(max(width * 1.15, 430), 560) }' in metrics
+assert 'var heroHeight: CGFloat { isPadWidth ? 600 : min(width * 1.58, max(600, height * 0.8)) }' in metrics  # Build 334: detail parity
 
 # --- Rails: floor only, pipeline otherwise unchanged ---
 assert 'enum RailCoverFloor' in loader and 'static let minWidth = 360' in loader
@@ -171,4 +171,4 @@ assert 'home-hero' in ui.split('func test326HomeHeroHQScreenshots()')[1].split('
 assert 'hero.frame.width, window.frame.width' in ui
 
 print('PASS home-hero-hq326 source contracts: independent HQ resolver, A/B/C tiers, no inset, '
-      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 333')
+      'no eviction, autoplay A/B-only, rail floor, decode cap 2048, release 334')

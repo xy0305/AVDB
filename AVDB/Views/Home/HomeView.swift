@@ -61,7 +61,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             GeometryReader { proxy in
-                homeRoot(HomeMetrics(width: proxy.size.width, safeTop: proxy.safeAreaInsets.top))
+                homeRoot(HomeMetrics(width: proxy.size.width, safeTop: proxy.safeAreaInsets.top, height: proxy.size.height))
             }
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(AdaptiveLayout.isPad ? .visible : .automatic, for: .tabBar)
@@ -910,13 +910,18 @@ enum HomeTheme {
 struct HomeMetrics {
     let width: CGFloat
     let safeTop: CGFloat
+    /// Full view height (Build 334: feeds the detail-parity hero height below).
+    var height: CGFloat = 0
 
     /// iPad layout from the actual window width.
     var isPadWidth: Bool { width >= 768 }
     /// P = 16 (W < 380), 20, 24 on iPad.
     var padding: CGFloat { isPadWidth ? 24 : (width < 380 ? 16 : 20) }
-    /// clamp(W * 1.15, 430, 560) on phone; 600 on iPad.
-    var heroHeight: CGFloat { isPadWidth ? 600 : min(max(width * 1.15, 430), 560) }
+    /// Build 334 (user: 「英雄区拉高，和详情页同比例」): on phone the hero height
+    /// mirrors DetailPortraitGeometry.imageHeight exactly —
+    /// min(width * 1.58, max(600, height * 0.8)) — so the home hero frames the
+    /// same window of the poster as the detail page's portraitHero. iPad: 600.
+    var heroHeight: CGFloat { isPadWidth ? 600 : min(width * 1.58, max(600, height * 0.8)) }
     /// Build 332: the light shortcuts/rails block overlaps the hero bottom by this
     /// amount, covering the poster edge. 32 pt was chosen after a SNOS-484 layout
     /// check (faces stay well above the band; the allowed window was 24–40 pt).
