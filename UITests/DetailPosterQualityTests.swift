@@ -1971,19 +1971,24 @@ final class HomeHero333Tests: XCTestCase {
         await ImageLoader.shared.resetCachesForTests()
         ImageLoader.resetTestTransport()
         HeroCoverStore.testDetailProvider = { $0 }
-        let display = Self.solid(745, 1081, 0.85, 0.55, 0.35)
-        let raw = Self.solid(1000, 1500, 0.20, 0.30, 0.80)
-        let ps = "https://pics.dmm.co.jp/digital/video/abf00334/abf00334ps.jpg"
-        let art = Self.distinctArt(display: display, raw: raw, source: ps)
-        HeroCoverStore.testResolverProvider = { _ in art }
+        // Distinct number + winner URL per item, mirroring the proven 331
+        // scaffolding: the 334 CI failure came from all seven items sharing
+        // one number/artwork, which serializes the number-keyed winner path
+        // and lands the first winner after this test's 6 s checkpoint.
+        HeroCoverStore.testResolverProvider = { movie in
+            let digits = movie.number.filter { $0.isNumber }
+            let ps = "https://pics.dmm.co.jp/digital/video/abf00\(digits)/abf00\(digits)ps.jpg"
+            return Self.distinctArt(display: Self.solid(745, 1081, 0.85, 0.55, 0.35),
+                                    raw: Self.solid(1000, 1500, 0.20, 0.30, 0.80), source: ps)
+        }
         let movies = (0..<7).map { i in
-            Movie(id: "hero-333-r\(i)", number: "ABF-334", title: "333 restore \(i)",
+            Movie(id: "hero-333-r\(i)", number: "ABF-\(334 + i)", title: "333 restore \(i)",
                                        thumbURL: "", coverURL: "")
         }
         HeroCoverStore.shared.start(movies: movies, currentIndex: 0)
         let settled = try await poll(6, movies[0].id) { $0.sharpImage != nil }
         XCTAssertEqual(settled.sharpImage.map(HeroCoverPolicy.pixelWidth), 745)
-        try await Task.sleep(nanoseconds: 800_000_000)
+        _ = try await poll(3, movies[0].id) { $0.sharpOnDisk }
         HeroCoverStore.shared.setCurrentIndex(3, movies: movies)
         let evicted = try await poll(3, movies[0].id) { $0.sharpImage == nil }
         XCTAssertNil(evicted.sharpImage, "an out-of-window winner bitmap must be evicted")
