@@ -1990,8 +1990,11 @@ struct DraggableReviewsPanel: View {
         .safeAreaPadding(.bottom)
         // Build 341: 面板展开时若首屏加载曾失败且列表仍空，自动补加载一次，
         // 不再逼用户靠切换排序触发唯一重试路径。加载成功过则不触发。
+        // Build 342: 条件放宽到「还没成功加载过」——首屏 load 挂在 .task
+        // 链路尾部（reloadDetail 之后才触发），面板先展开时 load 可能
+        // 根本还没开始（loadFailed 仍为 false），341 的条件救不了未加载。
         .onChange(of: isContentVisible) { _, visible in
-            if visible, vm.reviews.isEmpty, !vm.isLoading, vm.loadFailed {
+            if visible, vm.reviews.isEmpty, !vm.isLoading, (vm.loadFailed || !vm.hasLoadedOnce) {
                 Task { await vm.load(movieID: movieID) }
             }
         }
@@ -2101,29 +2104,51 @@ struct DraggableReviewsPanel: View {
         }
     }
 
+    // Build 342: 评论空态的三个互斥派生状态，列表为空时至多命中其一：
+    // 失败且不在加载中 → 重试行；还没成功加载过 → 等待占位（未开始、
+    // 首屏加载中、失败重试中都归这里）；成功加载过且确实为空 →
+    // 「暂无评论」。成功加载过后刷新在途时三者都不命中，只剩列表
+    // 底部的加载转圈（原有行为）。
+    private var showReviewsRetry: Bool {
+        vm.reviews.isEmpty && vm.loadFailed && !vm.isLoading
+    }
+    private var showReviewsPending: Bool {
+        vm.reviews.isEmpty && !vm.hasLoadedOnce && !showReviewsRetry
+    }
+    private var showReviewsEmpty: Bool {
+        vm.reviews.isEmpty && vm.hasLoadedOnce && !vm.loadFailed && !vm.isLoading
+    }
+
     private var reviewsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if vm.reviews.isEmpty && !vm.isLoading {
-                    if vm.loadFailed {
-                        // Build 341: 加载失败不再伪装成「暂无评论」，给可点的重试。
-                        Button {
-                            Task { await vm.load(movieID: movieID, force: true) }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Text("评论加载失败")
-                                Text("重试")
-                                    .fontWeight(.semibold)
-                            }
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 50)
+                if showReviewsRetry {
+                    // Build 341: 加载失败不再伪装成「暂无评论」，给可点的重试。
+                    Button {
+                        Task { await vm.load(movieID: movieID, force: true) }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Text("评论加载失败")
+                            Text("重试")
+                                .fontWeight(.semibold)
                         }
-                        .buttonStyle(.plain)
-                    } else {
-                        Text("暂无评论")
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 50)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 50)
                     }
+                    .buttonStyle(.plain)
+                } else if showReviewsPending {
+                    // Build 342: 首屏还没成功加载过（未开始或加载中），
+                    // 显示等待占位，不抢先渲染「暂无评论」。
+                    VStack(spacing: 6) {
+                        ProgressView()
+                        Text("加载中")
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 50)
+                } else if showReviewsEmpty {
+                    Text("暂无评论")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 50)
                 }
                 ForEach(vm.reviews, id: \.stableReviewID) { review in
                     ReviewRow(review: review, movieID: movieID)
@@ -2186,6 +2211,11 @@ final class ReviewsListViewModel: ObservableObject {
     /// 失败与「真的没有评论」在 UI 上无从区分；置位后空态显示重试入口、
     /// 面板展开时自动补一次加载。成功（含成功空结果）清除。
     @Published private(set) var loadFailed = false
+    /// Build 342: 是否已有过一次成功 fetch。341 只分得出「失败」，分不出
+    /// 「还没开始加载」与「加载成功但确实没评论」：详情页 .task 要先等
+    /// reloadDetail 等步骤走完才调 load，面板在此之前展开就会撞上假
+    /// 空态。成功（含成功空结果）置位，失败不置位。
+    @Published private(set) var hasLoadedOnce = false
     private var page = 1
     private var hasMore = true
 
@@ -2211,6 +2241,7 @@ final class ReviewsListViewModel: ObservableObject {
                 movieID, page: page, sortBy: sortBy, limit: 24
             )
             loadFailed = false
+            hasLoadedOnce = true
             if replace {
                 reviews = next
             } else if !next.isEmpty {

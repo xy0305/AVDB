@@ -8,19 +8,19 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '341' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 341;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '342' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 342;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HERO32800000000000001B' in pbx
 assert 'HeroCoverResolver.swift' in pbx and 'HERO32600000000000001B' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 341' in wf and 'feat/home-hot-328' in wf
+assert 'Home HQ posters App 342' in wf and 'feat/home-hot-328' in wf
 assert 'feat/detail-auth-327' in wf and 'feat/home-hero-hq-326' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
 assert 'python3 scripts/test-home-hero-hq326.py' in wf
 assert 'python3 scripts/test-detail-auth327.py' in wf
-assert 'scripts/package-lut341.py' in wf and 'AVDB-341-release' in wf
-assert 'AVDB-unsigned-1.0.2-341-reviews-first-load.ipa' in (r/'scripts/package-lut341.py').read_text()
+assert 'scripts/package-lut342.py' in wf and 'AVDB-342-release' in wf
+assert 'AVDB-unsigned-1.0.2-342-reviews-panel-pending.ipa' in (r/'scripts/package-lut342.py').read_text()
 assert 'home-hero-hq-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
 assert 'detail-auth-327' in wf and 'test327DetailAuthErrorMessageVisible' in wf
 assert 'home-hot-328' in wf
@@ -186,4 +186,4 @@ assert 'home-past-header' in nearby
 
 print('PASS home-hot328 source contracts: playback high_score+daily cap 10, '
       'DTO floor + per-item deadline, 往期 rail, light tokens, vertical arbitrator, '
-      '327 auth + 326 HQ intact, release 341')
+      '327 auth + 326 HQ intact, release 342')
