@@ -5,7 +5,7 @@ import json, plistlib, re, shutil, subprocess, tempfile
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '345' and pbx.count('CURRENT_PROJECT_VERSION = 345;') == 2
+assert plist['CFBundleVersion'] == '346' and pbx.count('CURRENT_PROJECT_VERSION = 346;') == 2
 for name in ['ZhongZhiTongCatalog.swift in Sources', 'ZhongZhiTongRankingView.swift in Sources', 'ZhongZhiTongMonthly.json in Resources']:
     assert pbx.count(name) == 2, name
 

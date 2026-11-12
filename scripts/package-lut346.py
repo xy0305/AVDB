@@ -4,7 +4,7 @@ root=Path(sys.argv[1]);out=Path(sys.argv[2]);e=out/'evidence-release';e.mkdir(ex
 for p in root.rglob('*'):
  if p.name in ['embedded.mobileprovision'] or p.suffix=='.xcent':p.unlink()
 app=root/'Payload/AVDB.app';pl=plistlib.loads((app/'Info.plist').read_bytes())
-assert pl['CFBundleVersion']=='345' and pl['CFBundleShortVersionString']=='1.0.2'
+assert pl['CFBundleVersion']=='346' and pl['CFBundleShortVersionString']=='1.0.2'
 assert pl['MinimumOSVersion']=='17.0'
 assert not (app/'_CodeSignature').exists()
 # Build 286: the Core ML model is compiled into the bundle (CoverSR.mlmodelc).
@@ -37,7 +37,7 @@ else: assert ck=='', 'no secret but a key in the plist?'
 coversKey={'present':bool(ck),'length':len(ck),'sha256_8':hashlib.sha256(ck.encode()).hexdigest()[:8] if ck else None}
 pl=dict(pl); pl['AVDBCoversKey']='<redacted>' if ck else ''
 appBytes=sum(f.stat().st_size for f in app.rglob('*') if f.is_file())
-ipa=out/'AVDB-unsigned-1.0.2-345-western-actor-ranking.ipa'
+ipa=out/'AVDB-unsigned-1.0.2-346-list-paging-repeat.ipa'
 subprocess.run(['zip','-qry',str(ipa),'Payload'],cwd=root,check=True)
 with zipfile.ZipFile(ipa) as z: assert z.testzip() is None
 manifest={'file':ipa.name,'bytes':ipa.stat().st_size,'sha256':hashlib.sha256(ipa.read_bytes()).hexdigest(),'zipCRC':'PASS','plist':pl,'sourceCommit':pl['AVDBSourceCommit'],'sourceTree':pl['AVDBSourceTree'],'unsigned':True,'coverSRModelBytes':modelBytes,'liveModelBytes':live,'appBytes':appBytes,'coversKey':coversKey}

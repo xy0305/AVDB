@@ -83,7 +83,19 @@ class MovieListViewModel: ObservableObject {
             if result.isEmpty {
                 hasMore = false
             } else {
-                movies.append(contentsOf: result)
+                // Build 346: some endpoints answer every page with the
+                // same fixed list — GET /api/v1/movies/recommend ignores
+                // `page` for a period query and returns the period's
+                // whole list each time (verified live 2026-11-12: period
+                // 610, pages 1–3 identical). Appending blindly repeated
+                // the list forever once the last cell could rest in view
+                // (Build 344). Drop ids already shown, and treat a page
+                // that contributes nothing new as the end of the list —
+                // the same rule CatalogListViewModel already uses.
+                var known = Set(movies.map(\.id))
+                let fresh = result.filter { known.insert($0.id).inserted }
+                movies.append(contentsOf: fresh)
+                if fresh.isEmpty { hasMore = false }
                 currentPage += 1
             }
         } catch {
