@@ -14,17 +14,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '343' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 343;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '344' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 344;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 343' in wf and 'feat/detail-api-335' in wf
+assert 'Home HQ posters App 344' in wf and 'feat/detail-api-335' in wf
 assert 'feat/home-hero-parity-334' in wf and 'feat/home-hero-detail-333' in wf
 assert wf.count('python3 scripts/test-detail-api335.py') == 3  # dedicated job + zzt-ranking job + release regressions
 assert 'python3 scripts/test-home-hero334.py' in wf
-assert 'scripts/package-lut343.py' in wf and 'AVDB-343-release' in wf and 'AVDB-334-release' not in wf
-pkg = (r/'scripts/package-lut343.py').read_text()
-assert "=='343'" in pkg and 'AVDB-unsigned-1.0.2-343-list-landscape-cover.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut344.py' in wf and 'AVDB-344-release' in wf and 'AVDB-334-release' not in wf
+pkg = (r/'scripts/package-lut344.py').read_text()
+assert "=='344'" in pkg and 'AVDB-unsigned-1.0.2-344-list-tabbar-clearance.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  detail-api-335:' in wf and '  home-hero-334:' in wf
 
 doc = (r/'Build335-DetailAPI.md').read_text()
@@ -76,4 +76,4 @@ assert detail.count('await enrichRailCovers(') == 2  # both rails
 
 print('PASS test-detail-api335: search family + mayAlsoLike send the token, detail 猜你喜欢 fed by '
       'may_also_like with payload fallback, Ta 还出演过 via the actor endpoint, portrait hero buttons '
-      'on Liquid Glass, search errors surfaced, release 343')
+      'on Liquid Glass, search errors surfaced, release 344')

@@ -523,6 +523,14 @@ struct MoviePosterCard: View {
 struct MoviePosterGrid: View {
     /// Build 300: default on for every list (search, rankings, categories, actors, lists…).
     var upgradesVisibleHQ = true
+    /// Build 344: the floating tab bar overlays the bottom ~94 pt of the
+    /// screen (a ~60 pt pill above the home-indicator zone), and grid
+    /// pages do not receive that bottom inset — the last row used to rest
+    /// underneath the bar and could only be seen while holding a
+    /// rubber-band overscroll. The grid reserves the clearance as bottom
+    /// padding so the last row can rest clear of the bar on every page
+    /// that uses this grid.
+    static let tabBarBottomClearance: CGFloat = 100
     let movies: [Movie]
     var showRank: Bool = false
     var scrollTargets: Bool = false
@@ -571,6 +579,7 @@ struct MoviePosterGrid: View {
         }
         .scrollTargetLayout(isEnabled: scrollTargets)
         .padding(.horizontal, AdaptiveLayout.gridPadding)
+        .padding(.bottom, Self.tabBarBottomClearance)
         .background {
             GeometryReader { geometry in
                 Color.clear.preference(key: PosterGridWidthKey.self, value: geometry.size.width)
