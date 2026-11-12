@@ -672,7 +672,8 @@ struct MovieDetailView: View {
         .padding(.horizontal, 6).padding(.vertical, 2)
         // Build 335: match play — the home-style Liquid Glass capsule
         // replaces the clear capsule with a white outline.
-        .liquidGlass(interactive: false)
+        // Build 339: match play — .clear glass, backdrop shows through.
+        .liquidGlass(interactive: false, clear: true)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("portrait-hero-actions")
     }

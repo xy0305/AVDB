@@ -22,7 +22,10 @@ struct DetailPlayPill: View {
         // Build 335: home-style Liquid Glass capsule. Through Build 334 this
         // was intentionally a clear capsule with a white outline; the user
         // asked for the same liquid glass as the home floating chrome.
-        .liquidGlass(interactive: true)
+        // Build 339: the user asked for the glass itself to be more
+        // transparent — .clear instead of .regular, so the backdrop colour
+        // and image show through instead of the milky .regular sampling.
+        .liquidGlass(interactive: true, clear: true)
         .overlay(alignment: .bottom) {
             if let p = progress {
                 GeometryReader { g in

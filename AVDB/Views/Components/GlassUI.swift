@@ -215,24 +215,41 @@ struct GlassChip: View {
 // MARK: - 系统玻璃修饰符
 
 /// 胶囊形系统 Liquid Glass（悬浮控件）。
+/// `clear` 为真时用 `.clear` 玻璃：底图大致透得过来（Build 339，详情页播放键与图标组专用）；
+/// 默认 `.regular` 不变，其余调用点不受影响。
 struct LiquidGlassEffect: ViewModifier {
     var tint: Color? = nil
     var interactive: Bool = false
+    var clear: Bool = false
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             Group {
                 if let tint {
-                    content.glassEffect(
-                        interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
-                        in: Capsule()
-                    )
+                    if clear {
+                        content.glassEffect(
+                            interactive ? .clear.tint(tint).interactive() : .clear.tint(tint),
+                            in: Capsule()
+                        )
+                    } else {
+                        content.glassEffect(
+                            interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                            in: Capsule()
+                        )
+                    }
                 } else {
-                    content.glassEffect(
-                        interactive ? .regular.interactive() : .regular,
-                        in: Capsule()
-                    )
+                    if clear {
+                        content.glassEffect(
+                            interactive ? .clear.interactive() : .clear,
+                            in: Capsule()
+                        )
+                    } else {
+                        content.glassEffect(
+                            interactive ? .regular.interactive() : .regular,
+                            in: Capsule()
+                        )
+                    }
                 }
             }
             .overlay {
@@ -340,8 +357,8 @@ struct LiquidGlassContainer<Content: View>: View {
 
 extension View {
     /// 悬浮胶囊控件：系统 Liquid Glass
-    func liquidGlass(tint: Color? = nil, interactive: Bool = false) -> some View {
-        modifier(LiquidGlassEffect(tint: tint, interactive: interactive))
+    func liquidGlass(tint: Color? = nil, interactive: Bool = false, clear: Bool = false) -> some View {
+        modifier(LiquidGlassEffect(tint: tint, interactive: interactive, clear: clear))
     }
 
     /// 悬浮圆角矩形：系统 Liquid Glass
