@@ -14,16 +14,16 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '342' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 342;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '343' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 343;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 342' in wf and 'feat/logout-access-338' in wf
+assert 'Home HQ posters App 343' in wf and 'feat/logout-access-338' in wf
 assert 'feat/recommender-throttle-337' in wf and 'feat/remove-javverse-336' in wf
 assert wf.count('python3 scripts/test-logout-access338.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
-assert 'scripts/package-lut342.py' in wf and 'AVDB-342-release' in wf and 'AVDB-337-release' not in wf
-pkg = (r/'scripts/package-lut342.py').read_text()
-assert "=='342'" in pkg and 'AVDB-unsigned-1.0.2-342-reviews-panel-pending.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut343.py' in wf and 'AVDB-343-release' in wf and 'AVDB-337-release' not in wf
+pkg = (r/'scripts/package-lut343.py').read_text()
+assert "=='343'" in pkg and 'AVDB-unsigned-1.0.2-343-list-landscape-cover.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  logout-access-338:' in wf and '  recommender-throttle-337:' in wf
 
 doc = (r/'Build338-LogoutAccess.md').read_text()
@@ -55,4 +55,4 @@ assert 'func logout()' in app and 'JavDBSDK.shared.logout()' in app  # the manua
 
 print('PASS test-logout-access338: manual logout reachable in profile, restoring and '
       'needsReauth states (three identical buttons, one logout() path); the 327 '
-      'retain-on-401 policy is untouched, release 342')
+      'retain-on-401 policy is untouched, release 343')

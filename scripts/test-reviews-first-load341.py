@@ -20,17 +20,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '342' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 342;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '343' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 343;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 342' in wf and 'feat/reviews-first-load-341' in wf
+assert 'Home HQ posters App 343' in wf and 'feat/reviews-first-load-341' in wf
 assert 'feat/session-revalidate-340' in wf and 'feat/detail-glass-clear-339' in wf
 assert wf.count('python3 scripts/test-reviews-first-load341.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-session-revalidate340.py') == 5  # the 340 gate keeps its 5 run lines
-assert 'scripts/package-lut342.py' in wf and 'AVDB-342-release' in wf and 'AVDB-340-release' not in wf
-pkg = (r/'scripts/package-lut342.py').read_text()
-assert "=='342'" in pkg and 'AVDB-unsigned-1.0.2-342-reviews-panel-pending.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut343.py' in wf and 'AVDB-343-release' in wf and 'AVDB-340-release' not in wf
+pkg = (r/'scripts/package-lut343.py').read_text()
+assert "=='343'" in pkg and 'AVDB-unsigned-1.0.2-343-list-landscape-cover.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  reviews-first-load-341:' in wf and '  session-revalidate-340:' in wf
 
 doc = (r/'Build341-ReviewsFirstLoad.md').read_text()
@@ -95,4 +95,4 @@ assert '.onChange(of: vm.sortBy)' in sort_section and 'load(movieID: movieID, fo
 print('PASS test-reviews-first-load341: reviews endpoint throws on error '
       'envelopes, the view model records replace-load failures, the panel '
       'retries a failed first load on expansion and shows a retry row '
-      'instead of a fake 「暂无评论」, release 342')
+      'instead of a fake 「暂无评论」, release 343')

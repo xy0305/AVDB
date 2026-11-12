@@ -9,7 +9,7 @@ reader = (S / 'LiveAudioReader.swift').read_text()
 views = (r / 'AVDB/Views/Player/LiveSubtitleViews.swift').read_text()
 pbx = (r / 'AVDB.xcodeproj/project.pbxproj').read_text()
 pl = plistlib.loads((r / 'AVDB/Resources/Info.plist').read_bytes())
-assert pl['CFBundleVersion'] == '342' and pbx.count('CURRENT_PROJECT_VERSION = 342;') == 2
+assert pl['CFBundleVersion'] == '343' and pbx.count('CURRENT_PROJECT_VERSION = 343;') == 2
 # Must not set the blocking on-video notice for reader failures
 assert '字幕音频读取失败（\\(msg)），拖动进度可重试' not in eng
 assert 'self?.notice = "字幕音频读取失败' not in eng

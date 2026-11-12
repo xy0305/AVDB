@@ -660,6 +660,7 @@ public struct JavDBImage: View {
     let contentMode: ContentMode
     let maxPixelSize: Int
     let frontPoster: Bool
+    let fitUncroppedLandscape: Bool
     let showsSourceLabel: Bool
 
     @State private var image: UIImage?
@@ -690,6 +691,7 @@ public struct JavDBImage: View {
         contentMode: ContentMode = .fill,
         maxPixelSize: Int = 2048,
         frontPoster: Bool = false,
+        fitUncroppedLandscape: Bool = false,
         showsSourceLabel: Bool = false
     ) {
         self.url = url
@@ -698,7 +700,18 @@ public struct JavDBImage: View {
         self.contentMode = contentMode
         self.maxPixelSize = maxPixelSize
         self.frontPoster = frontPoster
+        self.fitUncroppedLandscape = fitUncroppedLandscape
         self.showsSourceLabel = showsSourceLabel
+    }
+
+    /// Build 343: poster cells opt in so an image that stayed an uncropped
+    /// landscape (no portrait source existed, so the candidate loop's
+    /// landscape fallback is what got published) is shown whole instead of
+    /// as a magnified centre slice of itself. Portrait and square images,
+    /// and every caller that does not opt in, render exactly as before.
+    private var displayedContentMode: ContentMode {
+        if fitUncroppedLandscape, let image, image.size.width > image.size.height { return .fit }
+        return contentMode
     }
 
     private var imageURLs: [String] {
@@ -720,7 +733,7 @@ public struct JavDBImage: View {
                 if let image, imageIdentity == requestIdentity {
                     Image(uiImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: contentMode)
+                        .aspectRatio(contentMode: displayedContentMode)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     placeholder
@@ -1463,7 +1476,7 @@ public struct MoviePosterImage: View {
         JavDBImage(url: sources.first,
                    fallbackURL: sources.dropFirst().first,
                    secondFallbackURL: sources.dropFirst(2).first,
-                   contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original || wrapLead)
+                   contentMode: .fill, maxPixelSize: maxPixelSize, frontPoster: !original || wrapLead, fitUncroppedLandscape: true)
             .overlay {
                 if upgradesVisibleHQ, !original || movie.catalogueMetadata?.poster != nil {
                     VisibleHQPosterUpgrade(movie: movie)
