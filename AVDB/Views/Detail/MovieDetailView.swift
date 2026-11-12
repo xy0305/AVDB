@@ -1988,6 +1988,13 @@ struct DraggableReviewsPanel: View {
         .contentShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 10, y: -2)
         .safeAreaPadding(.bottom)
+        // Build 341: 面板展开时若首屏加载曾失败且列表仍空，自动补加载一次，
+        // 不再逼用户靠切换排序触发唯一重试路径。加载成功过则不触发。
+        .onChange(of: isContentVisible) { _, visible in
+            if visible, vm.reviews.isEmpty, !vm.isLoading, vm.loadFailed {
+                Task { await vm.load(movieID: movieID) }
+            }
+        }
     }
 
     private var handleDrag: some Gesture {
@@ -2098,9 +2105,25 @@ struct DraggableReviewsPanel: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 if vm.reviews.isEmpty && !vm.isLoading {
-                    Text("暂无评论")
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 50)
+                    if vm.loadFailed {
+                        // Build 341: 加载失败不再伪装成「暂无评论」，给可点的重试。
+                        Button {
+                            Task { await vm.load(movieID: movieID, force: true) }
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text("评论加载失败")
+                                Text("重试")
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 50)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text("暂无评论")
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 50)
+                    }
                 }
                 ForEach(vm.reviews, id: \.stableReviewID) { review in
                     ReviewRow(review: review, movieID: movieID)
@@ -2159,10 +2182,15 @@ final class ReviewsListViewModel: ObservableObject {
     @Published var reviews: [Review] = []
     @Published var isLoading = false
     @Published var sortBy = "hotly"
+    /// Build 341: 首屏（replace）加载失败标记。此前 fetch 把错误全吞掉，
+    /// 失败与「真的没有评论」在 UI 上无从区分；置位后空态显示重试入口、
+    /// 面板展开时自动补一次加载。成功（含成功空结果）清除。
+    @Published private(set) var loadFailed = false
     private var page = 1
     private var hasMore = true
 
     func load(movieID: String, force: Bool = false) async {
+        if !force, isLoading { return }
         if !force, !reviews.isEmpty { return }
         page = 1
         hasMore = true
@@ -2182,6 +2210,7 @@ final class ReviewsListViewModel: ObservableObject {
             let next = try await JavDBSDK.shared.movieReviews(
                 movieID, page: page, sortBy: sortBy, limit: 24
             )
+            loadFailed = false
             if replace {
                 reviews = next
             } else if !next.isEmpty {
@@ -2191,6 +2220,7 @@ final class ReviewsListViewModel: ObservableObject {
             hasMore = !next.isEmpty
         } catch {
             if replace {
+                loadFailed = true
                 page = 1
             } else {
                 page = max(1, page - 1)

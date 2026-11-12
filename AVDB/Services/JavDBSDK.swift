@@ -327,10 +327,16 @@ public final class JavDBSDK {
     }
 
     /// 影评列表（GET /api/v1/movies/{id}/reviews）
+    /// Build 341: 带 token 且校验 isSuccess——错误包络不再静默吞成空列表，
+    /// 与同文件其余详情接口（327/335 起的房规）一致。
     public func movieReviews(_ id: String, page: Int = 1, sortBy: String = "hotly", limit: Int = 24) async throws -> [Review] {
         let resp: JavDBResponse<ReviewListData> = try await client.get(
             "/api/v1/movies/\(id)/reviews",
-            query: ["page": "\(page)", "sort_by": sortBy, "limit": "\(limit)"])
+            query: ["page": "\(page)", "sort_by": sortBy, "limit": "\(limit)"],
+            useToken: true)
+        guard resp.isSuccess else {
+            throw JavDBError.apiError(action: resp.action, message: resp.message)
+        }
         return resp.data?.reviews ?? []
     }
 
