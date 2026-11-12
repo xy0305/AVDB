@@ -139,7 +139,7 @@ struct RankingsView: View {
                         tabs: RankPeriod.allCases.map { ($0, $0.title) },
                         selection: $period
                     )
-                    if tab == .censored {
+                    if RankingsViewModel.actorRankingType(for: tab) != nil {
                         CapsuleChipBar(
                             tabs: [("movies", "作品"), ("actors", "演員月榜")],
                             selection: $rankingKind
@@ -608,16 +608,37 @@ final class RankingsViewModel: ObservableObject {
     private var hasMore = true
     private var page = 0
 
+    /// Build 345: boards with a genuine monthly actor ranking on the
+    /// server (GET /api/v1/rankings/actors; verified live 2026-11-12 —
+    /// types 0/1/2 each return their own list, and type 2's first rows
+    /// match the official app's 歐美 演員月榜 exactly). FC2 (type 3) is
+    /// excluded: the endpoint answers it with the censored board's
+    /// list, so an FC2 segment would show the 有碼 ranking under the
+    /// wrong label. Until 344 the segment existed only on 有碼 with the
+    /// type hardcoded; it is now driven by the current board.
+    static func actorRankingType(for tab: RankingTab) -> String? {
+        switch tab {
+        case .censored: return "0"
+        case .uncensored: return "1"
+        case .western: return "2"
+        default: return nil
+        }
+    }
+
     init(movieLoader: @escaping MovieLoader = RankingsViewModel.requestMovies,
          actorLoader: @escaping ActorLoader = { r in
-             try await JavDBSDK.shared.actorRankings(type: "0", period: "monthly", page: r.page)
+             guard let type = RankingsViewModel.actorRankingType(for: r.tab) else { return [] }
+             return try await JavDBSDK.shared.actorRankings(type: type, period: "monthly", page: r.page)
          }) {
         self.movieLoader = movieLoader
         self.actorLoader = actorLoader
     }
 
     var displayed: [Movie] { movies }
-    var showingActors: Bool { request?.tab == .censored && request?.kind == "actors" }
+    var showingActors: Bool {
+        guard let request, request.kind == "actors" else { return false }
+        return Self.actorRankingType(for: request.tab) != nil
+    }
 
     func load(tab: RankingTab, period: RankPeriod, playbackFilter: String,
               playbackPeriod: RankPeriod = .daily, rankingKind: String = "movies", force: Bool = false) async {
@@ -656,7 +677,7 @@ final class RankingsViewModel: ObservableObject {
         errorMessage = nil
         defer { if generation == ticket { isLoading = false } }
         do {
-            if next.tab == .censored && next.kind == "actors" {
+            if next.kind == "actors", Self.actorRankingType(for: next.tab) != nil {
                 let list = try await actorLoader(next)
                 guard generation == ticket, !Task.isCancelled else { return }
                 if next.page == 1 { actors = list }

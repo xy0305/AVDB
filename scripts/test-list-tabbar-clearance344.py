@@ -20,17 +20,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '344' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 344;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '345' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 345;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 344' in wf and 'feat/list-tabbar-clearance-344' in wf
+assert 'Home HQ posters App 345' in wf and 'feat/list-tabbar-clearance-344' in wf
 assert 'feat/list-landscape-cover-343' in wf and 'feat/reviews-panel-pending-342' in wf
 assert wf.count('python3 scripts/test-list-tabbar-clearance344.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-list-landscape-cover343.py') == 5  # the 343 gate keeps its 5 run lines
-assert 'scripts/package-lut344.py' in wf and 'AVDB-344-release' in wf and 'AVDB-343-release' not in wf
-pkg = (r/'scripts/package-lut344.py').read_text()
-assert "=='344'" in pkg and 'AVDB-unsigned-1.0.2-344-list-tabbar-clearance.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut345.py' in wf and 'AVDB-345-release' in wf and 'AVDB-343-release' not in wf
+pkg = (r/'scripts/package-lut345.py').read_text()
+assert "=='345'" in pkg and 'AVDB-unsigned-1.0.2-345-western-actor-ranking.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  list-tabbar-clearance-344:' in wf and '  list-landscape-cover-343:' in wf
 
 doc = (r/'Build344-ListTabBarClearance.md').read_text()
@@ -70,4 +70,4 @@ assert 'onAppearLast?(movie)' in grid
 
 print('PASS test-list-tabbar-clearance344: MoviePosterGrid reserves a '
       '100 pt bottom clearance so the last row rests clear of the '
-      'floating tab bar on every grid page, release 344')
+      'floating tab bar on every grid page, release 345')
