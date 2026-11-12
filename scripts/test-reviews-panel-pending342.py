@@ -23,17 +23,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '346' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 346;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '347' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 347;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 346' in wf and 'feat/reviews-panel-pending-342' in wf
+assert 'Home HQ posters App 347' in wf and 'feat/reviews-panel-pending-342' in wf
 assert 'feat/reviews-first-load-341' in wf and 'feat/session-revalidate-340' in wf
 assert wf.count('python3 scripts/test-reviews-panel-pending342.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-reviews-first-load341.py') == 5  # the 341 gate keeps its 5 run lines
-assert 'scripts/package-lut346.py' in wf and 'AVDB-346-release' in wf and 'AVDB-341-release' not in wf
-pkg = (r/'scripts/package-lut346.py').read_text()
-assert "=='346'" in pkg and 'AVDB-unsigned-1.0.2-346-list-paging-repeat.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut347.py' in wf and 'AVDB-347-release' in wf and 'AVDB-341-release' not in wf
+pkg = (r/'scripts/package-lut347.py').read_text()
+assert "=='347'" in pkg and 'AVDB-unsigned-1.0.2-347-actor-ranking-period.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  reviews-panel-pending-342:' in wf and '  reviews-first-load-341:' in wf
 
 doc = (r/'Build342-ReviewsPanelPending.md').read_text()
@@ -96,4 +96,4 @@ assert 'await vm.load(movieID: movieID)' in panel  # plain load: fires only whil
 print('PASS test-reviews-panel-pending342: the view model records the '
       'first successful load, the panel shows a pending placeholder '
       'instead of a fake 「暂无评论」 before it, and expansion retries '
-      'a not-yet-loaded list, release 346')
+      'a not-yet-loaded list, release 347')

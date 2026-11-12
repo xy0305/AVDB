@@ -12,16 +12,16 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '346' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 346;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '347' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 347;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 346' in wf and 'feat/recommender-throttle-337' in wf
+assert 'Home HQ posters App 347' in wf and 'feat/recommender-throttle-337' in wf
 assert 'feat/remove-javverse-336' in wf and 'feat/detail-api-335' in wf
 assert wf.count('python3 scripts/test-recommender-throttle337.py') == 5  # dedicated job + the three jobs that run the 336 gate + release regressions
-assert 'scripts/package-lut346.py' in wf and 'AVDB-346-release' in wf and 'AVDB-336-release' not in wf
-pkg = (r/'scripts/package-lut346.py').read_text()
-assert "=='346'" in pkg and 'AVDB-unsigned-1.0.2-346-list-paging-repeat.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut347.py' in wf and 'AVDB-347-release' in wf and 'AVDB-336-release' not in wf
+pkg = (r/'scripts/package-lut347.py').read_text()
+assert "=='347'" in pkg and 'AVDB-unsigned-1.0.2-347-actor-ranking-period.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  recommender-throttle-337:' in wf and '  remove-javverse-336:' in wf
 
 doc = (r/'Build337-RecommenderThrottle.md').read_text()
@@ -64,4 +64,4 @@ assert 'VerificationThrottle.acquire()' in follow and 'requestSpacingSeconds' no
 
 print('PASS test-recommender-throttle337: recommender is manual-only, randomly slow-spaced, '
       'hard-capped at 10 requests per run; all ranking verifications pass the shared '
-      '1-wide / 20-per-minute / random-gap throttle, release 346')
+      '1-wide / 20-per-minute / random-gap throttle, release 347')

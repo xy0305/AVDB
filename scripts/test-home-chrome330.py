@@ -9,18 +9,18 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '346' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 346;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '347' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 347;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'HeroSwipePolicy.swift' in pbx and 'HeroCoverResolver.swift' in pbx and 'DetailPosterResolver.swift' in pbx
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 346' in wf and 'feat/home-chrome-330' in wf
+assert 'Home HQ posters App 347' in wf and 'feat/home-chrome-330' in wf
 assert 'feat/home-hot-329' in wf and 'feat/home-hot-328' in wf
 assert 'python3 scripts/test-home-chrome330.py' in wf
 assert 'python3 scripts/test-home-hot329.py' in wf
 assert 'python3 scripts/test-home-hot328.py' in wf
-assert 'scripts/package-lut346.py' in wf and 'AVDB-346-release' in wf
-assert 'AVDB-unsigned-1.0.2-346-list-paging-repeat.ipa' in (r/'scripts/package-lut346.py').read_text()
+assert 'scripts/package-lut347.py' in wf and 'AVDB-347-release' in wf
+assert 'AVDB-unsigned-1.0.2-347-actor-ranking-period.ipa' in (r/'scripts/package-lut347.py').read_text()
 assert 'home-chrome-330' in wf
 assert 'HomeChrome330Tests' in wf
 assert 'test330CleanTapOpensDetailAndPageCommitDoesNot' in wf
@@ -161,4 +161,4 @@ assert 'final class HomeHot328Tests' in unit
 
 print('PASS home-chrome330 source contracts: 44 pt liquid-glass search, overlay-tap '
       'navigation, official DetailPosterResolver portrait, three-step floor, '
-      'scheduler cap 2, iPhone-only LiquidGlassContainer shortcuts, release 346')
+      'scheduler cap 2, iPhone-only LiquidGlassContainer shortcuts, release 347')

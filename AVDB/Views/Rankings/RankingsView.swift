@@ -135,10 +135,17 @@ struct RankingsView: View {
                 }
             } else if tab != .top250 {
                 VStack(spacing: 0) {
-                    CapsuleChipBar(
-                        tabs: RankPeriod.allCases.map { ($0, $0.title) },
-                        selection: $period
-                    )
+                    // Build 347: 日榜 / 周榜 / 月榜 are categories of 作品
+                    // only. The 演員月榜 is a single monthly list (the
+                    // actor loader always requests period "monthly"), so
+                    // the period bar hides while the actor ranking is
+                    // shown instead of pretending it splits by period.
+                    if !showingActorRanking {
+                        CapsuleChipBar(
+                            tabs: RankPeriod.allCases.map { ($0, $0.title) },
+                            selection: $period
+                        )
+                    }
                     if RankingsViewModel.actorRankingType(for: tab) != nil {
                         CapsuleChipBar(
                             tabs: [("movies", "作品"), ("actors", "演員月榜")],
@@ -311,10 +318,18 @@ struct RankingsView: View {
             .contentShape(Capsule())
     }
 
+    /// Build 347: true while a board with a monthly actor ranking is
+    /// showing that ranking. The actor ranking has no 日榜 / 周榜 /
+    /// 月榜 split — its request is pinned to .monthly and the period
+    /// bar stays hidden; 作品 keeps the user's selected period.
+    private var showingActorRanking: Bool {
+        rankingKind == "actors" && RankingsViewModel.actorRankingType(for: tab) != nil
+    }
+
     private func reload(force: Bool = false) async {
         await vm.load(
             tab: tab,
-            period: period,
+            period: showingActorRanking ? .monthly : period,
             playbackFilter: playbackFilter,
             playbackPeriod: playbackPeriod,
             rankingKind: rankingKind,
