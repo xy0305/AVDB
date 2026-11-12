@@ -166,11 +166,24 @@ struct UserView: View {
                             .font(.footnote).foregroundStyle(.secondary)
 
                     }
+
+                    Section {
+                        Button("退出登录", role: .destructive) {
+                            appState.logout()
+                        }
+                    }
                 } else {
                     // 未登录
                     if appState.sessionStatus == .needsReauth {
                         Text("服务器已拒绝登录凭证，请重新登录")
                             .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if appState.sessionStatus == .needsReauth {
+                        Section {
+                            Button("退出登录", role: .destructive) {
+                                appState.logout()
+                            }
+                        }
                     }
                     Section {
                         Button {

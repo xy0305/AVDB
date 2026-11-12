@@ -7,8 +7,8 @@ import plistlib, subprocess, sys, tempfile
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '337' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 337;') == 2
+assert plist['CFBundleVersion'] == '338' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 338;') == 2
 
 player = (r/'AVDB/Views/Player/PlayerView.swift').read_text()
 views = (r/'AVDB/Views/Player/LiveSubtitleViews.swift').read_text()
@@ -80,11 +80,11 @@ assert 'throughput.reset()' in player.split('.onChange(of: url)')[1].split('.onC
 
 # Release wiring.
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 337' in wf and 'feat/player-chrome-323' in wf
+assert 'Home HQ posters App 338' in wf and 'feat/player-chrome-323' in wf
 assert 'python3 scripts/test-player-chrome323.py' in wf
-assert 'scripts/package-lut337.py' in wf and 'AVDB-337-release' in wf and 'AVDB-322-' not in wf
-pkg = (r/'scripts/package-lut337.py').read_text()
-assert "=='337'" in pkg and 'AVDB-unsigned-1.0.2-337-recommender-throttle.ipa' in pkg
+assert 'scripts/package-lut338.py' in wf and 'AVDB-338-release' in wf and 'AVDB-322-' not in wf
+pkg = (r/'scripts/package-lut338.py').read_text()
+assert "=='338'" in pkg and 'AVDB-unsigned-1.0.2-338-logout-access.ipa' in pkg
 assert (r/'Build323-PlayerChrome.md').is_file()
 print('PASS player-chrome323 source contracts: thin white chrome, identifiers kept, 倍速 menu, real-throughput speed, release 323')
 
