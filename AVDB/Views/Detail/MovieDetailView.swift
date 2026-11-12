@@ -382,7 +382,10 @@ struct MovieDetailView: View {
     private func reloadDetail() async {
         await vm.load()
         if vm.isAuthError, APIClient.shared.hasToken {
-            appState.markNeedsReauth()
+            // Build 340: a business endpoint's auth error does not mark the
+            // session by itself; AppState revalidates against the profile
+            // endpoint, which alone arbitrates the credential.
+            appState.revalidateCredential()
         }
     }
 

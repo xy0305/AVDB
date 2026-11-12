@@ -62,6 +62,7 @@ final class AppState: ObservableObject {
     @Published var currentUser: User?
     @Published private(set) var sessionStatus: SessionStatus = .signedOut
     private(set) var restoreTask: Task<Void, Never>?
+    private var revalidation: (token: String, task: Task<Void, Never>)?
     private var epoch = UUID()
     private var activeToken: String?
     private var monitor: NWPathMonitor?
@@ -94,7 +95,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    deinit { monitor?.cancel(); restoreTask?.cancel() }
+    deinit { monitor?.cancel(); restoreTask?.cancel(); revalidation?.task.cancel() }
 
     private func key(_ token: String) -> String {
         "avdb.profile.v1." + SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -138,6 +139,41 @@ final class AppState: ObservableObject {
         currentUser = nil
         isLoggedIn = false
         sessionStatus = .needsReauth
+    }
+
+    /// Build 340: a business endpoint's auth-class error is not proof the
+    /// credential is dead — that is the Build 327 principle, and since 335
+    /// the detail page's token-carrying endpoints can draw an auth-class
+    /// reply for one account while its credential is perfectly valid. The
+    /// detail page therefore no longer marks the session rejected itself;
+    /// it asks for this single check and the profile endpoint arbitrates:
+    /// one attempt, no retry burst, and only an authentication failure of
+    /// the profile check marks the session needsReauth. Any other error
+    /// (network, 5xx, decode) leaves the session exactly as it was.
+    /// No-ops when there is no stored token, when the session is already
+    /// marked needsReauth (327 leaves recovery to manual re-login / cold
+    /// launch), or when a check for the same token is already in flight.
+    func revalidateCredential() {
+        guard let token = (activeToken ?? readToken()).flatMap({ $0.isEmpty ? nil : $0 }) else { return }
+        guard sessionStatus != .needsReauth else { return }
+        if let inFlight = revalidation, inFlight.token == token { return }
+        let generation = epoch
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.revalidation?.token == token { self.revalidation = nil } }
+            do {
+                let user = try await self.fetchProfile()
+                guard !Task.isCancelled, self.epoch == generation, self.readToken() == token else { return }
+                self.save(user, token: token)
+                self.currentUser = user; self.isLoggedIn = true; self.sessionStatus = .validated
+            } catch {
+                guard !Task.isCancelled, self.epoch == generation, self.readToken() == token else { return }
+                if JavDBError.isAuthenticationFailure(error) {
+                    self.markNeedsReauth()
+                }
+            }
+        }
+        revalidation = (token: token, task: task)
     }
 
     func restoreLogin() {
