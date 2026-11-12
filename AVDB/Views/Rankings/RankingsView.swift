@@ -695,9 +695,19 @@ final class RankingsViewModel: ObservableObject {
             if next.kind == "actors", Self.actorRankingType(for: next.tab) != nil {
                 let list = try await actorLoader(next)
                 guard generation == ticket, !Task.isCancelled else { return }
-                if next.page == 1 { actors = list }
-                else { let ids = Set(actors.map(\.id)); actors += list.filter { !ids.contains($0.id) } }
-                hasMore = !list.isEmpty
+                // Build 348: the actor endpoint ignores `page` (verified
+                // live 2026-11-13: pages 1-3 return the identical list),
+                // so a page that appends nothing new is the end of the
+                // list. Judging by the raw page instead kept hasMore
+                // true forever: every pass over the last cell refetched
+                // and republished the whole grid.
+                if next.page == 1 { actors = list; hasMore = !list.isEmpty }
+                else {
+                    let ids = Set(actors.map(\.id))
+                    let fresh = list.filter { !ids.contains($0.id) }
+                    actors += fresh
+                    hasMore = !fresh.isEmpty
+                }
             } else {
                 let list = try await movieLoader(next)
                 guard generation == ticket, !Task.isCancelled else { return }

@@ -25,17 +25,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '347' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 347;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '348' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 348;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 347' in wf and 'feat/actor-ranking-period-347' in wf
+assert 'Home HQ posters App 348' in wf and 'feat/actor-ranking-period-347' in wf
 assert 'feat/list-paging-repeat-346' in wf and 'feat/western-actor-ranking-345' in wf
 assert wf.count('python3 scripts/test-actor-ranking-period347.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-list-paging-repeat346.py') == 5  # the 346 gate keeps its 5 run lines
-assert 'scripts/package-lut347.py' in wf and 'AVDB-347-release' in wf and 'AVDB-346-release' not in wf
-pkg = (r/'scripts/package-lut347.py').read_text()
-assert "=='347'" in pkg and 'AVDB-unsigned-1.0.2-347-actor-ranking-period.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut348.py' in wf and 'AVDB-348-release' in wf and 'AVDB-346-release' not in wf
+pkg = (r/'scripts/package-lut348.py').read_text()
+assert "=='348'" in pkg and 'AVDB-unsigned-1.0.2-348-actor-grid-scroll.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  actor-ranking-period-347:' in wf and '  list-paging-repeat-346:' in wf
 
 doc = (r/'Build347-ActorRankingPeriod.md').read_text()
@@ -87,4 +87,4 @@ assert 'showingActorRanking' not in playback_block
 print('PASS test-actor-ranking-period347: the monthly actor '
       'ranking shows without the day/week/month period bar '
       '(hidden in actor mode, request pinned to monthly); the '
-      'periods belong to 作品 only, release 347')
+      'periods belong to 作品 only, release 348')

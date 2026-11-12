@@ -12,20 +12,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '347' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 347;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '348' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 348;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 347' in wf and 'feat/home-hero-parity-334' in wf
+assert 'Home HQ posters App 348' in wf and 'feat/home-hero-parity-334' in wf
 assert 'feat/home-hero-detail-333' in wf and 'feat/home-hero-color-332' in wf
 assert wf.count('python3 scripts/test-home-hero334.py') == 2  # static job + release regressions
 assert 'python3 scripts/test-home-hero333.py' in wf
-assert 'scripts/package-lut347.py' in wf and 'AVDB-347-release' in wf and 'AVDB-333-release' not in wf
-pkg = (r/'scripts/package-lut347.py').read_text()
-assert "=='347'" in pkg and 'AVDB-unsigned-1.0.2-347-actor-ranking-period.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut348.py' in wf and 'AVDB-348-release' in wf and 'AVDB-333-release' not in wf
+pkg = (r/'scripts/package-lut348.py').read_text()
+assert "=='348'" in pkg and 'AVDB-unsigned-1.0.2-348-actor-grid-scroll.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 job = wf.split('  home-hero-334:')[1]
 assert '-only-testing:DetailPosterQualityTests/HomeHero334Tests' in job
-assert 'AVDB-347-home-hero-parity-tests' in job
+assert 'AVDB-348-home-hero-parity-tests' in job
 assert '  home-hero-333:' in wf and '  home-hero-332:' in wf
 
 doc = (r/'Build334-HomeHeroParity.md').read_text()
@@ -58,4 +58,4 @@ assert 'heroMovie' not in hero333 and 'render(width:' not in hero333
 assert 'final class HomeHero334Tests' in tests
 
 print('PASS test-home-hero334: phone hero height = DetailPortraitGeometry formula (detail parity), '
-      'iPad 600 kept, 333 test compile fix pinned, release 347')
+      'iPad 600 kept, 333 test compile fix pinned, release 348')

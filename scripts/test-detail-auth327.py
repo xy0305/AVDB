@@ -8,21 +8,21 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '347' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 347;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '348' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 348;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 347' in wf and 'feat/detail-auth-327' in wf
+assert 'Home HQ posters App 348' in wf and 'feat/detail-auth-327' in wf
 assert 'python3 scripts/test-detail-auth327.py' in wf
-assert 'scripts/package-lut347.py' in wf and 'AVDB-347-release' in wf
-assert 'AVDB-unsigned-1.0.2-347-actor-ranking-period.ipa' in (r/'scripts/package-lut347.py').read_text()
+assert 'scripts/package-lut348.py' in wf and 'AVDB-348-release' in wf
+assert 'AVDB-unsigned-1.0.2-348-actor-grid-scroll.ipa' in (r/'scripts/package-lut348.py').read_text()
 assert 'detail-auth-327' in wf
 assert 'DetailAuth327Tests' in wf
 assert 'test327DetailAuthErrorMessageVisible' in wf
 assert 'test327DetailAuthLoginButtonPresence' in wf
 # 326 hero screenshot path stays intact.
 assert 'home-hero-hq-screenshots' in wf and 'test326HomeHeroHQScreenshots' in wf
-assert 'AVDB-347-home-screenshots' in wf
+assert 'AVDB-348-home-screenshots' in wf
 
 doc = (r/'Build327-DetailAuth.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '327' in doc and 'jointly' in doc.lower()
@@ -111,4 +111,4 @@ assert 'contrast' not in auth_ui.lower() and 'foregroundColor' not in auth_ui an
 
 print('PASS detail-auth327 source contracts: token on detail fetch, cache policy, '
       'setToken cache clear, needsReauth retains token, visible paired error styling, '
-      'login entry, account-change reload, tests wired, release 347')
+      'login entry, account-change reload, tests wired, release 348')

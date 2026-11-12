@@ -78,9 +78,16 @@ struct ActorAliasCatalog: Sendable {
         })
     }
 
-    static func bundled() -> ActorAliasCatalog {
-        ActorAliasCatalog(index: ActorAliasIndex.bundled() ?? ActorAliasIndex(schema: 1, actors: [], conflicts: []))
-    }
+    /// Build 348: the bundled index never changes at runtime, so the
+    /// catalog is built exactly once. Rebuilding it on every call meant
+    /// re-reading and re-decoding the 922 KB / 8,115-record JSON and
+    /// rebuilding every lookup table on the main actor — and
+    /// JavBusActorService.names() is called for every actor cell's
+    /// task identity on every body pass, which made actor grids
+    /// （排行榜演員月榜 above all) stutter while scrolling.
+    private static let cached = ActorAliasCatalog(index: ActorAliasIndex.bundled() ?? ActorAliasIndex(schema: 1, actors: [], conflicts: []))
+
+    static func bundled() -> ActorAliasCatalog { cached }
 
     func record(id: String) -> ActorAliasRecord? { records.first { $0.id == id } }
 
