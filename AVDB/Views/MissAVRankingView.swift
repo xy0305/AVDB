@@ -66,6 +66,7 @@ struct MissAVRankingView: View {
                     .accessibilityIdentifier("missav-periods")
                 Text("MissAV 提供排序和身份；精确匹配后封面、标题、演员资料替换为 AVDB 数据，不改变排名。")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+                RankingFeedNote(board: "missav", term: state.period).padding(.horizontal)
                 if state.loading { ProgressView("载入 MissAV 排行…") }
                 if !state.error.isEmpty {
                     Text(state.error).font(.callout).padding(.horizontal)
@@ -142,6 +143,11 @@ struct MissAVRankingView: View {
             let page = try await source.page(path)
             guard !Task.isCancelled, state.revision == token, epoch == source.generation, key == requestKey else { return }
             state.videos = page.videos; state.next = page.next; state.visited.insert(path); state.loadedKey = key
+            // Build 349: seed whatever the server feed already resolved;
+            // the grid's enqueue() then only queues uncovered videos.
+            if let feed = await RankingFeedState.shared.ensure(board: "missav", term: state.period) {
+                metadata.applyFeed(feed)
+            }
         } catch { if !Task.isCancelled && state.revision == token && epoch == source.generation && key == requestKey { state.error = error.localizedDescription } }
     }
     #if DEBUG
@@ -184,6 +190,9 @@ struct MissAVRankingView: View {
                 let fresh = page.videos.filter { !ids.contains($0.path) }
                 guard !fresh.isEmpty else { throw JRError.message("来源下一页没有新条目；保留已载入列表，请重试或刷新。") }
                 state.videos.append(contentsOf: fresh); state.visited.insert(path)
+                if let feed = RankingFeedState.shared.feed(board: "missav", term: state.period) {
+                    metadata.applyFeed(feed)
+                }
                 state.next = page.next.flatMap { state.visited.contains($0) ? nil : $0 }
             } catch { if !Task.isCancelled && state.revision == token && epoch == source.generation && key == requestKey { state.error = error.localizedDescription } }
         }

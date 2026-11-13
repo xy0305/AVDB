@@ -92,13 +92,43 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private var indexes: [String: JRIndex] = [:]
     private struct Match { let movie: Movie?; let date: Date }
     private var matches: [String: Match] = [:]
+    // Build 349: server feed verdicts for codes the device has not resolved.
+    // Only consulted while the feed is fresh (<= 48h); a stale feed leaves
+    // the marks in place but matchedMovie ignores them, so the throttled
+    // on-device verification below takes over as the fallback again.
+    private enum FeedMark { case miss, ambiguous }
+    private var feedMarks: [String: FeedMark] = [:]
+    private var feedMarksDate: Date?
+    private var feedMarksFresh: Bool {
+        guard let date = feedMarksDate else { return false }
+        return Date().timeIntervalSince(date) <= RankingFeedClient.staleInterval
+    }
+    /// Build 349: pre-fill from the server pre-matching feed. Matched
+    /// entries land in the same `matches` table the views already read;
+    /// miss/ambiguous verdicts are remembered as marks (no network).
+    func applyFeed(_ feed: RankingFeed) {
+        updateMatchScope()
+        feedMarksDate = feed.generatedDate
+        for entry in feed.entries {
+            guard entry.match.pending != true, let raw = entry.code,
+                  let key = JRPolicy.exactCode(raw) else { continue }
+            switch entry.match.status {
+            case "matched":
+                if let movie = entry.makeMovie() { matches[key] = Match(movie: movie, date: Date()) }
+                feedMarks[key] = nil
+            case "ambiguous": feedMarks[key] = .ambiguous
+            case "miss": feedMarks[key] = .miss
+            default: break
+            }
+        }
+    }
     private var matchFlights: [String: Task<Movie?, Error>] = [:]
     private var matchTokens: [String: UUID] = [:]
     private var matchAccount: String?
     private func updateMatchScope() {
         let account = APIClient.shared.token
         if account != matchAccount {
-            cancelMappings(); matches.removeAll(); matchAccount = account
+            cancelMappings(); matches.removeAll(); feedMarks.removeAll(); feedMarksDate = nil; matchAccount = account
         }
     }
     func cachedMovie(code: String) -> Movie? {
@@ -118,6 +148,17 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         if JavDBSDK.shared.hasAmbiguousMovie(code: code) { throw JRError.message("同一番号对应多个有效影片 ID，请在原生搜索中核对。") }
         if !refresh, let native = JavDBSDK.shared.cachedExactMovie(code: code) { return native }
         if !refresh, let cached = matches[key], Date().timeIntervalSince(cached.date) < (cached.movie == nil ? 60 : 21600) { return cached.movie }
+        // Build 349: a fresh feed verdict ends the lookup without network.
+        // Ambiguous stays fail-closed (same message as the SDK's own
+        // ambiguous path); a feed miss returns nil for automatic callers,
+        // while an explicit refresh (manual retry) falls through to the
+        // throttled verification below.
+        if feedMarksFresh, let mark = feedMarks[key] {
+            switch mark {
+            case .ambiguous: throw JRError.message("同一番号对应多个有效影片 ID，请在原生搜索中核对。")
+            case .miss: if !refresh { return nil }
+            }
+        }
         if let flight = matchFlights[key] { return try await flight.value }
         let epoch = generation, token = UUID(), account = matchAccount
         let flight = Task<Movie?, Error>(priority: interactive ? .userInitiated : .utility) {
@@ -155,7 +196,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private var pageFlights: [String: Task<JRPage, Error>] = [:]
     private var indexFlights: [String: Task<JRIndex, Error>] = [:]
     private func clear() {
-        cancelMappings(); matches.removeAll(); previews.removeAll()
+        cancelMappings(); matches.removeAll(); feedMarks.removeAll(); feedMarksDate = nil; previews.removeAll()
         pageFlights.values.forEach { $0.cancel() }; indexFlights.values.forEach { $0.cancel() }
         pageFlights.removeAll(); indexFlights.removeAll()
         pages.removeAll(); indexes.removeAll(); pageDates.removeAll(); indexDates.removeAll()

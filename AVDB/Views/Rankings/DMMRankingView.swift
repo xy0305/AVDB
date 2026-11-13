@@ -34,6 +34,7 @@ import UniformTypeIdentifiers
             Text("\(store.kind.periodLabel) · \(store.kind.expectedCount)榜位 · 统计起止未知").font(.headline)
             Text(store.status).font(.footnote).foregroundStyle(.secondary)
                 .accessibilityIdentifier("dmm-source-status")
+            RankingFeedNote(board: "dmm", term: store.kind.rawValue)
             Toggle("我已满18岁，授权按官方自声明并记住选择", isOn: Binding(get: { adultAuthorization }, set: { value in
                 adultAuthorization = value; store.authorizeAdultDeclaration = value
                 if !value { Task { await store.forgetSession() } }
@@ -139,7 +140,16 @@ import UniformTypeIdentifiers
     private func resolveMapped() {
         let items = rows.compactMap(entry)
         guard !items.isEmpty else { return }
-        mapper.resolve(items, retry: false)
+        // Build 349: server feed first; resolve() then only queues the
+        // entries the feed did not cover (its batch filter skips rows
+        // that already have a movie or a message).
+        let term = kind.rawValue
+        Task { @MainActor in
+            if let feed = await RankingFeedState.shared.ensure(board: "dmm", term: term) {
+                mapper.applyFeed(feed, for: items)
+            }
+            mapper.resolve(items, retry: false)
+        }
     }
 }
 
@@ -229,6 +239,28 @@ import UniformTypeIdentifiers
         task?.cancel(); task = nil; generation = UUID(); busy = false
         for (key, value) in messages where value == "排队中" || value == "正在精确核对AVDB演员…" {
             messages.removeValue(forKey: key)
+        }
+    }
+    /// Build 349: pre-fill from the server pre-matching feed (dmm-actress),
+    /// matched by actress name. Matched rows land in `actors`; while the
+    /// feed is fresh, miss/ambiguous verdicts land in `messages`, which
+    /// keeps them out of the automatic resolveVisible batch (ambiguous
+    /// stays fail-closed). A stale feed contributes only matched rows;
+    /// the rest falls back to the exact-name verification below.
+    func applyFeed(_ feed: RankingFeed, rows: [DMMActressRow]) {
+        let fresh = !feed.isStale
+        for row in rows where actors[row.actressID] == nil {
+            guard let found = feed.actorEntry(forNames: [row.name]), found.match.pending != true else { continue }
+            if let actor = found.makeActor() {
+                actors[row.actressID] = actor
+                messages[row.actressID] = "服务器预匹配 · AVDB 演员精确匹配"
+            } else if fresh {
+                switch found.match.status {
+                case "ambiguous": messages[row.actressID] = "服务器预匹配：多个精确姓名候选，未匹配"
+                case "miss": messages[row.actressID] = "服务器预匹配：未匹配唯一AVDB演员 · 保留源榜位"
+                default: break
+                }
+            }
         }
     }
     func resolve(_ row: DMMActressRow, retry: Bool = false) {
@@ -327,9 +359,19 @@ import UniformTypeIdentifiers
         }
         .buttonStyle(.borderless)
         .navigationDestination(isPresented: $manualSearch) { SearchView() }
-        .onAppear { mapper.resolveVisible(rows, retry: false) }
-        .onChange(of: rows.map(\.actressID)) { _, _ in mapper.resolveVisible(rows, retry: false) }
+        .onAppear { applyFeedThenResolve() }
+        .onChange(of: rows.map(\.actressID)) { _, _ in applyFeedThenResolve() }
         .onDisappear { mapper.cancel() }
+    }
+    // Build 349: server feed first; resolveVisible then only queues the
+    // rows the feed did not cover.
+    private func applyFeedThenResolve() {
+        Task { @MainActor in
+            if let feed = await RankingFeedState.shared.ensure(board: "dmm", term: "actress") {
+                mapper.applyFeed(feed, rows: rows)
+            }
+            mapper.resolveVisible(rows, retry: false)
+        }
     }
 }
 

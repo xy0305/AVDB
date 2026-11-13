@@ -39,6 +39,51 @@ import Combine
         self.enrichMissAV = enrichMissAV; self.resolver = resolver
     }
     func value(_ request: Request) -> Result { results[request.key] ?? Result() }
+    /// Build 349: pre-fill from the server pre-matching feed. Movie
+    /// entries seed by the same key Request uses (exact code); actor
+    /// entries seed by source URL, which is the actor request key on the
+    /// JAVLibrary board (the only actor feed the pipeline publishes).
+    /// Seeded results are final (loading == false), so enqueue() leaves
+    /// them alone and the throttled queue only ever sees entries the
+    /// feed does not cover. While the feed is fresh, miss verdicts are
+    /// seeded as final too and ambiguous stays fail-closed (a final
+    /// unmatched result, never re-resolved automatically); a stale feed
+    /// seeds only its matched rows and the rest falls back to the queue.
+    /// Pending entries are skipped entirely — the server has not
+    /// resolved them yet, so the device fallback owns them.
+    func applyFeed(_ feed: RankingFeed) {
+        if account != APIClient.shared.token || originGeneration != generation() { reset() }
+        let fresh = !feed.isStale
+        for entry in feed.entries where entry.match.pending != true {
+            if let code = entry.code, !code.isEmpty {
+                seed(key: "movie:" + (JRPolicy.exactCode(code) ?? code), entry: entry, fresh: fresh, isActor: false)
+            }
+            if entry.name != nil, let url = entry.sourceURL, !url.isEmpty {
+                seed(key: "actor:" + url, entry: entry, fresh: fresh, isActor: true)
+            }
+        }
+    }
+    private func seed(key: String, entry: RankingFeedEntry, fresh: Bool, isActor: Bool) {
+        guard results[key] == nil, tasks[key] == nil,
+              !pending.contains(where: { $0.key == key }) else { return }
+        if isActor, let actor = entry.makeActor() {
+            results[key] = Result(actor: actor, avatarURL: entry.match.avatar,
+                                  message: "服务器预匹配 · AVDB 演员资料 · \(sourceName) 顺序", loading: false)
+            return
+        }
+        if !isActor, let movie = entry.makeMovie() {
+            results[key] = Result(movie: movie, message: "服务器预匹配 · AVDB 资料 · \(sourceName) 顺序", loading: false)
+            return
+        }
+        guard fresh else { return }
+        switch entry.match.status {
+        case "ambiguous":
+            results[key] = Result(message: "服务器预匹配：同一番号对应多个有效影片 ID，未匹配", loading: false)
+        case "miss":
+            results[key] = Result(message: "服务器预匹配：未找到唯一匹配", loading: false)
+        default: break
+        }
+    }
     func reset() {
         epoch = UUID(); tasks.values.forEach { $0.cancel() }; tasks.removeAll()
         pending.removeAll(); results.removeAll()

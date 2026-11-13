@@ -58,6 +58,7 @@ struct JAVLibraryRankingView: View {
                     .accessibilityIdentifier("javlibrary-kinds")
                 Text("替换为 AVDB 资料，不替换排名。每 8 小时服务器刷新；不是日 / 周 / 月榜，也不自动订阅或下载。")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+                RankingFeedNote(board: "javlibrary", term: kind.rawValue).padding(.horizontal)
                 if loading { ProgressView("载入 JAVLibrary 快照…") }
                 if !message.isEmpty {
                     Text(message).font(.callout).padding(.horizontal)
@@ -114,6 +115,11 @@ struct JAVLibraryRankingView: View {
             let value = try await ExternalLibraryClient.shared.javlibrary(selected)
             guard !Task.isCancelled, revision == token, generation == settings.revision, kind == selected else { return }
             snapshot = value; loadedKey = requestKey
+            // Build 349: seed whatever the server feed already resolved;
+            // the grids' enqueue() then only queues uncovered entries.
+            if let feed = await RankingFeedState.shared.ensure(board: "javlibrary", term: selected.rawValue) {
+                metadata.applyFeed(feed)
+            }
         } catch {
             if !Task.isCancelled, revision == token, generation == settings.revision { message = error.localizedDescription }
         }

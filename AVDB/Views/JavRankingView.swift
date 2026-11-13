@@ -127,6 +127,12 @@ private struct JRMeasuredGrid: View {
         .background { GeometryReader { g in Color.clear.preference(key: JRWidthKey.self, value: g.size.width) } }
         .onPreferenceChange(JRWidthKey.self) { if $0 > 0 { width = $0 } }
         .task(id: "\(source.generation):" + videos.map(\.path).joined(separator: ",")) {
+            // Build 349: the server feed pre-fills the shared match table
+            // first (no JavDB traffic); posters then read it through the
+            // same cachedMovie path as device-verified entries.
+            if let feed = await RankingFeedState.shared.ensure(board: "javranking", term: "explore") {
+                source.applyFeed(feed)
+            }
             // Never launch speculative JavDB searches while posters are loading.
             // Reuse only verified cache entries; an actual tap owns resolution.
             mapped.removeAll(); completed.removeAll()
@@ -341,6 +347,9 @@ struct JRPageView: View {
                     }
                     if !page.videos.isEmpty {
                         Text(isPreview ? "首批 \(page.videos.count) 部 · 正在读取完整榜单" : "\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
+                        if path.hasPrefix("/zh-hans/explore/") {
+                            RankingFeedNote(board: "javranking", term: "explore").padding(.horizontal)
+                        }
                         JRPosterGrid(videos: Array(page.videos.prefix(limit)), onAppearLast: {
                             if state.limit < page.videos.count { state.limit += 12 }
                         })

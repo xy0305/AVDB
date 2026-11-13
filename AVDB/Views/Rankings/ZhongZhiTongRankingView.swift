@@ -42,6 +42,13 @@ struct ZhongZhiTongRankingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { attempt += 1 }
         .task(id: attempt) { await load() }
+        .task(id: selectedMonth) {
+            // Build 349: seed this month's server feed matches, if any.
+            if !selectedMonth.isEmpty,
+               let feed = await RankingFeedState.shared.ensure(board: "zhongzhitong", term: selectedMonth) {
+                metadata.applyFeed(feed)
+            }
+        }
         .onChange(of: selectedMonth) { _, _ in metadata.suspend() }
         .onDisappear { metadata.suspend() }
         .onChange(of: appState.currentUser?.id) { _, _ in metadata.reset() }
@@ -87,6 +94,7 @@ struct ZhongZhiTongRankingView: View {
             if !remoteNote.isEmpty {
                 Text(remoteNote).font(.caption2).foregroundStyle(.secondary)
             }
+            RankingFeedNote(board: "zhongzhitong", term: month.month)
         }
         .padding(.horizontal)
     }
@@ -118,6 +126,14 @@ struct ZhongZhiTongRankingView: View {
         remoteNote = result.remoteOK ? "资料更新：\(catalog?.updatedAt ?? "")" : "使用安装包内资料（\(catalog?.updatedAt ?? "未知")），线上更新暂不可用"
         if selectedMonth.isEmpty || !months.contains(where: { $0.month == selectedMonth }) {
             selectedMonth = months.first?.month ?? ""
+        }
+        // Build 349: feed matches are the primary source for this month;
+        // the bundled catalog still provides the code list itself, and
+        // any code the feed does not cover falls back to the metadata
+        // queue (MissAVMetadata with the shared VerificationThrottle).
+        if let month = current?.month,
+           let feed = await RankingFeedState.shared.ensure(board: "zhongzhitong", term: month) {
+            metadata.applyFeed(feed)
         }
     }
 }

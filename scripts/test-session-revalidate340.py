@@ -19,17 +19,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '348' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 348;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '349' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 349;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 348' in wf and 'feat/session-revalidate-340' in wf
+assert 'Home HQ posters App 349' in wf and 'feat/session-revalidate-340' in wf
 assert 'feat/detail-glass-clear-339' in wf and 'feat/logout-access-338' in wf
 assert wf.count('python3 scripts/test-session-revalidate340.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-clear-glass339.py') == 5  # the 339 gate keeps its 5 run lines
-assert 'scripts/package-lut348.py' in wf and 'AVDB-348-release' in wf and 'AVDB-339-release' not in wf
-pkg = (r/'scripts/package-lut348.py').read_text()
-assert "=='348'" in pkg and 'AVDB-unsigned-1.0.2-348-actor-grid-scroll.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut349.py' in wf and 'AVDB-349-release' in wf and 'AVDB-339-release' not in wf
+pkg = (r/'scripts/package-lut349.py').read_text()
+assert "=='349'" in pkg and 'AVDB-unsigned-1.0.2-349-feed-prefill.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  session-revalidate-340:' in wf and '  clear-glass-339:' in wf
 
 doc = (r/'Build340-SessionRevalidate.md').read_text()
@@ -86,4 +86,4 @@ assert 'vm.isAuthError' in view and 'detail-error-login' in view
 print('PASS test-session-revalidate340: detail auth errors trigger one '
       'profile-endpoint revalidation; the session drops only when the '
       'profile check itself fails authentication, 327 policy intact, '
-      'release 348')
+      'release 349')

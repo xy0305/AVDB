@@ -134,6 +134,43 @@ enum JavVerseIdentity {
         task?.cancel(); task = nil; generation = UUID(); busy = false
         for (key, value) in messages where value == "排队中" || value == "请求中…" { messages.removeValue(forKey: key) }
     }
+    /// Build 349: pre-fill from the server pre-matching feed. Matched
+    /// entries go straight into the movies/actors tables the views read.
+    /// While the feed is fresh, its miss/ambiguous verdicts are recorded
+    /// as messages, which keeps those entries out of the automatic
+    /// resolve batch (resolve(retry:) skips entries that already carry a
+    /// message); ambiguous stays fail-closed and is never re-resolved
+    /// automatically. A stale feed only contributes its matched rows —
+    /// everything else falls back to the throttled verification below.
+    /// Pending entries (server budget exhausted) are left untouched.
+    func applyFeed(_ feed: RankingFeed, for entries: [JavVerseEntry]) {
+        guard account == accountProvider() else { return }
+        let fresh = !feed.isStale
+        for entry in entries where movies[entry.id] == nil && actors[entry.id] == nil {
+            let found: RankingFeedEntry?
+            if entry.kind == "movie" {
+                guard let code = entry.code else { continue }
+                found = feed.movieEntry(forCode: code)
+            } else if entry.kind == "actor" {
+                found = feed.actorEntry(forNames: [entry.label] + entry.aliases)
+            } else { continue }
+            guard let found, found.match.pending != true else { continue }
+            if let movie = found.makeMovie() {
+                movies[entry.id] = movie
+                messages[entry.id] = "服务器预匹配 · 已核验 AVDB 唯一身份"
+            } else if let actor = found.makeActor() {
+                actors[entry.id] = actor
+                if let avatar = found.match.avatar, !avatar.isEmpty { avatars[entry.id] = avatar }
+                messages[entry.id] = "服务器预匹配 · 已核验 AVDB 唯一身份"
+            } else if fresh {
+                switch found.match.status {
+                case "ambiguous": messages[entry.id] = "服务器预匹配：同一番号对应多个有效影片 ID，未匹配"
+                case "miss": messages[entry.id] = entry.kind == "actor" ? "服务器预匹配：未找到唯一匹配" : "服务器预匹配：未找到：AVDB 无完整身份匹配"
+                default: break
+                }
+            }
+        }
+    }
     func movie(for entry: JavVerseEntry) -> Movie? {
         guard account == accountProvider() else { return nil }; return movies[entry.id]
     }
