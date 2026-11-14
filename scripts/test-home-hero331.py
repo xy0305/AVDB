@@ -11,20 +11,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '349' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 349;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '350' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 350;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 349' in wf and 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
+assert 'Home HQ posters App 350' in wf and 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
 assert 'feat/home-hero-color-332' in wf
 assert wf.count('python3 scripts/test-home-hero331.py') == 2  # zzt-ranking job + release regressions
-assert 'scripts/package-lut349.py' in wf and 'AVDB-349-release' in wf and 'AVDB-331-release' not in wf
-pkg = (r/'scripts/package-lut349.py').read_text()
-assert "=='349'" in pkg and 'AVDB-unsigned-1.0.2-349-feed-prefill.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut350.py' in wf and 'AVDB-350-release' in wf and 'AVDB-331-release' not in wf
+pkg = (r/'scripts/package-lut350.py').read_text()
+assert "=='350'" in pkg and 'AVDB-unsigned-1.0.2-350-rankings-auth.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 job = wf.split('  home-hero-331:')[1].split('  home-hero-332:')[0]
 assert '-only-testing:DetailPosterQualityTests/HomeHero331Tests' in job
 assert 'test330EnrichMergedDetailCoverIsMiddleStep' in job
-assert 'AVDB-349-home-hero-tests' in job
+assert 'AVDB-350-home-hero-tests' in job
 assert 'home-chrome-330:' in wf and 'home-hot-329:' in wf and 'home-hot-328:' in wf
 
 doc = (r/'Build331-HomeHeroCrop.md').read_text()
@@ -148,4 +148,4 @@ assert 'final class HomeChrome330Tests' in unit and 'final class HomeHot329Tests
 
 print('PASS home-hero331 source contracts: original-bitmap hero + display-time front window, two-level floor, '
       'arrival-time keep/evict + disk-only restore, field-level merge, per-item pipeline cap 2 / 8s, '
-      'by-id winner sharing, release 349')
+      'by-id winner sharing, release 350')

@@ -229,10 +229,10 @@ public final class JavDBSDK {
         return movies
     }
 
-    /// 磁力搜索（GET /api/v1/search_magnet）
+    /// 磁力搜索（GET /api/v1/search_magnet）— 350: 服务端已改为必须带 JWT
     public func searchMagnet(_ keyword: String, page: Int = 1) async throws -> [Magnet] {
         let resp: JavDBResponse<MagnetListData> = try await client.get(
-            "/api/v1/search_magnet", query: ["q": keyword, "page": "\(page)"])
+            "/api/v1/search_magnet", query: ["q": keyword, "page": "\(page)"], useToken: true)
         return resp.data?.magnets ?? []
     }
 
@@ -600,31 +600,31 @@ public final class JavDBSDK {
         return resp.data?.movie
     }
 
-    /// 排行榜（GET /api/v1/rankings）
+    /// 排行榜（GET /api/v1/rankings）— 350: 服务端已改为必须带 JWT
     /// type: 0有码 1无码 2欧美 3 FC2；period: daily/weekly/monthly
     public func rankings(type: String, period: String, page: Int = 1) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/rankings",
-            query: ["type": type, "period": period, "page": "\(page)"])
+            query: ["type": type, "period": period, "page": "\(page)"], useToken: true)
         guard resp.isSuccess else { throw JavDBError.apiError(action: resp.action, message: resp.message) }
         let movies = (resp.data?.movies ?? []).map { $0.withCatalogType(type) }
         rememberMovies(movies)
         return movies
     }
 
-    /// 演员排行榜（GET /api/v1/rankings/actors）
+    /// 演员排行榜（GET /api/v1/rankings/actors）— 350: 服务端已改为必须带 JWT
     public func actorRankings(type: String = "0", period: String = "monthly", page: Int = 1) async throws -> [Actor] {
         let resp: JavDBResponse<ActorListData> = try await client.get(
             "/api/v1/rankings/actors",
-            query: ["type": type, "period": period, "page": "\(page)"])
+            query: ["type": type, "period": period, "page": "\(page)"], useToken: true)
         return resp.data?.actors ?? []
     }
 
-    /// 热播排行（GET /api/v1/rankings/playback）
+    /// 热播排行（GET /api/v1/rankings/playback）— 350: 服务端已改为必须带 JWT
     public func playbackRankings(filterBy: String = "all", period: String = "daily", page: Int = 1) async throws -> [Movie] {
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v1/rankings/playback",
-            query: ["filter_by": filterBy, "period": period, "page": "\(page)"])
+            query: ["filter_by": filterBy, "period": period, "page": "\(page)"], useToken: true)
         let movies = resp.data?.movies ?? []
         rememberMovies(movies)
         return movies

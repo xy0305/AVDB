@@ -12,20 +12,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '349' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 349;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '350' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 350;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 349' in wf and 'feat/home-hero-detail-333' in wf
+assert 'Home HQ posters App 350' in wf and 'feat/home-hero-detail-333' in wf
 assert 'feat/home-hero-color-332' in wf and 'feat/home-hero-crop-331' in wf
 assert wf.count('python3 scripts/test-home-hero333.py') == 2  # static job + release regressions
 assert 'python3 scripts/test-home-hero332.py' in wf
-assert 'scripts/package-lut349.py' in wf and 'AVDB-349-release' in wf and 'AVDB-332-release' not in wf
-pkg = (r/'scripts/package-lut349.py').read_text()
-assert "=='349'" in pkg and 'AVDB-unsigned-1.0.2-349-feed-prefill.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut350.py' in wf and 'AVDB-350-release' in wf and 'AVDB-332-release' not in wf
+pkg = (r/'scripts/package-lut350.py').read_text()
+assert "=='350'" in pkg and 'AVDB-unsigned-1.0.2-350-rankings-auth.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 job = wf.split('  home-hero-333:')[1]
 assert '-only-testing:DetailPosterQualityTests/HomeHero333Tests' in job
-assert 'AVDB-349-home-hero-detail-tests' in job
+assert 'AVDB-350-home-hero-detail-tests' in job
 assert '  home-hero-332:' in wf and '  home-hero-331:' in wf
 
 doc = (r/'Build333-HomeHeroDetail.md').read_text()
@@ -67,4 +67,4 @@ assert '.padding(.bottom, 38 + HomeMetrics.heroContentOverlap)' in hero, 'more b
 assert 'HomeMetrics.heroContentOverlap' in home and 'static let heroContentOverlap: CGFloat = 32' in home
 
 print('PASS test-home-hero333: sharp layer = detail display image (art.image), floor transition kept, '
-      'detail-style bottom gradient into systemBackground, chrome above the fade band, release 349')
+      'detail-style bottom gradient into systemBackground, chrome above the fade band, release 350')

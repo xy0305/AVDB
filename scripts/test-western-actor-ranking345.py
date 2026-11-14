@@ -25,17 +25,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '349' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 349;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '350' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 350;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 349' in wf and 'feat/western-actor-ranking-345' in wf
+assert 'Home HQ posters App 350' in wf and 'feat/western-actor-ranking-345' in wf
 assert 'feat/list-tabbar-clearance-344' in wf and 'feat/list-landscape-cover-343' in wf
 assert wf.count('python3 scripts/test-western-actor-ranking345.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-list-tabbar-clearance344.py') == 5  # the 344 gate keeps its 5 run lines
-assert 'scripts/package-lut349.py' in wf and 'AVDB-349-release' in wf and 'AVDB-344-release' not in wf
-pkg = (r/'scripts/package-lut349.py').read_text()
-assert "=='349'" in pkg and 'AVDB-unsigned-1.0.2-349-feed-prefill.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut350.py' in wf and 'AVDB-350-release' in wf and 'AVDB-344-release' not in wf
+pkg = (r/'scripts/package-lut350.py').read_text()
+assert "=='350'" in pkg and 'AVDB-unsigned-1.0.2-350-rankings-auth.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  western-actor-ranking-345:' in wf and '  list-tabbar-clearance-344:' in wf
 
 doc = (r/'Build345-WesternActorRanking.md').read_text()
@@ -90,4 +90,4 @@ assert '"/api/v1/rankings/actors"' in sdk  # the endpoint itself, unchanged
 print('PASS test-western-actor-ranking345: the monthly actor ranking '
       'segment is driven by the board type (censored 0, uncensored 1, '
       'western 2; FC2 excluded) across the chip row, the view model '
-      'and the loader, release 349')
+      'and the loader, release 350')
