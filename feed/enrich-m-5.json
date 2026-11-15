@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-5",
- "generated_at": "2026-11-15T06:39:32+00:00",
+ "generated_at": "2026-11-15T20:30:01+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -57,12 +57,120 @@
    "enriched_at": "2026-11-15T04:09:53+00:00"
   },
   {
+   "javdb_id": "5nDP6M",
+   "code": "DLDSS560",
+   "director": "ひむろっく",
+   "maker": "DAHLIA",
+   "duration_min": 130,
+   "release_date": "2026-11-01",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:9b7b5eaefc4e9554425f7e3694324b90cfa079d5&amp;dn=DLDSS-560",
+     "size": "1.46GB",
+     "title": "DLDSS-560"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:1D056F06A0234A04908D086B1EF1AB46B2A4A13A&amp;dn=DLDSS-560",
+     "size": "2.39GB",
+     "title": "DLDSS-560"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:13de19a6498ccc65a268b9b9b1fe13957215e515&amp;dn=DLDSS-560",
+     "size": "1.33GB",
+     "title": "DLDSS-560"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5c3651787e067ede273bc99ff0e95992ae9abb6c&amp;dn=DLDSS-560+%5BHD%5D",
+     "size": "1.33GB",
+     "title": "DLDSS-560 [HD]"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:658c42903b930d0d9dbb251551690efce1834f5b&amp;dn=DLDSS-560",
+     "size": "2.19GB",
+     "title": "DLDSS-560"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9DACB5C5926DF92F5DF66458A081AB9E5E486527&amp;dn=DLDSS-560",
+     "size": "5.70GB",
+     "title": "DLDSS-560"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:a658cf5ca7babd482549dbb9ddbe2d6ed7ac9db2&amp;dn=DLDSS-560",
+     "size": "5.32GB",
+     "title": "DLDSS-560"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9407B9ACC3515064243E7476DD8111B884C85846&amp;dn=DLDSS-560",
+     "size": "1.33GB",
+     "title": "DLDSS-560"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5A926A10115378C2C7841B638041B93E427058AE&amp;dn=DLDSS-560",
+     "size": "5.32GB",
+     "title": "DLDSS-560"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:02:14+00:00"
+  },
+  {
+   "javdb_id": "5nDdP9",
+   "code": "DROP142",
+   "maker": "OFFICE K’S",
+   "series": "初めてのセンズリ鑑賞に興奮しちゃった素人娘",
+   "duration_min": 178,
+   "release_date": "2026-11-01",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:8c809ec0f8410a1bdf1cb682c85deb5a5288aa09&amp;dn=DROP142",
+     "size": "5.81GB",
+     "title": "DROP142"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:03eecabffd105e6d798dc096b90359593da09a8a&amp;dn=DROP-142",
+     "size": "5.74GB",
+     "title": "DROP-142"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4b4e3cc0c52b390470a969d1e3c92257ba5162ba&amp;dn=DROP-142",
+     "size": "5.76GB",
+     "title": "DROP-142"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7be29e47c06abf3efe84f5503bfa81babadd91fb&amp;dn=DROP-142",
+     "size": "1.96GB",
+     "title": "DROP-142"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:e3c32742ee97774f6fd8a2c5d06aa5fdad96078a&amp;dn=DROP-142",
+     "size": "5.74GB",
+     "title": "DROP-142"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C94FEF1439EE1AFC78AD0737796061BED86CD1FB&amp;dn=DROP-142",
+     "size": "5.74GB",
+     "title": "DROP-142"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:CB5A3EC3ABFAE5ED0E124735AF5C84E0EA3D50F7&amp;dn=DROP-142",
+     "size": "1.69GB",
+     "title": "DROP-142"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C44BE8EB81F6E8FF0333354E48791A264662D910&amp;dn=DROP-142",
+     "size": "5.75GB",
+     "title": "DROP-142"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:03:29+00:00"
+  },
+  {
    "javdb_id": "5nXANM",
    "code": "DANDY985",
    "director": "山崎千年",
    "maker": "DANDY",
    "series": "「おばさん我慢できないわ…」",
    "duration_min": 223,
+   "cover_hires_url": "http://163.47.40.207:8901/5nXANM.jpg",
    "release_date": "2025-07-10",
    "magnets": [
     {
@@ -97,6 +205,32 @@
     }
    ],
    "enriched_at": "2026-11-15T06:29:25+00:00"
+  },
+  {
+   "javdb_id": "5naAgB",
+   "code": "EYAN221",
+   "plot": "異常性欲者の執念性交為に成すすべなく…大型連休。初めて夫（智）の実家に帰省することになった「まろん」夫の田舎で過ごすことをとても楽しみにしていた。しかし、何故かまろんは夫の二人の両親に違和感を感じていた。その理由は、義父（賢治）の異常性癖。夫の知らないところで、その異常な関係に巻き込まれていく…。息子の妻にスケベ心が抑えられない異常性欲者の義父セクハラ！「お義父さん、これは不同意性交です！！」",
+   "plot_source": "dmm",
+   "director": "前田文豪",
+   "maker": "E-BODY",
+   "duration_min": 118,
+   "score": 4.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/eyan00221/eyan00221jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/D3B9BgQgv74sWDK3XDNPT9OJkwdfn6jEO6Kp-8nEsCNxRtNdtDwnsfJ_yqIk1d/eyan00221hhb.mp4",
+   "release_date": "2026-09-10",
+   "enriched_at": "2026-11-15T19:11:04+00:00"
   }
  ]
 }

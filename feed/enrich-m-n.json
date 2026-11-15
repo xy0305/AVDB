@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-n",
- "generated_at": "2026-11-15T06:39:32+00:00",
+ "generated_at": "2026-11-15T20:30:01+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -38,6 +38,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dass00787/dass00787jp-20.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/DHUwJAAqu2yQSN-wxHhAKYsNGPYC9B1EXYvdqjAHJnRwjNi-VzObEMuCXv-ozR/dass00787hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/NQ6mB4.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
@@ -73,6 +74,67 @@
    "enriched_at": "2026-11-15T04:09:53+00:00"
   },
   {
+   "javdb_id": "NQXO94",
+   "code": "DLDSS567",
+   "director": "ひむろっく",
+   "maker": "DAHLIA",
+   "duration_min": 128,
+   "release_date": "2026-11-01",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:a8001ac5c196776b55b98cf7b57aa63df88fac5d&amp;dn=DLDSS-567",
+     "size": "1.32GB",
+     "title": "DLDSS-567"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7032dc340899e17106410eb3ec1517a9e3718c2a&amp;dn=DLDSS-567",
+     "size": "2.41GB",
+     "title": "DLDSS-567"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:aa518988177355e6e2553200ce4501570a14ba3d&amp;dn=DLDSS-567",
+     "size": "5.57GB",
+     "title": "DLDSS-567"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:73a58675f5ecbe6b69b5615b25c46e88cb30623f&amp;dn=DLDSS-567",
+     "size": "2.07GB",
+     "title": "DLDSS-567"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:04bc5121228bb0c63238e30d41ebd3c7aa06d956&amp;dn=DLDSS-567-UC",
+     "size": "3.49GB",
+     "title": "DLDSS-567-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:ab9be164f5401bedd8fb0baaf072f97312187339&amp;dn=DLDSS-567-AI",
+     "size": "3.50GB",
+     "title": "DLDSS-567-AI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3ccf9626f2b3ea060600db4a6eb7d973f43d7e22&amp;dn=DLDSS-567",
+     "size": "1.56GB",
+     "title": "DLDSS-567"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:58df959228d56fcb457fb24ccce4c5ff331399a1&amp;dn=DLDSS-567",
+     "size": "5.58GB",
+     "title": "DLDSS-567"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D41F23971572AE0572D19C7494909675B99C0B7B&amp;dn=DLDSS-567",
+     "size": "1.32GB",
+     "title": "DLDSS-567"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DFE70B028913550EDF1194976C755E60365896FD&amp;dn=DLDSS-567",
+     "size": "5.57GB",
+     "title": "DLDSS-567"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:02:40+00:00"
+  },
+  {
    "javdb_id": "NQXOKw",
    "code": "ATID708",
    "plot": "…パン！店内に響く平手打ちの音。\n「お客様になんて事するのっ！謝りなさい」 \n静まり返る店内で新人ボーイの西倉に声を上げているのはこの店のナンバーワン、レン。\nレンに絡む客を力づくで止めた西倉をれんが引っぱたいたのだ。\n腑に落ちない西倉、しかしそれは場を収めようとれんが機転を利かせたのだった。\n閉店後「ホントはちょっとうれしかったよ。ありがとね」と詫びるレン。\nそんなレンに何か言いかけた西倉だが、レンは気付かず店を後にするのだった。\n明日、自分がこの男にレ●プされる事になるとも知らずに…。",
@@ -93,6 +155,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/atid00708/atid00708jp-10.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/JnIGLBUx_5OYFU94_rTZjamyJ6K3U21ai4tI9nRUmfCTCoaAj13RIfylNb7-1h/atid00708hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/NQXOKw.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
@@ -150,6 +213,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/cjod00535/cjod00535jp-18.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/SB94QB8H1X15Lct5KG1UPdwUOG3PIw1aqgCNG7CoPgzIS3a8QYy6j2liBZEFmw/cjod00535hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/NQmP7Z.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
@@ -158,6 +222,7 @@
    "maker": "プレステージ",
    "series": "俺の従順ペット候補生",
    "duration_min": 135,
+   "cover_hires_url": "http://163.47.40.207:8901/NQwPYw.jpg",
    "release_date": "2024-03-29",
    "magnets": [
     {
@@ -223,6 +288,118 @@
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
+   "javdb_id": "Nnrr",
+   "code": "DV1553",
+   "director": "坂本優二",
+   "maker": "アリスJAPAN",
+   "series": "危ない密室",
+   "duration_min": 120,
+   "release_date": "2013-09-27",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:271701ED417A62FFB2A8DBE19F159C2EF69600F2&amp;dn=DV-1553",
+     "size": "1.20GB",
+     "title": "DV-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:BB166C52B6236E76F92CFAFA01140503A39B1186&amp;dn=%5BInitial+D%5D+DV-1553",
+     "size": "5.00GB",
+     "title": "[Initial D] DV-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:96ECE558A018C3405425C0594E174019940B885D&amp;dn=DV1553MP4",
+     "size": "1.21GB",
+     "title": "DV1553MP4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:FA98520910E5FB950C6B1F2ABEC4C3DBFB1C9885&amp;dn=DV-1553-MP4",
+     "size": "1.07GB",
+     "title": "DV-1553-MP4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3884F98E4E5DB94A721AB1D557C5F99B8A7D82AD&amp;dn=DV-1553",
+     "size": "981.59MB",
+     "title": "DV-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0AC88568E57E749E474FD8E5B5CADBDFFC1C0A97&amp;dn=DV-1553",
+     "size": "1.03GB",
+     "title": "DV-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A46828450230EAEFBCA2F33C3A38ADB1C692E625&amp;dn=DV-1553+%E5%8D%B1%E3%81%AA%E3%81%84%E5%AF%86%E5%AE%A4+%E3%83%AC%E3%83%BC%E3%82%B9%E3%82%AF%E3%82%A4%E3%83%BC%E3%83%B3%E7%9B%A3%E7%A6%81+%E8%BE%B0%E5%B7%B3%E3%82%86%E3%81%84",
+     "size": "1.03GB",
+     "title": "DV-1553 危ない密室 レースクイーン監禁 辰巳ゆい"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F4207AF1E46DEE96FE103295803AFC2E3623C436&amp;dn=tony-657%40www.sexinsex.net%40DV-1553",
+     "size": "422.48MB",
+     "title": "tony-657@sexinsex@DV-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D67AF9ADC73269DB869780C3C2A7056340992A68&amp;dn=%E7%AC%AC%E4%B8%80%E6%9C%83%E6%89%80%E6%96%B0%E7%89%87%40SIS001%40%28%E3%82%A2%E3%83%AA%E3%82%B9JAPAN%29%28DV-1553%29%E5%8D%B1%E3%81%AA%E3%81%84%E5%AF%86%E5%AE%A4_%E3%83%AC%E3%83%BC%E3%82%B9%E3%82%AF%E3%82%A4%E3%83%BC%E3%83%B3%E7%9B%A3%E7%A6%81_%E8%BE%B0%E5%B7%B3%E3%82%86%E3%81%84",
+     "size": "1.03GB",
+     "title": "第一會所新片@SIS001@(アリスJAPAN)(DV-1553)危ない密室_レースクイーン監禁_辰巳ゆい"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F7F0325A2AC9B67202E90843BE57B423298D25E1&amp;dn=DV-1553",
+     "size": "1.03GB",
+     "title": "DV-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3E9988828E53CFFD0410DDD3E830E96DE6467B8D&amp;dn=0924-dv-1553",
+     "size": "1.03GB",
+     "title": "0924-dv-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DD9DC80EC7877B7657EB52699A2E4F38F4F18F4C&amp;dn=DV-1553+%E5%8D%B1%E6%A9%9F%E5%AF%86%E5%AE%A4%E8%B3%BD%E8%BB%8A%E5%A5%B3%E9%83%8E%E6%80%A7+%E6%84%9B%E7%9B%A3%E7%A6%81%7E%E8%BE%B0%E5%B7%B3%E5%94%AF",
+     "size": "975.28MB",
+     "title": "DV-1553 危機密室賽車女郎性 愛監禁~辰巳唯"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:59F4806D53EFF4BC61168F687E2EE33E4CB2C9FA&amp;dn=DV-1553.mp4",
+     "size": "1.03GB",
+     "title": "DV-1553.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:40A020E855F9DB068B4F1CC828167BF9DB60D611&amp;dn=0924-dv-1553",
+     "size": "1.03GB",
+     "title": "0924-dv-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:228209EB37AAA4F300765B4EEBFBBBB9D5D3B4BA&amp;dn=DV-1553-AVI",
+     "size": "975.97MB",
+     "title": "DV-1553-AVI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:30A3E2AC81C0A1A8D94F86A096F6B92F2C6A828F&amp;dn=DV-1553",
+     "size": "1.03GB",
+     "title": "DV-1553"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F4759E5F4EBD6802E5F48A73A13634AFA1397A05&amp;dn=DV-1553.avi",
+     "size": "1.03GB",
+     "title": "DV-1553.avi"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:86C8D94FC9D5DA141D6543E3C0D0F8D0F22DD7F4&amp;dn=dv-1553.mpg",
+     "size": "675.12MB",
+     "title": "dv-1553.mpg"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F41791180A2861E171BAC9E5AB0EFDCD03761991&amp;dn=dv-1553%2C.avi",
+     "size": "1.03GB",
+     "title": "dv-1553,.avi"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F2A2718C207EE449514A2685057932C1FFB689B3&amp;dn=0924-dv-1553",
+     "size": "1.03GB",
+     "title": "0924-dv-1553"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:07:16+00:00"
+  },
+  {
    "javdb_id": "NwvKmN",
    "code": "SIVR292",
    "plot": "本郷愛、S1VR第二弾！脳をエロスで満たす究極オナサポシチュエーション！濃厚ベロキス…美乳ぱふぱふ…濃密フェラ…弾力パイズリ…焦らされ、寸止め…我慢の末の大暴発…超至近距離で感じる最高にヌケるテクニック！見せ合い相互オナニー…芳しい美マンコにご褒美クンニ…結合部をバッチリ見せつける…最高のエロ下品な騎乗位…止まらない連続射精…腰をクネらせるゼロ距離密着騎乗位！「いっぱいシコシコしてるとこ見せて」チンポと五感を超刺激され人生で一番気持ちいいSSS級オナサポ体験",
@@ -257,6 +434,7 @@
    "maker": "プレステージ",
    "series": "※胸糞NTR",
    "duration_min": 160,
+   "cover_hires_url": "http://163.47.40.207:8901/n8kRw.jpg",
    "release_date": "2021-05-14",
    "magnets": [
     {
@@ -388,6 +566,104 @@
    "enriched_at": "2026-11-15T06:36:47+00:00"
   },
   {
+   "javdb_id": "nK5A7Y",
+   "code": "DVMM455",
+   "plot": "むっちむちの身体で肉尻を見せつけて歩く爆乳デカ尻家庭教師！勉強そっちのけで生徒に美巨乳ロケットボインを押し付け肉厚尻で窒息顔騎！フル勃起チ○ポが大好物などすけべ女先生が性欲を満たすため四六時中ノーハンドフェラ！さらに締め付け抜群のビショ濡れオマ○コで金玉からっからになるまで精子を搾りヌキ！こんなどすけべ痴女に責められたい！",
+   "plot_source": "dmm",
+   "maker": "ディープス",
+   "series": "どすけべ○○（ディープス）",
+   "duration_min": 149,
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00455/dvmm00455jp-12.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/SnF6Ajs3363whS2HI7UjyIa8JyBe6w2DfTLzFms7cyAksZmvDZWFDQ7Xfmng/dvmm455hhb.mp4",
+   "release_date": "2026-10-16",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:347c9713f978e1ee0939b3a26fcf4636e0741bbc&amp;dn=DVMM-455.%5B4K%5D%40R90s",
+     "size": "11.82GB",
+     "title": "DVMM-455.[4K]@R90s"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:054966f4c01baa16f9244fe64cb3826520baa245&amp;dn=DVMM-455",
+     "size": "2.66GB",
+     "title": "DVMM-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:c690b695255e2f927330fbe4cbc4b378592313e5&amp;dn=DVMM-455_4KS",
+     "size": "11.85GB",
+     "title": "DVMM-455_4KS"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:98233aba7209cf91a03ab1f20f42303411eb3ceb&amp;dn=DVMM-455",
+     "size": "5.83GB",
+     "title": "DVMM-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5E62E6A0A6B97368F16262EB914296F1731C1184&amp;dn=DVMM-455-%E4%B8%AD%E6%96%87%E5%AD%97%E5%B9%95",
+     "size": "1.82GB",
+     "title": "DVMM-455-中文字幕"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2e04cbeccec3cb7d48fcdf59003bed9ad0a72151&amp;dn=DVMM-455-C+I%E3%82%AB%E3%83%83%E3%83%97%E7%88%86%E4%B9%B3%C3%97%E3%83%87%E3%82%AB%E5%B0%BB%C3%97%E3%83%90%E3%82%AD%E3%83%A5%E3%83%BC%E3%83%A0%E7%97%B4%E5%A5%B3+%E3%81%A9%E3%81%99%E3%81%91%E3%81%B9%E4%B9%B3%E8%BC%AA%E8%82%89%E9%A3%9F%E5%AE%B6%E5%BA%AD%E6%95%99%E5%B8%AB%E3%81%8C%E3%81%98%E3%82%85%E3%81%BC%E3%81%98%E3%82%85%E3%81%BC%E3%83%8E%E3%83%BC%E3%83%8F%E3%83%B3%E3%83%89%E3%83%95%E3%82%A7%E3%83%A9%E6%8E%88%E6%A5%AD+%E5%AE%8D%E6%88%B8%E9%87%8C%E5%B8%86",
+     "size": "7.90GB",
+     "title": "DVMM-455-C Iカップ爆乳×デカ尻×バキューム痴女 どすけべ乳輪肉食家庭教師がじゅぼじゅぼノーハンドフェラ授業 宍戸里帆"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d50739c87869918f272d042dbd6cc52f03cecaf8&amp;dn=DVMM455",
+     "size": "1.88GB",
+     "title": "DVMM455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:b23ec780ec37f99abf2097783b4f609a99360e84&amp;dn=DVMM-455",
+     "size": "6.03GB",
+     "title": "DVMM-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:25b6d4309375eb0f3fc3c273d51029b830c7d085&amp;dn=DVMM-455",
+     "size": "5.83GB",
+     "title": "DVMM-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d7f2f10d38bd24e1f601a042d2a5352dd5a29d87&amp;dn=DVMM-455",
+     "size": "1.47GB",
+     "title": "DVMM-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AB2EA079D92D617125CA67AA79094D5D5D928625&amp;dn=DVMM-455",
+     "size": "5.86GB",
+     "title": "DVMM-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d6e866959f51eabe5061dd24d68e07dce17b5623&amp;dn=DVMM-455",
+     "size": "5.83GB",
+     "title": "DVMM-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:c149e1c1f6bfc346ca1e7a93d7886e680929a9b9&amp;dn=dvmm-455",
+     "size": "6.05GB",
+     "title": "dvmm-455"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:19A19BF6AB4C09DE23A54C930CD5C2D2CC86F328&amp;dn=DVMM-455",
+     "size": "1.47GB",
+     "title": "DVMM-455"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:09:23+00:00"
+  },
+  {
    "javdb_id": "nK7RY4",
    "code": "CEMD880",
    "plot": "カットソーのボタンが弾けそうなおっぱいにジューシーな桃肌の艶美人新村あかりさんをクンニ＆マン責めでイキヨガらせる！もともとクリ責めが大好物で感度抜群の彼女、図解説明でマ〇コの構造を聞きながら脚を広げ白いパンティを喰い込ませてタテスジを晒す。いやらしいハミマンを定規で測られて少々恥じらいつつも、股間の中心を指で擦られてピクピクしてしまう。マン汁が滲みだしたパンティを脱いでパイパンマ〇コを2本指で擦るように指示されて口元を緩ませる。定規をあてられてピクつきながら淫靡なマ〇コを両手で広げてしばし羞恥プレイ状態になる。ひとしきり診察したらマ〇コに舌を伸ばされて、クリ吸いしながらの2本指の擦りに一瞬でイってしまった。後向きになってお尻を持ち上げバックからのクンニで悶え、向きを変えて顔面騎乗で舐められて何度も絶頂しているうちに、彼の股間を見つけて手を伸ばしてあかりさんが責め始めた。勃起チ〇ポを旨そうにしゃぶって高速手コキであっけなくザーメン放出させると、お次はハードクンニタイム。しっとりしたあかりさんが艶っぽい紅い長襦袢で布団の上に…。はだけた裾から脚を舐められ乳首を撫でまわされて手マンに全身でヨガる。待ち切れなくなったあかりさんが彼の浴衣をはがして股間に吸いつきチ〇ポをうっとりしながらフェラチオすると、脚を広げて「挿れて！」と欲しがるあかりさんのマ〇コにズブズブと奥まで極太チ〇ポを突き立てた。怒涛のヌキサシの快感に彼の身体にしがみついてヨガるあかりさん。バックからも激しくピストンされて、フィニッシュは熱いマ〇コの中にザーメン中出し！絶頂マ〇コから垂れ流す白濁液が何ともいやらしい絵図だ。ソファーにM字開脚で高速されて容赦無い激しいクンニに身をよじって歓喜に震えるあかりさん。バイブを突っ込まれて自分から腰を振ってヌキサシの擦りに悶える。無防備なマ〇コをクンニされ、更にバイブでヌキサシされて絶叫して震えながらイキヨガった。感度MAX状態で情熱的にお互いを求め合い、密着した腰をぶつけ合うセックスに激しくイキヨガり、フィニッシュはあかりさんの大きなおっぱいにザーメンをぶっかけた。",
@@ -419,7 +695,141 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/cemd00880/cemd00880jp-20.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/Pj8PLQYXGxFXUsWvkIKzzvLgEHu2SlpsrlOgVv43GIhRqYyt1lEBnJ-cHywBei/cemd00880hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/nK7RY4.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
+  },
+  {
+   "javdb_id": "nK7Zmw",
+   "code": "EBWH363",
+   "plot": "家事代行サービスでやってきた女の体がエロすぎたので晒します。\n\nまずはざっと概要から。\nCMでもお馴染みの某派遣家政婦サービスを利用。\n利用は4、5回目。\n初回から指名はできない。\n基本的にやってくるのはババアが多い。\n\nところが今回は大当たり。\nRさんとしようか、年は20代中盤くらい。\nたぬき顔でかわいい。\nひとめで分かるほどの爆乳、恐らくG～Hはある。エプロンで前は隠れているもののズッシリとした重量感のある胸。\n恵体系で全身ムッチムチ。\nパッツパツのジーンズがクソエロい。\nスマホで粘着気味に接写しまくったのでお楽しみに。\n\nそろそろ本題へ、以下詳細。\n12:30 Rさん到着\n12:40 緊張気味のRさん\n12:45 手触る、スベスベw\n01:10 ムチケツ盗撮\n01:21 おしっこ盗撮、アナルひくついてる\n01:50 接近、いい匂い\n02:00 超接写\n02:15 ケツタッチ、安産体型\n02:26 ガッツリ尻揉み\n02:47 パイタッチ\n02:50 乳揉み、クソやわらけえ\n\nこれにて一日目終了。\n続きをお楽しみに。",
+   "plot_source": "dmm",
+   "director": "赤井彗星",
+   "maker": "E-BODY",
+   "duration_min": 141,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-12.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-13.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-14.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ebwh00363/ebwh00363jp-15.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/SHF4LwQX161ZWsynshCLwr_Uv_4rfH1lIPkJbiQ6x95wfbJZ20ozgOx9BSMb0l/ebwh00363hhb.mp4",
+   "release_date": "2026-09-11",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:4c19066edb8827ebd73817f51ba2e1b83ba42f61&amp;dn=EBWH-363-C",
+     "size": "6.10GB",
+     "title": "EBWH-363-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2F7F6EC0CEA1998EAAEF14763CC469BC93601AFE&amp;dn=EBWH-363",
+     "size": "2.19GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0b6e087cea6c326efd3e88747cf3f438605843da&amp;dn=ebwh-363+%E5%AE%B6%E4%BA%8B%E4%BB%A3%E8%A1%8C%E3%82%B5%E3%83%BC%E3%83%93%E3%82%B9%E3%81%AE%E5%A5%B3%E3%82%92%E5%AE%B6%E5%BA%AD%E5%86%85%E7%9B%97%E6%92%AE%E3%83%8E%E3%83%BC%E3%81%A8%E8%A8%80%E3%81%88%E3%81%AA%E3%81%84%E5%B7%A8%E4%B9%B3%E5%A5%B3%E6%80%A7%E3%82%92%E7%8A%AF%E3%81%97%E3%81%A6%E4%B8%AD%E5%87%BA%E3%81%97%E3%82%AD%E3%83%A1%E3%82%8B%E3%81%BE%E3%81%A7%E3%80%82+%E8%8E%89%E3%81%AF%E3%82%8B%E3%81%8B",
+     "size": "2.51GB",
+     "title": "ebwh-363 家事代行サービスの女を家庭内盗撮ノーと言えない巨乳女性を犯して中出しキメるまで。 莉はるか"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:a9da09b3cb15436a3804c238de7d5e134c92d3fa&amp;dn=EBWH-363",
+     "size": "5.98GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2F6DA20E04B7883511DC04F1ACDA38465C3BBEBB&amp;dn=EBWH-363",
+     "size": "2.38GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:96043f8fba5a7e587200c1b177f0e10e3ea8d671&amp;dn=EBWH-363",
+     "size": "4.11GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8c1ebb7e0f55215ef7442e18b1130238f891f5f2&amp;dn=EBWH-363",
+     "size": "2.58GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:424f9af831e30844d1c5e2604674ba00dc5dd7b4&amp;dn=EBWH-363",
+     "size": "4.11GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:e00f114e7236b1334af22ee16492c50d5ad352f4&amp;dn=EBWH-363-FHD",
+     "size": "3.81GB",
+     "title": "EBWH-363-FHD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:67f9459a77cf797e502810187ba01f58d89a04b3&amp;dn=EBWH-363-UC",
+     "size": "2.02GB",
+     "title": "EBWH-363-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:e6511101f72c83c9462f68fa71747876534beff1&amp;dn=EBWH-363",
+     "size": "1.42GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3ee096d74af46122ff9450f9f1666405f79c8d74&amp;dn=EBWH-363",
+     "size": "1.42GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:c71d1680641dcd136d85d2f8358dec490ab3b85e&amp;dn=EBWH363",
+     "size": "1.79GB",
+     "title": "EBWH363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:515cca889337d253254823ba4d6d3538d1615558&amp;dn=EBWH-363",
+     "size": "2.67GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4a93ca0c95ce08244845699789561c30a91b006a&amp;dn=EBWH-363-U",
+     "size": "5.97GB",
+     "title": "EBWH-363-U"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:18c329dca1df0de8771b319957686adfb784d73c&amp;dn=EBWH-363",
+     "size": "1.45GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:58870bd40f3cf72f565592729b5312ad9809e434&amp;dn=EBWH-363",
+     "size": "1.42GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:51a9f54138f049f4eb7fe0f3365bf76ae86c540e&amp;dn=ebwh-363",
+     "size": "4.13GB",
+     "title": "ebwh-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:c8f37f925fe6fd79f262ce4e85cbc72c9bf18c42&amp;dn=EBWH-363",
+     "size": "4.13GB",
+     "title": "EBWH-363"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:424a2d1e455559d55385fd7241b21947dca79dc9&amp;dn=EBWH-363",
+     "size": "4.11GB",
+     "title": "EBWH-363"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:10:34+00:00"
   },
   {
    "javdb_id": "nK7zbV",
@@ -506,6 +916,62 @@
    "enriched_at": "2026-11-15T02:54:22+00:00"
   },
   {
+   "javdb_id": "nKgNze",
+   "code": "DVMM211",
+   "plot": "街で声をかけたラブラブ夫婦を壁穴特設スタジオにご案内！夫婦の絆を再確認するため壁穴から顔だけを出した状態の奥様とそれを見ている旦那さんが高額賞金をかけた「伝言ゲーム」に挑戦！恥ずかしそうに穴から顔だけ出してゲームを始める奥様に旦那からは見えていない奥様の身体に控えていた男優がHないたずら！突然の行為にビックリ戸惑いながらも男優のテクニックに徐々に感じてしまうイケナイ人妻！旦那にバレないよう顔を出しているときは平静をよそおい顔をひっこめた時は壁の後ろでデカチンでイキまくる浮気妻にたっぷりとNTR連続中出し！",
+   "plot_source": "dmm",
+   "director": "よーすけ",
+   "maker": "ディープス",
+   "series": "一般男女モニタリングAV",
+   "duration_min": 217,
+   "score": 4.2,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00211/dvmm00211jp-12.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/PTALQ2MXDwB60sCi-EciTtrzmFE6IvqeqDj41QCbVsUdtEjVrU32-R6amltcFr/dvmm00211hhb.mp4",
+   "release_date": "2025-02-28",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:CF08773C3A5959D5D5C8001B709CB010E20C3681&amp;dn=DVMM211",
+     "size": "2.19GB",
+     "title": "DVMM211"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:1E56C35550B35ECCA81065048CBD0C8D8B50698E&amp;dn=DVMM-211",
+     "size": "2.29GB",
+     "title": "DVMM-211"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:59401C7D763E1CF0DB2E91D2D986D570404330E2&amp;dn=dvmm-211",
+     "size": "9.16GB",
+     "title": "dvmm-211"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EA864ECA045C59EC5592011E582DDF6116870A39&amp;dn=DVMM211",
+     "size": "2.66GB",
+     "title": "DVMM211"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3F0339D585E3B80FC6A180F881CDE027DDFF27BC&amp;dn=DVMM-211",
+     "size": "9.12GB",
+     "title": "DVMM-211"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:09:04+00:00"
+  },
+  {
    "javdb_id": "nKx1Qe",
    "code": "DDH462",
    "plot": "【ハイレグ水着De素股チャレンジ！】\n露出多めのエロ水着を着た美人女子大生たちに素股をしてもらおうという企画！\nオイルもたっぷりつかって感度も上昇しきった彼女らはそのままSEXをしてしまうのか！？\n\n今回の女の子は「ののか」さん。\n料理が趣味で特にパンが好きなので、パン屋を経営したいんだそう！\n最近ホームベーカリーを買って作るようになったというプチ情報。\nどう見てもマジメ系な彼女ですが意外とムッツリな側面も…！？",
@@ -520,7 +986,161 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/amateur/ddh462/ddh462jp-005.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/P3McQx0xF4U6NUys13C_GIP6GXqC0eqNUTcfL4FZj_gCVufwNhBM0hffKE/ddh462hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/nKx1Qe.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
+  },
+  {
+   "javdb_id": "nKxa0M",
+   "code": "DSOD112",
+   "plot": "強すぎる性欲を持つ拓哉に悩む母・陽子は昔の後輩で同じく強い欲求を持つ和花に相談する。和花は「同じタイプなら抑えられる」と考え、自ら拓哉と向き合うことを決意する。最初の対決では、拓哉の底なしの欲求に和花は圧倒され、敗北。その後…",
+   "plot_source": "dmm",
+   "director": "三島六三郎",
+   "maker": "ダスッ！",
+   "series": "うちの息子は性欲モンスター",
+   "duration_min": 116,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00112/dsod00112jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/DncxJREsw0xPBHHo5OmMTquNr0KlpnrlYEu4W10dNgfhfPdwoOIy_JoKvBcpn9/dsod00112hhb.mp4",
+   "release_date": "2026-11-06",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:9c4e005d51d4bf8f15ce72a7c0e1a3ff64410f12&amp;dn=DSOD-112-AI",
+     "size": "3.21GB",
+     "title": "DSOD-112-AI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0b3018522288263bcfe67f0c967d69e19483c628&amp;dn=DSOD112",
+     "size": "5.29GB",
+     "title": "DSOD112"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:f716518adf8cff3274f9db288bf305ffabbad967&amp;dn=DSOD-112",
+     "size": "5.21GB",
+     "title": "DSOD-112"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:278c85a384b2fd3489299c84058f1bb4171a5c14&amp;dn=DSOD-112",
+     "size": "5.21GB",
+     "title": "DSOD-112"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d48a3ce6bbdcb4e3a978ca54ca6bd9b091b59c71&amp;dn=DSOD-112",
+     "size": "5.24GB",
+     "title": "DSOD-112"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:91af0cff73580cc0e7d60cdba9f47d36aefebf15&amp;dn=dsod-112",
+     "size": "5.23GB",
+     "title": "dsod-112"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:eee4801c7f47eddfa0b63990f7582439ba86478b&amp;dn=DSOD-112",
+     "size": "1.22GB",
+     "title": "DSOD-112"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DB125BB8FB24692417A18051610F310273C5813F&amp;dn=DSOD-112",
+     "size": "1.34GB",
+     "title": "DSOD-112"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:06:22+00:00"
+  },
+  {
+   "javdb_id": "nKxnrM",
+   "code": "DSAM026",
+   "plot": "★尿を浴びたい変態素人 2名収録★\n\n淫乱ドM・女子大生 しおりさん\n敏感失禁・女子大生 れいさん\n\n浴尿プレイがシテみたい、オシッコかけて欲しい。ド変態性癖を持った素人さん発見。\n2名収録。200分超え大ボリューム。\n公衆トイレに連れ出し、その場で浴尿プレイ。\n家に連れ込み、お泊り放尿セックス。\n小便まみれのカラダを肉便器としてハメまくる――――。\n更に、翌日溜まった尿意全開で朝イチ即ハメSEX。\n本人も驚きながら、初めての膣内放尿。",
+   "plot_source": "dmm",
+   "maker": "独占素人",
+   "duration_min": 208,
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-12.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-13.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-14.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-15.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-16.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-17.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-18.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsam00026/dsam00026jp-19.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/HTMKOCsRdtCMxuFNmLHHcMhODP1ngqDvMrfQdWg4Y65BaVyxib3hmP-nt7tEX7/dsam00026hhb.mp4",
+   "release_date": "2026-10-30",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:281d21b5e7d2c19cbfd47a6b7e9be3abfc876b4d&amp;dn=DSAM-026",
+     "size": "8.64GB",
+     "title": "DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0adc9a33fbab61b9d224b8d90c1e4d76303774f3&amp;dn=%E7%AC%AC%E4%B8%80%E6%9C%83%E6%89%80%E6%96%B0%E7%89%87%40SIS001%40DSAM-026",
+     "size": "8.65GB",
+     "title": "第一會所新片@SIS001@DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5db4abbc0835e92123de7aadf4e3add54c63c36a&amp;dn=DSAM-026",
+     "size": "2.29GB",
+     "title": "DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:e19555e3330e1d3082341a2f84bc145d8d633041&amp;dn=DSAM-026",
+     "size": "8.66GB",
+     "title": "DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:76b04205db36031103180749ef30abb0f8d529aa&amp;dn=DSAM-026",
+     "size": "4.07GB",
+     "title": "DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7AE00D03480318D959364B9379D286FF1344B4AD&amp;dn=DSAM-026",
+     "size": "2.61GB",
+     "title": "DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d591952c77405578c5b244cec035bc20cc203859&amp;dn=dsam-026",
+     "size": "8.65GB",
+     "title": "dsam-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:67288AC0F36FAC25F3BB486F04CFC60C449F5203&amp;dn=DSAM-026",
+     "size": "2.59GB",
+     "title": "DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2A1C3335B6E0CDF1CEB505F178CA6FED146823EA&amp;dn=DSAM-026",
+     "size": "8.64GB",
+     "title": "DSAM-026"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E95969E257A5525183789E98E81E14A0061E9509&amp;dn=DSAM-026",
+     "size": "2.29GB",
+     "title": "DSAM-026"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:04:21+00:00"
   },
   {
    "javdb_id": "ne6yB4",
@@ -529,6 +1149,7 @@
    "maker": "ナチュラルハイ",
    "series": "おっぱいムギュ!",
    "duration_min": 180,
+   "cover_hires_url": "http://163.47.40.207:8901/ne6yB4.jpg",
    "release_date": "2023-10-26",
    "magnets": [
     {

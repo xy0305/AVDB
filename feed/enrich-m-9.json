@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-9",
- "generated_at": "2026-11-15T06:39:32+00:00",
+ "generated_at": "2026-11-15T20:30:01+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -28,6 +28,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/atvr00075/atvr00075jp-11.jpg",
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/atvr00075/atvr00075jp-12.jpg"
    ],
+   "cover_hires_url": "http://163.47.40.207:8901/962598.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
@@ -36,6 +37,7 @@
    "maker": "プレステージ",
    "series": "「顔」で、ヌく。",
    "duration_min": 135,
+   "cover_hires_url": "http://163.47.40.207:8901/962NPX.jpg",
    "release_date": "2026-11-06",
    "magnets": [
     {
@@ -134,6 +136,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/cawb00060/cawb00060jp-15.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/HSYiLSc7dakXt_LNsKnpQOF21XgC8__c1-bVRgfieZD75SjgDsWAgG23lbtAE1/cawb00060hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/962ZR5.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
@@ -157,7 +160,64 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/atid00711/atid00711jp-10.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/QR19Pz0H8Z4JncRffQVs0rayKof5I9-4zt3Ip2mrD3lHTbCkTLKavh2aeyNDcQ/atid00711hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/962ZRR.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
+  },
+  {
+   "javdb_id": "962Zdw",
+   "code": "DRPT128",
+   "director": "ひでモンク",
+   "maker": "電脳ラスプーチン",
+   "duration_min": 134,
+   "release_date": "2026-10-30",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:126d1b21753d365aab96e448b51efe4d31a15da5&amp;dn=DRPT-128-UC",
+     "size": "3.65GB",
+     "title": "DRPT-128-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2b4cadce78a73c0ac7a201f252eef8a61079abe9&amp;dn=DRPT-128",
+     "size": "1.71GB",
+     "title": "DRPT-128"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7fbbf1cdd2d9ebf577d70c1544a19a9b44dcd98c&amp;dn=DRPT128",
+     "size": "4.71GB",
+     "title": "DRPT128"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d08f24c6d2d2ae88253338205e3f200d1bc1e26b&amp;dn=DRPT-128",
+     "size": "2.42GB",
+     "title": "DRPT-128"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:16591646173d729d27f153aa10cfc44afe85e75d&amp;dn=DRPT-128",
+     "size": "4.66GB",
+     "title": "DRPT-128"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:f6232ca220f4cf03a4f6aeb6ef6336ed8b0b5770&amp;dn=DRPT-128",
+     "size": "1.72GB",
+     "title": "DRPT-128"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DFD0849CEFBE57679F5A03443446BCDE42C6BA5C&amp;dn=drpt-128",
+     "size": "4.65GB",
+     "title": "drpt-128"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C8ADB2D3B77EA7F148D28774CA8189A6828E304E&amp;dn=DRPT-128",
+     "size": "1.45GB",
+     "title": "DRPT-128"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:05959246B804C16EAB9A6097285B528781E17B0D&amp;dn=DRPT-128",
+     "size": "4.64GB",
+     "title": "DRPT-128"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:03:53+00:00"
   },
   {
    "javdb_id": "962b0w",
@@ -165,6 +225,7 @@
    "director": "濡れた子犬",
    "maker": "SODクリエイト",
    "duration_min": 72,
+   "cover_hires_url": "http://163.47.40.207:8901/962b0w.jpg",
    "release_date": "2026-10-19",
    "enriched_at": "2026-11-15T06:33:08+00:00"
   },
@@ -254,6 +315,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/cjod00439/cjod00439jp-12.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/SSMbIiQ-0dRWwZyHq5E6fXlcEOji1toiAolBY0YoXff8iXTaXA2qlbh5ZkorS1/cjod00439hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/966mEw.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
@@ -287,6 +349,117 @@
    ],
    "cover_hires_url": "http://163.47.40.207:8901/96D0Ep.jpg",
    "enriched_at": "2026-11-15T02:54:22+00:00"
+  },
+  {
+   "javdb_id": "96Gx0R",
+   "code": "DLDSS559",
+   "director": "ハナサカジン",
+   "maker": "DAHLIA",
+   "duration_min": 127,
+   "release_date": "2026-10-01",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:fb61355682996d3b66ec587f54251a9b38e72594&amp;dn=DLDSS-559",
+     "size": "5.17GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:65a2fde9c743652f1414eb504cb1ae3dc8d805fc&amp;dn=DLDSS-559-C",
+     "size": "5.46GB",
+     "title": "DLDSS-559-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d68809380e645223e25e4698c29d7be5b1c457f8&amp;dn=DLDSS-559-C_U.mp4",
+     "size": "5.52GB",
+     "title": "DLDSS-559-C_U.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:22e5433fd9d9e06b5326ec836adc8e3eb87ca531&amp;dn=DLDSS-559-C",
+     "size": "5.49GB",
+     "title": "DLDSS-559-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:705D63609A38C92CE56CC5F4FCC41E1BF52967B4&amp;dn=DLDSS-559",
+     "size": "1.98GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8db1ee1b010dc8897a58bb096ffb5afd624432be&amp;dn=DLDSS-559_4KS",
+     "size": "8.44GB",
+     "title": "DLDSS-559_4KS"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:75042fc07d8657ee19be4e17cbb97480e4628a42&amp;dn=DLDSS-559.%5B4K%5D%40R90s",
+     "size": "8.40GB",
+     "title": "DLDSS-559.[4K]@R90s"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:99dd70c26682852c8a436515875b79973dd4660a&amp;dn=DLDSS-559",
+     "size": "2.36GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:ac8c23a507eebd1687201ec74145eb1cf4437c89&amp;dn=%E7%AC%AC%E4%B8%80%E6%9C%83%E6%89%80%E6%96%B0%E7%89%87%40SIS001%40DLDSS-559",
+     "size": "5.53GB",
+     "title": "第一會所新片@SIS001@DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:91989de4db3a0daddbd68919d1b98f94c0d5edac&amp;dn=DLDSS-559",
+     "size": "2.94GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:ade7fe69581802ce2aaf2a606ec3949fac8453c7&amp;dn=DLDSS-559",
+     "size": "1.25GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:50bc7eb2cc144d92727bfeb4e71af42126e026c5&amp;dn=DLDSS-559",
+     "size": "3.43GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:16208ebba19a4259c4b9f267ffa91349e49e03a6&amp;dn=DLDSS-559-UC",
+     "size": "3.44GB",
+     "title": "DLDSS-559-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4954bb9e71e6d137b18345287f373cd2269b9ec6&amp;dn=DLDSS-559",
+     "size": "1.53GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d1d110f1be71177d0a679d689fa4a29344e17dc3&amp;dn=DLDSS-559-AI",
+     "size": "3.46GB",
+     "title": "DLDSS-559-AI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:668d67ecae3b836bcefe56ad775c1611d2764ef3&amp;dn=DLDSS-559",
+     "size": "5.17GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:1a853f814780cede17035ee06ac42e650c33b8bf&amp;dn=DLDSS-559",
+     "size": "2.43GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3fe7f40ee223c1ddb01e5e60c8c750390b2c1385&amp;dn=DLDSS-559",
+     "size": "5.17GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:820dab65f8627d9393e4253951291c9e32994009&amp;dn=DLDSS-559",
+     "size": "1.24GB",
+     "title": "DLDSS-559"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:668D67ECAE3B836BCEFE56AD775C1611D2764EF3&amp;dn=DLDSS-559",
+     "size": "5.17GB",
+     "title": "DLDSS-559"
+    }
+   ],
+   "enriched_at": "2026-11-15T19:02:08+00:00"
   },
   {
    "javdb_id": "96Ymeq",
@@ -330,6 +503,7 @@
    "director": "ジーニアス膝",
    "maker": "SODクリエイト",
    "duration_min": 92,
+   "cover_hires_url": "http://163.47.40.207:8901/96r4BV.jpg",
    "release_date": "2026-09-24",
    "magnets": [
     {
@@ -376,6 +550,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/cjod00539/cjod00539jp-18.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/TAUtQRs95Bd4HYlQ3Kx_sp8n3D8azTDr8mu_aLja5vJuC1gDOkTdvEEl5PnXrP/cjod00539hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/96rqyX.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
