@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "actors",
- "generated_at": "2026-11-15T04:03:15+00:00",
+ "generated_at": "2026-11-15T04:11:08+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -63,6 +63,48 @@
   },
   {
    "javdb_id": null,
+   "name": "ちゃんよた",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E3%81%A1%E3%82%83%E3%82%93%E3%82%88%E3%81%9F.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "つぼみ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E3%81%A4%E3%81%BC%E3%81%BF.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "めぐり（藤浦めぐ）",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/9-AVDBS/AI-Fix-%E3%82%81%E3%81%90%E3%82%8A%EF%BC%88%E8%97%A4%E6%B5%A6%E3%82%81%E3%81%90%EF%BC%89.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "わか菜ほの",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E3%82%8F%E3%81%8B%E8%8F%9C%E3%81%BB%E3%81%AE.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "ティア",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Ebody/%E3%83%86%E3%82%A3%E3%82%A2.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "一乃あおい",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E4%B8%80%E4%B9%83%E3%81%82%E3%81%8A%E3%81%84.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "一条みお",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E4%B8%80%E6%9D%A1%E3%81%BF%E3%81%8A.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "七ツ森りり",
    "birthday": "1995-06-08",
    "height_cm": 153,
@@ -80,6 +122,18 @@
    "name": "七沢みあ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Capsule/%E4%B8%83%E6%B2%A2%E3%81%BF%E3%81%82.jpg",
    "enriched_at": "2026-11-15T03:55:06+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "七海ひな（七瀬ひな）",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/9-AVDBS/AI-Fix-%E4%B8%83%E6%B5%B7%E3%81%B2%E3%81%AA%EF%BC%88%E4%B8%83%E7%80%AC%E3%81%B2%E3%81%AA%EF%BC%89.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "七海ティナ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-FALENO/%E4%B8%83%E6%B5%B7%E3%83%86%E3%82%A3%E3%83%8A.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   },
   {
    "javdb_id": null,
@@ -111,6 +165,18 @@
   },
   {
    "javdb_id": null,
+   "name": "三比菜々美",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Mines/%E4%B8%89%E6%AF%94%E8%8F%9C%E3%80%85%E7%BE%8E.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "三澄寧々",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E4%B8%89%E6%BE%84%E5%AF%A7%E3%80%85.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "三田真鈴",
    "birthday": "2002-06-28",
    "height_cm": 157,
@@ -125,9 +191,51 @@
   },
   {
    "javdb_id": null,
+   "name": "中森ななみ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/v-Attackers/%E4%B8%AD%E6%A3%AE%E3%81%AA%E3%81%AA%E3%81%BF.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "丸最レア",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E4%B8%B8%E6%9C%80%E3%83%AC%E3%82%A2.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "乙アリス",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E4%B9%99%E3%82%A2%E3%83%AA%E3%82%B9.jpg",
    "enriched_at": "2026-11-15T03:55:57+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "九井スナオ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E4%B9%9D%E4%BA%95%E3%82%B9%E3%83%8A%E3%82%AA.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "九野ひなの",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E4%B9%9D%E9%87%8E%E3%81%B2%E3%81%AA%E3%81%AE.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "二羽紗愛",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E4%BA%8C%E7%BE%BD%E7%B4%97%E6%84%9B.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "二葉エマ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E4%BA%8C%E8%91%89%E3%82%A8%E3%83%9E.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "今井なつめ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E4%BB%8A%E4%BA%95%E3%81%AA%E3%81%A4%E3%82%81.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   },
   {
    "javdb_id": null,
@@ -142,6 +250,42 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E4%BC%8A%E8%97%A4%E8%88%9E%E9%9B%AA.jpg",
    "gender": "female",
    "enriched_at": "2026-11-15T03:56:09+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "佐々木あき",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E4%BD%90%E3%80%85%E6%9C%A8%E3%81%82%E3%81%8D.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "佐山愛",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E4%BD%90%E5%B1%B1%E6%84%9B.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "佐野咲空",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E4%BD%90%E9%87%8E%E5%92%B2%E7%A9%BA.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "依本しおり",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E4%BE%9D%E6%9C%AC%E3%81%97%E3%81%8A%E3%82%8A.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "倉多まお",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E5%80%89%E5%A4%9A%E3%81%BE%E3%81%8A.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "倉木華",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E5%80%89%E6%9C%A8%E8%8F%AF.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   },
   {
    "javdb_id": null,
@@ -160,6 +304,12 @@
   },
   {
    "javdb_id": null,
+   "name": "兒玉七海",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E5%85%92%E7%8E%89%E4%B8%83%E6%B5%B7.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "八木奈々",
    "birthday": "2000-09-03",
    "height_cm": 157,
@@ -171,6 +321,24 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Mines/%E5%85%AB%E6%9C%A8%E5%A5%88%E3%80%85.jpg",
    "gender": "female",
    "enriched_at": "2026-11-15T03:56:28+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "凰華りん",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E5%87%B0%E8%8F%AF%E3%82%8A%E3%82%93.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "加藤あやの",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E5%8A%A0%E8%97%A4%E3%81%82%E3%82%84%E3%81%AE.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "加賀美まり",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E5%8A%A0%E8%B3%80%E7%BE%8E%E3%81%BE%E3%82%8A.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   },
   {
    "javdb_id": null,
@@ -189,9 +357,39 @@
   },
   {
    "javdb_id": null,
+   "name": "北村海智",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E5%8C%97%E6%9D%91%E6%B5%B7%E6%99%BA.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "北野未奈",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E5%8C%97%E9%87%8E%E6%9C%AA%E5%A5%88.jpg",
    "enriched_at": "2026-11-15T03:56:50+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "千乃あずみ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E5%8D%83%E4%B9%83%E3%81%82%E3%81%9A%E3%81%BF.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "千葉優花",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E5%8D%83%E8%91%89%E5%84%AA%E8%8A%B1.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "南沢海香",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E5%8D%97%E6%B2%A2%E6%B5%B7%E9%A6%99.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "博多彩葉",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-Diaz/%E5%8D%9A%E5%A4%9A%E5%BD%A9%E8%91%89.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   },
   {
    "javdb_id": null,
@@ -215,6 +413,18 @@
   },
   {
    "javdb_id": null,
+   "name": "園梨音",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E5%9C%92%E6%A2%A8%E9%9F%B3.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "夏目彩春",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E5%A4%8F%E7%9B%AE%E5%BD%A9%E6%98%A5.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "夢乃あいか",
    "birthday": "1994-08-26",
    "height_cm": 149,
@@ -225,6 +435,12 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E5%A4%A2%E4%B9%83%E3%81%82%E3%81%84%E3%81%8B.jpg",
    "gender": "female",
    "enriched_at": "2026-11-15T03:57:30+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "大原伶菜",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E5%A4%A7%E5%8E%9F%E4%BC%B6%E8%8F%9C.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   },
   {
    "javdb_id": null,
@@ -343,6 +559,12 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E5%B0%8F%E5%B3%B6%E3%81%BF%E3%81%AA%E3%81%BF.jpg",
    "gender": "female",
    "enriched_at": "2026-11-15T03:59:22+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "小松空",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E5%B0%8F%E6%9D%BE%E7%A9%BA.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   },
   {
    "javdb_id": null,
@@ -564,6 +786,373 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E6%9C%AA%E6%AD%A9%E3%81%AA%E3%81%AA.jpg",
    "gender": "female",
    "enriched_at": "2026-11-15T04:03:15+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "末広純",
+   "birthday": "1994-01-10",
+   "height_cm": 151,
+   "bust": 82,
+   "waist": 60,
+   "hip": 90,
+   "cup": "D",
+   "birthplace": "日本・山梨県",
+   "bio": "末広 純（すえひろ じゅん、2000年1月10日 - ）は、日本のAV女優。LIGHT所属。六本木のレッドドラゴンに在籍。\n\n山梨県出身。デビューのきっかけは調理師として就職したものの、一人暮らしができないほど給料が安く、貯金もしたかったため、1本だけやってみるかと軽い気持ちで事務所の門を叩いたこと。芸名は「広末涼子に似ている」と言われたことから。バラエティ番組出演時にも「広末涼子似」と紹介された。デビューして5本目までほとんどが人妻を演じるドラマ作品であったことから「AVって演技力がいるんだ」と驚いたが、スタート時期にみっちり演技を身に着けた下地がキカタン転身後も役立っているらしい。\nファンにはおしりを評価されることが多いと述べており、中高とバスケットボールに明け暮れたおかげで下半身がしっかりしているのではと自己考察している。尻特化作品への出演も多いため、垂れないように日常的に鍛えており、下着に関してはフルバック10％、Tバック30％、残りがノーパンと通気性と食い込みに気を付け、なるべく穿かない生活を心がけている。\nアサヒ芸能の担当者は素の状態の末広について「語尾の全部に音符やハートがつきそうなくらいキュートで陽キャな雰囲気」と会話のニュアンスを記述している。\n\n2025年1月22日、週刊文春よりDeNAベイスターズの東克樹投手と不倫関係にあることが報じられた。末広はベイスターズ女子としても知られ、シーズン中は頻繁に横浜スタジアムに通い、ベイスターズのユニフォームを着て観戦する様子をSNSなどで頻繁にアップしていた。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%9C%AB%E5%BA%83%E7%B4%94.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-15T04:10:10+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "村上悠華",
+   "birthday": "2003-01-30",
+   "height_cm": 163,
+   "bust": 85,
+   "waist": 59,
+   "hip": 88,
+   "cup": "F",
+   "birthplace": "日本・東京都",
+   "bio": "村上 悠華（むらかみ ゆか、2003年〈平成15年〉1月30日 - ）は、日本のAV女優。東京都出身。LIGHT所属。\n\n公式ニックネームは「ゆっか」。本人考案。プライベートで使われている本名由来のニックネームにも「っ」がつくためそれに合わせた（YouTubeチャンネル「 もっとメンタメch -大人のセイカツ向上委員会-」2026/10/28配信より）。\n芸名は三上悠亜と村上宗隆から。三上からは「上」「悠」の字、村上からは姓を取っている。「華」は当て字（YouTubeチャンネル「 もっとメンタメch -大人のセイカツ向上委員会-」2026/10/28配信より）。\n上記の休業期間中はコンビニエンスストアでアルバイトをしていた。上手く出来ずに外国人店員に叱られたりもしたがこの休業経験のせいで本業のやる気が増した。\n元々旅行好きだったことや、ある企業の会社説明会に参加した際に可愛くてキラキラしているバスガイドのお姉さんを見かけて「絶対、この人みたいになりたい!」と思ったことをきっかけに、デビュー前はバスガイドをしていた（高卒で入社し約2年半勤務）。AV女優に転身したきっかけは三上悠亜に憧れていたため。事務所面接およびデビュー作撮影はまだ前職在籍中で有休消化して臨んだ。2026年にはバスガイド退職の原因が安月給に加え睡眠不足の慢性化（1日2時間ほど）による疲弊が原因であることを告白している。\n高校時代は弓道部に所属していた。\n初体験は中学2年生の時で相手は高校1年生の彼氏。場所は彼の家だった。知り合ったきっかけは祭りで友達の知り合いの先輩で野球部だった。彼からの交際だったが3ヶ月で別れた。\n2人目の彼氏は高校に入ってから4年間付き合った。\nデビュー作は初脱ぎシーンであまりにも堂々としていたため、全カットされた。レビューで「監督のセンスなし」と批判されたが、のちのインタビューでは自分のせいであると述べている。\n膣が後ろ側かつ下付きであるため、グラインド騎乗位を苦手としており（ペニスが外れてしまう）、自分で動く場合は杭打ち式。好きな体位はバック。AV女優になって上達した技術に手コキ、乳首舐め、フェラの3点を挙げている。\nイラストレーターの杜のひやし中華は「アイドル顔負けのビジュアルと均整の取れたメリハリボディ。見た目は清純っぽいのに、SEXでは侮れないポテンシャルを発揮」と批評。AVライターのくろがね阿礼は「男の反応を見ながら念入りに舌を使うフェラ、ねっとりベロキスをしながらの手コキはフル勃起必至」とテクニックを評価した。ライターのいんごまは村上の印象を「人懐っこくてコミュ力おばけ」と論じた。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E6%9D%91%E4%B8%8A%E6%82%A0%E8%8F%AF.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-15T04:10:21+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "東條なつ",
+   "birthday": "1999-08-19",
+   "height_cm": 156,
+   "bust": 78,
+   "waist": 55,
+   "hip": 85,
+   "cup": "C",
+   "bio": "东条夏（日语：東條 なつ／とうじょう なつ，罗马化：Tōjō Natsu，1999年8月19日—），日本AV女优。所属事务所是LINX（日语：LINX (芸能事務所)）。\n\n2020年2月成为FALENO的内部企划“FALENOstar”的专属女优并在AV界出道。\n\n2020年4月发售第1张印象DVD，同年8月发售第1本写真集。\n\n2020年11月25日在官方Twitter上宣布脱离专属女优，成为企划单体女优。\n\n出身于栃木县。兴趣是唱卡拉OK。\n\n与FALENO的专属合约结束后本来想要引退，但与经纪人讨论过后决定以企划单体女优的身份继续活动。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-FALENO/%E6%9D%B1%E6%A2%9D%E3%81%AA%E3%81%A4.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-15T04:10:33+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "松本いちか",
+   "birthday": "2000-02-19",
+   "height_cm": 153,
+   "bust": 68,
+   "waist": 58,
+   "hip": 86,
+   "cup": "B",
+   "bio": "松本一香（日语：松本 いちか／まつもと いちか，罗马化：Matsumoto Ichika，2000年2月19日—），日本AV女优。所属事务所是ARROWS→LIGHT。\n\n2019年9月以SODクリエイト的专属女优身份出道。\n\n2020年2月脱离专属女优，成为企划单体女优。\n\n2020年上半年的AV女优影片销售量排名第7名。\n\n2020年7月于月刊FANZA发表的“このAV女优がすごい!2020夏”，在女优部门获得第3名。\n\n2020年12月于“FLASH 2020年现役最强セクシー女优BEST100”的读者投票中，在清纯部门获得第3名（总排名是第38名）。\n\n2021年2月于月刊FANZA发表的“このAV女优がすごい!2021冬”获得第2名。\n\n2021年3月被周刊Playboy选为“2021年エロデミー赏”中的最佳女优赏。\n\n2023年11月 宣布成为 ダスッ! （Das!）和 本中双专属女优。\n\n2023年12月1日、松本いちか 官方YouTube频道开设。\n\n2024年3月中 宣布成为痴女ヘブン(痴女天堂) 专属女优 。 将于 ダスッ! （Das!) 、 本中 和 痴女ヘブン(痴女天堂) 轮流发片。\n\n2024年8月3日 宣布已转移至经纪公司LIGHT。\n\n2025年5月13日 宣布从片商 ダスッ! （Das!）卒业。\n\n2025年7月 宣布成为MOODYZ的专属女优。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%9D%BE%E6%9C%AC%E3%81%84%E3%81%A1%E3%81%8B.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-15T04:10:47+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "枢木あおい",
+   "birthday": "1998-03-20",
+   "height_cm": 154,
+   "bust": 84,
+   "waist": 59,
+   "hip": 93,
+   "cup": "D",
+   "birthplace": "日本・京都府",
+   "bio": "枢木 あおい（くるるぎ あおい、1998年3月20日 - ）は、日本の歌手、タレント、パチスロ演者。元AV女優。京都府出身。LIGHT所属。\n\n14歳の頃に性に目覚め、初体験は16歳。\n特技は水泳と半目。趣味はパチスロとカラオケでアニメソングをよく歌う。歌唱力も高く評価されている。\n自宅に実機（中古で購入）があるほどのパチスロ好きであり、のちのパチスロ演者への転身に繋がった。2019年11月に発売されたオムニバス作品では他の6人にはアダルトな紹介文がついていたのにもかかわらず、当人は「関西のスロッター」と紹介され\n平常時でも乳首が勃起しているかのように立っているのが特徴。\n推し名は「枢木組」と2018年6月22日本人より告知された。後にファンクラブの名称となった。\n関西地区に在住しており、仕事のたびに2週間上京する生活を送っている。関西出身の女優の場合、普段は関西弁で話したりドラマ物で関西弁で話す役を演じる事が多いが彼女の場合はそういった事は少ない。但し求められれば上手くこなす。2021年頃に方言AVブームが起きてからは京都弁作品も増え、自身では2019年5月発売の『至近距離に彼女がいるのに〜』から増加したと分析している。この作品でのアドリブ淫語「私のオ〇コって、たこ焼きみたいにアッツアツなんよ」はこの時期のインタビュー、レビュー記事で度々言及された。\nボディソープはLUSHのみつばちマーチ、シャンプー・リンスはTOKIOインカラミを使用している。使用している香水では、サムライライトが一番多い。\nあだ名の「くるるん」は久留木玲 と同一。久留木玲の「久留木玲の凄テクを我慢できれば生★中出しSEX!」のパッケージでは「『くるるぎあおい』じゃないんです」といじられている。Kawaiiでの共演作では、「2大くるるん共演」と表記されている。また、大槻ひびきとともに久留木玲の初レズの相手を務めている。\n2020年11月、アダルトビデオ芸人リボルバー・ヘッドから、最高レベルのフェラチオを駆使していると紹介され、フェラチオ名を「メトロノームフェラ」と名付けられた。\n女子校生、妹役の作品から、大学生、若妻設定と幅広い役柄を演じることができ演技力を評価する声も多いが、最初から上手かったわけではなく、VRでの助演を重ねて得たものだと、このエロVRがすごい！編集部は分析している。同ランキングの女優部門で2018年下半期から4期連続1位を獲得している。\n2018年5月にレズを解禁して以降、数多くのレズ作品にも出演し、2020年以降は天才レズ（タチ）女優として初レズの女優の相手役を務めることも多かった。\n共演作が多かった高杉麻里とは親友。また、「枢木あおいを貸し切りドライブデート」内で美谷朱里やみひなとも仲が良いことを明かしている。その他、渚みつきとも親友。松本いちかや沙月恵奈とも仲良し。なお、上記の女優とは全員レズ作品でも共演している。自身の性格は「基本サバサバしている」と述べており、「かわいい全振り」ができないとのこと。さもあり監督作品出演以降は小悪魔痴女役も増えており、乳首責めテクニックである親指と中指で乳首を広げつつ、人差し指で乳首を愛撫する通称「龍の爪」もさもあり作品出演時に覚えたものである。\n2023年8月には新幹線乗車中、席を外していた間に席に置いていた荷物を、隣席の客に捨てられていたことがニュースとなった。\nAV撮影終了後の2023年11月15日、耳にインダスリアルピアス、唇下にラブレットピアスの穴をあけている。また、髪を緑色に染めている。…",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%9E%A2%E6%9C%A8%E3%81%82%E3%81%8A%E3%81%84.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "架乃ゆら",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E6%9E%B6%E4%B9%83%E3%82%86%E3%82%89.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "柏木こなつ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%9F%8F%E6%9C%A8%E3%81%93%E3%81%AA%E3%81%A4.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "桃乃木かな",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E6%A1%83%E4%B9%83%E6%9C%A8%E3%81%8B%E3%81%AA.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "桐谷エマ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-Diaz/%E6%A1%90%E8%B0%B7%E3%82%A8%E3%83%9E.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "桜空もも",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E6%A1%9C%E7%A9%BA%E3%82%82%E3%82%82.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "森日向子",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%A3%AE%E6%97%A5%E5%90%91%E5%AD%90.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "森沢かな（飯岡かなこ）",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/9-AVDBS/AI-Fix-%E6%A3%AE%E6%B2%A2%E3%81%8B%E3%81%AA%EF%BC%88%E9%A3%AF%E5%B2%A1%E3%81%8B%E3%81%AA%E3%81%93%EF%BC%89.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "椿りか",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%A4%BF%E3%82%8A%E3%81%8B.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "楓ふうあ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E6%A5%93%E3%81%B5%E3%81%86%E3%81%82.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "楓カレン",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E6%A5%93%E3%82%AB%E3%83%AC%E3%83%B3.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "楪カレン",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Ebody/%E6%A5%AA%E3%82%AB%E3%83%AC%E3%83%B3.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "榊原萌",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E6%A6%8A%E5%8E%9F%E8%90%8C.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "沙月恵奈",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-FALENO/%E6%B2%99%E6%9C%88%E6%81%B5%E5%A5%88.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "波多野結衣",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%B3%A2%E5%A4%9A%E9%87%8E%E7%B5%90%E8%A1%A3.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "浅野こころ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E6%B5%85%E9%87%8E%E3%81%93%E3%81%93%E3%82%8D.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "浜崎真緒",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%B5%9C%E5%B4%8E%E7%9C%9F%E7%B7%92.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "清野咲",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E6%B8%85%E9%87%8E%E5%92%B2.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "瀬戸環奈",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E7%80%AC%E6%88%B8%E7%92%B0%E5%A5%88.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "田中ねね",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E7%94%B0%E4%B8%AD%E3%81%AD%E3%81%AD.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "田野憂",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Mines/%E7%94%B0%E9%87%8E%E6%86%82.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "由良かな",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E7%94%B1%E8%89%AF%E3%81%8B%E3%81%AA.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "白上咲花",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E7%99%BD%E4%B8%8A%E5%92%B2%E8%8A%B1.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "百永さりな",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E7%99%BE%E6%B0%B8%E3%81%95%E3%82%8A%E3%81%AA.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "皆月ひかる",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E7%9A%86%E6%9C%88%E3%81%B2%E3%81%8B%E3%82%8B.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "石原希望",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E7%9F%B3%E5%8E%9F%E5%B8%8C%E6%9C%9B.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "石川澪",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E7%9F%B3%E5%B7%9D%E6%BE%AA.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "神宮寺ナオ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E7%A5%9E%E5%AE%AE%E5%AF%BA%E3%83%8A%E3%82%AA.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "篠崎沙帆",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E7%AF%A0%E5%B4%8E%E6%B2%99%E5%B8%86.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "篠田ゆう",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E7%AF%A0%E7%94%B0%E3%82%86%E3%81%86.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "篠真有",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E7%AF%A0%E7%9C%9F%E6%9C%89.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "美咲かんな",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E3%82%82%E3%82%82%E3%81%8B.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "美園和花",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E7%BE%8E%E5%9C%92%E5%92%8C%E8%8A%B1.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "羽月乃蒼",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E7%BE%BD%E6%9C%88%E4%B9%83%E8%92%BC.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "胡桃さくら",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E8%83%A1%E6%A1%83%E3%81%95%E3%81%8F%E3%82%89.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "花守夏歩",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E8%8A%B1%E5%AE%88%E5%A4%8F%E6%AD%A9.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "花狩まい",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E8%8A%B1%E7%8B%A9%E3%81%BE%E3%81%84.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "蒼井すず",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E8%92%BC%E4%BA%95%E3%81%99%E3%81%9A.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "蓮実クレア",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E8%93%AE%E5%AE%9F%E3%82%AF%E3%83%AC%E3%82%A2.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "藤森里穂",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E3%81%AF%E3%82%8B%E3%81%8B%E3%81%BF%E3%82%89%E3%81%84.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "辻井ほのか",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E8%BE%BB%E4%BA%95%E3%81%BB%E3%81%AE%E3%81%8B.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "逢沢みゆ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%80%A2%E6%B2%A2%E3%81%BF%E3%82%86.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "金松季歩",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E9%87%91%E6%9D%BE%E5%AD%A3%E6%AD%A9.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "雛形みくる",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E9%9B%9B%E5%BD%A2%E3%81%BF%E3%81%8F%E3%82%8B.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "青空ひかり",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Cmore/%E9%9D%92%E7%A9%BA%E3%81%B2%E3%81%8B%E3%82%8A.jpg",
+   "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "風間ゆみ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Ebody/%E9%A2%A8%E9%96%93%E3%82%86%E3%81%BF.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "香水じゅん",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E9%A6%99%E6%B0%B4%E3%81%98%E3%82%85%E3%82%93.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鷲尾めい",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E7%AD%A7%E3%82%B8%E3%83%A5%E3%83%B3.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "黒島玲衣",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%BB%92%E5%B3%B6%E7%8E%B2%E8%A1%A3.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "黒川すみれ",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E9%BB%92%E5%B7%9D%E3%81%99%E3%81%BF%E3%82%8C.jpg",
+   "enriched_at": "2026-11-15T04:11:08+00:00"
   }
  ]
 }

@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-3",
- "generated_at": "2026-11-15T02:54:22+00:00",
+ "generated_at": "2026-11-15T05:22:13+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -28,6 +28,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-10.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/SCojTTc11mj8dQEnxvo1fWogN9z_YZo2qcaRqfX0OAw0XW_5lNdEwAkFgU_vUD/idpc00001hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/3nJD7w.jpg",
    "enriched_at": "2026-11-15T02:54:22+00:00"
   }
  ]
