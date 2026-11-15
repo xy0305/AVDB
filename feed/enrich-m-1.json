@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-1",
- "generated_at": "2026-11-15T05:22:13+00:00",
+ "generated_at": "2026-11-15T06:39:32+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -229,6 +229,27 @@
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/PysOGh5RFlGoM5bbr7VXd1B77aZ7wE56JiA1qlOdKuktkfatYNQ8fR1Kgv6rzw/snos00421hhb.mp4",
    "cover_hires_url": "http://163.47.40.207:8901/1Agzz4.jpg",
    "enriched_at": "2026-11-15T04:09:53+00:00"
+  },
+  {
+   "javdb_id": "1BgPeW",
+   "code": "STCV223",
+   "maker": "素人CLOVER",
+   "series": "エロフラグ、ギン立ちしました！",
+   "duration_min": 89,
+   "release_date": "2023-02-10",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:3067FAFA168ABEA2A2BCD21CA88DBA331D416E3C&amp;dn=529STCV-223",
+     "size": "979.45MB",
+     "title": "529STCV-223"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:50F5FFDACBC63CD595B1DCB639C91967A3F88BA3&amp;dn=529STCV-223",
+     "size": "1.01GB",
+     "title": "529STCV-223"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:30:04+00:00"
   }
  ]
 }

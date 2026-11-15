@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-e",
- "generated_at": "2026-11-15T05:22:13+00:00",
+ "generated_at": "2026-11-15T06:39:32+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -306,6 +306,263 @@
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/QHUlB2ci92lr4Fh1z7efT4YbjqEt-S9fOdnSKCGV6VDHBW52ykdHx_VmIrTsCt/snos00098hhb.mp4",
    "cover_hires_url": "http://163.47.40.207:8901/e8qk9N.jpg",
    "enriched_at": "2026-11-15T04:09:53+00:00"
+  },
+  {
+   "javdb_id": "eDNGd",
+   "code": "ABP975",
+   "director": "チャーリー中田",
+   "maker": "プレステージ",
+   "series": "スプラッシュ○○",
+   "duration_min": 149,
+   "release_date": "2020-05-08",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:398F073D9DCDC3FFACFBF2F6CA72B84162D263A4&amp;dn=ABP-975-UC",
+     "size": "6.44GB",
+     "title": "ABP-975-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:669D4FB6BF142799562473AA2A6C05AAFB65D254&amp;dn=ABP-975",
+     "size": "1.39GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DA30F9FF01ADA873D81E3511E89A89FED62E6E7C&amp;dn=ABP975P",
+     "size": "1.90GB",
+     "title": "ABP975P"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E17B615BC4A04B6957CBD45779992B5C0931C699&amp;dn=ABP-975",
+     "size": "1.39GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:FE8F3D775E1F9725C90F8B995AF6FF997EA1354A&amp;dn=ABP-975",
+     "size": "8.26GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F522A3943E6EAF22CDA241E5DDDF7A2A22DD51C5&amp;dn=ABP-975",
+     "size": "2.28GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6F5A2966056535F58EC935FB9EABB1BB19D2C80C&amp;dn=ABP-975-uncensored-HD",
+     "size": "4.11GB",
+     "title": "ABP-975-uncensored-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:678DE72E5D8E987C35067798F6E74B075F7CB969&amp;dn=ABP-975",
+     "size": "2.31GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9843916ACAB70099A59952B09A03E855E5813E07&amp;dn=%40ABP-975",
+     "size": "1.93GB",
+     "title": "@ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:88BA45E6E43CED17AF7331A55EA5AAAC0BE71ACB&amp;dn=ABP-975",
+     "size": "1.48GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0B0B4F3BC22AC4730AF1D7F74A9F209E5595F9AB&amp;dn=ABP-975",
+     "size": "2.43GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:70FFB181BFCEB93F2939348E75D27C81A6A09055&amp;dn=ABP-975",
+     "size": "1.48GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A0A89828AAE926DBD2C4298ED8F9A2E2BDA22229&amp;dn=ABP-975_uncensored",
+     "size": "5.84GB",
+     "title": "ABP-975_uncensored"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:63C6D745C403D84273145CF634A67BD447BE9287&amp;dn=-ABP975C",
+     "size": "2.80GB",
+     "title": "-ABP975C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:91435C381F9D532910F4BB4347B4CA18E119F06B&amp;dn=_ABP975C",
+     "size": "1.77GB",
+     "title": "_ABP975C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:CBF0FDBEEE8B8D6C74AC5F90D3BA68893C2EE446&amp;dn=ABP-975-C",
+     "size": "6.50GB",
+     "title": "ABP-975-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A2899E29BD5D1BF0368358962E853087BB7E5901&amp;dn=ABP-975",
+     "size": "2.91GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0D0B087A7C21425AEE9E8D0A57985CE3A6F2ED63&amp;dn=ABP-975+%E5%A5%B3%E3%81%AE%E4%BD%93%E6%B6%B2%E3%80%81%E5%85%A8%E9%83%A8%E6%8A%9C%E3%81%8F+%E9%A9%9A%E7%95%B0%E3%81%AE3SEX+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80",
+     "size": "4.57GB",
+     "title": "ABP-975 女の体液、全部抜く 驚異の3SEX 涼森れむ"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7A90FD5074725FCA0C68119680E7CF717C4304F6&amp;dn=+ABP-975+%28Uncensored+Leaked%29+%E3%80%90%E3%83%A2%E3%82%B6%E3%82%A4%E3%82%AF%E7%A0%B4%E5%A3%8A%E7%89%88%E3%80%91%E3%82%B9%E3%83%97%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E3%82%8C%E3%82%80+%E5%A5%B3%E3%81%AE%E4%BD%93%E6%B6%B2%E3%80%81%E5%85%A8%E9%83%A8%E6%8A%9C%E3%81%8F%EF%BC%81%E9%A9%9A%E7%95%B0%E3%81%AE3SEX+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80+%28Remu+Suzumori+%29.mp4",
+     "size": "725.64MB",
+     "title": "ABP-975 (Uncensored Leaked) 【モザイク破壊版】スプラッシュれむ 女の体液、全部抜く！驚異の3SEX 涼森れむ (Remu Suzumori ).mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3B98FA428FAB5FD26EBA64653E97F537CED166F5&amp;dn=%28Uncensored+Leaked%29+ABP-975+%28FHD%29+%E3%82%B9%E3%83%97%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E3%82%8C%E3%82%80+%E5%A5%B3%E3%81%AE%E4%BD%93%E6%B6%B2%E3%80%81%E5%85%A8%E9%83%A8%E6%8A%9C%E3%81%8F%EF%BC%81%E9%A9%9A%E7%95%B0%E3%81%AE3SEX+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80",
+     "size": "5.79GB",
+     "title": "(Uncensored Leaked) ABP-975 (FHD) スプラッシュれむ 女の体液、全部抜く！驚異の3SEX 涼森れむ"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3F45E8490E37B4E091FA889D015CAE75002FD6E6&amp;dn=%28Uncensored+Leaked%29+ABP-975+%28FHD%29+%E3%82%B9%E3%83%97%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E3%82%8C%E3%82%80+%E5%A5%B3%E3%81%AE%E4%BD%93%E6%B6%B2%E3%80%81%E5%85%A8%E9%83%A8%E6%8A%9C%E3%81%8F%EF%BC%81%E9%A9%9A%E7%95%B0%E3%81%AE3SEX+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80",
+     "size": "5.79GB",
+     "title": "(Uncensored Leaked) ABP-975 (FHD) スプラッシュれむ 女の体液、全部抜く！驚異の3SEX 涼森れむ"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EE8DD85C04541E11D660DD6F3A3332B9CCADFCA3&amp;dn=ABP-975+%28Uncensored+Leaked%29+%E3%80%90%E3%83%A2%E3%82%B6%E3%82%A4%E3%82%AF%E7%A0%B4%E5%A3%8A%E7%89%88%E3%80%91%E3%82%B9%E3%83%97%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E3%82%8C%E3%82%80+%E5%A5%B3%E3%81%AE%E4%BD%93%E6%B6%B2%E3%80%81%E5%85%A8%E9%83%A8%E6%8A%9C%E3%81%8F%EF%BC%81%E9%A9%9A%E7%95%B0%E3%81%AE3SEX+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80+%28Remu+Suzumori+%29.mp4",
+     "size": "725.64MB",
+     "title": "ABP-975 (Uncensored Leaked) 【モザイク破壊版】スプラッシュれむ 女の体液、全部抜く！驚異の3SEX 涼森れむ (Remu Suzumori ).mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D58D7D93C14063277EF750DDEA69B36910729E6E&amp;dn=ABP-975+%28Uncensored+Leaked%29+%E3%80%90%E3%83%A2%E3%82%B6%E3%82%A4%E3%82%AF%E7%A0%B4%E5%A3%8A%E7%89%88%E3%80%91%E3%82%B9%E3%83%97%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E3%82%8C%E3%82%80+%E5%A5%B3%E3%81%AE%E4%BD%93%E6%B6%B2%E3%80%81%E5%85%A8%E9%83%A8%E6%8A%9C%E3%81%8F%EF%BC%81%E9%A9%9A%E7%95%B0%E3%81%AE3SEX+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80+%28Remu+Suzumori+%29.mp4",
+     "size": "725.64MB",
+     "title": "ABP-975 (Uncensored Leaked) 【モザイク破壊版】スプラッシュれむ 女の体液、全部抜く！驚異の3SEX 涼森れむ (Remu Suzumori ).mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E70F7D56139A9EBDEB0007FDF3966DB01408CEC3&amp;dn=%5BJAV%5D+%5BUncensored%5D+ABP-975+%5B1080p%5D",
+     "size": "5.79GB",
+     "title": "[JAV] [Uncensored] ABP-975 [1080p]"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:942C19831B1D11EDF38BB7E727B1FD1CABD4ECAB&amp;dn=abp-975-uncensored",
+     "size": "5.79GB",
+     "title": "abp-975-uncensored"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7B3C6B88B14138D4092C3DACB80745C3E321308B&amp;dn=ABP975C",
+     "size": "1.54GB",
+     "title": "ABP975C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3595DF0A2FCCCE5F6C12D9FE7CB0FD4B596B262F&amp;dn=ABP-975_uncensored.mp4",
+     "size": "5.79GB",
+     "title": "ABP-975_uncensored.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EDE723BB1D7F77380E6AD9C81A3376FC1676B20D&amp;dn=abp-975-uncensored",
+     "size": "5.85GB",
+     "title": "abp-975-uncensored"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AE60991CE694163ABBB0B9D7F1B102BBD2739F8B&amp;dn=abp-975-uncensored",
+     "size": "5.85GB",
+     "title": "abp-975-uncensored"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:15DC52EFBF5B7DA56F3FA90AF17DFCA4E0C2FD40&amp;dn=%E4%B8%89%E7%9F%B3%40%E7%AC%AC%E4%B8%80%E4%BC%9A%E6%89%80%40ABP-975",
+     "size": "4.50GB",
+     "title": "三石@第一会所@ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:03ED117EC494BAB0E6AF8E76E12A60297C6EEFE1&amp;dn=ABP-975-CS.mp4",
+     "size": "749.81MB",
+     "title": "ABP-975-CS.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E156A764FF4335FAE0D33058CB49089E785F4829&amp;dn=ABP975",
+     "size": "6.57GB",
+     "title": "ABP975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:fe35c4d89436729eada41b46d5bbca6b215fb2e1&amp;dn=ABP-975",
+     "size": "6.33GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:768B9F4DA9ACD6CC85AD67F71B5E5874EAE4BA0C&amp;dn=abp-975",
+     "size": "6.32GB",
+     "title": "abp-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9115C476BB759177EB4D0E0304E5441A4CDB25FA&amp;dn=abp-975-C",
+     "size": "6.75GB",
+     "title": "abp-975-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6E833BB214313B4893C7CE639C38910080600213&amp;dn=ABP-975",
+     "size": "2.86GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:773D44A67D82277EAD633C1532DE4C134F5F2C7C&amp;dn=ABP-975-C",
+     "size": "6.40GB",
+     "title": "ABP-975-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0C3F7747613EDD94C5F5FC462F6A62264BB1BC93&amp;dn=ABP-975",
+     "size": "2.38GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4F40C9D76F47709C2046B932B9640BB7A119F0D3&amp;dn=abp-975",
+     "size": "6.51GB",
+     "title": "abp-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EC618515A36A5A8A36A666E5C7A81CA6807AC2AD&amp;dn=ABP-975-2K",
+     "size": "2.33GB",
+     "title": "ABP-975-2K"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0962C933E4AAA0E31F24A809D59783D391B56A25&amp;dn=ABP-975",
+     "size": "5.56GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5C4373168E434BA7FF9D652365A565706945366B&amp;dn=HD_ABP-975",
+     "size": "2.78GB",
+     "title": "HD_ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:722AA59CBFFD2176FE94E6B48A56FB86EC9D0B99&amp;dn=ABP975",
+     "size": "1.55GB",
+     "title": "ABP975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:FE8321926C729C3E19061E0D3E4A96619C416DBC&amp;dn=ABP-975.mp4",
+     "size": "6.50GB",
+     "title": "ABP-975.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:220CB10B858E949A290B7CA43FF6C8CDB9B656CA&amp;dn=ABP975",
+     "size": "1.63GB",
+     "title": "ABP975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5A5587A9F4DD6F21D7F8FD509E0EF365B05468E6&amp;dn=ABP-975++3SEX+.mp4",
+     "size": "1.44GB",
+     "title": "ABP-975 3SEX .mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:49F853D2A2FEDDA1A6DFE5316C4C3E18D96E4C67&amp;dn=abp-975",
+     "size": "6.54GB",
+     "title": "abp-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6ED7BA5137C7F4F9FA660FF6303EF742CB364D83&amp;dn=ABP-975",
+     "size": "6.52GB",
+     "title": "ABP-975"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:225E40F336789B77460644FEC3682565F331C726&amp;dn=ABP-975.mp4",
+     "size": "1.44GB",
+     "title": "ABP-975.mp4"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:36:19+00:00"
   }
  ]
 }

@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-0",
- "generated_at": "2026-11-15T05:22:13+00:00",
+ "generated_at": "2026-11-15T06:39:32+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -28,6 +28,732 @@
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/SHB9N2U2174B6RkJrncB0k1ZbZV9OWvAeiP_AeCscNwK-692haxdnDXkUyOBKH/dasd00732_mhb_w.mp4",
    "enriched_at": "2026-11-15T04:09:54+00:00"
+  },
+  {
+   "javdb_id": "0RX9ra",
+   "code": "ABW366",
+   "maker": "プレステージ",
+   "series": "恍惚のイキ顔",
+   "duration_min": 215,
+   "release_date": "2023-06-30",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:DD6DF76F15D64B1656AFE6154F12A2B6451C9B69&amp;dn=ABW-366-UC",
+     "size": "9.33GB",
+     "title": "ABW-366-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2465e92dcb72bbdaed856356fe2e5502d4333258&amp;dn=ABW-366-UC",
+     "size": "10.21GB",
+     "title": "ABW-366-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:794F3F4D451CC3234C709565EDB8BF9434D9C297&amp;dn=ABW-366+BVPP",
+     "size": "3.48GB",
+     "title": "ABW-366 BVPP"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:86EA8BC608D9316D8627BD53DEB010C5E7BE2F1E&amp;dn=ABW-366",
+     "size": "2.75GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8CBBD5868721B93F1E5196ABD03B559B67CAFDBA&amp;dn=ABW-366",
+     "size": "3.13GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:75A89F6CB297DD7E5EED62D54F3DE366C11D7656&amp;dn=ABW-366",
+     "size": "2.14GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:B58C7A109FEDB641434C5C37E8A6D9D65FA2D570&amp;dn=ABW-366",
+     "size": "2.77GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:47C9E7E0AF26B487B640673F76B761C6D74CD54F&amp;dn=ABW-366",
+     "size": "3.32GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6F8D8D4A2FDEDD4320849BFD34C86431041F0673&amp;dn=ABW-366-uncensored-HD",
+     "size": "5.79GB",
+     "title": "ABW-366-uncensored-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5C42875B2FF91C76750134F27F5F9704AC27CE55&amp;dn=ABW-366-C",
+     "size": "8.48GB",
+     "title": "ABW-366-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0F448F42402520B8945A3C8BA834CA7ACF4B4E0D&amp;dn=%40ABW366",
+     "size": "6.60GB",
+     "title": "@ABW366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A7BCB6B7148E14943F146D3F0E784F9C09CE387B&amp;dn=ABW-366",
+     "size": "11.73GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C071C295F75B27744D058D55544736B0F5F0BCAC&amp;dn=ABW-366.HD",
+     "size": "5.82GB",
+     "title": "ABW-366.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:349D8D4D6C1F84A2FBBA6632612541A8C0033F5D&amp;dn=abw-366ch",
+     "size": "8.81GB",
+     "title": "abw-366ch"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A19047DE7CB43AEC3B5FBB0B63B589B58380FD6B&amp;dn=abw-366",
+     "size": "8.77GB",
+     "title": "abw-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:39DCC3877D28529F3AAB0CDDD7E6055B7186465E&amp;dn=ABW-366",
+     "size": "2.72GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AAD8A8C2AC9420722FC4DDA4895A56C92349709B&amp;dn=%40ABW366",
+     "size": "2.73GB",
+     "title": "@ABW366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:B58F90F13555EC12F899E72B3530108513F906F5&amp;dn=ABW-366",
+     "size": "8.74GB",
+     "title": "ABW-366"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7F0B7B7E1DEEECE040ACAC25CFAA03B44DB23954&amp;dn=abw-366",
+     "size": "8.81GB",
+     "title": "abw-366"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:37:52+00:00"
+  },
+  {
+   "javdb_id": "0RzPa",
+   "code": "ABP583",
+   "director": "みちるサン",
+   "maker": "プレステージ",
+   "series": "●●は、僕達の性処理ペット。",
+   "duration_min": 190,
+   "release_date": "2017-04-07",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:6269AD59634DB9DA2E4C769FAE7F9483DFFD8233&amp;dn=ABP-583",
+     "size": "2.84GB",
+     "title": "ABP-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2994EA818B6CEC7E1B9F544E47E7D8F280F694BC&amp;dn=ABP-583-uncensored-HD",
+     "size": "5.31GB",
+     "title": "ABP-583-uncensored-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:55A8248AD048B4EDFC4BDBBE60A70A021A132C39&amp;dn=ABP-583_4K",
+     "size": "33.59GB",
+     "title": "ABP-583_4K"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E0830E0E44ECA28F2662A242F8C9B7C131DFCBA2&amp;dn=%40ABP-583",
+     "size": "2.91GB",
+     "title": "@ABP-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5587B7121FCA54ED13BCBEDEF74A78881174BF0D&amp;dn=%40ABP583",
+     "size": "2.51GB",
+     "title": "@ABP583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D6CF076DA33164D50F55525BAFB1E7E3551F3914&amp;dn=ABP-583+%E5%83%95%E9%81%94%E3%81%AE%E6%80%A7%E5%87%A6%E7%90%86%E3%83%9A%E3%83%83%E3%83%88+%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82+Uncensored+Leaked+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA",
+     "size": "3.67GB",
+     "title": "ABP-583 僕達の性処理ペット 愛音まりあ Uncensored Leaked 无码流出"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8A6AA4B458C6A7BD6C855DA1EE17FFD64276AAE6&amp;dn=ABP-583-uncensored-HD",
+     "size": "5.29GB",
+     "title": "ABP-583-uncensored-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C428863BD0069418AA15296ECF7DED7EADE2BE08&amp;dn=+%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+FC2+PPV+1040114+-+ABP-583+%28Uncensored+Leaked%29+%E7%88%B1%E9%9F%B3%E9%BA%BB%E9%87%8C%E4%BA%9A%E6%B5%81%E5%87%BA03+%28Maria+Aine%29.mp4",
+     "size": "897.64MB",
+     "title": "(無修正-流出) FC2 PPV 1040114 - ABP-583 (Uncensored Leaked) 爱音麻里亚流出03 (Maria Aine).mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DB174BDF39FC03525BEC6AE78B4F93BA4CF4381F&amp;dn=%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+FC2+PPV+1040114+-+ABP-583+%28Uncensored+Leaked%29+%E7%88%B1%E9%9F%B3%E9%BA%BB%E9%87%8C%E4%BA%9A%E6%B5%81%E5%87%BA03+%28Maria+Aine%29+",
+     "size": "598.89MB",
+     "title": "(無修正-流出) FC2 PPV 1040114 - ABP-583 (Uncensored Leaked) 爱音麻里亚流出03 (Maria Aine)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F16D8747009D191F2561B8413C3A3165AC0DB11C&amp;dn=%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+FC2+PPV+1040114+-+ABP-583+%28Uncensored+Leaked%29+%E7%88%B1%E9%9F%B3%E9%BA%BB%E9%87%8C%E4%BA%9A%E6%B5%81%E5%87%BA03+%28Maria+Aine%29+",
+     "size": "551.57MB",
+     "title": "(無修正-流出) FC2 PPV 1040114 - ABP-583 (Uncensored Leaked) 爱音麻里亚流出03 (Maria Aine)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AA3DC03D33C6CD80AC5544D3BE48D11313EDAC84&amp;dn=ABP-583+%E5%83%95%E9%81%94%E3%81%AE%E6%80%A7%E5%87%A6%E7%90%86%E3%83%9A%E3%83%83%E3%83%88+%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82+Uncensored+Leaked+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA",
+     "size": "3.67GB",
+     "title": "ABP-583 僕達の性処理ペット 愛音まりあ Uncensored Leaked 无码流出"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F8BF73713210CCCA3E9EB01DF3CC1DAD376B6344&amp;dn=ABP-583_uncensored",
+     "size": "5.37GB",
+     "title": "ABP-583_uncensored"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:60733862F2C695F34B768C5E9166889854A060DC&amp;dn=ABP-583+%E5%83%95%E9%81%94%E3%81%AE%E6%80%A7%E5%87%A6%E7%90%86%E3%83%9A%E3%83%83%E3%83%88+%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82+Uncensored+Leaked+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA",
+     "size": "3.67GB",
+     "title": "ABP-583 僕達の性処理ペット 愛音まりあ Uncensored Leaked 无码流出"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:CDEE8E9C31E8A5CF3FEA4B4A2C98D951BFA400DA&amp;dn=ABP-583+%E5%83%95%E9%81%94%E3%81%AE%E6%80%A7%E5%87%A6%E7%90%86%E3%83%9A%E3%83%83%E3%83%88+%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82+Uncensored+Leaked+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA.MP4",
+     "size": "717.12MB",
+     "title": "ABP-583 僕達の性処理ペット 愛音まりあ Uncensored Leaked 无码流出.MP4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A00F0C56A7C35B868344DE9F97C7750E69506588&amp;dn=ABP-583+%E5%83%95%E9%81%94%E3%81%AE%E6%80%A7%E5%87%A6%E7%90%86%E3%83%9A%E3%83%83%E3%83%88+%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82+Uncensored+Leaked+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA.MP4",
+     "size": "717.12MB",
+     "title": "ABP-583 僕達の性処理ペット 愛音まりあ Uncensored Leaked 无码流出.MP4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9185F170F1C74B2BA2BDE3B420724F725E0C424D&amp;dn=ABP-583+%E5%83%95%E9%81%94%E3%81%AE%E6%80%A7%E5%87%A6%E7%90%86%E3%83%9A%E3%83%83%E3%83%88+%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82+Uncensored+Leaked+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA",
+     "size": "3.62GB",
+     "title": "ABP-583 僕達の性処理ペット 愛音まりあ Uncensored Leaked 无码流出"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AA2B607C559C6B6852D3ABDB994311F575FBD900&amp;dn=ABP-583_uncensored",
+     "size": "5.32GB",
+     "title": "ABP-583_uncensored"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D2DC6A48B6C347C059EAAC6D3C71A39B7625F140&amp;dn=%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%BC%8F%E3%82%8C%29+FC2+PPV+1040114+%28Uncensored+Leaked%29+%E7%88%B1%E9%9F%B3%E9%BA%BB%E9%87%8C%E4%BA%9A%E6%B5%81%E5%87%BA03+%5BABP-583%5D+%28Maria+Aine%29",
+     "size": "551.57MB",
+     "title": "(無修正-漏れ) FC2 PPV 1040114 (Uncensored Leaked) 爱音麻里亚流出03 [ABP-583] (Maria Aine)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:36DC24ED2E1616D6621C1A4D695B90FCAAA2ABE8&amp;dn=Maria+Aine+ABP-583.mp4",
+     "size": "177.14MB",
+     "title": "Maria Aine ABP-583.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:73DD53C44C878461786C4F7A2058F68992E7D680&amp;dn=%5B%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82%5D+ABP-583+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA+UNCENSORED+LEAKED+%28%E4%B8%AD%E6%96%87%E5%AD%97%E5%B9%95%29.mp4",
+     "size": "780.36MB",
+     "title": "[愛音まりあ] ABP-583 无码流出 UNCENSORED LEAKED (中文字幕).mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:24E8C61D95810BCF40CE7FCE63A4D98E69079010&amp;dn=%5B%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82%5D+ABP-583+%E6%97%A0%E7%A0%81%E6%B5%81%E5%87%BA+UNCENSORED+LEAKED+%28%E4%B8%AD%E6%96%87%E5%AD%97%E5%B9%95%29.mp4",
+     "size": "780.36MB",
+     "title": "[愛音まりあ] ABP-583 无码流出 UNCENSORED LEAKED (中文字幕).mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:60DDA3A044ED69B420E53DDC86AFF6DDDD8C36C5&amp;dn=ABP-583%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82.mp4",
+     "size": "585.42MB",
+     "title": "ABP-583愛音まりあ.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:1F0AD7A45A28469520EC3215174D75D7025674DE&amp;dn=ABP-583",
+     "size": "8.83GB",
+     "title": "ABP-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:93804610B321F0B76330A303BB9BAFD12EDDF0EB&amp;dn=ABP-583-H",
+     "size": "8.78GB",
+     "title": "ABP-583-H"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D3E170FBA55C2E7EACCEC7A6AE67C5082E474E6C&amp;dn=ABP-583.mp4",
+     "size": "700.50MB",
+     "title": "ABP-583.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:26DB1E08A296E94979021EE8045E053875DECDEF&amp;dn=%5B22sht.me%5DABP-583-C",
+     "size": "4.92GB",
+     "title": "[22sht]ABP-583-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4DCE0973AA14AFFCE21A932FDA3F4B0699889998&amp;dn=%5B22sht.me%5DABP-583-C",
+     "size": "5.61GB",
+     "title": "[22sht]ABP-583-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7E02FD15F08B0A80C48DDC88C03C4BA875E381CC&amp;dn=ABP583%E6%B5%81%E5%87%BA",
+     "size": "1.21GB",
+     "title": "ABP583流出"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6BC636413FBE50A730F157C0FA1CA1C6C3E9CC43&amp;dn=ABP583-5",
+     "size": "322.38MB",
+     "title": "ABP583-5"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:49134818F82A4B9697D5FBB91CD88B51A18DF5DA&amp;dn=ABP583.Part+2",
+     "size": "537.12MB",
+     "title": "ABP583.Part 2"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E665771E38791403B90CA3326833E7CBF7EDAFD0&amp;dn=ABP-583-HD",
+     "size": "4.34GB",
+     "title": "ABP-583-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DF6D95AB3024C58EA29DD490751F6DE9C953C57B&amp;dn=abp00583",
+     "size": "1.79GB",
+     "title": "abp00583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:52CD12C4258048E51A0DE17EBD97A654417863F8&amp;dn=ABP-583-HD",
+     "size": "7.31GB",
+     "title": "ABP-583-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:ACBB9A4755F867CB64277AB86E90548E5B9FE658&amp;dn=ABP-583.mp4",
+     "size": "7.60GB",
+     "title": "ABP-583.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2385603A223577D259F89C64F93A1B1ED4067D53&amp;dn=%5B7sht.me%5Dabp-583-C",
+     "size": "7.60GB",
+     "title": "[7sht]abp-583-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:10AC1464114E2C373C666FE69493886BC56636D3&amp;dn=ABP-583",
+     "size": "2.91GB",
+     "title": "ABP-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2F9897F1F80EADE716EA9207EA0E0964B58C8721&amp;dn=02.abp-583",
+     "size": "2.25GB",
+     "title": "02.abp-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:659BE455393C30B9C62AFBC9575E7EC08ED89E45&amp;dn=ABP-583",
+     "size": "2.26GB",
+     "title": "ABP-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6CF1F7CE58B5A578F9CE24766C4CA18308E3C26F&amp;dn=ABP-583+%E5%A5%B3%E5%AD%90%E3%83%9E%E3%83%8D%E3%83%BC%E3%82%B8%E3%83%A3%E3%83%BC%E3%81%AF%E3%80%81%E5%83%95%E9%81%94%E3%81%AE%E6%80%A7%E5%87%A6%E7%90%86%E3%83%9A%E3%83%83%E3%83%88%E3%80%82+024+%E6%84%9B%E9%9F%B3%E3%81%BE%E3%82%8A%E3%81%82.mp4",
+     "size": "1.78GB",
+     "title": "ABP-583 女子マネージャーは、僕達の性処理ペット。 024 愛音まりあ.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AC27A5E10C6B4485B00ACE5242E221EFF4D06F42&amp;dn=abp-583",
+     "size": "1.73GB",
+     "title": "abp-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:435FF1DEE3A534B34BA895FAB4AA8E3C3489CDC8&amp;dn=ABP-583.HD",
+     "size": "4.29GB",
+     "title": "ABP-583.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C2773340FFFEDD50443A356689BB5AF21596BF5D&amp;dn=ABP-583.HD",
+     "size": "4.24GB",
+     "title": "ABP-583.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2DA9727908FE95413AB2C4830BF68C254E613CBB&amp;dn=ABP-583",
+     "size": "1.78GB",
+     "title": "ABP-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2003C1149322084336A46DC3EDAC8E8FB58C48AC&amp;dn=0410-abp-583-FHD",
+     "size": "7.55GB",
+     "title": "0410-abp-583-FHD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EEDDACFA49515C6D924A2961591870B7B9B1DD0A&amp;dn=%5BThz.la%5Dabp-583",
+     "size": "5.57GB",
+     "title": "[Thz]abp-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:211FD42D3CC43AEA9CAFAA09C456CF51C60A4206&amp;dn=abp-583",
+     "size": "3.14GB",
+     "title": "abp-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:498E58FFA0AF79016E737FDDB520C86949448C4D&amp;dn=ABP-583",
+     "size": "4.24GB",
+     "title": "ABP-583"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F4A678AD9A8ADA75AFEA8A28BB113474279C9673&amp;dn=ABP-583-AVI",
+     "size": "1.85GB",
+     "title": "ABP-583-AVI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:BE617FDAF4813A8E75489F48FF32A0A41DD07524&amp;dn=abp-583.mp4",
+     "size": "1.78GB",
+     "title": "abp-583.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:CDA5BF7ED599D914B0790EEA47417697498A27DF&amp;dn=0401-abp-583",
+     "size": "1.83GB",
+     "title": "0401-abp-583"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:35:41+00:00"
+  },
+  {
+   "javdb_id": "0e497",
+   "code": "ABP566",
+   "director": "萬舐亭ムジナ",
+   "maker": "プレステージ",
+   "series": "絶対的鉄板シチュエーション",
+   "duration_min": 166,
+   "release_date": "2017-02-17",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:B1861446436B45D950D5A98D8FAC974D5A780434&amp;dn=+%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+ABP-566++FC2+PPV+1065588+%28Uncensored+Leaked%29+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3+2+%E3%81%82+%E3%82%84%E3%81%BF%E6%97%AC+%E6%9E%9C+%28Shunka+Ayami%29",
+     "size": "4.82GB",
+     "title": "(無修正-流出) ABP-566 FC2 PPV 1065588 (Uncensored Leaked) 絶対的鉄板シチュエーション 2 あ やみ旬 果 (Shunka Ayami)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:ADCD8A8E914AAC46C4454967A31820948EF6E2F4&amp;dn=+%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+ABP-566++FC2+PPV+1065588+%28Uncensored+Leaked%29+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3+2+%E3%81%82+%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C+%28Shunka+Ayami%29",
+     "size": "4.82GB",
+     "title": "(無修正-流出) ABP-566 FC2 PPV 1065588 (Uncensored Leaked) 絶対的鉄板シチュエーション 2 あ やみ旬果 (Shunka Ayami)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5581ACD50E93B781618E22455C8E2683AD4E61FD&amp;dn=abp566",
+     "size": "1.70GB",
+     "title": "abp566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0E320E8F545D3BDFB42A05341BC1BDC3EED91D3A&amp;dn=%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+ABP-566++FC2+PPV+1065588+%28Uncensored+Leaked%29+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3+2+%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C+%28Shunka+Ayami%29+",
+     "size": "4.82GB",
+     "title": "(無修正-流出) ABP-566 FC2 PPV 1065588 (Uncensored Leaked) 絶対的鉄板シチュエーション 2 あやみ旬果 (Shunka Ayami)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F9AED877718F31E095F913E8699666EB4C712FDB&amp;dn=%40ABP-566",
+     "size": "2.69GB",
+     "title": "@ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8ADAFA10279862090AA068988ABD4ED8343FCFF9&amp;dn=%40ABP-566",
+     "size": "2.08GB",
+     "title": "@ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C3F7D3596A865788D99257B7BC8B1EE1D343A002&amp;dn=%40ABP566",
+     "size": "2.05GB",
+     "title": "@ABP566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3B3EBF299270E2306EAA15E84EA3D10E0E02B1A0&amp;dn=%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+ABP-566++FC2+PPV+1065588+%28Uncensored+Leaked%29+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3+2+%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C+%28Shunka+Ayami%29+",
+     "size": "4.82GB",
+     "title": "(無修正-流出) ABP-566 FC2 PPV 1065588 (Uncensored Leaked) 絶対的鉄板シチュエーション 2 あやみ旬果 (Shunka Ayami)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:14C3347F16E1852AC77E01E6D1697D1833A7C984&amp;dn=ABP-566+Part+2%28Uncensored+Leaked%29+%E7%84%A1%E7%A2%BC%E6%B5%81%E5%87%BA+S1%E5%B0%82%E5%B1%9E%E5%A5%B3%E5%84%AA+%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C+%E3%81%82%E3%82%84%E3%81%BF%E3%81%97%E3%82%85%E3%82%93%E3%81%8B+%E7%84%A1%E4%BF%AE%E6%AD%A3+%28Shunka+Ayami+%29.MP4",
+     "size": "204.32MB",
+     "title": "ABP-566 Part 2(Uncensored Leaked) 無碼流出 S1専属女優 あやみ旬果 あやみしゅんか 無修正 (Shunka Ayami ).MP4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0DF88BA41FD3B105712E08A277CC6D9D20D68C07&amp;dn=abp-566-C",
+     "size": "5.40GB",
+     "title": "abp-566-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:FF3D31007A83F55274755F033EB06CF8172BFA05&amp;dn=%28%E7%84%A1%E4%BF%AE%E6%AD%A3-%E6%B5%81%E5%87%BA%29+ABP-566++FC2+PPV+1065588+%28Uncensored+Leaked%29+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3+2+%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C+%28Shunka+Ayami%29",
+     "size": "4.82GB",
+     "title": "(無修正-流出) ABP-566 FC2 PPV 1065588 (Uncensored Leaked) 絶対的鉄板シチュエーション 2 あやみ旬果 (Shunka Ayami)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8AC7412918223554E67DED39B8C600629F98D86B&amp;dn=%5BHD+Uncensored%5D+ABP-566+%28Uncensored+Leaked%29+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3+2+%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C+%28Shunka+Ayami%29",
+     "size": "1.52GB",
+     "title": "[HD Uncensored] ABP-566 (Uncensored Leaked) 絶対的鉄板シチュエーション 2 あやみ旬果 (Shunka Ayami)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2DE91D21A851C3D66FF5123776CF086427C3CFAA&amp;dn=ABP-566-4K",
+     "size": "44.49GB",
+     "title": "ABP-566-4K"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:B64D798350E7D5E2BAA8CF7E93A2E754298DF847&amp;dn=ABP-566-uncensored-HD",
+     "size": "4.32GB",
+     "title": "ABP-566-uncensored-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:FBFA90CA62D2D57D1D3B030A279581CED71AE7AB&amp;dn=ABP-566-uncensored-HD",
+     "size": "4.30GB",
+     "title": "ABP-566-uncensored-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2073D47B81602CD45D164BB36603E0DB6808C37A&amp;dn=ABP-566.mp4",
+     "size": "1.12GB",
+     "title": "ABP-566.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:BA0F45A718785D0BDA1F8123ED462E27EC755D7F&amp;dn=ABP-566+Part+5+Shunka+Ayami.mp4",
+     "size": "45.82MB",
+     "title": "ABP-566 Part 5 Shunka Ayami.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C9D4972C5A9B547E5E497D6DA8BD67A468928380&amp;dn=ABP-566+Part+4+Shunka+Ayami.mp4",
+     "size": "165.44MB",
+     "title": "ABP-566 Part 4 Shunka Ayami.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2BEA44760E98BA1228F8A4A1574DEC88042F5B19&amp;dn=ABP-566+Part+3+Shunka+Ayami.mp4",
+     "size": "190.23MB",
+     "title": "ABP-566 Part 3 Shunka Ayami.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7A9298649D39B0EBC893D40D9ADEB2B3B00B7520&amp;dn=ABP-566+Part+2+Shunka+Ayami.mp4",
+     "size": "204.32MB",
+     "title": "ABP-566 Part 2 Shunka Ayami.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:CC1B1F2E9B57F939BC885AE9BE3F001FBCEEA897&amp;dn=ABP-566",
+     "size": "555.83MB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F114AC35A3830549BF04368C1A4E9CCB5F8DD8CE&amp;dn=%28Uncensored%29+Shunka+Ayami%7BABP-566%7D+++%E7%B5%B6%E5%AF%BE%E7%9A%84%E3%81%AA%E5%8F%A4%E5%85%B8%E7%9A%84%E3%81%AA%E7%8A%B6%E6%B3%81",
+     "size": "483.48MB",
+     "title": "(Uncensored) Shunka Ayami{ABP-566} 絶対的な古典的な状況"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F5F7FAB58B7E766694D02588D71D380AE6E68509&amp;dn=ABP-566",
+     "size": "3.40GB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2F3D8990A1E800470832621D86BEA564371F2DE8&amp;dn=ABP-566",
+     "size": "6.92GB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:39B68ED13302A5A8E12A6A03D78B46093293ADDE&amp;dn=ABP-566-H",
+     "size": "6.86GB",
+     "title": "ABP-566-H"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:01040C53495DE08AF9AA5F81FA2A8D83C89294D8&amp;dn=%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C+ABP-566+%28H265%29",
+     "size": "4.13GB",
+     "title": "あやみ旬果 ABP-566 (H265)"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6702589C0DBDAA6B8519BF85A7B8F218334032B3&amp;dn=ABP566",
+     "size": "204.03MB",
+     "title": "ABP566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4DA73BAD8CFD8BB4971CF8A9AE786E3BEE8CBC28&amp;dn=encode720p-abp-566-absolute+steel+plate+application-2-you+and+shun+played-just.mp4",
+     "size": "1.77GB",
+     "title": "encode720p-abp-566-absolute steel plate application-2-you and shun played-just.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DA2866E2BB1CB96BA1528DD08599CC1785A2EF1E&amp;dn=%5B7sht.me%5Dabp-566-C",
+     "size": "6.62GB",
+     "title": "[7sht]abp-566-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9A8044735F99FBA24CDA688E4ACF8A6FF25CE9FF&amp;dn=01.abp-566",
+     "size": "1.58GB",
+     "title": "01.abp-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:91D51B239A13BDBE0631F15CE3201200D560DDBD&amp;dn=ABP-566.mp4",
+     "size": "1.56GB",
+     "title": "ABP-566.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A4902188986777EAA4D04496D90B53314A3A3C90&amp;dn=ABP-566.HD",
+     "size": "3.77GB",
+     "title": "ABP-566.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:060DDE3D342C684BE880771C8977C6DA81F516BA&amp;dn=abp-566.HD",
+     "size": "3.8GB",
+     "title": "abp-566.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:124CBAC1846AEC626D3A4CF831D44382D4EA9576&amp;dn=%5BABP-566%5D",
+     "size": "1.37GB",
+     "title": "[ABP-566]"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:24340E3649D6DB04DAA62446B4252077E7A98610&amp;dn=ABP-566",
+     "size": "1.37GB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:68FD9548FC8A3191E5786C5DD1754433534EE6BF&amp;dn=ABP-566+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3+2+%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C.mp4",
+     "size": "1.56GB",
+     "title": "ABP-566 絶対的鉄板シチュエーション 2 あやみ旬果.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A09EC71AF802F7C9094E455A80F8EF0E432CA908&amp;dn=%E7%AC%AC%E4%B8%80%E6%9C%83%E6%89%80%E6%96%B0%E7%89%87%40SIS001%40%28PRESTIGE%29%28ABP-566%29%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3_2_%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C",
+     "size": "1.56GB",
+     "title": "第一會所新片@SIS001@(PRESTIGE)(ABP-566)絶対的鉄板シチュエーション_2_あやみ旬果"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:33572BFD3D419428ABE40259FAD1DE5EE2987F43&amp;dn=ABP-566",
+     "size": "1.98GB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:94879E0CAC0EDA8AC0BD1749D9184CBAFAF87820&amp;dn=ABP-566",
+     "size": "1.98GB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5BDEA38B9544C8AD40669AADB0EDA05D471EA270&amp;dn=%5BThz.la%5Dabp-566",
+     "size": "4.85GB",
+     "title": "[Thz]abp-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:41D4E2FA759E48BE094F7B5A1AE84DA918922FCD&amp;dn=ABP-566+%E7%B5%B6%E5%AF%BE%E7%9A%84%E9%89%84%E6%9D%BF%E3%82%B7%E3%83%81%E3%83%A5%E3%82%A8%E3%83%BC%E3%82%B7%E3%83%A7+%E3%83%B3+2+%E3%81%82%E3%82%84%E3%81%BF%E6%97%AC%E6%9E%9C.mp4",
+     "size": "1.56GB",
+     "title": "ABP-566 絶対的鉄板シチュエーショ ン 2 あやみ旬果.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:537B644186F0F027AECC1460E115CFA0755131F0&amp;dn=abp-566",
+     "size": "1.41GB",
+     "title": "abp-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:24DF154069822DE68B81A69B722710D89C373441&amp;dn=abp-566-hhbhd",
+     "size": "6.14GB",
+     "title": "abp-566-hhbhd"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:BAAFABA1AEBC1065FAFEEC0541BFAE4537952B43&amp;dn=ABP-566.HD",
+     "size": "3.66GB",
+     "title": "ABP-566.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EAB64749704BA79C2A5F20AD8D2ABCEA483D749F&amp;dn=ABP-566-CAVI",
+     "size": "1.65GB",
+     "title": "ABP-566-CAVI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:740DDB2BECEE058595F35DA09DE3A9793B23A02B&amp;dn=0222-abp-566-FHD",
+     "size": "6.14GB",
+     "title": "0222-abp-566-FHD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0A5F9844C6019378040AF4D9FFDC0FB78AE2771B&amp;dn=ABP-566",
+     "size": "1.56GB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:11FECF90F76491A6B4884BC4FC0ACCEDE8009715&amp;dn=ABP-566-AVI",
+     "size": "1.62GB",
+     "title": "ABP-566-AVI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:91248FA49EAB36ECDC6D354EAA306A2024F68DAD&amp;dn=ABP-566",
+     "size": "4.24GB",
+     "title": "ABP-566"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AA24E9818B5D709DC04E24B41AD70BD47FE1E2E3&amp;dn=ABP-566.mp4",
+     "size": "1.56GB",
+     "title": "ABP-566.mp4"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:35:35+00:00"
+  },
+  {
+   "javdb_id": "0eRZ8b",
+   "code": "ABF116",
+   "maker": "プレステージ",
+   "series": "働く痴女系お姉さん",
+   "duration_min": 155,
+   "release_date": "2024-06-21",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:4B5C0C66E7D64A68015463C3BAEECDB8EB9D5599&amp;dn=ABF-116-%E4%B8%AD%E6%96%87%E5%AD%97%E5%B9%95",
+     "size": "2.10GB",
+     "title": "ABF-116-中文字幕"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:064749685B416B0B4E35AF478211647FF82B82A2&amp;dn=ABF-116_CH.HD",
+     "size": "4.60GB",
+     "title": "ABF-116_CH.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:A9642A4DF795ABCD338835E93A67E97FF7A0DABB&amp;dn=ABF-116_FHD_CH",
+     "size": "1.62GB",
+     "title": "ABF-116_FHD_CH"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:32C05E038EE40B6B5045C76628F7BC74631FE507&amp;dn=ABF-116",
+     "size": "3.94GB",
+     "title": "ABF-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F5CB47CDBBD8C012B94E656F0F13D9A1F1B467D9&amp;dn=ABF-116-HD",
+     "size": "2.20GB",
+     "title": "ABF-116-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:29D3C36357C7507F8F5B3B71748631CE2AB1CB36&amp;dn=abf-116",
+     "size": "6.08GB",
+     "title": "abf-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:00C0837C0FC6EAAA5F9F4698733156D615222E3F&amp;dn=ABF-116",
+     "size": "2.21GB",
+     "title": "ABF-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E5B6D2907B25E8422233F43DFAD6FC132F396870&amp;dn=ABF-116-AI",
+     "size": "4.74GB",
+     "title": "ABF-116-AI"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EE0710E4749B63D2157D94E011C53F19A66D4051&amp;dn=ABF-116",
+     "size": "2.27GB",
+     "title": "ABF-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:064ADD1BEC5A33D6B55C2ADE9E82F087A6E9F3F5&amp;dn=ABF-116",
+     "size": "8.54GB",
+     "title": "ABF-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D0F3BAF53D88F432C284C096539F51C61CA8F74B&amp;dn=416352_3xplanet_ABF-116.mp4",
+     "size": "6.04GB",
+     "title": "416352_3xplanet_ABF-116.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:14A3DFE8B67DA1A2C087084DF27E96D9AEC81F12&amp;dn=ABF-116",
+     "size": "6.07GB",
+     "title": "ABF-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DBCACCB097275DF8ACB2185AB651555098C6B987&amp;dn=ABF-116",
+     "size": "1.57GB",
+     "title": "ABF-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:053EF42385E63CBCC12A818844B582741DB6F09B&amp;dn=%40ABF116",
+     "size": "2.04GB",
+     "title": "@ABF116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E63AFCFDC9BC60FBDD9635EC2CA17B8CCEC79F60&amp;dn=abf-116",
+     "size": "6.04GB",
+     "title": "abf-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:89BDC35864E33C2B3C7269E01DBDCEAFBCA2233B&amp;dn=abf-116",
+     "size": "6.10GB",
+     "title": "abf-116"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:21E425BD584FE8B80498416CC67A99D28427EC1D&amp;dn=ABF-116",
+     "size": "6.04GB",
+     "title": "ABF-116"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:33:49+00:00"
   },
   {
    "javdb_id": "0ea1DX",

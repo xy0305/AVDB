@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-5",
- "generated_at": "2026-11-15T05:22:13+00:00",
+ "generated_at": "2026-11-15T06:39:32+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -55,6 +55,48 @@
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/GDd-IjAzap7WcWl_r4CgfBwYBhocPyEL6fbwNv5GWpCbM8LLSTj7yD8mdf9ulU/sone00912hhb.mp4",
    "cover_hires_url": "http://163.47.40.207:8901/5n40z8.jpg",
    "enriched_at": "2026-11-15T04:09:53+00:00"
+  },
+  {
+   "javdb_id": "5nXANM",
+   "code": "DANDY985",
+   "director": "山崎千年",
+   "maker": "DANDY",
+   "series": "「おばさん我慢できないわ…」",
+   "duration_min": 223,
+   "release_date": "2025-07-10",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:48951a9754fec43c5579753217cbabb4d8fd915c&amp;dn=DANDY-985",
+     "size": "9.37GB",
+     "title": "DANDY-985"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:ad51aca1481fa1e141da8936b899f8054f79f5c1&amp;dn=DANDY-985",
+     "size": "2.17GB",
+     "title": "DANDY-985"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:dc0a20f2d93ac254d9970500d04a6a5976e18adc&amp;dn=DANDY-985",
+     "size": "9.37GB",
+     "title": "DANDY-985"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2c1747aaaf3aaa652e6a5f9be5b6a9adfdb677c7&amp;dn=DANDY-985",
+     "size": "2.12GB",
+     "title": "DANDY-985"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2b95f181014fe0a39b3266db02b80b657daa7cba&amp;dn=DANDY-985.%5B4K%5D%40R90s",
+     "size": "17.53GB",
+     "title": "DANDY-985.[4K]@R90s"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7660560652E558EF4E123DF369B06FCA6306E737&amp;dn=DANDY985",
+     "size": "2.77GB",
+     "title": "DANDY985"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:29:25+00:00"
   }
  ]
 }

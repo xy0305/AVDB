@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-v",
- "generated_at": "2026-11-15T05:22:13+00:00",
+ "generated_at": "2026-11-15T06:39:32+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -171,6 +171,223 @@
    "enriched_at": "2026-11-15T04:09:54+00:00"
   },
   {
+   "javdb_id": "V7v7n",
+   "code": "ABP968",
+   "director": "みちるサン",
+   "maker": "プレステージ",
+   "series": "なまなかだし",
+   "duration_min": 135,
+   "release_date": "2020-04-17",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:BBA746ECEC0928320F9C493F87BB190EE9F83279&amp;dn=ABP-968-UC",
+     "size": "6.60GB",
+     "title": "ABP-968-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0A3D8261C4CC214F2C0E7ABC765A4DADF8216EEE&amp;dn=ABP-968",
+     "size": "2.52GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:806499cf7a3b13bf117c4536a1bf49a43f9e7832&amp;dn=ABP-968-C",
+     "size": "5.89GB",
+     "title": "ABP-968-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:d37419e256164595ee21bab60730b0534a9ccffb&amp;dn=ABP-968-U",
+     "size": "7.04GB",
+     "title": "ABP-968-U"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7A9480849AC977385EF3ED5D3F99B910509EC72E&amp;dn=ABP-968",
+     "size": "1.25GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:71AFD02CFD78C8DC7BF4378F7402481DD1F208EA&amp;dn=ABP-968",
+     "size": "2.00GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EAAF7872FECF5333CB6DCA7A50729AC3EBBE8779&amp;dn=ABP-968",
+     "size": "5.88GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3FD026F1D20B8FC812644481DD05152BD39480BD&amp;dn=ABP-968",
+     "size": "5.88GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0FFED6F2CD99DC97A3F62D480ED24BC90A440248&amp;dn=abp-968",
+     "size": "5.43GB",
+     "title": "abp-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E16D185C61A2A5428059797DFCE84BC3C84F0573&amp;dn=ABP-968",
+     "size": "5.88GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:598C577BC1A1FE8B3BE8361714E1537210D1C7CB&amp;dn=ABP-968",
+     "size": "5.88GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0D0AB355A6BEF9D657452CD9166C43F9895BD282&amp;dn=ABP-968",
+     "size": "5.88GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:1399969DF9193BEF17D819734B4C276EC3560C82&amp;dn=ABP-968",
+     "size": "5.88GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3B0AF1626F7D905C9CCAAD2E8ACCAA0CC3A58212&amp;dn=%40abp00968",
+     "size": "2.58GB",
+     "title": "@abp00968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EB29B050A1AFB4D999624F6CB4E64B8AD6D9C708&amp;dn=-ABP968C",
+     "size": "2.51GB",
+     "title": "-ABP968C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3E818F7916BDA0CA58A1272ADECABD05FEB186A0&amp;dn=_ABP968C",
+     "size": "1.57GB",
+     "title": "_ABP968C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:FD78A571DE5B91EB23B609CF12A75B67BC8C60B6&amp;dn=ABP-968.mp4",
+     "size": "656.38MB",
+     "title": "ABP-968.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8D4395103980D766AEE984BCBFEDF8E706CC4251&amp;dn=ABP968",
+     "size": "1.65GB",
+     "title": "ABP968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:596BF967280E6EB9DBD2FEA644807EE3A7FEE9A7&amp;dn=ABP-968+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80+%E3%81%AA%E3%81%BE%E3%81%AA%E3%81%8B%E3%81%A0%E3%81%97+%E9%80%8F%E6%98%8E%E6%84%9FNo.1%E3%81%AE%E6%9C%80%E5%BC%B7%E7%BE%8E%E5%B0%91%E5%A5%B3%E3%82%92%E5%AD%95%E3%81%BE%E3%81%9B%E3%82%8B",
+     "size": "4.66GB",
+     "title": "ABP-968 涼森れむ なまなかだし 透明感No.1の最強美少女を孕ませる"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9B3F163673B713F61B9DE378B4D52646498250E9&amp;dn=%E7%89%9B%E5%A4%A7%E5%8A%9B%40%E7%AC%AC%E4%B8%80%E4%BC%9A%E6%89%80%40ABP-968",
+     "size": "5.38GB",
+     "title": "牛大力@第一会所@ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F88BC8D0C8EB44D465C1923629997EB5AFE4D4BB&amp;dn=ABP968C",
+     "size": "2.01GB",
+     "title": "ABP968C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:55FFD69F64EAF2790CA311AFC82AAD6DB7557C30&amp;dn=ABP968C",
+     "size": "1.40GB",
+     "title": "ABP968C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:20928381D205C30A21181A93C2ED7D32EFFB9B62&amp;dn=%E4%B8%89%E7%9F%B3%40%E7%AC%AC%E4%B8%80%E4%BC%9A%E6%89%80%40ABP-968",
+     "size": "4.38GB",
+     "title": "三石@第一会所@ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:26D52FFD7B9AD5826DFD5400C604E19FBC1C09B2&amp;dn=ABP-968+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80+%E3%81%AA%E3%81%BE%E3%81%AA%E3%81%8B%E3%81%A0%E3%81%97+35+%E9%80%8F%E6%98%8E%E6%84%9FNo%EF%BC%8E1%E3%81%AE%E6%9C%80%E5%BC%B7%E7%BE%8E%E5%B0%91%E5%A5%B3%E3%82%92%E5%AD%95%E3%81%BE%E3%81%9B%E3%82%8B%EF%BC%81%EF%BC%81",
+     "size": "1.15GB",
+     "title": "ABP-968 涼森れむ なまなかだし 35 透明感No．1の最強美少女を孕ませる！！"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:88ED8A53EB344A44C07CDE98C218B44C4BB68A38&amp;dn=ABP-968.HD",
+     "size": "3.52GB",
+     "title": "ABP-968.HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:41D2CAED7A5BEB3310CB7AE6441767563A15E03A&amp;dn=ABP-968-CS.mp4",
+     "size": "1.22GB",
+     "title": "ABP-968-CS.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:7648220bdf6934d6277a8aae26403e882e234ae8&amp;dn=ABP-968",
+     "size": "5.68GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9EFBEFB3C821CB08F3C4BAA712A4232EFFBF9422&amp;dn=ABP-968+%E6%B6%BC%E6%A3%AE%E3%82%8C%E3%82%80+%E3%81%AA%E3%81%BE%E3%81%AA%E3%81%8B%E3%81%A0%E3%81%97+35+%E9%80%8F%E6%98%8E%E6%84%9FNo.1%E3%81%AE%E6%9C%80%E5%BC%B7%E7%BE%8E%E5%B0%91%E5%A5%B3%E3%82%92%E5%AD%95%E3%81%BE%E3%81%9B%E3%82%8B%EF%BC%81%EF%BC%81.mp4",
+     "size": "656.38MB",
+     "title": "ABP-968 涼森れむ なまなかだし 35 透明感No.1の最強美少女を孕ませる！！.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:6C3EF3D6A3D34860F2D1F808404B2E2F8314206A&amp;dn=abp-968",
+     "size": "5.53GB",
+     "title": "abp-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:566238D835E342B564C2D916A36131B63880ED7D&amp;dn=ABP-968",
+     "size": "5.81GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:2BAB357BA4996F363FC2294CC3ED76A31205BD60&amp;dn=ABP-968",
+     "size": "2.73GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:5089705A9CD0FF7AF27D015E3FAF5695601FE2E3&amp;dn=abp-968-C",
+     "size": "6.37GB",
+     "title": "abp-968-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3F02C44078FB8989B89182A665AC1CE54CA6B686&amp;dn=abp968",
+     "size": "609.56MB",
+     "title": "abp968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:099A7A108A3C53D3BC202C5783B590B94680414C&amp;dn=ABP-968",
+     "size": "5.43GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4864D067ADDEE2184D4525D94CE1031AF5A38B8C&amp;dn=one2048.com-0410-abp968-FHD",
+     "size": "4.68GB",
+     "title": "one2048-0410-abp968-FHD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:12ADADBB4AC2950F1DCA1AD21FC47F78607877C5&amp;dn=ABP-968.mp4",
+     "size": "1.30GB",
+     "title": "ABP-968.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:28B134BDD5AC2A2DB1C4615CEA153B7B74F27AA1&amp;dn=ABP-968",
+     "size": "5.40GB",
+     "title": "ABP-968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:23BAA644D71CEA6EBFFB03CFAE4B596079B56795&amp;dn=ABP-968+++35+No.1.mp4",
+     "size": "1.30GB",
+     "title": "ABP-968 35 No.1.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:E0AEA3F75281360E3CDBDC44D57512EBD6BFDDFC&amp;dn=ABP-968.mp4",
+     "size": "5.84GB",
+     "title": "ABP-968.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:781B3E448D70B357BCC5AB17E55943FB34FE03E8&amp;dn=ABP968",
+     "size": "1.55GB",
+     "title": "ABP968"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8EE23393C56078696F47F82ABC1E85508C2FDEFF&amp;dn=abp-968",
+     "size": "5.39GB",
+     "title": "abp-968"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:36:13+00:00"
+  },
+  {
    "javdb_id": "VwvxE3",
    "code": "DASS110",
    "plot": "IT企業の社長と結婚し豪邸で何不自由なく幸せに暮らすあみり。夫を出張に送り出した翌朝、目を覚ましたあみりの視界に飛び込んできたのは軽薄そうな男たちだった。二人は夫が通報したことで前科がついた炎上系配信者。復讐のため家に侵入しあみりを襲いにきたのだ。したこともないフェラを強要。箱入り娘に首輪をつけて調教。夫婦の思い出のドレスで尊厳破壊セックスからのどっぷり中出し。もう幸福で平穏な日々は戻らない。",
@@ -194,6 +411,47 @@
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/MiJ7BWsVKe2p8qHhyZskHHr0PJWw9sMxb8ymQC9biW63TuOsgEbAU2kixawX12/dass00110_mhb_w.mp4",
    "enriched_at": "2026-11-15T04:09:54+00:00"
+  },
+  {
+   "javdb_id": "vWKy9",
+   "code": "CWPBD138",
+   "maker": "キャットウォーク",
+   "series": "キャットウォークポイズン(Blu-ray)",
+   "duration_min": 120,
+   "release_date": "2015-11-07",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:F6A8B7E22498A7EF8702C400BA3960C9F41C7C20&amp;dn=CWPBD-138.mp4",
+     "size": "2.46GB",
+     "title": "CWPBD-138.mp4"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0CE868ADF4E9DE9309C147E54D3AB52CF7BEC016&amp;dn=CWPBD-138",
+     "size": "1.84GB",
+     "title": "CWPBD-138"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:CAD321340D9EAA54CCBA634F187EE4F69E836601&amp;dn=CWPBD-138_4K",
+     "size": "20.34GB",
+     "title": "CWPBD-138_4K"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4997523699F21CDD19BE409D8F0C6507B74785C6&amp;dn=%5BFHD%5DCWPBD-138",
+     "size": "5.09GB",
+     "title": "[FHD]CWPBD-138"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:62080FA7547D9163D703BB59C21B5C88ED8DA8F0&amp;dn=%5BBD%5DCWPBD-138",
+     "size": "21.60GB",
+     "title": "[BD]CWPBD-138"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:926717C9C877EE6444B0240B70966D49FC0FDF1B&amp;dn=dioguitar-23.net_CWPBD-138-H265-1080P",
+     "size": "4.37GB",
+     "title": "dioguitar-23_CWPBD-138-H265-1080P"
+    }
+   ],
+   "enriched_at": "2026-11-15T06:39:20+00:00"
   },
   {
    "javdb_id": "veAv8O",
