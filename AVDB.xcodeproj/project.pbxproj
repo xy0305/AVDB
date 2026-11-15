@@ -123,6 +123,8 @@
 		A24300000000000000000001 /* ActorAliasIndex.json in Resources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000002 /* ActorAliasIndex.json */; };
 		A24300000000000000000003 /* ActorAliasCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000004 /* ActorAliasCatalog.swift */; };
 		FEED34900000000000000001 /* RankingFeedClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED34900000000000000002 /* RankingFeedClient.swift */; };
+		E351FEED0000000000000002 /* EnrichmentFeedClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E351FEED0000000000000001 /* EnrichmentFeedClient.swift */; };
+		E351FEED0000000000000004 /* XAITranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E351FEED0000000000000003 /* XAITranslationService.swift */; };
 		A24300000000000000000005 /* ExternalActorResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000006 /* ExternalActorResolver.swift */; };
 		RESUME280000000000000001 /* PlaybackResume.swift in Sources */ = {isa = PBXBuildFile; fileRef = RESUME280000000000000002 /* PlaybackResume.swift */; };
 		FOLLOW280000000000000001 /* FollowUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = FOLLOW280000000000000002 /* FollowUpdates.swift */; };
@@ -254,6 +256,8 @@
 		A24300000000000000000002 /* ActorAliasIndex.json */ = {isa = PBXFileReference; includeInIndex = 1; path = ActorAliasIndex.json; sourceTree = "<group>"; };
 		A24300000000000000000004 /* ActorAliasCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActorAliasCatalog.swift; sourceTree = "<group>"; };
 		FEED34900000000000000002 /* RankingFeedClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingFeedClient.swift; sourceTree = "<group>"; };
+		E351FEED0000000000000001 /* EnrichmentFeedClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentFeedClient.swift; sourceTree = "<group>"; };
+		E351FEED0000000000000003 /* XAITranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XAITranslationService.swift; sourceTree = "<group>"; };
 		A24300000000000000000006 /* ExternalActorResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalActorResolver.swift; sourceTree = "<group>"; };
 		E21E8365384D35AB1B1B4C52 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		EXTLIB000000000000000002 /* ExternalLibraryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalLibraryClient.swift; sourceTree = "<group>"; };
@@ -477,6 +481,8 @@
 				2F68672CD386CC334CA6547F /* VerificationThrottle.swift */,
 				A24300000000000000000004 /* ActorAliasCatalog.swift */,
 				FEED34900000000000000002 /* RankingFeedClient.swift */,
+				E351FEED0000000000000001 /* EnrichmentFeedClient.swift */,
+				E351FEED0000000000000003 /* XAITranslationService.swift */,
 				A24300000000000000000006 /* ExternalActorResolver.swift */,
 			);
 			name = Services;
@@ -786,6 +792,8 @@
 				D2E744DF0C578C2882AA1F88 /* VerificationThrottle.swift in Sources */,
 				A24300000000000000000003 /* ActorAliasCatalog.swift in Sources */,
 				FEED34900000000000000001 /* RankingFeedClient.swift in Sources */,
+				E351FEED0000000000000002 /* EnrichmentFeedClient.swift in Sources */,
+				E351FEED0000000000000004 /* XAITranslationService.swift in Sources */,
 				A24300000000000000000005 /* ExternalActorResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -799,7 +807,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 350;
+				CURRENT_PROJECT_VERSION = 351;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -822,7 +830,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 350;
+				CURRENT_PROJECT_VERSION = 351;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

@@ -285,6 +285,16 @@ struct ActorDetailView: View {
             if let actor = vm.actor {
                 VStack(alignment: .leading, spacing: 10) {
                     actorHeader(actor)
+                    // Build 351: biography from the enrichment feed; the
+                    // section simply does not exist without one.
+                    if let bio = actor.bio, !bio.isEmpty {
+                        Text(bio)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                            .accessibilityIdentifier("actor-detail-bio")
+                    }
                     if vm.movies.isEmpty {
                         if vm.isLoadingMovies {
                             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -524,6 +534,17 @@ struct ActorDetailView: View {
                     if let cup = actor.cup { info(cup) }
                     if let count = actor.videosCount { info("\(count) 部") }
                 }
+                // Build 351: measurements / birthplace — decoded all along
+                // (and now also filled by the enrichment feed), shown here
+                // for the first time.
+                if [actor.bust, actor.waist, actor.hips].contains(where: { $0?.isEmpty == false })
+                    || actor.birthplace?.isEmpty == false {
+                    HStack(spacing: 12) {
+                        let sizes = [actor.bust, actor.waist, actor.hips].compactMap { $0 }.filter { !$0.isEmpty }
+                        if !sizes.isEmpty { info(sizes.joined(separator: "-")) }
+                        if let place = actor.birthplace, !place.isEmpty { info(place) }
+                    }
+                }
                 if let twitter = actor.twitterID, !twitter.isEmpty {
                     info("@" + twitter)
                 }
@@ -644,6 +665,14 @@ final class ActorDetailViewModel: ObservableObject {
         defer { isLoading = false }
         if let payload = try? await JavDBSDK.shared.actorDetail(actorID) {
             actor = payload.actor
+            // Build 351: best-effort server enrichment (profile fields,
+            // bio, better portrait from the feed). A miss or a failed
+            // fetch leaves the native record exactly as it was.
+            if let base = payload.actor,
+               let enrichment = await EnrichmentFeedState.shared.actorEnrichment(
+                   id: base.id, names: JavBusActorService.names(base)) {
+                actor = base.mergingEnrichment(enrichment)
+            }
             filterTags = payload.filterTags ?? []
             tags = payload.tags ?? []
             // 优先读本地缓存，没有再用服务端状态

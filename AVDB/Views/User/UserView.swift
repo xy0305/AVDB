@@ -272,6 +272,21 @@ struct UserView: View {
                     }
                 }
 
+                Section("AI 翻译") {
+                    NavigationLink {
+                        XAISettingsView()
+                    } label: {
+                        HStack {
+                            Label("AI 翻译（xAI）", systemImage: "translate")
+                            Spacer()
+                            Text(XAISettings.shared.configured ? "已设置" : "未设置")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("xai-settings-entry")
+                }
+
                 Section("关于") {
                     NavigationLink("关于 AVDB") {
                         AboutView()

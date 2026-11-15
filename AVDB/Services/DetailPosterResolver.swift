@@ -148,7 +148,7 @@ enum DetailPosterResolver {
         let scope = SHA256.hash(data: Data((account ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined()
         let actors = actorIdentities(movie).map { $0.joined(separator: "|") }.joined(separator: ";")
         // Separate enhanced vs raw JavDB cover rasters in the detail cache.
-        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + "#" + (movie.catalogueMetadata?.images.joined(separator: "|") ?? "") + "#" + JavDBCoverEnhance.cacheTag + "#" + cacheVersion
+        return scope + "#" + movie.id + "#" + (movie.type ?? "") + "#" + (movie.number ?? "") + "#" + (movie.coverURL ?? "") + "#" + (movie.thumbURL ?? "") + "#" + actors + "#" + (movie.catalogueMetadata?.images.joined(separator: "|") ?? "") + "#" + JavDBCoverEnhance.cacheTag + "#" + cacheVersion + "#" + (movie.enrichmentCoverURL ?? "")
     }
 
     /// Drop detail poster winners when the JavDB cover-enhance toggle flips.
@@ -183,7 +183,25 @@ enum DetailPosterResolver {
         // Build 284: DMM rule candidates (ps portrait, pl jacket) directly after the anchors, so a
         // second JavDB size or metadata copy can never push the DMM jacket out of the 4 slots.
         let dmm = validated.filter { rules.contains($0) && !anchors.contains($0) }
-        return anchors + dmm + validated.filter { !anchors.contains($0) && !dmm.contains($0) }
+        let rest = validated.filter { !anchors.contains($0) && !dmm.contains($0) }
+        // Build 351: the enrichment pipeline's upscaled cover ranks above
+        // the plain thumb/cover sources but below the anchors and the DMM
+        // rule candidates. resolve() additionally drops it from the pool
+        // whenever a genuine HD source (>= 1200 px native) decoded, so it
+        // can never displace a true high-resolution original.
+        if let hires = movie.enrichmentCoverURL, EnrichmentFeedClient.isEnrichmentCover(hires) {
+            return anchors + dmm + [hires] + rest
+        }
+        return anchors + dmm + rest
+    }
+
+    /// Build 351: a stored winner predates the enrichment merge when the
+    /// movie now carries an upscaled cover the winner did not come from
+    /// and the winner itself is below genuine-HD size. Such a winner must
+    /// not short-circuit a fresh resolve that includes the new candidate.
+    static func winnerPredatesEnrichment(_ art: DetailPosterArtwork, movie: Movie) -> Bool {
+        guard let hires = movie.enrichmentCoverURL, !hires.isEmpty, art.sourceURL != hires else { return false }
+        return max(art.nativeWidth, art.nativeHeight) < 1200
     }
 
     static func catalogueEligible(_ movie: Movie) -> Bool {
@@ -196,7 +214,8 @@ enum DetailPosterResolver {
             // Build 331: the identity key includes the full movie record, so the
             // detail page's full record and the home hero's ranking record never
             // met. A winner for the same movie id (either side) is used directly.
-            if let shared = DetailPosterWinners.winner(movieID: movie.id, account: account) { return .portrait(shared) }
+            if let shared = DetailPosterWinners.winner(movieID: movie.id, account: account),
+               !winnerPredatesEnrichment(shared, movie: movie) { return .portrait(shared) }
             // Definite unsupported/no eligible candidates: retain legacy immediately.
             if validatedSources(movie).isEmpty && tenhowPaths(movie).isEmpty && !catalogueEligible(movie) { return .landscape }
         }
@@ -205,28 +224,33 @@ enum DetailPosterResolver {
 
     /// Coalesce in-flight resolve work with the home hero *by movie id*, so a
     /// sparse ranking DTO and the detail page do not run the same resolve twice.
-    /// The identity cache is still consulted first.
+    /// The identity cache is still consulted first. Build 351: flights are
+    /// keyed by the full identity inside the id slot — a record that gained
+    /// an enrichment cover mid-visit starts its own resolve instead of
+    /// joining the pre-enrichment one.
     private static let idFlightLock = NSLock()
-    private static var idFlights: [String: Task<DetailPosterArtwork?, Never>] = [:]
+    private static var idFlights: [String: (key: String, task: Task<DetailPosterArtwork?, Never>)] = [:]
 
     static func resolveShared(movie: Movie, account: String?) async -> DetailPosterArtwork? {
         let id = movie.id
         if let cached = cache.snapshot(key: identity(movie: movie, account: account)).artwork {
             return cached
         }
-        if let shared = DetailPosterWinners.winner(movieID: id, account: account) {
+        if let shared = DetailPosterWinners.winner(movieID: id, account: account),
+           !winnerPredatesEnrichment(shared, movie: movie) {
             return shared
         }
+        let flightKey = identity(movie: movie, account: account)
         let task: Task<DetailPosterArtwork?, Never> = {
             idFlightLock.lock(); defer { idFlightLock.unlock() }
-            if let existing = idFlights[id] { return existing }
+            if let existing = idFlights[id], existing.key == flightKey { return existing.task }
             let created = Task { await resolve(movie: movie, account: account) }
-            idFlights[id] = created
+            idFlights[id] = (flightKey, created)
             return created
         }()
         let value = await task.value
         idFlightLock.lock()
-        idFlights[id] = nil
+        if idFlights[id]?.key == flightKey { idFlights[id] = nil }
         idFlightLock.unlock()
         return value
     }
@@ -276,9 +300,23 @@ enum DetailPosterResolver {
                 let singleImage = url.path.contains("/digital/amateur/") || url.lastPathComponent.hasPrefix("h1-")
                 return await download(url: url, timeout: timeout, derive: !original && !singleImage)
             }
+            // Build 351: the upscaled enrichment cover is a fallback, not a
+            // peer of genuine HD sources. If any other candidate decoded
+            // from a native bitmap at least 1200 px on its longest side,
+            // the upscaled cover leaves the pool before the winner is
+            // picked, whatever its own pixel count says.
+            var pool = decoded
+            if let hires = movie.enrichmentCoverURL, !hires.isEmpty,
+               pool.contains(where: { $0.quality.source == hires }),
+               pool.contains(where: { candidate in
+                   guard candidate.quality.source != hires, let cg = candidate.originalImage.cgImage else { return false }
+                   return max(cg.width, cg.height) >= 1200
+               }) {
+                pool.removeAll { $0.quality.source == hires }
+            }
             guard !Task.isCancelled,
-                  let winner = DetailPosterQuality.winner(decoded.map(\.quality)),
-                  let selected = decoded.first(where: { $0.quality.source == winner.source }) else { return nil }
+                  let winner = DetailPosterQuality.winner(pool.map(\.quality)),
+                  let selected = pool.first(where: { $0.quality.source == winner.source }) else { return nil }
             // Tip list grids with the verified HQ URL (Amazon/DMM/MGS/Tenhow).
             ListHQCoverCache.store(number: movie.number, source: winner.source)
             // Build 326: write accepted HQ back to HQPosterDiskCache under the
@@ -452,7 +490,10 @@ enum DetailPosterResolver {
         }
         let originalImage = UIImage(cgImage: cg)
         var cropped = false
+        // Build 351: the enrichment upscaled cover is a DVD jacket at 2x;
+        // it derives its front with the same measured crop as a JavBus jacket.
         let javbusJacket = URL(string: sourceURL).map(JavBusPoster.allowedImage) == true
+            || EnrichmentFeedClient.isEnrichmentCover(sourceURL)
         if derive, let rect = FrontPosterPolicy.cropRect(width: cg.width, height: cg.height, source: sourceURL, validatedJacket: javbusJacket) {
             guard let front = PosterColorCrop.crop(originalImage, to: rect), let frontCG = front.cgImage else { return nil }
             cg = frontCG; cropped = true

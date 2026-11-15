@@ -458,7 +458,7 @@ import SwiftUI
     @State private var portrait: UIImage?
     @State private var revision = 0
     private var identity: String {
-        actor.id + "|" + ([actor.avatarURL, actor.coverURL].compactMap { $0 }.joined(separator: ",")) + "|" + JavBusActorService.names(actor).joined(separator: ",") + "|" + numbers.joined(separator: ",") + "|" + String(revision)
+        actor.id + "|" + ([actor.avatarURL, actor.enrichmentAvatarURL, actor.coverURL].compactMap { $0 }.joined(separator: ",")) + "|" + JavBusActorService.names(actor).joined(separator: ",") + "|" + numbers.joined(separator: ",") + "|" + String(revision)
     }
     var body: some View {
         Group {
@@ -470,7 +470,9 @@ import SwiftUI
             let account = JavBusActorService.currentScope
             // A non-empty URL is not proof of a decoded image. Preserve valid AVDB artwork;
             // only a completed failed load enables public fallbacks (not cancellation).
-            for source in ActorNameNormalizer.orderedUnique([actor.avatarURL, actor.coverURL].compactMap { $0 }) {
+            // Build 351: the enrichment portrait sits directly below the
+            // JavDB original avatar and above the JavBus chain.
+            for source in ActorNameNormalizer.orderedUnique([actor.avatarURL, actor.enrichmentAvatarURL, actor.coverURL].compactMap { $0 }) {
                 let image = await ImageLoader.shared.load(source, maxPixelSize: 512)
                 guard !Task.isCancelled, account == JavBusActorService.currentScope else { return }
                 if let image { portrait = image; return }

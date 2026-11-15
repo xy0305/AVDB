@@ -473,6 +473,16 @@ struct MovieDetailView: View {
                                             collapsedLines: 2)
                             .shadow(color: .black.opacity(0.25), radius: 8)
                             .padding(.horizontal, 32)
+                        // Build 351: the translated title rides under the
+                        // original once the plot translation has run.
+                        if vm.showingTranslation, let translated = vm.translatedTitle, !translated.isEmpty {
+                            Text(translated)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .padding(.horizontal, 32)
+                                .padding(.top, 6)
+                                .accessibilityIdentifier("portrait-hero-title-zh")
+                        }
                     }
                     portraitMetadata(movie)
                         .padding(.horizontal, 18).padding(.top, 16)
@@ -711,6 +721,12 @@ struct MovieDetailView: View {
                 DetailReadableTitle(title: movie.displayTitle, identifier: "landscape-detail-title",
                                     font: .system(size: 28, weight: .bold))
                     .foregroundStyle(.white)
+                if vm.showingTranslation, let translated = vm.translatedTitle, !translated.isEmpty {
+                    Text(translated)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .accessibilityIdentifier("landscape-detail-title-zh")
+                }
             }
 
             ZStack(alignment: .bottomTrailing) {
@@ -1062,12 +1078,36 @@ struct MovieDetailView: View {
     private func summarySection(_ summary: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             GlassSectionHeader(title: "简介", icon: "text.alignleft", trailingTitle: nil)
-            Text(summary)
+            Text(vm.showingTranslation ? (vm.translatedPlot ?? summary) : summary)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.4, scrolling: true)
+            // Build 351: on-device xAI translation. The button exists only
+            // when a key is configured and the plot is Japanese.
+            if vm.canTranslatePlot {
+                HStack(spacing: 12) {
+                    Button {
+                        Task { await vm.toggleTranslation() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if vm.translationBusy { ProgressView().controlSize(.small) }
+                            Text(vm.showingTranslation ? "查看原文" : "翻译成中文")
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .disabled(vm.translationBusy)
+                    .accessibilityIdentifier("detail-translate-plot")
+                    if let error = vm.translationError, !vm.showingTranslation {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .accessibilityIdentifier("detail-translate-error")
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
         }
         .padding(.horizontal)
     }
@@ -1303,6 +1343,9 @@ final class MovieDetailViewModel: ObservableObject {
     @Published var movie: Movie?
     // Immutable native image identity for this visit; text enrichment cannot
     // restart the winner task, change geometry or publish a second winner.
+    // Build 351: the one deliberate exception is the enrichment merge adding
+    // an upscaled-cover candidate — that re-keys the poster task so the new
+    // candidate can compete (it still ranks below any genuine HD source).
     @Published private(set) var posterMovie: Movie?
     private var loadGeneration = UUID()
     @Published var relatedMovies: [Movie] = []
@@ -1360,6 +1403,18 @@ final class MovieDetailViewModel: ObservableObject {
             guard !Task.isCancelled, loadGeneration == generation,
                   APIClient.shared.token == account, full.movie?.id == movieID else { return }
             movie = full.movie
+            // Build 351: best-effort server enrichment (plot / director /
+            // score / stills / trailer / upscaled cover from the feed).
+            // A miss or a failed fetch leaves the native record untouched
+            // and never enters the error path.
+            if let base = full.movie,
+               let enrichment = await EnrichmentFeedState.shared.movieEnrichment(javdbID: base.id) {
+                guard !Task.isCancelled, loadGeneration == generation,
+                      APIClient.shared.token == account else { return }
+                let merged = base.mergingEnrichment(enrichment)
+                movie = merged
+                if posterMovie?.id == merged.id { posterMovie = merged }
+            }
             relatedMovies = full.movie?.relativeMovies
                 ?? full.relativeMovies
                 ?? []
@@ -1416,6 +1471,60 @@ final class MovieDetailViewModel: ObservableObject {
             guard !Task.isCancelled, loadGeneration == generation, APIClient.shared.token == account else { return }
             errorMessage = error.localizedDescription
             isAuthError = JavDBError.isAuthenticationFailure(error)
+        }
+    }
+
+    // Build 351: on-device xAI translation of the plot and title. All
+    // state is keyed to the exact source text, so a different movie (or a
+    // reloaded record) never shows a stale translation.
+    @Published private(set) var translatedPlot: String?
+    @Published private(set) var translatedTitle: String?
+    @Published private(set) var showingTranslation = false
+    @Published private(set) var translationBusy = false
+    @Published var translationError: String?
+    private var translationSourcePlot: String?
+    private var translationSourceTitle: String?
+
+    /// The translate button exists only with a key configured and a
+    /// Japanese plot on screen; no key → no button, no request, no error.
+    var canTranslatePlot: Bool {
+        guard XAISettings.shared.configured,
+              let summary = movie?.summary, !summary.isEmpty else { return false }
+        return XAITranslationService.needsTranslation(summary)
+    }
+
+    func toggleTranslation() async {
+        if showingTranslation {
+            showingTranslation = false
+            return
+        }
+        guard let current = movie, let plot = current.summary, !plot.isEmpty else { return }
+        if translatedPlot != nil, translationSourcePlot == plot {
+            showingTranslation = true
+            return
+        }
+        guard XAISettings.shared.configured else { return }
+        translationBusy = true
+        translationError = nil
+        defer { translationBusy = false }
+        do {
+            let translated = try await XAITranslationService.translate(text: plot, field: "plot")
+            guard !Task.isCancelled, movie?.id == current.id else { return }
+            translatedPlot = translated
+            translationSourcePlot = plot
+            showingTranslation = true
+            // The Chinese title rides along with the plot translation and
+            // is shown as small text under the original title.
+            let title = current.displayTitle
+            if translatedTitle == nil || translationSourceTitle != title,
+               XAITranslationService.needsTranslation(title),
+               let translated = try? await XAITranslationService.translate(text: title, field: "title") {
+                translatedTitle = translated
+                translationSourceTitle = title
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            translationError = (error as? LocalizedError)?.errorDescription ?? "翻译失败，请重试"
         }
     }
 

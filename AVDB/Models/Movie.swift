@@ -76,6 +76,12 @@ public struct Movie: Decodable, Identifiable, Hashable {
     }
     // Bound source record retained separately from primary API metadata.
     var catalogueMetadata: ScrapedMetadata? = nil
+    /// Build 351: upscaled cover published by the server enrichment
+    /// pipeline (feed cover_hires_url). Not a display field by itself:
+    /// DetailPosterResolver admits it as a poster candidate ranked above
+    /// the plain cover_url but below any genuine HD source. Nil for
+    /// almost every movie; never decoded from the JavDB payload.
+    var enrichmentCoverURL: String? = nil
     func withCatalogueMetadata(_ metadata: ScrapedMetadata) -> Movie {
         guard let number, let key = CatalogueIdentity.key(number), key == CatalogueIdentity.key(metadata.number),
               !["1", "2", "3", "4"].contains(type ?? "") else { return self }
@@ -93,6 +99,36 @@ public struct Movie: Decodable, Identifiable, Hashable {
         if seriesName?.isEmpty != false { copy.seriesName = metadata.series }
         return copy
     }
+    /// Build 351: fill-empty merge of a server enrichment feed entry
+    /// (EnrichmentFeedClient) — the same contract as withCatalogueMetadata:
+    /// a field the native record already carries is never overwritten.
+    /// Stills merge with dedup instead of only filling an empty list,
+    /// because the payload's own stills and DMM's overlap only partly.
+    func mergingEnrichment(_ enrichment: MovieEnrichment) -> Movie {
+        guard enrichment.javdbID == id else { return self }
+        var copy = self
+        if summary?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false
+            && desc?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+           let plot = enrichment.plot, !plot.isEmpty { copy.summary = plot }
+        if directorName?.isEmpty != false, let director = enrichment.director, !director.isEmpty { copy.directorName = director }
+        if makerName?.isEmpty != false, let maker = enrichment.maker, !maker.isEmpty { copy.makerName = maker }
+        if seriesName?.isEmpty != false, let series = enrichment.series, !series.isEmpty { copy.seriesName = series }
+        if score == nil, let value = enrichment.score, value > 0 { copy.score = value }
+        if duration == nil, let minutes = enrichment.durationMin, minutes > 0 { copy.duration = minutes }
+        if let stills = enrichment.stills, !stills.isEmpty {
+            var seen = Set((previewImages ?? []).map { $0.largeURL ?? $0.thumbURL ?? "" })
+            var merged = previewImages ?? []
+            for url in stills where seen.insert(url).inserted {
+                merged.append(PreviewImage(thumbURL: url, largeURL: url))
+            }
+            if merged.count != (previewImages ?? []).count { copy.previewImages = merged }
+        }
+        if previewVideoURL?.isEmpty != false, let trailer = enrichment.trailerURL, !trailer.isEmpty { copy.previewVideoURL = trailer }
+        if let hires = enrichment.coverHiresURL, EnrichmentFeedClient.isEnrichmentCover(hires) {
+            copy.enrichmentCoverURL = hires
+        }
+        return copy
+    }
     public let number: String?
     public let numberLetter: String?
     public private(set) var title: String?
@@ -103,7 +139,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
     public private(set) var thumbURL: String?
     public private(set) var coverURL: String?
     public private(set) var duration: Int?
-    public let score: Double?
+    public private(set) var score: Double?
     public let rating: Double?
     public private(set) var releaseDate: String?
 
@@ -122,7 +158,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
     public let makerID: String?
     public private(set) var makerName: String?
     public let directorID: String?
-    public let directorName: String?
+    public private(set) var directorName: String?
     public let publisherID: String?
     public private(set) var publisherName: String?
     public let seriesID: String?
@@ -136,9 +172,9 @@ public struct Movie: Decodable, Identifiable, Hashable {
 
     public let newMagnets: [Magnet]?
     public let hasNewMagnets: Bool
-    public let previewImages: [PreviewImage]?
+    public private(set) var previewImages: [PreviewImage]?
     public let playSources: [PlaySource]?
-    public let previewVideoURL: String?
+    public private(set) var previewVideoURL: String?
     public let relativeMovies: [Movie]?
     public let actorMovies: [Movie]?
     public let review: Review?
@@ -439,10 +475,10 @@ public struct Actor: Decodable, Identifiable, Hashable {
     public let keyword: String?
     public let avatarURL: String?
     public let coverURL: String?
-    public let birthday: String?
+    public private(set) var birthday: String?
     public let age: Int?
-    public let height: Int?
-    public let cup: String?
+    public private(set) var height: Int?
+    public private(set) var cup: String?
     public let bloodType: String?
     public let hobby: String?
     public let heightText: String?
@@ -452,11 +488,37 @@ public struct Actor: Decodable, Identifiable, Hashable {
     public let nameZht: String?
     public let twitterID: String?
     public let instagramID: String?
-    public let bust: String?
-    public let waist: String?
-    public let hips: String?
-    public let birthplace: String?
+    public private(set) var bust: String?
+    public private(set) var waist: String?
+    public private(set) var hips: String?
+    public private(set) var birthplace: String?
     public let cons: String?
+    /// Build 351: biography from the server enrichment feed (Wikipedia /
+    /// Wikidata via the pipeline). The JavDB payload has no such field;
+    /// when present it is decoded from a `bio` key, and the enrichment
+    /// merge can also fill it.
+    public private(set) var bio: String?
+    /// Build 351: enrichment portrait (gfriends / Wikidata), ranked by
+    /// ActorAvatarArtwork directly below the JavDB original avatar and
+    /// above the JavBus chain. Never decoded from the JavDB payload.
+    var enrichmentAvatarURL: String? = nil
+
+    /// Build 351: fill-empty merge of a server enrichment feed entry
+    /// (EnrichmentFeedClient); a field the native record already carries
+    /// is never overwritten.
+    func mergingEnrichment(_ enrichment: ActorEnrichment) -> Actor {
+        var copy = self
+        if birthday?.isEmpty != false, let value = enrichment.birthday, !value.isEmpty { copy.birthday = value }
+        if height == nil, let value = enrichment.heightCM, value > 0 { copy.height = value }
+        if cup?.isEmpty != false, let value = enrichment.cup, !value.isEmpty { copy.cup = value }
+        if bust?.isEmpty != false, let value = enrichment.bust, !value.isEmpty { copy.bust = value }
+        if waist?.isEmpty != false, let value = enrichment.waist, !value.isEmpty { copy.waist = value }
+        if hips?.isEmpty != false, let value = enrichment.hip, !value.isEmpty { copy.hips = value }
+        if birthplace?.isEmpty != false, let value = enrichment.birthplace, !value.isEmpty { copy.birthplace = value }
+        if bio?.isEmpty != false, let value = enrichment.bio, !value.isEmpty { copy.bio = value }
+        if let avatar = enrichment.avatarHires, !avatar.isEmpty { copy.enrichmentAvatarURL = avatar }
+        return copy
+    }
 
     public var displayName: String {
         if let z = nameZht, !z.isEmpty { return z }
@@ -465,7 +527,7 @@ public struct Actor: Decodable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, keyword, age, height, cup, hobby, gender, type, birthday, cons
+        case id, name, keyword, age, height, cup, hobby, gender, type, birthday, cons, bio
         case otherName = "other_name"
         case avatarURL = "avatar_url"
         case coverURL = "cover_url"
@@ -504,6 +566,7 @@ public struct Actor: Decodable, Identifiable, Hashable {
         hips = JSONFlex.string(c, .hips)
         birthplace = try? c.decode(String.self, forKey: .birthplace)
         cons = try? c.decode(String.self, forKey: .cons)
+        bio = try? c.decode(String.self, forKey: .bio)
     }
 }
 
