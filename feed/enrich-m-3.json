@@ -1,0 +1,34 @@
+{
+ "board": "enrich",
+ "term": "m-3",
+ "generated_at": "2026-11-15T02:54:22+00:00",
+ "source": "enrichment-v1",
+ "entries": [
+  {
+   "javdb_id": "3nJD7w",
+   "code": "IDPC001",
+   "plot": "大原伶菜。\n清楚。\n清潔。\n自然。\n美麗。\n\n\n2004年から始まった\nFirst Impressionの196番目にして\n最もヘルシー神スタイルな\nお姉さん。\n\n男性にとって魅力的な\n見た目は上品で\n話すと気さくな\n親近感のある高嶺の花。\n\n穏やかで完璧そうなのに\n隙もあってちょっぴりお茶目。\n\n美意識が高く努力家で\n趣味は筋トレ＆ランニング\n日課は週4ピラティス\n好きなプロテインはホエイ100％のココア味。\n\n\n150分後。\nこの美女は、あなたの期待を、いい意味で、裏切る。",
+   "plot_source": "dmm",
+   "director": "嵐山みちる",
+   "maker": "アイデアポケット",
+   "series": "First Impression",
+   "duration_min": 153,
+   "score": 4.38,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/idpc00001/idpc00001jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/SCojTTc11mj8dQEnxvo1fWogN9z_YZo2qcaRqfX0OAw0XW_5lNdEwAkFgU_vUD/idpc00001hhb.mp4",
+   "enriched_at": "2026-11-15T02:54:22+00:00"
+  }
+ ]
+}
