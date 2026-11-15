@@ -14,8 +14,6 @@ def func_body(src, signature, end_markers):
 
 # --- Enrichment feed client -------------------------------------------------
 feed = (r/'AVDB/Services/EnrichmentFeedClient.swift').read_text()
-assert 'struct MovieEnrichment: Decodable' in feed
-assert 'struct ActorEnrichment: Decodable' in feed
 assert 'enum EnrichmentFeedClient' in feed
 assert 'RankingFeedClient.rawBase' in feed            # same raw feed base
 assert '"enrich-m-\\(shard).json"' in feed            # per-shard movie files
@@ -24,10 +22,29 @@ assert 'func movieEnrichment(javdbID: String)' in feed
 assert 'func actorEnrichment(id: String?, names: [String])' in feed
 assert 'new < old' in feed                            # monotonic cache guard
 assert 'func isEnrichmentCover(_ value: String) -> Bool' in feed
-assert 'port == 8901' in feed                         # SR static host only
+assert 'MovieEnrichment.isEnrichmentCover(value)' in feed   # delegates to Models
 
 # --- Movie / Actor fill-empty merges ---------------------------------------
 movie = (r/'AVDB/Models/Movie.swift').read_text()
+# The DTOs live in the Models file so Movie.swift stays self-contained
+# (several regression harnesses compile it on its own with swiftc).
+assert 'struct MovieEnrichment: Decodable' in movie
+assert 'struct ActorEnrichment: Decodable' in movie
+assert 'static func isEnrichmentCover(_ value: String) -> Bool' in movie
+assert 'url.port == 8901' in movie                    # SR static host only
+# Every key a DTO init reads must be declared in its CodingKeys, and the
+# non-optional actor name must not use the `try? ... ??` precedence trap
+# (both were real app compile errors in the first 351 CI run).
+import re
+for dto in ('MovieEnrichment', 'ActorEnrichment'):
+    body = func_body(movie, f'struct {dto}: Decodable', ['\n}\n'])
+    keys_block = body.split('enum CodingKeys')[1].split('}')[0]
+    declared = set()
+    for line in keys_block.split('\n'):
+        declared |= {w.strip() for w in line.split('=')[0].replace('case', ' ').split(',') if w.strip().isidentifier()}
+    used = set(re.findall(r'forKey: \.([A-Za-z]+)', body)) | set(re.findall(r'JSONFlex\.\w+\(c, \.([A-Za-z]+)\)', body))
+    assert used <= declared, (dto, used - declared)
+assert 'try? c.decode(String.self, forKey: .name) ?? ""' not in movie
 merge = func_body(movie, 'func mergingEnrichment(_ enrichment: MovieEnrichment) -> Movie',
                   ['\n    func withCatalogueMetadata'])
 assert 'guard enrichment.javdbID == id else { return self }' in merge
@@ -36,6 +53,7 @@ assert 'copy.directorName = director' in merge
 assert 'copy.score = value' in merge
 assert 'copy.previewVideoURL = trailer' in merge
 assert 'copy.enrichmentCoverURL = hires' in merge
+assert 'MovieEnrichment.isEnrichmentCover(hires)' in merge
 assert 'var enrichmentCoverURL: String? = nil' in movie
 actor_merge = func_body(movie, 'func mergingEnrichment(_ enrichment: ActorEnrichment) -> Actor',
                         ['\n}\n\nextension Actor'])

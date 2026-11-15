@@ -8,6 +8,106 @@
 import Foundation
 
 /// 影片通用模型
+// Build 351: enrichment feed DTOs live with the models (not in the
+// feed client) so the model layer stays self-contained — several
+// regression harnesses compile Movie.swift on its own.
+struct MovieEnrichment: Decodable {
+    let javdbID: String
+    let code: String?
+    let plot: String?
+    let plotSource: String?
+    let director: String?
+    let maker: String?
+    let series: String?
+    let durationMin: Int?
+    let score: Double?
+    let scoreSource: String?
+    let stills: [String]?
+    let trailerURL: String?
+    let coverHiresURL: String?
+    let enrichedAt: String?
+    enum CodingKeys: String, CodingKey {
+        case code, plot, director, maker, series, stills, score
+        case javdbID = "javdb_id"
+        case plotSource = "plot_source"
+        case durationMin = "duration_min"
+        case scoreSource = "score_source"
+        case trailerURL = "trailer_url"
+        case coverHiresURL = "cover_hires_url"
+        case enrichedAt = "enriched_at"
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        javdbID = JSONFlex.string(c, .javdbID) ?? ""
+        code = try? c.decode(String.self, forKey: .code)
+        plot = try? c.decode(String.self, forKey: .plot)
+        plotSource = try? c.decode(String.self, forKey: .plotSource)
+        director = try? c.decode(String.self, forKey: .director)
+        maker = try? c.decode(String.self, forKey: .maker)
+        series = try? c.decode(String.self, forKey: .series)
+        durationMin = JSONFlex.int(c, .durationMin)
+        score = JSONFlex.double(c, .score)
+        scoreSource = try? c.decode(String.self, forKey: .scoreSource)
+        stills = try? c.decode([String].self, forKey: .stills)
+        trailerURL = try? c.decode(String.self, forKey: .trailerURL)
+        coverHiresURL = try? c.decode(String.self, forKey: .coverHiresURL)
+        enrichedAt = try? c.decode(String.self, forKey: .enrichedAt)
+    }
+}
+
+struct ActorEnrichment: Decodable {
+    let javdbID: String?
+    let name: String
+    let birthday: String?
+    let heightCM: Int?
+    let bust: String?
+    let waist: String?
+    let hip: String?
+    let cup: String?
+    let birthplace: String?
+    let bio: String?
+    let avatarHires: String?
+    let enrichedAt: String?
+    enum CodingKeys: String, CodingKey {
+        case name, birthday, cup, birthplace, bio
+        case javdbID = "javdb_id"
+        case heightCM = "height_cm"
+        case bust, waist, hip
+        case avatarHires = "avatar_hires"
+        case enrichedAt = "enriched_at"
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        javdbID = JSONFlex.string(c, .javdbID)
+        name = JSONFlex.string(c, .name) ?? ""
+        birthday = JSONFlex.string(c, .birthday)
+        heightCM = JSONFlex.int(c, .heightCM)
+        bust = JSONFlex.string(c, .bust)
+        waist = JSONFlex.string(c, .waist)
+        hip = JSONFlex.string(c, .hip)
+        cup = JSONFlex.string(c, .cup)
+        birthplace = try? c.decode(String.self, forKey: .birthplace)
+        bio = try? c.decode(String.self, forKey: .bio)
+        avatarHires = try? c.decode(String.self, forKey: .avatarHires)
+        enrichedAt = try? c.decode(String.self, forKey: .enrichedAt)
+    }
+}
+
+extension MovieEnrichment {
+    /// The pipeline's upscaled covers live on the user's VPS static
+    /// host (one file per movie id, nothing else is served there).
+    /// Only a cover_hires_url with this exact shape is trusted.
+    static func isEnrichmentCover(_ value: String) -> Bool {
+        guard let url = URL(string: value),
+              url.scheme == "http" || url.scheme == "https",
+              url.host?.lowercased() == "163.47.40.207", url.port == 8901,
+              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else { return false }
+        let path = url.path
+        guard path.hasSuffix(".jpg"), !path.dropFirst().contains("/") else { return false }
+        return true
+    }
+}
+
 public struct Movie: Decodable, Identifiable, Hashable {
     public init(
         id: String,
@@ -124,7 +224,7 @@ public struct Movie: Decodable, Identifiable, Hashable {
             if merged.count != (previewImages ?? []).count { copy.previewImages = merged }
         }
         if previewVideoURL?.isEmpty != false, let trailer = enrichment.trailerURL, !trailer.isEmpty { copy.previewVideoURL = trailer }
-        if let hires = enrichment.coverHiresURL, EnrichmentFeedClient.isEnrichmentCover(hires) {
+        if let hires = enrichment.coverHiresURL, MovieEnrichment.isEnrichmentCover(hires) {
             copy.enrichmentCoverURL = hires
         }
         return copy

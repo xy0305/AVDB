@@ -18,88 +18,6 @@ import Combine
 //                          lowercased; entries keyed by javdb_id.
 //   enrich-actors.json     one file; entries keyed by javdb_id when the
 //                          pipeline has one, else by actor name.
-struct MovieEnrichment: Decodable {
-    let javdbID: String
-    let code: String?
-    let plot: String?
-    let plotSource: String?
-    let director: String?
-    let maker: String?
-    let series: String?
-    let durationMin: Int?
-    let score: Double?
-    let scoreSource: String?
-    let stills: [String]?
-    let trailerURL: String?
-    let coverHiresURL: String?
-    let enrichedAt: String?
-    enum CodingKeys: String, CodingKey {
-        case code, plot, director, maker, series, stills
-        case javdbID = "javdb_id"
-        case plotSource = "plot_source"
-        case durationMin = "duration_min"
-        case scoreSource = "score_source"
-        case trailerURL = "trailer_url"
-        case coverHiresURL = "cover_hires_url"
-        case enrichedAt = "enriched_at"
-    }
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        javdbID = JSONFlex.string(c, .javdbID) ?? ""
-        code = try? c.decode(String.self, forKey: .code)
-        plot = try? c.decode(String.self, forKey: .plot)
-        plotSource = try? c.decode(String.self, forKey: .plotSource)
-        director = try? c.decode(String.self, forKey: .director)
-        maker = try? c.decode(String.self, forKey: .maker)
-        series = try? c.decode(String.self, forKey: .series)
-        durationMin = JSONFlex.int(c, .durationMin)
-        score = JSONFlex.double(c, .score)
-        scoreSource = try? c.decode(String.self, forKey: .scoreSource)
-        stills = try? c.decode([String].self, forKey: .stills)
-        trailerURL = try? c.decode(String.self, forKey: .trailerURL)
-        coverHiresURL = try? c.decode(String.self, forKey: .coverHiresURL)
-        enrichedAt = try? c.decode(String.self, forKey: .enrichedAt)
-    }
-}
-
-struct ActorEnrichment: Decodable {
-    let javdbID: String?
-    let name: String
-    let birthday: String?
-    let heightCM: Int?
-    let bust: String?
-    let waist: String?
-    let hip: String?
-    let cup: String?
-    let birthplace: String?
-    let bio: String?
-    let avatarHires: String?
-    let enrichedAt: String?
-    enum CodingKeys: String, CodingKey {
-        case name, birthday, cup, birthplace, bio
-        case javdbID = "javdb_id"
-        case heightCM = "height_cm"
-        case bust, waist, hip
-        case avatarHires = "avatar_hires"
-        case enrichedAt = "enriched_at"
-    }
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        javdbID = JSONFlex.string(c, .javdbID)
-        name = try? c.decode(String.self, forKey: .name) ?? ""
-        birthday = JSONFlex.string(c, .birthday)
-        heightCM = JSONFlex.int(c, .heightCM)
-        bust = JSONFlex.string(c, .bust)
-        waist = JSONFlex.string(c, .waist)
-        hip = JSONFlex.string(c, .hip)
-        cup = JSONFlex.string(c, .cup)
-        birthplace = try? c.decode(String.self, forKey: .birthplace)
-        bio = try? c.decode(String.self, forKey: .bio)
-        avatarHires = try? c.decode(String.self, forKey: .avatarHires)
-        enrichedAt = try? c.decode(String.self, forKey: .enrichedAt)
-    }
-}
-
 struct EnrichmentFeed<Entry: Decodable>: Decodable {
     let board: String
     let term: String?
@@ -123,18 +41,10 @@ enum EnrichmentFeedClient {
         guard let first = id.trimmingCharacters(in: .whitespacesAndNewlines).first else { return nil }
         return String(first).lowercased()
     }
-    /// The pipeline's upscaled covers live on the user's VPS static host
-    /// (phase 4 deployment: one file per movie id, nothing else is served
-    /// there). The detail poster chain only trusts a cover_hires_url that
-    /// matches this exact shape.
+    /// The shape check itself lives on MovieEnrichment (Models layer) so
+    /// Movie.swift stays self-contained; this is the feed client's entry.
     static func isEnrichmentCover(_ value: String) -> Bool {
-        guard let url = URL(string: value),
-              url.scheme == "http" || url.scheme == "https",
-              url.host?.lowercased() == "163.47.40.207", url.port == 8901,
-              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else { return false }
-        let path = url.path
-        guard path.hasSuffix(".jpg"), !path.dropFirst().contains("/") else { return false }
-        return true
+        MovieEnrichment.isEnrichmentCover(value)
     }
 
     private static var cacheDirectory: URL {
