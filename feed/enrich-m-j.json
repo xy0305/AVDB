@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-j",
- "generated_at": "2026-11-15T20:30:01+00:00",
+ "generated_at": "2026-11-16T20:13:59+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -48,6 +48,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00458/dvmm00458jp-12.jpg"
    ],
    "trailer_url": "https://cc3001.dmm.co.jp/pv/LTB4MxhUTw1FK0a5iCYqXROcGmDvYRjM8zX-VpfOvmtTZUQPuQutfntC0evkxj/dvmm00458hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/J0ygJ2.jpg",
    "release_date": "2026-10-30",
    "magnets": [
     {
@@ -200,6 +201,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00136/dsod00136jp-20.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/KhgWJmAjS__S3GyXLcK78aRyRznId3uRg4vyNRIW_akkkHc-r8e4gwfaCxHbI7/dsod00136hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/J0yxX2.jpg",
    "release_date": "2026-11-06",
    "magnets": [
     {

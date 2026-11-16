@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-v",
- "generated_at": "2026-11-15T20:30:01+00:00",
+ "generated_at": "2026-11-16T20:13:59+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -72,6 +72,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dsod00139/dsod00139jp-20.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/HRMLQyBUdTB6s0oDQqJE_WPdQ0_l2KE0Xmn-bAWyuW2y3otekBT-PxBv3fY1zO/dsod00139hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/V4AMmQ.jpg",
    "release_date": "2026-11-06",
    "magnets": [
     {
@@ -165,6 +166,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvmm00459/dvmm00459jp-12.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/DgEoHjEWwFakbr8ZY1qWrUNJVUc179dRxsn5JCXrKDVKH_b0y8wOqEvQzWnvWD/dvmm00459hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/V4AxEQ.jpg",
    "release_date": "2026-10-30",
    "magnets": [
     {
@@ -537,6 +539,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvdms00860/dvdms00860jp-12.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/OyIIFxs9BeAbHYc5nlJ_gY7oGWfumu_CjFwAvf4APoUom47hHzOO05dsmQUAjAad/dvdms00860_mhb_w.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/Vw4gz2.jpg",
    "release_date": "2022-08-12",
    "magnets": [
     {
@@ -604,6 +607,7 @@
    "maker": "キャットウォーク",
    "series": "キャットウォークポイズン(Blu-ray)",
    "duration_min": 120,
+   "cover_hires_url": "http://163.47.40.207:8901/vWKy9.jpg",
    "release_date": "2015-11-07",
    "magnets": [
     {
@@ -669,6 +673,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/dvaj00724/dvaj00724jp-17.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/DjQmMRECwsoDBf8hjPG5xin_0brxo70OHOq983q0gfNnyvwT3bpzefVoznoj7z/dvaj00724hhbs.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/ve32zW.jpg",
    "release_date": "2026-01-09",
    "magnets": [
     {
