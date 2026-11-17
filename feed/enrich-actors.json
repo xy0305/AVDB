@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "actors",
- "generated_at": "2026-11-16T19:22:29+00:00",
+ "generated_at": "2026-11-17T19:25:37+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -69,6 +69,19 @@
   },
   {
    "javdb_id": null,
+   "name": "いいなりなお",
+   "birthday": "1996-07-17",
+   "height_cm": 153,
+   "bust": 90,
+   "waist": 66,
+   "hip": 96,
+   "cup": "G",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/v-Attackers/%E3%81%84%E3%81%84%E3%81%AA%E3%82%8A%E3%81%AA%E3%81%8A.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:11:25+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "うんぱい",
    "birthday": "1994-04-17",
    "height_cm": 165,
@@ -93,6 +106,21 @@
    "name": "さくまつな",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E4%BD%90%E4%B9%85%E9%96%93%E3%81%A4%E3%81%AA.jpg",
    "enriched_at": "2026-11-16T19:12:57+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "さくらわかな",
+   "birthday": "2000-07-27",
+   "height_cm": 165,
+   "bust": 83,
+   "waist": 60,
+   "hip": 85,
+   "cup": "C",
+   "birthplace": "石川県",
+   "bio": "さくら わかな（2002年〈平成14年〉3月21日 - ）は、日本のAV女優。石川県 能美市出身。Bstar所属。\n\n趣味・特技は、一人旅、ピアノ。苦手なものはセロリと運動（特に球技）。\n昔から人見知りするタイプで、少人数での会話は頑張ってするようにしているが、大人数での会話の場は苦手で黙ってしまう。また、同世代の特にノリの良い人が苦手で、落ち着いている年上の人と話す方が安心できる。\n光文社『FLASH』2023年9月5日号でグラビアで登場した際に「金沢の箱入り娘」と評していた。\n中学校の3年間は吹奏楽部に所属し、打楽器を演奏していた。\n初恋愛は18歳の時で相手は4つ上の人だった。異性のビジュアルに特に拘りは無いが、30代から40代の落ち着いていて、あまり感情的にならない男性が好み。\nアサ芸シークレット編集部は「スレンダーだがぷりんとした美尻とむっちり太ももがセクシー」と体型的特徴を表現している。\n2026年時点での作品傾向について、儚げな容姿の印象から「“やられちゃう系”がすごい多い」と告白している。需要との合致からのオファーではあるものの、結果的にハードな撮影が重なりメンタルが疲弊したこともあったが、作品と自分自身は別と割り切ることで克服傾向にあるという。\n股下は78センチ。\nウェブバラエティー『愛のハイエナ』出演時には元アイドルと紹介された。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E3%81%95%E3%81%8F%E3%82%89%E3%82%8F%E3%81%8B%E3%81%AA.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:11:43+00:00"
   },
   {
    "javdb_id": null,
@@ -134,6 +162,19 @@
    "name": "つぼみ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E3%81%A4%E3%81%BC%E3%81%BF.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "ひなの花音",
+   "birthday": "1999-04-03",
+   "height_cm": 160,
+   "bust": 96,
+   "waist": 58,
+   "hip": 92,
+   "cup": "J",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E3%81%B2%E3%81%AA%E3%81%AE%E8%8A%B1%E9%9F%B3.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:11:53+00:00"
   },
   {
    "javdb_id": null,
@@ -253,6 +294,19 @@
   },
   {
    "javdb_id": null,
+   "name": "三枝木玲実",
+   "birthday": "1973-11-30",
+   "height_cm": 163,
+   "bust": 83,
+   "waist": 59,
+   "hip": 82,
+   "cup": "D",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/025/903781.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:12:02+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "三比菜々美",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Mines/%E4%B8%89%E6%AF%94%E8%8F%9C%E3%80%85%E7%BE%8E.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
@@ -309,9 +363,37 @@
   },
   {
    "javdb_id": null,
+   "name": "上原あゆな",
+   "birthday": "2002-01-01",
+   "height_cm": 155,
+   "bust": 95,
+   "waist": 59,
+   "hip": 92,
+   "cup": "H",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/957/765957.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:12:12+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "上原瑞穂",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Warashi/AI-Fix-%E4%B8%8A%E5%8E%9F%E7%91%9E%E7%A9%82.jpg",
    "enriched_at": "2026-11-15T19:12:34+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "中城葵",
+   "birthday": "1998-09-30",
+   "height_cm": 160,
+   "bust": 83,
+   "waist": 59,
+   "hip": 85,
+   "cup": "C",
+   "birthplace": "長野県",
+   "bio": "中城 葵（なかじょう あおい、1999年4月29日 - ）は、日本のAV女優である。プロダクションALIVE所属。\n\n小さい頃から水泳教室に通い、学生時代の部活も水泳部一筋。デビュー作のジャケット写真も水泳部のイメージから連想でデザインされた。\n\n小学生時代に父親が押し入れに隠していたアダルトビデオを見つけたことをきっかけに興味を持つ。\n\n「作品自体は売れてほしい」が「表に出て有名になりたいって気持ちはあんまりない」という方針でメディアのインタビューには応じているものの、SNSや詳細なプロフィールは明かしておらず、イベントなどへの出演も辞退している。生年も明かされていないが、2019年12月発売（ただし撮影自体は9月）のデビュー作では20歳と答えている。\n\nAV監督のTODOは野球で例えれば「岩隈久志投手のフォームの美しさ」、ガンダムで例えれば「ガンダムF91」と中城のスタイルを例えている。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E4%B8%AD%E5%9F%8E%E8%91%B5.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:12:24+00:00"
   },
   {
    "javdb_id": null,
@@ -324,6 +406,20 @@
    "name": "丸最レア",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E4%B8%B8%E6%9C%80%E3%83%AC%E3%82%A2.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "久和原せいら",
+   "birthday": "2003-02-14",
+   "height_cm": 164,
+   "bust": 78,
+   "waist": 60,
+   "hip": 90,
+   "cup": "C",
+   "birthplace": "神奈川県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Mines/%E4%B9%85%E5%92%8C%E5%8E%9F%E3%81%9B%E3%81%84%E3%82%89.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:12:35+00:00"
   },
   {
    "javdb_id": null,
@@ -410,6 +506,21 @@
    "name": "佐々木あき",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E4%BD%90%E3%80%85%E6%9C%A8%E3%81%82%E3%81%8D.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "佐々木さき",
+   "birthday": "2003-03-03",
+   "height_cm": 150,
+   "bust": 84,
+   "waist": 58,
+   "hip": 85,
+   "cup": "E",
+   "birthplace": "日本",
+   "bio": "佐々木 さき（ささき さき、3月3日 - ））は、日本のAV女優。luminous promotion所属。中華圏では佐佐木佐木と記述されることが多い。\n\n趣味:ゲーム・お笑い・アニメ鑑賞。同じアイドルグループの小野六花からは引きこもりのオタクと言及されている。\nAVライターの芝田カズは「小柄できゃしゃな体つきながら、均整の取れたスタイル」と体型を評価。同じくAVライターのくろがね阿礼は「男を誘惑する小悪魔ものに定評。乳首を刺激されただけで腰砕けになる感度のよさも見逃せない」と評している。\n好きな食べ物はきんぴらごぼう。\n弱点は鎖骨。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E4%BD%90%E3%80%85%E6%9C%A8%E3%81%95%E3%81%8D.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:12:48+00:00"
   },
   {
    "javdb_id": null,
@@ -636,6 +747,20 @@
   },
   {
    "javdb_id": null,
+   "name": "友保レナ",
+   "birthday": "2003-07-03",
+   "height_cm": 160,
+   "bust": 85,
+   "waist": 60,
+   "hip": 85,
+   "cup": "E",
+   "birthplace": "福岡県",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/027/810854.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:13:01+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "友田真希",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Madonna/%E5%8F%8B%E7%94%B0%E7%9C%9F%E5%B8%8C.jpg",
    "enriched_at": "2026-11-15T03:56:56+00:00"
@@ -717,6 +842,21 @@
   },
   {
    "javdb_id": null,
+   "name": "坂井美桜",
+   "birthday": "2002-04-10",
+   "height_cm": 162,
+   "bust": 91,
+   "waist": 54,
+   "hip": 88,
+   "cup": "H",
+   "birthplace": "京都府",
+   "bio": "坂井 美桜（さかい みお、2002年〈平成14年〉4月10日 - ）は、日本のAV女優。Y's Entertainment所属。\n\nデビュー時は薬学部の学生。\n以前からAVには興味を持っていて、小島みなみと佐倉絆が好きだった。こういう人になりたいというロールモデルは峰不二子とドロンジョ。\nオナニーを始めたのは中学の時で初体験は20歳の時だった。\n初体験の相手は居酒屋で居合わせた男性グループの一人（29歳の男性）にナンパされた。しかしあまりにも痛かったのでその1回きりだった。\nデビューまでの経験人数は3人。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E5%9D%82%E4%BA%95%E7%BE%8E%E6%A1%9C.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:13:14+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "坂道みる",
    "birthday": "1999-11-29",
    "height_cm": 157,
@@ -749,6 +889,33 @@
    "name": "夏目彩春",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E5%A4%8F%E7%9B%AE%E5%BD%A9%E6%98%A5.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "夏目玲香",
+   "birthday": "1983-10-17",
+   "height_cm": 152,
+   "bust": 96,
+   "waist": 58,
+   "hip": 87,
+   "cup": "J",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/331/313331.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:13:24+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "夏花まろん",
+   "birthday": "1996-12-25",
+   "height_cm": 164,
+   "bust": 88,
+   "waist": 58,
+   "hip": 88,
+   "cup": "G",
+   "birthplace": "東京都",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/019/828076.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:13:34+00:00"
   },
   {
    "javdb_id": null,
@@ -788,6 +955,19 @@
    "name": "大橋未久",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E5%A4%A7%E6%A9%8B%E6%9C%AA%E4%B9%85.jpg",
    "enriched_at": "2026-11-15T19:15:06+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "天宮あさひ",
+   "birthday": "1988-05-30",
+   "height_cm": 154,
+   "bust": 88,
+   "waist": 60,
+   "hip": 90,
+   "cup": "E",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/010/50799.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:13:43+00:00"
   },
   {
    "javdb_id": null,
@@ -847,6 +1027,20 @@
   },
   {
    "javdb_id": null,
+   "name": "女神ジュン",
+   "birthday": "1999-01-08",
+   "height_cm": 155,
+   "bust": 88,
+   "waist": 54,
+   "hip": 86,
+   "cup": "G",
+   "birthplace": "兵庫県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-FALENO/%E5%A5%B3%E7%A5%9E%E3%82%B8%E3%83%A5%E3%83%B3.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:13:53+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "妃ひかり",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-%E7%97%B4%E5%A5%B3%E5%A4%A9%E5%A0%82/%E5%A6%83%E3%81%B2%E3%81%8B%E3%82%8A.jpg",
    "enriched_at": "2026-11-15T19:15:42+00:00"
@@ -864,6 +1058,19 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E5%A7%AB%E5%92%B2%E3%81%AF%E3%81%AA.jpg",
    "gender": "female",
    "enriched_at": "2026-11-15T03:58:29+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "守屋よしの",
+   "birthday": "1999-09-09",
+   "height_cm": 168,
+   "bust": 88,
+   "waist": 60,
+   "hip": 90,
+   "cup": "F",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/027/412740.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:14:03+00:00"
   },
   {
    "javdb_id": null,
@@ -891,6 +1098,20 @@
    "name": "宍戸里帆",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E5%AE%8D%E6%88%B8%E9%87%8C%E5%B8%86.jpg",
    "enriched_at": "2026-11-15T03:58:47+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "宮上唯依花",
+   "birthday": "1977-12-01",
+   "height_cm": 163,
+   "bust": 90,
+   "waist": 62,
+   "hip": 93,
+   "cup": "E",
+   "birthplace": "京都府",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/737/999737.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:14:14+00:00"
   },
   {
    "javdb_id": null,
@@ -1113,6 +1334,21 @@
   },
   {
    "javdb_id": null,
+   "name": "山田鈴奈",
+   "birthday": "2005-03-07",
+   "height_cm": 151,
+   "bust": 88,
+   "waist": 54,
+   "hip": 85,
+   "cup": "F",
+   "birthplace": "神奈川県",
+   "bio": "山田 鈴奈（やまだ すずな、2005年〈平成17年〉3月7日 - ）は、日本のAV女優。マインズ所属。\n\n趣味は音楽鑑賞・アニメ鑑賞・ゲーム・クラリネット。\nAVライターの芝田カズは「ねっとり舌を絡めるキス」を評価。同じくAVライターのさおりは「SEXになると目が輝きだす」「アグレッシブな腰振り」とAV女優という職への適性を論評した。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E5%B1%B1%E7%94%B0%E9%88%B4%E5%A5%88.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:14:40+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "川北メイサ",
    "birthday": "2000-07-21",
    "height_cm": 154,
@@ -1139,9 +1375,37 @@
   },
   {
    "javdb_id": null,
+   "name": "巴ひかり",
+   "birthday": "2003-12-07",
+   "height_cm": 168,
+   "bust": 86,
+   "waist": 58,
+   "hip": 88,
+   "cup": "F",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/024/104440.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:14:49+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "市来まひろ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E5%B8%82%E6%9D%A5%E3%81%BE%E3%81%B2%E3%82%8D.jpg",
    "enriched_at": "2026-11-15T19:19:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "希崎ジェシカ",
+   "birthday": "1989-06-10",
+   "height_cm": 160,
+   "bust": 86,
+   "waist": 60,
+   "hip": 95,
+   "cup": "D",
+   "birthplace": "東京都",
+   "bio": "希崎杰西卡（日语：希崎ジェシカ／きざき ジェシカ，罗马化：Kizaki Jeshika，亦译希崎谢茜嘉，1989年6月10日—），是一名出身于东京都的日本AV女优。有1/4意大利血统。所属公司为Duo Entertainment。\n\n希崎杰西卡初出道于水著杂志《Bejean》2008年8月号里面的“白娘队”单元。同年6月6日，推出第一张个人写真DVD“现役高校生身体检查”，当时她只是高中三年级生。不久更在男性杂志《The Best Magazine Original》10月号初次挑战拍摄裸体写真，为成为AV女优作出准备。。\n\n后来希崎跟AV片商IdeaPocket签约一年。2008年9月1日，推出首张AV作品《FIRST IMPRESSION 38 希崎杰西卡》，此作更于IdeaPocket的9月商品排行榜上位列第一，并打进DMM DVD商品排行榜的三甲之内。2009年，希崎杰西卡演出了多部AV作品，人气急升，更于东京电视台的节目《おねだり!!マスカット》中出演AV女优团体惠比寿麝香葡萄的第二代成员，结果在2010年正式加入惠比寿麝香葡萄，成为固定班底。2011年随团到香港、台湾等地区进行巡回演出；又与同公司的女优横山美雪、希志爱野一起推出音乐专辑《そばにいてね》。2012年到香港拍摄成人电影《一路向西》。2016年移籍到S1，后转型为单体女优。2019年6月发表了引退宣言。\n\n引退后在美容诊所从事前台工作。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E5%B8%8C%E5%B4%8E%E3%82%B8%E3%82%A7%E3%82%B7%E3%82%AB.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:15:10+00:00"
   },
   {
    "javdb_id": null,
@@ -1254,6 +1518,20 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E6%84%9B%E6%89%8D%E3%82%8A%E3%81%82.jpg",
    "gender": "female",
    "enriched_at": "2026-11-16T19:16:16+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "愛那あい",
+   "birthday": "1999-11-17",
+   "height_cm": 153,
+   "bust": 93,
+   "waist": 68,
+   "hip": 90,
+   "cup": "H",
+   "birthplace": "高知県",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/018/59476.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:15:19+00:00"
   },
   {
    "javdb_id": null,
@@ -1386,6 +1664,20 @@
   },
   {
    "javdb_id": null,
+   "name": "星野ねね",
+   "birthday": "2006-02-04",
+   "height_cm": 158,
+   "bust": 85,
+   "waist": 59,
+   "hip": 91,
+   "cup": "D",
+   "birthplace": "山梨県",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/017/708017.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:15:28+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "春陽モカ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E6%98%A5%E9%99%BD%E3%83%A2%E3%82%AB.jpg",
    "enriched_at": "2026-11-15T04:01:52+00:00"
@@ -1461,6 +1753,19 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%9C%89%E6%9D%91%E3%81%AE%E3%81%9E%E3%81%BF.jpg",
    "gender": "female",
    "enriched_at": "2026-11-16T19:16:27+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "有馬せいな",
+   "birthday": "2004-11-30",
+   "height_cm": 158,
+   "bust": 84,
+   "waist": 58,
+   "hip": 87,
+   "cup": "E",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/714/184714.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:15:36+00:00"
   },
   {
    "javdb_id": null,
@@ -1606,6 +1911,19 @@
   },
   {
    "javdb_id": null,
+   "name": "松坂つぐみ",
+   "birthday": "1992-05-20",
+   "height_cm": 157,
+   "bust": 88,
+   "waist": 59,
+   "hip": 93,
+   "cup": "E",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/025/861721.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:15:43+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "松本いちか",
    "birthday": "2000-02-19",
    "height_cm": 153,
@@ -1661,9 +1979,61 @@
   },
   {
    "javdb_id": null,
+   "name": "柊かな",
+   "birthday": "2003-01-30",
+   "height_cm": 170,
+   "bust": 85,
+   "waist": 59,
+   "hip": 87,
+   "cup": "A",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/025/261197.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:15:54+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "柊もみじ",
+   "birthday": "2000-04-28",
+   "height_cm": 165,
+   "bust": 85,
+   "waist": 60,
+   "hip": 88,
+   "cup": "B",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/695/872695.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:16:02+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "柏木こなつ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%9F%8F%E6%9C%A8%E3%81%93%E3%81%AA%E3%81%A4.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "柏木ふみか",
+   "birthday": "1996-01-01",
+   "height_cm": 162,
+   "bust": 98,
+   "waist": 56,
+   "hip": 100,
+   "cup": "I",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/027/714287.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:16:10+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "柚木れんか",
+   "birthday": "1999-11-30",
+   "height_cm": 167,
+   "bust": 92,
+   "waist": 65,
+   "hip": 88,
+   "cup": "D",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/027/586940.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:16:21+00:00"
   },
   {
    "javdb_id": null,
@@ -1676,6 +2046,34 @@
    "name": "栗山莉緒",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Mines/%E6%A0%97%E5%B1%B1%E8%8E%89%E7%B7%92.jpg",
    "enriched_at": "2026-11-15T19:22:00+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "栗林里莉",
+   "birthday": "1987-04-16",
+   "height_cm": 156,
+   "bust": 90,
+   "waist": 60,
+   "hip": 85,
+   "cup": "G",
+   "birthplace": "東京都",
+   "bio": "栗林里莉（日语：栗林 里莉，1987年4月16日—），是日本东京都出身的AV女优、女优。\n\n喜欢看动漫，尤其是《航海王》、《七龙珠》、《JoJo的奇妙冒险》等，动画《圣斗士星矢》凤凰座一辉的爱好者。\n除AV作品外，另涉及影剧、舞台剧等演艺活动。\n\n2008年5月，于Max-A的AV作品出道。\n2009年2月，移籍IdeaPocket。\n2010年12月，在作品《検証・裏・栗林里莉》发行后，结束与IdeaPocket的关系。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%A0%97%E6%9E%97%E9%87%8C%E8%8E%89.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:16:33+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "栞名結",
+   "birthday": "2002-04-30",
+   "height_cm": 160,
+   "bust": 88,
+   "waist": 60,
+   "hip": 90,
+   "cup": "G",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/221/921221.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:16:43+00:00"
   },
   {
    "javdb_id": null,
@@ -1709,6 +2107,20 @@
   },
   {
    "javdb_id": null,
+   "name": "桜井あゆ",
+   "birthday": "1991-04-15",
+   "height_cm": 162,
+   "bust": 82,
+   "waist": 59,
+   "hip": 81,
+   "cup": "B",
+   "birthplace": "宮崎県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%A1%9C%E4%BA%95%E3%81%82%E3%82%86.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:17:06+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "桜空もも",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E6%A1%9C%E7%A9%BA%E3%82%82%E3%82%82.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
@@ -1736,6 +2148,21 @@
    "name": "椎名そら",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%A4%8E%E5%90%8D%E3%81%9D%E3%82%89.jpg",
    "enriched_at": "2026-11-16T19:16:52+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "椎名のあ",
+   "birthday": "1999-11-17",
+   "height_cm": 144,
+   "bust": 90,
+   "waist": 63,
+   "hip": 91,
+   "cup": "E",
+   "birthplace": "日本・福島県",
+   "bio": "椎名 のあ（しいな のあ、1999年3月18日 - ）は、日本のAV女優。ティーパワーズ所属。\n\n福島県出身。\n\n趣味は音楽鑑賞、寝ること。特技は、体が柔らかいこと。\n\n2019年10月、Fitchの専属女優「倉田アンナ（くらた あんな）」としてAVデビュー。エルプロモーション所属。\n\n2020年2月、所属事務所をティーパワーズに移し「椎名のあ」に改名、企画単体女優となる。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%A4%8E%E5%90%8D%E3%81%AE%E3%81%82.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:17:20+00:00"
   },
   {
    "javdb_id": null,
@@ -1769,6 +2196,20 @@
   },
   {
    "javdb_id": null,
+   "name": "橋本ありな",
+   "birthday": "1996-12-15",
+   "height_cm": 167,
+   "bust": 84,
+   "waist": 56,
+   "hip": 83,
+   "cup": "C",
+   "bio": "新有菜（日语：新 ありな／あらた ありな，罗马化：Arata Arina，旧名桥本有菜，1996年12月15日—），日本的前AV女优，东京都出身。自出道以来先后为S1、FALENO及MOODYZ旗下的专属女优，属于“ACT事务所”。享有日本AV界“最强美腿”封号。2025年末引退。\n\n兴趣是购物、看影片，特技是唱歌和倒立，喜欢看YouTube上的恐怖游戏实况和Cosplay。\n初恋对象是一名小学3年级的学生，而初体验是与高二打工时常来店里的老顾客，并表示自己只有与那个人发生过关系。\n虽然她AV出道时被指出下半身有体毛，但是它很难长出来因为自己在写真偶像时期就剔除了。\n现实与AV女优明里䌷、三上悠亚是好朋友，因为崇拜AV女优明日花绮罗才入行，并把对方当作偶像。\n平时会利用跑步来维持身材，也热爱泡澡保养法，最喜欢正常体位还有背后式。\n最讨厌“日烧”类型的作品，表示自己绝对不能晒黑。\n\n2015年12月在写真影像初登场。2016年3月成为“S1”専属AV女优出道，被封为“次世代的直球偶像”。\n2016年7月，成为AV女优偶像团体“SEXY-J”的成员（会员编号19），2017年5月毕业。\n2016年11月，她担任埼玉电视台节目《ビ〜チ9》的常规助理。\n2017年与白石茉莉奈、高桥圣子共同担任AV OPEN 2017的形象女孩。\n2018年5月19日，她击败日本AV天后高桥圣子，获得《DMM成人奖》2018“最优秀女优奖”。\n2018年8月10日，她与君色华奈、桐谷茉莉等人宣布成立偶像团体“un panopticon girl”（アン・パノプティコンガール），同年10月3日在“MILKY POP GENERATION”发布CD出道。\n2020年3月，桥本有菜宣布将移藉至FALENO。\n2022年8月，桥本有菜宣布将移藉至MOODYZ，并改名叫“新有菜”。\n2024年12月，年底宣布2025年将引退。\n2025年12月31日，新有菜开直播向粉丝正式亲口宣告“完全引退”。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-FALENO/%E6%A9%8B%E6%9C%AC%E3%81%82%E3%82%8A%E3%81%AA.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:17:46+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "橘メアリー",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E6%A9%98%E3%83%A1%E3%82%A2%E3%83%AA%E3%83%BC.jpg",
    "enriched_at": "2026-11-15T19:22:00+00:00"
@@ -1781,9 +2222,28 @@
   },
   {
    "javdb_id": null,
+   "name": "水咲ローラ（滝澤ローラ）",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/z-DMM%28%E9%AA%91%29/AI-Fix-%E6%B0%B4%E5%92%B2%E3%83%AD%E3%83%BC%E3%83%A9%EF%BC%88%E6%BB%9D%E6%BE%A4%E3%83%AD%E3%83%BC%E3%83%A9%EF%BC%89.jpg",
+   "enriched_at": "2026-11-17T19:17:54+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "水川スミレ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E6%B0%B4%E5%B7%9D%E3%82%B9%E3%83%9F%E3%83%AC.jpg",
    "enriched_at": "2026-11-15T19:22:00+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "水瀬さな",
+   "birthday": "1998-03-30",
+   "height_cm": 170,
+   "bust": 90,
+   "waist": 62,
+   "hip": 86,
+   "cup": "E",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/021/729433.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:18:05+00:00"
   },
   {
    "javdb_id": null,
@@ -1926,6 +2386,21 @@
    "name": "瀬戸環奈",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E7%80%AC%E6%88%B8%E7%92%B0%E5%A5%88.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "瀬緒凛",
+   "birthday": "2003-04-02",
+   "height_cm": 149,
+   "bust": 85,
+   "waist": 55,
+   "hip": 84,
+   "cup": "F",
+   "birthplace": "日本・東京都",
+   "bio": "瀬緒 凛（せお りん、2003年〈平成15年〉4月2日 - ）は、日本のAV女優。ルミナスプロモーション所属。\n\n東京都出身。趣味はイヤホン（オーディオマニア）。好きな食べ物はアイスクリーム。\nデビュー時は「アナウンサー志望の女子大生」と紹介された。\n2024年から『ケンコバのバコバコナイト』（サンテレビ）出演。\nスタイルは「ミニマム美巨乳」とも称された。AVライターの芝田カズは「大きな瞳にあどけないルックス」「身長149センチと小柄ながら肉感Fカップ」と外見を評した。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E7%80%AC%E7%B7%92%E5%87%9B.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:18:20+00:00"
   },
   {
    "javdb_id": null,
@@ -2147,6 +2622,21 @@
   },
   {
    "javdb_id": null,
+   "name": "神菜美まい",
+   "birthday": "1997-05-15",
+   "height_cm": 171,
+   "bust": 88,
+   "waist": 62,
+   "hip": 93,
+   "cup": "D",
+   "birthplace": "東京都",
+   "bio": "神彩美舞（神菜美まい、かなみ まい、1997年5月15日—），日本AV女优。隶属于T-POWERS。\n\n2021年8月，她作为IdeaPocket的专属女优首次亮相。\n\n东京都出身。\n\n爱好是散步、看电影和收集朱印。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E7%A5%9E%E8%8F%9C%E7%BE%8E%E3%81%BE%E3%81%84.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:18:31+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "神谷充希",
    "birthday": "1997-09-30",
    "height_cm": 150,
@@ -2159,6 +2649,21 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E7%A5%9E%E8%B0%B7%E5%85%85%E5%B8%8C.jpg",
    "gender": "female",
    "enriched_at": "2026-11-16T19:22:20+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "立花美涼",
+   "birthday": "1988-05-15",
+   "height_cm": 162,
+   "bust": 88,
+   "waist": 56,
+   "hip": 93,
+   "cup": "E",
+   "birthplace": "岩手県",
+   "bio": "立花 美凉（日语：たちばな · みすず，英语：Tachibana Misuzu，1988年5月15日—）是日本AV女优。所属T-Powers事务所。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E7%AB%8B%E8%8A%B1%E7%BE%8E%E6%B6%BC.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:18:47+00:00"
   },
   {
    "javdb_id": null,
@@ -2267,6 +2772,21 @@
   },
   {
    "javdb_id": null,
+   "name": "羽田あい",
+   "birthday": "1989-09-22",
+   "height_cm": 170,
+   "bust": 87,
+   "waist": 55,
+   "hip": 85,
+   "cup": "D",
+   "birthplace": "東京都",
+   "bio": "羽田爱（日语：羽田あい，1989年9月22日—）生于日本东京都，是一名日本AV女优，曾经属于Prime事务所，推出过8本写真集。\n\n2010年成为SOD专属女优，2月18日发表AV出道作品《芸能人 羽田あい AVDebut》。\n2010年12月 获得SOD大赏─最优秀新人女优奖。\n2012年7月移籍IdeaPocket。\n2014年4月移籍Attackers。\n2014年7月首次隐退。\n2018年7月于SOD复出。(未宣布隐退，但2018年12月6日后无新的AV作品发布。)\n2023年8月于香港时装单元喜剧《东京爱情动作故事》中以本人姓名饰演第一女主角。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/3-Allpro/%E7%BE%BD%E7%94%B0%E3%81%82%E3%81%84.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:19:00+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "胡桃さくら",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E8%83%A1%E6%A1%83%E3%81%95%E3%81%8F%E3%82%89.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
@@ -2333,6 +2853,15 @@
   },
   {
    "javdb_id": null,
+   "name": "蒼井なぎさ",
+   "height_cm": 157,
+   "cup": "E",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E8%92%BC%E4%BA%95%E3%81%AA%E3%81%8E%E3%81%95.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:19:11+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "蓮実クレア",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E8%93%AE%E5%AE%9F%E3%82%AF%E3%83%AC%E3%82%A2.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
@@ -2369,6 +2898,20 @@
   },
   {
    "javdb_id": null,
+   "name": "西宮ゆめ",
+   "birthday": "1996-11-04",
+   "height_cm": 158,
+   "bust": 85,
+   "waist": 56,
+   "hip": 86,
+   "cup": "D",
+   "bio": "西宫梦（日语：西宮ゆめ，1996年11月4日—），日本的AV女优，目前为“IdeaPocket”专属女优。所属于“Cielo Production”（シエロ）事务所，2019年9月开始所属于“LIGHT（日语：LIGHT (芸能事務所)）”事务所。\n\n兴趣是购物，特征是个性随和，很好相处。特别的是即使在她出道将近1年的时候，仍然没有使用任何社群媒体与粉丝互动。她将自己的性格描述为“哇”和“轻飘飘的感觉”，并说她有很多角色，例如“傲慢自大”的高中女生和“小恶魔”女孩，而且这些是一个容易扮演的角色，也很适合自己。\n\n第一次自慰是在小学低年级时，初体验是在高中一年级的时候，第一次潮吹也是在高中的时候。\n\n2016年9月，在日本AV片商“IdeaPocket”以新人专属女优身份AV出道。\n\n2017年12月，接受《DMM NEWS.R18》的出道一周年纪念访谈。\n\n2018年12月15日，宣布创立个人Twitter账号。\n\n2021年11月9日，被任命为FANZA的VR动画5周年纪念活动2021VR性感武士（IdeaPocket代表）。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E8%A5%BF%E5%AE%AE%E3%82%86%E3%82%81.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:19:38+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "観月あいな",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E8%A6%B3%E6%9C%88%E3%81%82%E3%81%84%E3%81%AA.jpg",
    "enriched_at": "2026-11-16T19:22:29+00:00"
@@ -2387,9 +2930,95 @@
   },
   {
    "javdb_id": null,
+   "name": "谷村凪咲",
+   "birthday": "2005-03-14",
+   "height_cm": 167,
+   "bust": 85,
+   "waist": 57,
+   "hip": 88,
+   "cup": "C",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E8%B0%B7%E6%9D%91%E5%87%AA%E5%92%B2.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:19:46+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "足立友梨",
+   "birthday": "1991-11-30",
+   "height_cm": 155,
+   "bust": 84,
+   "waist": 57,
+   "hip": 88,
+   "cup": "C",
+   "birthplace": "長崎県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E8%B6%B3%E7%AB%8B%E5%8F%8B%E6%A2%A8.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:19:56+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "辰巳ゆい",
+   "birthday": "1984-06-08",
+   "height_cm": 168,
+   "bust": 88,
+   "waist": 60,
+   "hip": 95,
+   "cup": "F",
+   "birthplace": "岐阜県",
+   "bio": "辰巳唯（日语：辰巳ゆい、1984年6月8日—），出身自岐阜县，日本前赛车女郎、AV女优。现在为演员和艺人。\n\n兴趣是购物，擅长料理和做馃子。最喜欢的食物是荞麦面、银鳕西京烧和日式烧肉，最爱喝的饮料是咖啡欧蕾。最喜欢的艺人是韩国男团BIGBANG。平日休闲时最喜欢看电视。最好的朋友是AV女优小仓奈奈。\n\n喜欢温柔有男子气概的男生，体型不要太壮也不要太高。平常会用按摩棒自慰，第一次性经验是在19岁念大学时候，对方比自己小一岁。\n\n曾以“朝仓亚矢”名义担任赛车女郎，后因兴趣加入AV界。在前三部作品中公司则让她不完全退去身上衣物演出，在第四部作品《完全AV》之后，则开始解禁。\n\n2008年1月11日，成为AV片商“Alice Japan”旗下专属AV女优AV出道，并签有“无限期契约”。\n\n2011年11月，成为Alice Japan旗下AV女优团体“Alice Stars”（アリスた～ず☆）的成员之一，并是该团较资深的女优。2013年6月，经过两年后首次公开出道。\n\n2012年8月10日，前往韩国宣传电影《AVアイドル》。\n\n2013年，与葵司、小森爱到香港宣传写真集，这也是她们首次发行写真集。10月15日，与港星杜汶泽合拍香港三级片《豪情3D》。\n\n2014年6月，演出Alice Japan的30周年纪念作品。\n\n2014年11月4日，她在自己的部落格上宣布，将会于2015年1月发表最后一部作品后AV引退。一直到引退前都是所属于“At Honeys”（アットハニーズ）事务所。AV引退后仍然以演员和艺人身份出席活动还有舞台剧的演出。\n\n2014年12月29日，与葵司和川上奈奈美等6名AV女优一同参加Alice Japan的圣诞活动。\n\n2016年12月7日，举辨桃色电影《弱腰OL 控えめな腰使い》的握手见面会。\n\n2026年推出写真集《秘香ーhikou-》。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Warashi/AI-Fix-%E8%BE%B0%E5%B7%B3%E3%82%86%E3%81%84.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:20:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "辻みいな",
+   "birthday": "2004-04-15",
+   "height_cm": 157,
+   "bust": 88,
+   "waist": 57,
+   "hip": 86,
+   "cup": "G",
+   "birthplace": "福岡県",
+   "bio": "辻 みいな（つじ みいな、2004年〈平成16年〉4月15日 - ）は、日本のAV女優。Ys Entertainment所属。\n\n女性アイドルファンを公言している。\nAVデビューのきっかけはSNSにAV女優の写真が流れてきて、それを見たら本当に綺麗で可愛い女性がとても多くて、そこからAV女優さんに興味を持って憧れるようになった。好きはAV女優は伊藤舞雪。\n初めて自慰行為をしたのは20歳の時だった。\n初体験は18歳の高3の終わり頃で相手は同じ学校の同級生で場所は彼氏の家だった。挿入時は痛かった。気持ち良さを知ったのは2回目からだったが、その彼とは高校卒業時に別れた。\nその後、経験人数は7人だった。それで思い出に残っていることは大学生の時に実家暮らしの男性の家にお泊りして、親が2階で寝ていたので、1階の部屋で声を出さないようにエッチしたが、普段のエッチだと声を出しちゃうので、声を我慢しながらやるっていうシチュエーションは興奮したことだった。\n好きな男性のタイプは性格は騒がしくない人。\n初脱ぎの時は彼氏に裸を見せた時くらい恥ずかしく、初体験の時と同じようにお腹を見られるのが恥ずかしかった。\n好きな体位はバックが気持ち良いが、好きなのは正常位。\n胸は小学5年生でD、Eカップあって、女の子からはいい意味でからかわれたりしていた。中学の体育祭で、私が体操服になると、会話中に視線がおっぱいにいっているようであった。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Ideapocket/%E8%BE%BB%E3%81%BF%E3%81%84%E3%81%AA.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:20:24+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "辻井ほのか",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E8%BE%BB%E4%BA%95%E3%81%BB%E3%81%AE%E3%81%8B.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "辻更紗",
+   "birthday": "2002-10-08",
+   "height_cm": 161,
+   "bust": 98,
+   "waist": 59,
+   "hip": 95,
+   "cup": "I",
+   "birthplace": "京都府",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E8%BE%BB%E6%9B%B4%E7%B4%97.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:20:34+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "通野未帆",
+   "birthday": "1991-01-21",
+   "height_cm": 160,
+   "bust": 84,
+   "waist": 59,
+   "hip": 85,
+   "cup": "E",
+   "birthplace": "東京都",
+   "bio": "通野未帆（日语：通野未帆，1991年1月21日—），日本AV女优。所属事务所是GREEN。\n\n2013年出道，自称“売りがない”、“永远の素人”的AV女优。\n\n2014年7月于SEGA发售的游戏“人中之龙”中，进入演出角色的女优人气投票。同年8月24日于Niconico直播的“龙が如く特别番组～セクシー女优・男の出演者発表～”的结果发表，获得47561票排名第30名，并获得“人中之龙0 誓约的场所”的演出权利。\n\n兴趣是玩游戏（恶灵古堡、人中之龙）。喜欢的食物是红茶。喜欢动物。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E9%80%9A%E9%87%8E%E6%9C%AA%E5%B8%86.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:20:46+00:00"
   },
   {
    "javdb_id": null,
@@ -2399,9 +3028,155 @@
   },
   {
    "javdb_id": null,
+   "name": "逢見リカ",
+   "birthday": "1999-12-30",
+   "height_cm": 145,
+   "bust": 79,
+   "waist": 53,
+   "hip": 78,
+   "cup": "H",
+   "birthplace": "岐阜県",
+   "bio": "逢见梨花（日语：逢見 リカ／あいみ りか，罗马化：Aimi Rika，1999年12月30日—），日本AV女优，岐阜县出身。\n\n2019年4月，以《身長145cm体重38kg。小さくて細い、でも胸は天然Hカップというミニマム巨乳少女》作为S1专属AV女优出道。\n\n2020年1月，专属事务所由S1移籍到Madonna。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E9%80%A2%E8%A6%8B%E3%83%AA%E3%82%AB.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:21:09+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "那賀崎ゆきね",
+   "birthday": "1998-06-27",
+   "height_cm": 165,
+   "bust": 87,
+   "waist": 59,
+   "hip": 88,
+   "cup": "D",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/v-Attackers/%E9%82%A3%E8%B3%80%E5%B4%8E%E3%82%86%E3%81%8D%E3%81%AD.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:21:20+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "都月るいさ",
+   "birthday": "1997-11-30",
+   "height_cm": 165,
+   "bust": 89,
+   "waist": 56,
+   "hip": 86,
+   "cup": "E",
+   "birthplace": "京都府",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E9%83%BD%E6%9C%88%E3%82%8B%E3%81%84%E3%81%95.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:21:32+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "釈アリス",
+   "birthday": "2003-07-10",
+   "height_cm": 169,
+   "bust": 88,
+   "waist": 57,
+   "hip": 95,
+   "cup": "E",
+   "birthplace": "東京都",
+   "bio": "釈 アリス（しゃく ありす、2003年7月10日 - ）は、日本のAV女優。NAXプロモーション所属。東京都出身。\n\n趣味は推し活、美術館巡り、特技はコアガズム、アイス早食い。\nAV女優の八掛うみとは事務所こそ異なるものの、プライベートでも仲が良い。\n\n幼稚園児の時から母に怒られるほどオナニーを行っており、物心ついてからもAVのサンプル動画で抜いていた。\nAV好きを公言しており、逆転マジックミラー号シリーズなど、プレステージ以外のメーカーの作品も購入して視聴している。また自身の出演作も視聴しているが自身の作品では抜けず、あくまで作品の仕上がり具合を確認するために視聴している。\n身長は小学生時代から高く、背の順で並ぶと例外なく一番後ろであった。\n好きな男性のタイプはビスケット・オリバ。またデビュー時から一貫してパイパンである。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E9%87%88%E3%82%A2%E3%83%AA%E3%82%B9.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:21:45+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "野々浦暖",
+   "birthday": "1999-02-10",
+   "height_cm": 152,
+   "bust": 86,
+   "waist": 52,
+   "hip": 83,
+   "cup": "D",
+   "birthplace": "東京都",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E9%87%8E%E3%80%85%E6%B5%A6%E6%9A%96.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:21:59+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "金松季歩",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E9%87%91%E6%9D%BE%E5%AD%A3%E6%AD%A9.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鈴の家りん",
+   "birthday": "2002-09-10",
+   "height_cm": 151,
+   "bust": 86,
+   "waist": 58,
+   "hip": 86,
+   "cup": "E",
+   "birthplace": "兵庫県",
+   "bio": "鈴の家 りん（すずのや りん、2002年9月10日 - ）は、日本のAV女優。兵庫県出身。ティーパワーズ所属。\n\n@media screen{.mw-parser-output .fix-domain{border-bottom:dashed 1px}}趣味は映画鑑賞、特技は食べること。\n愛称は“りんりん”。ふとした時に出る関西弁も特徴。身長は151㎝と小さくパイパン。清純系でデビューしたが、へそピアス跡があるなどギャル系の一面も持ち、デビュー12作目では金髪ギャル作品に出演した。\n前職はコンカフェ嬢。\n『鈴の家りんの凄テクを我慢できれば生★中出しSEX!』（2025年、ワンズファクトリー）では「この嵐、かわいいだけじゃなかった」と、プレステージから発売したデビュー作のキャッチコピー「嵐の予感… この女の子、可愛いだけじゃ、ない」を踏まえた異名で紹介された。\n得意技は「チクテコ」（乳首舐め手コキの略）。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E9%88%B4%E3%81%AE%E5%AE%B6%E3%82%8A%E3%82%93.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:22:12+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鈴木心春",
+   "birthday": "1993-12-01",
+   "height_cm": 160,
+   "bust": 85,
+   "waist": 58,
+   "hip": 85,
+   "cup": "F",
+   "birthplace": "神奈川県",
+   "bio": "铃木心春（日语：鈴木心春，1993年12月1日—），日本前AV女优，神奈川县出身。曾同时为“S1”及“kawaii*”双专属女优。所属于“CAPSULE AGENCY”事务所。引退之后改以“オタサーの姫”名义活动。\n\n兴趣是料理，特技是韵律体操，所以她的身体十分柔软。\n\n她除了很注重每日的肌肤护理以及除毛，也很在乎吃的食物，还有透过重量训练像是练腹肌跟深蹲等等来维持身材。此外，她也喜欢看AV，有时候还会去学习研究AV。\n\n她以前在拍摄之前都会预先除毛，但是从2014年开始她已经永久除毛了。\n\n2013年3月，AV出道。她与另外3人“铃木心夏”、“铃木秋心”、“铃木心冬”一起在“キャンディ”亮相，并发行贩售铃木心4姊妹的首部作品。\n\n2013年7月，移籍“D☆Collection”。并发行了13部以上的单体作品。\n\n2014年8月，移籍“MOODYZ”。2015年3月，发行了个人在MOODYZ的最后一部作品。\n\n2015年10月25日，个人在“kawaii*”的复出作品发表。并随着本人的Twitter上加注了“1年ぶりに复帰します。”到她的个人资料栏中。\n\n2016年3月，成为“E-BODY”的专属女优，因此同时是kawaii*及E-BODY双专属女优。\n\n2017年5月，她在E-BODY发表了最后一部作品，之后经纪公司宣布，因为身体不适的关系将会暂停发片一阵子。\n\n2017年11月，个人在kawaii*的新作品消息公开。12月，她成为“S1”的专属女优，正式回归AV界。\n\n2018年2月8日，她睽违已久再度更新自己的部落格。7月22日，以“オタサーの姫”名义成立新推特账号，在与粉丝的问答中证实自己的引退消息。\n\n2018年9月22日，删除个人推特账号。10月11日，将以“オタサーの姫”举办个人活动。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%88%B4%E6%9C%A8%E5%BF%83%E6%98%A5.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:22:27+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鈴村あいり",
+   "birthday": "1993-09-24",
+   "height_cm": 152,
+   "bust": 82,
+   "waist": 53,
+   "hip": 80,
+   "cup": "D",
+   "birthplace": "神奈川県",
+   "bio": "铃村爱里（日语：鈴村あいり，1993年9月24日—），日本的AV女优，神奈川县出身。现为“PRESTIGE”专属女优，所属于“New Actor Experience”事务所。\n\n出道前曾在“MGS动画”《素人AV体験撮影493【铃村あいり 19歳アルバイト】》中亮相。\n\n兴趣是制作糕点。会习惯性道歉。不擅长玩弹跳海盗（日语：黒ひげ危機一発）玩具。\n\n2013年2月，在日本AV片商“PRESTIGE”以专属女优身份AV出道，所属于“LOTUS GROUP（日语：ロータスグループ）”事务所。同年12月7日，她在Twitter上推文：“我想静静的做，因为这是一种感觉”，所以目前有关电视及雑志媒体的工作基本上都拒绝。\n\n2014年4月24日，个人演出的作品《绝対的美少女、お贷しします。 ACT.32》，获得《DMM成人奖》2014配送部门“最优秀作品奖”。\n\n其他个人成就及表现方面，在DMM.18的“每月AV女优排行榜”第20名、“1日圆动画（影片）排名”第1名、“录像带动画 每周最佳100作品”第1名、“录像带动画 每月最佳100作品”第1名、“月费DVD出租 每月最佳100AV女优”第2名、“录像带动画 每月最佳100AV女优”第1名，从排名就可以知道，她在日本有相当高的人气。\n\n截至2015年为止，个人主演的DVD销售数量累计达到50万张，DVD销售金额约5亿日元。2项纪录都是在PRESTIGE历代女优演出中的第一人。\n\n2017年12月27日，她在个人Twitter上宣布事务所移籍至“New Actor Experience”。\n\n2018年9月26日，在个人Twitter推文写到：“去年的这时候我就在想了，无论引退形式为何，能勇敢地和大家说再见就是件很棒的事了”，一度被外界认为是她即将引退的消息。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E9%88%B4%E6%9D%91%E3%81%82%E3%81%84%E3%82%8A.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:22:42+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "長浜みつり",
+   "birthday": "2002-06-01",
+   "height_cm": 161,
+   "bust": 90,
+   "waist": 58,
+   "hip": 90,
+   "cup": "G",
+   "birthplace": "神奈川県",
+   "bio": "長浜 みつり（ながはま みつり、2002年6月1日 - ）は、日本のAV女優。神奈川県出身。ティーパワーズ所属。\n\n趣味はショッピングと音楽鑑賞と泳ぐこと。休日はアニメやドラマを見ることが多い。特技は体が柔らかいこと。洋服は『SNIDEL（スナイデル）』、音楽はK-POP、アニメは少年ジャンプ系の作品などを好む。\n小学校6年間は水泳を、中学3年間はバレーボールをやっていた。水泳はクロールとバタフライが得意でかなり泳げる 。\n初めての彼氏はバスケットボール部の同級生。初体験は中学2年生だが、高校の時に付き合っていた2人目の彼氏で気持ちよさを知った。\nチャームポイントは笑顔。女友達の中ではツッコミを入れるタイプで、周りからは明るくて優しいと言ってもらえる。その一方で落ち込み易い一面も持ち合わせており、人から言われた一言や自分が人に言ってしまった一言が後々になって気になってしまい反省してしまうこともある。長浜は自身の性格について、他人には見せないが二面性のあるタイプであると自己分析している。\n自分のパーソナルスペースに急に踏み込まれるのが苦手なため、人との距離感の取り方が上手い人にすごく好感が持てるという。また、相手から追いかけられるよりも相手を追いかけたいタイプで、「あの人のこと知りたい」と自ら思えた時の方が心を開きやすいとも明かしている。\n他人と過ごす時間と一人で過ごす時間のバランスが取れていないとストレスを感じるタイプで、社会人として働いていた頃には、気付かぬうちに溜まっていたストレスでパンク状態になってしまったことが何度かあり、これ機にストレスでパンクしそうになった時は、仲の良い友人に話を聞いてもらって、全て吐き出すようにしている。\n好きな男性のタイプは、私を優先してくれる優しい性格で尊敬できる人。見た目や年齢はあまり気にせず、好きな人なら何歳でも大丈夫。また「なにとは言いませんが大きい人」とも答えている。好きになった人には自分からアタックする「自ら恋をしにいくタイプ」だが、自分の好みと異なる異性からの好意には鈍感で、友人から指摘されて気付くことも多い。また優しくされると「自分のことを一番に考えてくれる人かも」と感じてしまい、すぐに好きになってしまうところがあると明かしている。\n下着販売の経験から自分のおっぱいを客観的に見て『形は悪くない…… むしろイイと思う』と答えている。\nバイブのような膣内に挿れるタイプの玩具は異物感を感じるため苦手で、「ナカ（膣内）は人間用、外（クリ）は機械用」と語っている。\nAVライターのくろがね阿礼は「エッチなことにはアクティブ & ポジティブで、健康的な小麦色の肌が男心をソソる」、また同じくAVライターのさおりは「美人なのにSEXは貪欲で、男の人の性感帯を的確にとらえている」と論評している。\nライターの沢木毅彦は8年間の水泳のたまものか腰振り騎乗位は強い体幹と分析。デビュー直後はガチ姦作品をものにしていたが、撮影を重ねるごとに背徳と羞恥が交錯する難役、ヤリマンギャルなど芸域の広さを見せ、癖のない演技力を獲得したと評論した。\n犬を飼っており、犬種はマルプー（マルチーズとプードルのミックス）のオスで、名前はラテ。休日は家でアニメを観たり、ゲームをしたりして過ごしていることが多いが、ラテと暮らすようになってから、愛犬と散歩に行ったり、愛犬家の友人とドックランやカフェに行くようになった。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E9%95%B7%E6%B5%9C%E3%81%BF%E3%81%A4%E3%82%8A.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:22:52+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "阿部乃みく",
+   "birthday": "1993-10-18",
+   "height_cm": 155,
+   "bust": 80,
+   "waist": 60,
+   "hip": 83,
+   "cup": "C",
+   "birthplace": "大分県",
+   "bio": "阿部乃美久（日语：阿部乃 みく，1993年10月18日—），日本前AV女优。所属事务所是FUNSTAR PROMOTION。 出生于大分县。兴趣是去咖啡店和看BL类动画。擅长于Cosplay，尤其是扮男装。\n\n在2013年以一位双性恋的AV女优出道，其艺名是来自于安倍经济学。由于仅出道半年就演出了100多部的AV，因此也成为当时的热门话题。\n\n2014年7月，在SEGA发售的游戏，“人中之龙”的女优人气投票中获得第29名，因此也获得续作“人中之龙0 誓约的场所”的出场权利。\n\n在2020年6月1日宣布将于2021年1月自AV界引退，原因是在2019年的检查中发现子宫颈受伤。 同年12月与KM Produce签订一份专属合约并建立网站。巧合的是安倍晋三也在同年卸任首相。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E9%98%BF%E9%83%A8%E4%B9%83%E3%81%BF%E3%81%8F.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:23:11+00:00"
   },
   {
    "javdb_id": null,
@@ -2411,9 +3186,87 @@
   },
   {
    "javdb_id": null,
+   "name": "青坂あおい",
+   "birthday": "2005-05-01",
+   "height_cm": 163,
+   "bust": 80,
+   "waist": 62,
+   "hip": 97,
+   "cup": "C",
+   "birthplace": "群馬県",
+   "bio": "青坂 あおい（あおさか あおい、2005年5月1日 - ）は、日本のAV女優。マインズ所属。\n\n好きな飲み物は赤ワイン、ジャスハイ。リンゴ、サクランボなどバラ科のフルーツアレルギー。\nAV女優になった経緯に深い理由はなく、「生に刺激がほしくて、楽しいと思わないと生きている理由が分からなくなったんです」と答えている。小さいころからお尻が大きく、2人で座れる椅子に1人お尻がはみ出たりしていたが、デビュー以降は長所となっている。とはいえ用意してもらった衣裳が入らない、顔とお尻と一緒に見せるために腰をひねらなければならないなど苦労は多い。シーンとしても床を拭く、拾うシーンが多いなど前屈や前かがみになることが多いという。\n「月に1度訪れる、女の子の日が意外と気持ちいいことに気がついた」「痛いんですけど、子宮周辺を刺激されるのが気持ちいい」と配信番組で述べ、視聴者を騒然とさせたことがある。デビューまでの経験人数は秘密。初体験は16歳。\n好きな体位は正常位。特技はフェラチオ。口の中で大きく硬くなっていく感覚が興奮するとのこと。イベントなどでは特技として自らの指を使った疑似フェラチオを披露している。\n好きな女優は松本いちか。2026年時点では「雲の上の存在です」と回答している。\n事務所先輩でもあるみひなは、青坂の容姿を「昭和のアイドル顔で、すごくアイドル感がある」と例えて批評している。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%9D%92%E5%9D%82%E3%81%82%E3%81%8A%E3%81%84.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:23:22+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "青空ひかり",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Cmore/%E9%9D%92%E7%A9%BA%E3%81%B2%E3%81%8B%E3%82%8A.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "静河",
+   "birthday": "2002-10-16",
+   "height_cm": 158,
+   "bust": 85,
+   "waist": 56,
+   "hip": 83,
+   "cup": "D",
+   "birthplace": "日本・岡山県",
+   "bio": "月瀬りりあ（つきせ りりあ、2002年10月16日 - ）は、日本のAV女優。NAX所属。\n\n岡山県出身。かつては非公開ながら、デビュー時点では兵庫在住とされていた。デビュー理由はエッチへの興味はありつつも経験が少なく、コンプレックスだったため。\n目標は「みんなが知っている女優さんになること」、「“オナニーしたくなったときに、静河の作品”と候補に挙げられること」。\nアダルトメディア評論家の安田理央は年間100本近く出ても透明感があり、ミステリアスな雰囲気を評価。個人名で買われず、買った作品に出ているという在り様から「真のキカタン女優」と評した。なお2025年は11月時点で216本に出演。学生役を演じた次の日に未亡人を演じるなど役柄の切り替えが大変だが、常に複数の役柄を頭に入れた状態で演じているという。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%9D%99%E6%B2%B3.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:23:38+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鞠るり",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/166/704166.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:23:48+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "音無鈴",
+   "birthday": "2003-10-22",
+   "height_cm": 160,
+   "bust": 77,
+   "waist": 54,
+   "hip": 89,
+   "cup": "F",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E9%9F%B3%E7%84%A1%E9%88%B4.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:23:56+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "響蓮",
+   "birthday": "2002-12-04",
+   "height_cm": 160,
+   "bust": 85,
+   "waist": 50,
+   "hip": 88,
+   "cup": "F",
+   "bio": "響 蓮（ひびき れん、2002年〈平成14年〉12月4日 - ）は、日本のAV女優。Bstarを経てSTAR NEXT所属。\n\nAV出演の動機はプライベートで体験したハメ撮りでものすごく興奮したこと。\n\n休みの日は昼から激安居酒屋で1人飲みをするヘビードランカー。デビュー作のインタビューシーンは居酒屋で撮影され、メガハイボールを頼んでいる。kawaii*広報によると、デビュー作ラストチャプターでの3Pでの潮吹きシーンでは、水道管破裂したかのように吹いており、撮影段階でこれは売れると確信したという。\nアルコールはウイスキー類のみ苦手にしており、ハイボールなどは飲めない。ビールは永久に飲める。\nAVライターのくろがね阿礼は「絶頂するとき、ものすごくエビ反ることで有名」と特筆点を論じた。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%9F%BF%E8%93%AE.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:24:09+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "須崎美羽",
+   "birthday": "1997-06-19",
+   "height_cm": 149,
+   "bust": 75,
+   "waist": 60,
+   "hip": 80,
+   "cup": "C",
+   "birthplace": "千葉県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E9%A0%88%E5%B4%8E%E7%BE%8E%E7%BE%BD.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:24:19+00:00"
   },
   {
    "javdb_id": null,
@@ -2429,9 +3282,95 @@
   },
   {
    "javdb_id": null,
+   "name": "高杉麻里",
+   "birthday": "1998-01-30",
+   "height_cm": 166,
+   "bust": 88,
+   "waist": 59,
+   "hip": 89,
+   "cup": "E",
+   "birthplace": "千葉県",
+   "bio": "高杉麻里（日语：高杉麻里，1998年2月18日—），出身于千叶县的前AV女优。所属事务所是フォーティーフォーマネジメント。兴趣是唱卡拉OK和料理。\n\n2017年11月7日从MOODYZ出道。出道时是设定成带着眼镜的女大学生。\n\n2018年12月于FANZA发表的2018年通贩フロア・年度AV女优排行榜前100中获得第9名。同年12月25日获得にキカタン2.0アウォーズ的“美少女部门赏”。\n\n2019年4月，SETN三立新闻网报导指出高杉麻里已回归。\n\n2020年3月12日在个人的Twitter上宣布于2020年4月26日从AV女优引退。由于疫情的影响，造成引退活动无期限的延期。。\n\n与在多部作品中共同演出的枢木葵是亲密好友。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E9%AB%98%E6%9D%89%E9%BA%BB%E9%87%8C.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:24:39+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鳥羽いく",
+   "birthday": "2005-07-30",
+   "height_cm": 153,
+   "bust": 73,
+   "waist": 60,
+   "hip": 82,
+   "cup": "A",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%B3%A5%E7%BE%BD%E3%81%84%E3%81%8F.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:24:49+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鳳みゆ",
+   "birthday": "2000-12-05",
+   "height_cm": 154,
+   "bust": 85,
+   "waist": 57,
+   "hip": 90,
+   "cup": "E",
+   "birthplace": "群馬県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/v-Attackers/%E9%B3%B3%E3%81%BF%E3%82%86.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:24:59+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "鷲尾めい",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E7%AD%A7%E3%82%B8%E3%83%A5%E3%83%B3.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "麻倉憂",
+   "birthday": "1989-12-24",
+   "height_cm": 160,
+   "bust": 85,
+   "waist": 56,
+   "hip": 85,
+   "cup": "C",
+   "birthplace": "静岡県",
+   "bio": "麻仓忧（日语：麻倉 憂／あさくら ゆう，罗马化：Asakura Yū，1989年12月24日—），出身于日本静冈县，日本AV女优，所属GLANZPRO（旧サンプロ）事务所。出道前曾是当红传播妹。\n\n2009年以单体女优的方式出道，游走于各家片商拍片。\n2010年麻仓忧被K.M.Produce网罗，和旗下的另外两名女优藤井雪莉和神咲诗织组成新一代的女优团体Million Girls。\n2011年获得成人广播奖女优奖。\n2013年3月8日，推出引退作品，“8时间10本番! 引退麻仓忧”。2013年7月27日，推出无码作品。并在同年11月正式复出。12月被发现有新作品释出。\n2014年3月，从KMP毕业。同年6月，转籍至Wanz Factory，并成为该片商的专属女优。\n2016年8月，麻仓忧宣布引退，退出AV界。\n2017年7月，再次回归AV界。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Nanairo/%E9%BA%BB%E5%80%89%E6%86%82.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:25:13+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "麻里梨夏",
+   "birthday": "1993-06-09",
+   "height_cm": 148,
+   "bust": 80,
+   "waist": 56,
+   "hip": 82,
+   "cup": "D",
+   "birthplace": "千葉県",
+   "bio": "麻里梨夏（日语：麻里梨夏，1993年6月9日—），日本前AV女优。所属事务所是C-more Entertainment。\n\n出身于千叶县。2014年3月以制造商S1的专属女优身份出道，扮演的角色是萝莉系AV女优。所属事务所有ロータスグループ、ファンスタープロモーション、CLAPと経て、C-more Entertainment。\n\n喜欢玩RPG类游戏和读书，也擅长于烹饪。\n\n刚出道的艺名是 成海丽（成海うるみ，なるみ うるみ）。2015年4月1日改为 広瀬りりあ（ひろせ りりあ），同年6月9日再改为 渚うるみ（なぎさ うるみ），2016年1月改为 麻里梨夏 。\n\n2019年9月3日在个人Twitter上宣布，将在2019年10月的AV拍摄结束后引退。\n\n虽然在2020年1月31日停止AV相关活动，但仍属于C-more Entertainment。\n\n在2020年12月25日宣布将于2021年重启AV相关活动。同时本中的官方Twitter上宣布她将作为专属女优。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E9%BA%BB%E9%87%8C%E6%A2%A8%E5%A4%8F.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:25:28+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "黒咲華",
+   "birthday": "2001-12-24",
+   "height_cm": 160,
+   "bust": 91,
+   "waist": 59,
+   "hip": 95,
+   "cup": "G",
+   "birthplace": "静岡県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E9%BB%92%E5%92%B2%E8%8F%AF.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:25:34+00:00"
   },
   {
    "javdb_id": null,
@@ -2444,6 +3383,20 @@
    "name": "黒川すみれ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E9%BB%92%E5%B7%9D%E3%81%99%E3%81%BF%E3%82%8C.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "黒川一花",
+   "birthday": "2001-02-27",
+   "height_cm": 153,
+   "bust": 83,
+   "waist": 58,
+   "hip": 81,
+   "cup": "C",
+   "birthplace": "神奈川県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Capsule/%E9%BB%92%E5%B7%9D%E4%B8%80%E8%8A%B1.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-17T19:25:37+00:00"
   }
  ]
 }

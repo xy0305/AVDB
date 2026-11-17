@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-n",
- "generated_at": "2026-11-16T20:13:59+00:00",
+ "generated_at": "2026-11-17T20:18:07+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -30,6 +30,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00497/ipx00497jp-12.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/TgIOMRgF7EGDKaEbLT8K37R9_d9Nu6xDCj6JW_A1k4dglpPxwL-md5c1g-F6p/ipx00497_mhb_w.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/N7nvG.jpg",
    "release_date": "2020-07-11",
    "enriched_at": "2026-11-16T19:11:42+00:00"
   },
@@ -59,6 +60,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00416/ipx00416jp-12.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/Omo5Nj4PC-pCmkA19JL2HYVVAiL1gVDY5aqG_cSWeaucP5UxAFK4dZI1XDSU4/ipx00416_mhb_w.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/NP2Ag.jpg",
    "release_date": "2019-12-07",
    "enriched_at": "2026-11-16T19:11:42+00:00"
   },
@@ -366,8 +368,38 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/huntc00571/huntc00571jp-15.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/LzIlHQE2VulhRR0nKUiEggc3vusbIyR2xv_8299-oBvBfTJ_7ZYl1AAslQnR9zX_/huntc00571hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/NQXxe3.jpg",
    "release_date": "2026-11-05",
    "enriched_at": "2026-11-16T19:11:42+00:00"
+  },
+  {
+   "javdb_id": "NQkPaw",
+   "code": "IPZZ932",
+   "plot": "『僕はいつも先輩のカレンさんに怒られている…』カレン「もう終電なくなるからウチきなさい。」仕事が終わらず普段厳しい社長秘書の家へお泊まり…合間に宅飲みで酒も回り勢いで襲ってしまったら僕のチ●ポで感じまくる普段とのギャップが可愛過ぎて翌日も朝勃ち止まらずヤリまくってしまった奇跡の一夜。仕事は厳しい女。エッチはめちゃ女の子w仕事はめちゃ厳しいのに、Hは激甘で優しく受け入れてくれる！",
+   "plot_source": "dmm",
+   "director": "HAKUSHU",
+   "maker": "アイデアポケット",
+   "duration_min": 131,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00932/ipzz00932jp-12.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/LiolQxElWml6BAX1cmsskkQdfUcL5FLq_cDrKXlBH7r18JyE3C0G5kzJKJ7W8x/ipzz00932hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/NQkPaw.jpg",
+   "release_date": "2026-08-06",
+   "enriched_at": "2026-11-17T19:11:09+00:00"
   },
   {
    "javdb_id": "NQm9Wr",
@@ -398,6 +430,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/hublk00080/hublk00080jp-15.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/Fg19GDFXoJ4mb3TM2eooUrPSH6eKTFIpo387Afp4LB7AKlLgvnKGAU6ZaQWhUMqf/hublk00080hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/NQm9Wr.jpg",
    "release_date": "2026-10-22",
    "enriched_at": "2026-11-16T19:11:42+00:00"
   },
@@ -618,6 +651,35 @@
     }
    ],
    "enriched_at": "2026-11-15T19:07:16+00:00"
+  },
+  {
+   "javdb_id": "Npm5x",
+   "code": "IPX620",
+   "plot": "絶対的美女「相沢みなみ」とパンスト騎乗位の最強コラボ！！私、上から男の人が気持ち良さそうにしている姿眺めるのスキなの！！1、痴女教師の居残り騎乗位セックス2、立場逆転ダメ上司杭打ち騎乗位3、図書室で逆痴●パンスト美脚コキ4、パンスト専門デリヘル跨りFUCKそしてお得な【特典映像】が二つ！！ 1パンストフェチアングル 2ASMRパンストの音色！パンスト×痴女淫語×騎乗位が融合した超絶間違いなし作品！",
+   "plot_source": "dmm",
+   "director": "イナバール",
+   "maker": "アイデアポケット",
+   "duration_min": 182,
+   "score": 4.27,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipx00620/ipx00620jp-12.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/OA15MhhRAJ0GK5nAS8RqTKyUXRAvpnHR4uQIkc9fdAc3UgQQquJszlYTDQNiC/ipx00620_mhb_w.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/Npm5x.jpg",
+   "release_date": "2021-02-12",
+   "enriched_at": "2026-11-17T19:11:09+00:00"
   },
   {
    "javdb_id": "NwvKmN",
@@ -1281,6 +1343,34 @@
     }
    ],
    "enriched_at": "2026-11-15T19:06:22+00:00"
+  },
+  {
+   "javdb_id": "nKxndm",
+   "code": "IPZZ991",
+   "plot": "一時中断・リセットなし。感度覚醒！？マンコも脳細胞もぶっ飛ぶ！！前回撮影からオナニー・SEX禁止令。初の禁欲期間を経て、極限まで溜め込まれた感度。軽い接触だけで反応してしまうその状態から本番強行へ。スタジオ内を連れ回し入れ替わり立ち替わりノンストップ性交！媚薬投入で確変！？イキ尽きても回復の隙を与えず追撃攻め！！ 「イキ尽きて灰になるまで」…その過程を途切れなく公開！！\n本作はノーカット進行で撮影！",
+   "plot_source": "dmm",
+   "director": "前田文豪",
+   "maker": "アイデアポケット",
+   "duration_min": 151,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00991/ipzz00991jp-12.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/HgkcGQYsgNUlUHrs5KSpBUQbPWwayypjlztHZWxnPt57JDtolM-_1ausjMxo2C/ipzz00991hhb.mp4",
+   "release_date": "2026-10-29",
+   "enriched_at": "2026-11-17T19:11:10+00:00"
   },
   {
    "javdb_id": "nKxnrM",

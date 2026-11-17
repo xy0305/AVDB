@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-5",
- "generated_at": "2026-11-16T20:13:59+00:00",
+ "generated_at": "2026-11-17T20:18:07+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -199,6 +199,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/gvh00894/gvh00894jp-20.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/SBQqPiYA1ScKudrQx1JzWpvPPf988_DTqEPBFv0Hp_l_1oCH1QpDHZ8M8iNFb/gvh00894hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/5nDxM7.jpg",
    "release_date": "2026-11-06",
    "enriched_at": "2026-11-16T19:11:42+00:00"
   },
@@ -226,6 +227,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/gma00106/gma00106jp-12.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/KDZ8QTc3Qq54dSuwvEaczBMvloOiiklQCNsefSWiAj-hxAEfx3qHFZ44IaYVC/gma001064ks.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/5nDxvY.jpg",
    "release_date": "2026-11-06",
    "enriched_at": "2026-11-16T19:11:42+00:00"
   },
