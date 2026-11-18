@@ -18,17 +18,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '351' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 351;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '352' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 352;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 351' in wf and 'feat/rankings-auth-350' in wf
+assert 'Home HQ posters App 352' in wf and 'feat/rankings-auth-350' in wf
 assert 'feat/feed-prefill-349' in wf and 'feat/actor-grid-scroll-348' in wf
 assert wf.count('python3 scripts/test-rankings-auth350.py') == 5  # dedicated job + shared lists + release regressions
 assert wf.count('python3 scripts/test-feed-prefill349.py') == 5  # the 349 gate keeps its 5 run lines
-assert 'scripts/package-lut351.py' in wf and 'AVDB-351-release' in wf and 'AVDB-349-release' not in wf
-pkg = (r/'scripts/package-lut351.py').read_text()
-assert "=='351'" in pkg and 'AVDB-unsigned-1.0.2-351-enrichment.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut352.py' in wf and 'AVDB-352-release' in wf and 'AVDB-349-release' not in wf
+pkg = (r/'scripts/package-lut352.py').read_text()
+assert "=='352'" in pkg and 'AVDB-unsigned-1.0.2-352-endpoints.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  rankings-auth-350:' in wf and '  feed-prefill-349:' in wf
 
 doc = (r/'Build350-RankingsAuth.md').read_text()
