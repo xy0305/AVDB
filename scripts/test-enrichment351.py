@@ -109,12 +109,12 @@ wf = (r/'.github/workflows/home-hq298.yml').read_text()
 assert wf.count('python3 scripts/test-enrichment351.py') == 5
 assert wf.count('python3 scripts/test-rankings-auth350.py') == 5
 assert '  enrichment-351:' in wf
-assert 'scripts/package-lut351.py' in wf and 'AVDB-351-release' in wf and 'AVDB-350-release' not in wf
-pkg = (r/'scripts/package-lut351.py').read_text()
-assert "=='351'" in pkg and 'AVDB-unsigned-1.0.2-351-enrichment.ipa' in pkg
+assert 'scripts/package-lut352.py' in wf and 'AVDB-352-release' in wf and 'AVDB-350-release' not in wf
+pkg = (r/'scripts/package-lut352.py').read_text()
+assert "=='352'" in pkg and 'AVDB-unsigned-1.0.2-352-endpoints.ipa' in pkg
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
-assert plist['CFBundleVersion'] == '351'
-assert pbx.count('CURRENT_PROJECT_VERSION = 351;') == 2
+assert plist['CFBundleVersion'] == '352'
+assert pbx.count('CURRENT_PROJECT_VERSION = 352;') == 2
 doc = (r/'Build351-Enrichment.md').read_text()
 assert 'Muse' in doc and 'Kai' in doc and '351' in doc and 'unsigned' in doc
 print('PASS test-enrichment351: enrichment feed client + fill-empty movie/actor '
