@@ -12,8 +12,8 @@ rank = read('AVDB/Views/Rankings/RankingsView.swift')
 assert 'MissAVRankingView()' in rank and 'JavRankingView(rankingsOnly: true)' in rank
 assert 'RankingTab.allCases' in rank and 'initialTab: RankingTab = .top250' in rank
 assert 'WKWebView' not in core + source + view and 'Widget.' not in core + source + view
-assert 'JavDBSDK' not in view and 'VerificationThrottle' not in view  # Build 353: board matching is avfan-only
-assert 'AvfanBoardGrid' in view and 'AvfanMatchStore' in view and 'MovieDetailView' not in view
+assert 'JavDBSDK.shared.exactMovie(code: code' in view
+assert 'MovieDetailView(movieID: movie.id)' in view and 'SearchMovieResultView(keyword: code)' in view
 assert 'Pan115Client' not in view and 'addOfflineTask' not in source
 assert 'videos.append(contentsOf: fresh)' in view and '.sorted(' not in view
 assert 'revision == token' in view and 'epoch == source.generation' in view

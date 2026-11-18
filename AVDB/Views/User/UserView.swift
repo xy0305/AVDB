@@ -11,12 +11,6 @@ struct UserView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var pan115 = Pan115Settings.shared
     @State private var showLogin = false
-    // Build 353: avfan account (external boards' matching/detail login).
-    @ObservedObject private var avfanSession = AvfanSession.shared
-    @State private var showAvfanLogin = false
-    // Build 352: unread dot for the JavDB notifications entry (fail-soft:
-    // userAdditional() failing simply leaves the dot hidden).
-    @State private var hasUnreadNotifications = false
 
     var body: some View {
         NavigationStack {
@@ -134,19 +128,6 @@ struct UserView: View {
                             Label("抽签历史", systemImage: "sparkles")
                         }
                         NavigationLink {
-                            NotificationsView()
-                        } label: {
-                            HStack {
-                                Label("通知", systemImage: "bell.badge")
-                                if hasUnreadNotifications {
-                                    Spacer()
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 8, height: 8)
-                                }
-                            }
-                        }
-                        NavigationLink {
                             FollowingTagsView()
                         } label: {
                             Label("我的關注", systemImage: "eye")
@@ -169,14 +150,6 @@ struct UserView: View {
                         }
                         NavigationLink("我的钱包") {
                             WalletView()
-                        }
-                    }
-
-                    Section("账号") {
-                        NavigationLink {
-                            AccountSettingsView()
-                        } label: {
-                            Label("账号设置", systemImage: "person.crop.circle")
                         }
                     }
 
@@ -299,29 +272,6 @@ struct UserView: View {
                     }
                 }
 
-                Section("avfan 账号") {
-                    Button {
-                        showAvfanLogin = true
-                    } label: {
-                        HStack {
-                            Label("avfan 登录", systemImage: "person.crop.circle")
-                            Spacer()
-                            Text(avfanSession.isSignedIn ? (avfanSession.displayName ?? "已登录") : "未登录")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityIdentifier("avfan-account-entry")
-                    if avfanSession.isSignedIn {
-                        Button("退出 avfan 登录", role: .destructive) {
-                            Task { await avfanSession.signOut() }
-                        }
-                    }
-                    Text("登录只让外接榜单的 AVFan 匹配与详情抓取带上登录态（磁链等更完整），不抓取账号页、不采集账号数据。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
                 Section("AI 翻译") {
                     NavigationLink {
                         XAISettingsView()
@@ -353,149 +303,6 @@ struct UserView: View {
             .sheet(isPresented: $showLogin) {
                 LoginView()
             }
-            .sheet(isPresented: $showAvfanLogin) {
-                AvfanLoginView()
-            }
-            .task {
-                // Build 352: notification unread dot (best-effort only).
-                if appState.currentUser != nil {
-                    hasUnreadNotifications =
-                        (try? await JavDBSDK.shared.userAdditional())?.hasUnreadNotifications ?? false
-                }
-            }
-        }
-    }
-}
-
-/// Build 352: JavDB 站内通知（GET /api/v2/users/notifications）。
-/// 打开即调 read_notifications 标已读（失败忽略，不影响列表展示）。
-struct NotificationsView: View {
-    @State private var items: [JDBNotification] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        Group {
-            if isLoading && items.isEmpty {
-                ProgressView()
-            } else if items.isEmpty {
-                GlassEmptyView(
-                    icon: "bell.slash",
-                    title: "暫無通知",
-                    subtitle: errorMessage ?? "有新通知时会在这里显示"
-                )
-            } else {
-                List {
-                    ForEach(items) { item in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                if item.read == false {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 7, height: 7)
-                                }
-                                Text(item.title ?? "通知")
-                                    .font(.subheadline.weight(.medium))
-                            }
-                            if let content = item.content, !content.isEmpty {
-                                Text(content)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let createdAt = item.createdAt, !createdAt.isEmpty {
-                                Text(createdAt)
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-            }
-        }
-        .navigationTitle("通知")
-        .liquidGlassList()
-        .task { await load() }
-        .refreshable { await load() }
-    }
-
-    private func load() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        do {
-            items = try await JavDBSDK.shared.notifications()
-            _ = try? await JavDBSDK.shared.markNotificationsRead()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-}
-
-/// Build 352: 账号设置 — 改用户名 / 改密码。错误原样显示 API message。
-struct AccountSettingsView: View {
-    @State private var newUsername = ""
-    @State private var currentPassword = ""
-    @State private var newPassword = ""
-    @State private var message: String?
-    @State private var isError = false
-    @State private var isSaving = false
-
-    var body: some View {
-        Form {
-            Section("修改用户名") {
-                TextField("新用户名", text: $newUsername)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                Button("保存用户名") {
-                    Task { await saveUsername() }
-                }
-                .disabled(isSaving || newUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            Section("修改密码") {
-                SecureField("当前密码", text: $currentPassword)
-                SecureField("新密码", text: $newPassword)
-                Button("修改密码") {
-                    Task { await savePassword() }
-                }
-                .disabled(isSaving || currentPassword.isEmpty || newPassword.isEmpty)
-            }
-            if let message {
-                Section {
-                    Text(message)
-                        .foregroundStyle(isError ? .red : .green)
-                }
-            }
-        }
-        .navigationTitle("账号设置")
-        .liquidGlassList()
-    }
-
-    private func saveUsername() async {
-        isSaving = true
-        defer { isSaving = false }
-        do {
-            _ = try await JavDBSDK.shared.changeUsername(newUsername.trimmingCharacters(in: .whitespacesAndNewlines))
-            message = "用户名已更新"
-            isError = false
-        } catch {
-            message = error.localizedDescription
-            isError = true
-        }
-    }
-
-    private func savePassword() async {
-        isSaving = true
-        defer { isSaving = false }
-        do {
-            _ = try await JavDBSDK.shared.changePassword(current: currentPassword, new: newPassword)
-            currentPassword = ""
-            newPassword = ""
-            message = "密码已修改"
-            isError = false
-        } catch {
-            message = error.localizedDescription
-            isError = true
         }
     }
 }
@@ -633,13 +440,9 @@ struct CollectedView: View {
     }
 
     private func deleteSelected() async {
-        // Build 352: prefer the batch endpoint; if it fails (unverified
-        // endpoint), fall back to the previous per-actor uncollect flow.
-        let ids = Array(selectedActors)
-        if (try? await JavDBSDK.shared.batchUncollectActors(ids: ids)) != true {
-            for actorID in ids {
-                _ = try? await JavDBSDK.shared.collectActor(actorID, collect: false)
-            }
+        // TODO: 调用批量取消收藏接口
+        for actorID in selectedActors {
+            _ = try? await JavDBSDK.shared.collectActor(actorID, collect: false)
         }
         selectedActors.removeAll()
         isEditing = false

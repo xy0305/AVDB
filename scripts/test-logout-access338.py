@@ -14,16 +14,16 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '354' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 354;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '351' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 351;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 354' in wf and 'feat/logout-access-338' in wf
+assert 'Home HQ posters App 351' in wf and 'feat/logout-access-338' in wf
 assert 'feat/recommender-throttle-337' in wf and 'feat/remove-javverse-336' in wf
 assert wf.count('python3 scripts/test-logout-access338.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
-assert 'scripts/package-lut354.py' in wf and 'AVDB-354-release' in wf and 'AVDB-337-release' not in wf
-pkg = (r/'scripts/package-lut354.py').read_text()
-assert "=='354'" in pkg and 'AVDB-unsigned-1.0.2-354-avfanhdcovers.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut351.py' in wf and 'AVDB-351-release' in wf and 'AVDB-337-release' not in wf
+pkg = (r/'scripts/package-lut351.py').read_text()
+assert "=='351'" in pkg and 'AVDB-unsigned-1.0.2-351-enrichment.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  logout-access-338:' in wf and '  recommender-throttle-337:' in wf
 
 doc = (r/'Build338-LogoutAccess.md').read_text()

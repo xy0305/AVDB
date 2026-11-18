@@ -10,79 +10,22 @@ import SwiftUI
 struct FollowingTagsView: View {
     @StateObject private var store = FollowingTagsStore.shared
     @State private var editMode: EditMode = .inactive
-    // Build 352: official tag presets (fail-soft — empty/failure hides the section).
-    @State private var presets: [FollowingTag] = []
-
-    /// Presets the user has not followed yet (matched by name+value).
-    private var visiblePresets: [FollowingTag] {
-        presets.filter { preset in
-            !store.tags.contains { $0.name == preset.name && $0.value == preset.value }
-        }
-    }
-
-    @ViewBuilder
-    private var presetsSection: some View {
-        if !visiblePresets.isEmpty {
-            Section("官方預設") {
-                ForEach(visiblePresets) { preset in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(preset.displayName)
-                                .font(.body)
-                            if let typeText = preset.typeText {
-                                Text(typeText)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                        Button("關注") {
-                            Task { await followPreset(preset) }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-        }
-    }
-
-    private func followPreset(_ preset: FollowingTag) async {
-        guard let name = preset.name, let value = preset.value,
-              !name.isEmpty, !value.isEmpty else { return }
-        if (try? await JavDBSDK.shared.followTag(name: name, value: value)) != nil {
-            presets.removeAll { $0.id == preset.id }
-            await store.refreshFromServer()
-        }
-    }
 
     var body: some View {
         Group {
             if store.tags.isEmpty && store.isLoading {
                 ProgressView()
             } else if store.tags.isEmpty {
-                if visiblePresets.isEmpty {
-                    GlassEmptyView(
-                        icon: "eye.slash",
-                        title: "暫無關注",
-                        subtitle: "在演員 / 類別 / 清單頁可以加入關注"
-                    )
-                    if let err = store.errorMessage {
-                        Text(err).font(.caption).foregroundColor(.red)
-                    }
-                } else {
-                    List {
-                        Section {
-                            Text("暫無關注，在演員 / 類別 / 清單頁可以加入關注")
-                                .foregroundStyle(.secondary)
-                        }
-                        presetsSection
-                    }
+                GlassEmptyView(
+                    icon: "eye.slash",
+                    title: "暫無關注",
+                    subtitle: "在演員 / 類別 / 清單頁可以加入關注"
+                )
+                if let err = store.errorMessage {
+                    Text(err).font(.caption).foregroundColor(.red)
                 }
             } else {
                 List {
-                    presetsSection
                     ForEach(Array(store.tags.enumerated()), id: \.element.id) { idx, tag in
                         NavigationLink {
                             FollowingTagDestination(tag: tag)
@@ -130,7 +73,6 @@ struct FollowingTagsView: View {
         .environment(\.editMode, $editMode)
         .task {
             await store.refreshFromServer()
-            presets = (try? await JavDBSDK.shared.followingTagPresets()) ?? []
         }
         .refreshable {
             await store.refreshFromServer()

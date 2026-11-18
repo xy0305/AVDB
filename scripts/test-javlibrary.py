@@ -12,7 +12,7 @@ assert '/api/v1/javlibrary/rankings' in client
 assert 'JAVLibraryRankingView()' in read('AVDB/Views/Rankings/RankingsView.swift')
 assert 'enrichMissAV: false' in view and 'snapshot.items.prefix(visibleCount)' in view
 assert 'ranks: Dictionary(uniqueKeysWithValues:' in view
-assert 'AvfanRouteView' in read('AVDB/Views/AvfanBoards.swift')  # Build 353: shared grid routes to the avfan detail
+assert 'MovieDetailView(movieID: movie.id)' in read('AVDB/Views/MissAVRankingView.swift')
 assert 'WKWebView' not in source + view and 'Pan115Client' not in source + view
 assert 'local_tid' not in source.replace('// poster/avatar/local_tid deliberately never become an AVDB identity/cover.', '')
 for name in ['JAVLibrarySource.swift','JAVLibraryRankingView.swift']:

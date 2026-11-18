@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Build 349 ranking feed pre-fill (board wiring superseded by
-Build 353: the five boards no longer read the feed — they match
-avfan through AvfanMatchStore with zero JavDB requests; the feed
-client itself remains in the app for other consumers, so section 1
-and the untouched-neighbour contracts still hold, while sections
-2-4 now assert the 353 retirement on the boards). Original 349
-contracts: the five ranking
+"""Build 349 ranking feed pre-fill. Contracts: the five ranking
 boards (JAV Ranking explore, DMM daily/weekly/monthly/actress,
 MissAV today/weekly/monthly-hot, JAVLibrary mostwanted/bestrated/
 actors, ZhongZhiTong per-month) read the server pre-matching feed
@@ -36,18 +30,18 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '354' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 354;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '351' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 351;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 assert 'RankingFeedClient.swift in Sources' in pbx and pbx.count('RankingFeedClient.swift') >= 4
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 354' in wf and 'feat/feed-prefill-349' in wf
+assert 'Home HQ posters App 351' in wf and 'feat/feed-prefill-349' in wf
 assert 'feat/actor-grid-scroll-348' in wf and 'feat/actor-ranking-period-347' in wf
 assert wf.count('python3 scripts/test-feed-prefill349.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-actor-grid-scroll348.py') == 5  # the 348 gate keeps its 5 run lines
-assert 'scripts/package-lut354.py' in wf and 'AVDB-354-release' in wf and 'AVDB-348-release' not in wf
-pkg = (r/'scripts/package-lut354.py').read_text()
-assert "=='354'" in pkg and 'AVDB-unsigned-1.0.2-354-avfanhdcovers.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut351.py' in wf and 'AVDB-351-release' in wf and 'AVDB-348-release' not in wf
+pkg = (r/'scripts/package-lut351.py').read_text()
+assert "=='351'" in pkg and 'AVDB-unsigned-1.0.2-351-enrichment.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  feed-prefill-349:' in wf and '  actor-grid-scroll-348:' in wf
 
 doc = (r/'Build349-FeedPrefill.md').read_text()
@@ -79,36 +73,51 @@ assert 'static let staleInterval: TimeInterval = 48 * 3600' in client
 assert 'struct RankingFeedNote: View' in client and '数据更新于' in client and '可能过期' in client
 assert 'func makeMovie() -> Movie?' in client and 'func makeActor() -> Actor?' in client
 
-# --- 2. JAV Ranking: Build 353 retired the feed + JavDB matcher here ---
+# --- 2. JAV Ranking: feed pre-fills matches; fresh verdicts end lookups ---
 jr = (r/'AVDB/Services/JavRankingSource.swift').read_text()
-assert 'func applyFeed' not in jr and 'matchedMovie' not in jr and 'cachedMovie' not in jr
-assert 'JavDBSDK' not in jr and 'VerificationThrottle' not in jr  # source layer is list-only now
+assert 'func applyFeed(_ feed: RankingFeed)' in jr
+assert 'matches[key] = Match(movie: movie, date: Date())' in jr
+matched = func_body(jr, 'func matchedMovie(code: String')
+assert 'feedMarksFresh, let mark = feedMarks[key]' in matched
+assert 'case .ambiguous: throw JRError.message("同一番号对应多个有效影片 ID，请在原生搜索中核对。")' in matched  # fail-closed
+assert 'case .miss: if !refresh { return nil }' in matched  # manual refresh still falls through
+assert matched.index('feedMarksFresh') < matched.index('VerificationThrottle.acquire')  # feed checked before any throttled request
 view_jr = (r/'AVDB/Views/JavRankingView.swift').read_text()
-assert 'RankingFeed' not in view_jr and 'JavDBSDK' not in view_jr and 'VerificationThrottle' not in view_jr
-assert 'AvfanMatchStore' in view_jr and 'AvfanRouteView' in view_jr and 'AvfanMovieDetailView' in view_jr
+assert 'RankingFeedState.shared.ensure(board: "javranking", term: "explore")' in view_jr
+assert 'source.applyFeed(feed)' in view_jr and 'RankingFeedNote(board: "javranking", term: "explore")' in view_jr
 
-# --- 3. DMM: JavVerseMapper/DMMActressMapper retired from the board ---
+# --- 3. DMM via JavVerseMapper + the actress mapper ---
 mapper = (r/'AVDB/Services/JavVerseSource.swift').read_text()
-assert 'func applyFeed(_ feed: RankingFeed, for entries: [JavVerseEntry])' in mapper  # type kept; the DMM board no longer uses it
+assert 'func applyFeed(_ feed: RankingFeed, for entries: [JavVerseEntry])' in mapper
+assert 'movies[entry.id] = movie' in mapper and 'actors[entry.id] = actor' in mapper
+assert 'case "ambiguous": messages[entry.id] = "服务器预匹配：同一番号对应多个有效影片 ID，未匹配"' in mapper
+assert 'found.match.pending != true' in mapper  # pending entries are left to the fallback
 view_dmm = (r/'AVDB/Views/Rankings/DMMRankingView.swift').read_text()
-assert 'JavVerseMapper' not in view_dmm and 'DMMActressMapper' not in view_dmm
-assert 'RankingFeed' not in view_dmm and 'JavDBSDK' not in view_dmm and 'VerificationThrottle' not in view_dmm
-assert 'AvfanMatchStore' in view_dmm and 'AvfanRouteView' in view_dmm and 'AvfanActorRouteView' in view_dmm
-assert 'store.evidence[row.cid]' in view_dmm  # maker code still comes from DMMRankingStore evidence, never from the CID
+assert 'RankingFeedState.shared.ensure(board: "dmm", term: term)' in view_dmm
+assert 'mapper.applyFeed(feed, for: items)' in view_dmm and 'mapper.resolve(items, retry: false)' in view_dmm
+assert 'func applyFeed(_ feed: RankingFeed, rows: [DMMActressRow])' in view_dmm
+assert 'RankingFeedState.shared.ensure(board: "dmm", term: "actress")' in view_dmm
+assert 'RankingFeedNote(board: "dmm", term: store.kind.rawValue)' in view_dmm
 
-# --- 4. MissAV / JAVLibrary / ZhongZhiTong: metadata queue retired from the boards ---
+# --- 4. MissAV / JAVLibrary / ZhongZhiTong via the shared metadata queue ---
 meta = (r/'AVDB/Services/MissAVMetadata.swift').read_text()
-assert 'func applyFeed(_ feed: RankingFeed)' in meta  # the type remains in the app; boards no longer instantiate it
+apply_body = func_body(meta, 'func applyFeed(_ feed: RankingFeed)')
+assert 'entry.match.pending != true' in apply_body and 'VerificationThrottle' not in apply_body  # seeding is network-free
+assert '"movie:" + (JRPolicy.exactCode(code) ?? code)' in meta and '"actor:" + url' in meta
+assert 'guard results[key] == nil' in meta  # never overwrite a device result
+assert 'VerificationThrottle.acquire' in meta  # the uncovered-entry fallback queue is unchanged
 view_missav = (r/'AVDB/Views/MissAVRankingView.swift').read_text()
-assert 'RankingFeed' not in view_missav and 'MissAVMetadata' not in view_missav
-assert 'JavDBSDK' not in view_missav and 'VerificationThrottle' not in view_missav
-assert 'AvfanBoardGrid' in view_missav and 'missAVMatchCode' in view_missav  # MissAV suffixes stripped before matching
+assert 'RankingFeedState.shared.ensure(board: "missav", term: state.period)' in view_missav
+assert 'metadata.applyFeed(feed)' in view_missav and 'RankingFeedNote(board: "missav", term: state.period)' in view_missav
 view_jl = (r/'AVDB/Views/JAVLibraryRankingView.swift').read_text()
-assert 'RankingFeed' not in view_jl and 'MissAVMetadata' not in view_jl and 'AvfanBoardGrid' in view_jl
+assert 'RankingFeedState.shared.ensure(board: "javlibrary", term: selected.rawValue)' in view_jl
+assert 'metadata.applyFeed(feed)' in view_jl and 'RankingFeedNote(board: "javlibrary", term: kind.rawValue)' in view_jl
 view_zzt = (r/'AVDB/Views/Rankings/ZhongZhiTongRankingView.swift').read_text()
-assert 'RankingFeed' not in view_zzt and 'MissAVMetadata' not in view_zzt and 'AvfanBoardGrid' in view_zzt
+assert 'RankingFeedState.shared.ensure(board: "zhongzhitong", term: month)' in view_zzt
+assert 'RankingFeedState.shared.ensure(board: "zhongzhitong", term: selectedMonth)' in view_zzt
+assert 'RankingFeedNote(board: "zhongzhitong", term: month.month)' in view_zzt
 zzt = (r/'AVDB/Services/ZhongZhiTongCatalog.swift').read_text()
-assert 'raw.githubusercontent.com/xy0305/AVDB/main/AVDB/Resources/ZhongZhiTongMonthly.json' in zzt  # bundled catalog still provides the code list itself
+assert 'raw.githubusercontent.com/xy0305/AVDB/main/AVDB/Resources/ZhongZhiTongMonthly.json' in zzt  # feed branch carries no same-name catalog file (checked 2026-11-13); constant kept, feed matching takes priority
 
 # --- 5. Untouched neighbours ---
 throttle = (r/'AVDB/Services/VerificationThrottle.swift').read_text()
@@ -116,6 +125,7 @@ assert 'RankingFeed' not in throttle
 follow = (r/'AVDB/Services/FollowUpdates.swift').read_text()
 assert 'RankingFeed' not in follow
 
-print('PASS test-feed-prefill349: feed client intact for other '
-      'consumers; the five boards retired it in Build 353 and match '
-      'avfan with zero JavDB requests, release 354')
+print('PASS test-feed-prefill349: boards read the server '
+      'pre-matching feed first and pre-fill their result tables; '
+      'uncovered, unfetchable and stale cases keep the throttled '
+      'on-device fallback, ambiguous stays fail-closed, release 351')

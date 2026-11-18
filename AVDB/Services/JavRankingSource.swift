@@ -90,15 +90,113 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private let protocolClasses: [AnyClass]?
     private var pages: [String: JRPage] = [:]
     private var indexes: [String: JRIndex] = [:]
-    // Build 353: the JavDB match table that used to live here is
-    // gone. Board entries now match avfan through AvfanMatchStore;
-    // this type only fetches and caches the source site's own pages.
+    private struct Match { let movie: Movie?; let date: Date }
+    private var matches: [String: Match] = [:]
+    // Build 349: server feed verdicts for codes the device has not resolved.
+    // Only consulted while the feed is fresh (<= 48h); a stale feed leaves
+    // the marks in place but matchedMovie ignores them, so the throttled
+    // on-device verification below takes over as the fallback again.
+    private enum FeedMark { case miss, ambiguous }
+    private var feedMarks: [String: FeedMark] = [:]
+    private var feedMarksDate: Date?
+    private var feedMarksFresh: Bool {
+        guard let date = feedMarksDate else { return false }
+        return Date().timeIntervalSince(date) <= RankingFeedClient.staleInterval
+    }
+    /// Build 349: pre-fill from the server pre-matching feed. Matched
+    /// entries land in the same `matches` table the views already read;
+    /// miss/ambiguous verdicts are remembered as marks (no network).
+    func applyFeed(_ feed: RankingFeed) {
+        updateMatchScope()
+        feedMarksDate = feed.generatedDate
+        for entry in feed.entries {
+            guard entry.match.pending != true, let raw = entry.code,
+                  let key = JRPolicy.exactCode(raw) else { continue }
+            switch entry.match.status {
+            case "matched":
+                if let movie = entry.makeMovie() { matches[key] = Match(movie: movie, date: Date()) }
+                feedMarks[key] = nil
+            case "ambiguous": feedMarks[key] = .ambiguous
+            case "miss": feedMarks[key] = .miss
+            default: break
+            }
+        }
+    }
+    private var matchFlights: [String: Task<Movie?, Error>] = [:]
+    private var matchTokens: [String: UUID] = [:]
+    private var matchAccount: String?
+    private func updateMatchScope() {
+        let account = APIClient.shared.token
+        if account != matchAccount {
+            cancelMappings(); matches.removeAll(); feedMarks.removeAll(); feedMarksDate = nil; matchAccount = account
+        }
+    }
+    func cachedMovie(code: String) -> Movie? {
+        updateMatchScope()
+        guard !JavDBSDK.shared.hasAmbiguousMovie(code: code) else { return nil }
+        if let native = JavDBSDK.shared.cachedExactMovie(code: code) { return native }
+        guard let key = JRPolicy.exactCode(code), let cached = matches[key],
+              Date().timeIntervalSince(cached.date) < 21600 else { return nil }
+        return cached.movie
+    }
+    func cancelMappings() {
+        matchFlights.values.forEach { $0.cancel() }; matchFlights.removeAll(); matchTokens.removeAll()
+    }
+    func matchedMovie(code: String, refresh: Bool = false, interactive: Bool = false) async throws -> Movie? {
+        updateMatchScope()
+        guard let key = JRPolicy.exactCode(code) else { return nil }
+        if JavDBSDK.shared.hasAmbiguousMovie(code: code) { throw JRError.message("同一番号对应多个有效影片 ID，请在原生搜索中核对。") }
+        if !refresh, let native = JavDBSDK.shared.cachedExactMovie(code: code) { return native }
+        if !refresh, let cached = matches[key], Date().timeIntervalSince(cached.date) < (cached.movie == nil ? 60 : 21600) { return cached.movie }
+        // Build 349: a fresh feed verdict ends the lookup without network.
+        // Ambiguous stays fail-closed (same message as the SDK's own
+        // ambiguous path); a feed miss returns nil for automatic callers,
+        // while an explicit refresh (manual retry) falls through to the
+        // throttled verification below.
+        if feedMarksFresh, let mark = feedMarks[key] {
+            switch mark {
+            case .ambiguous: throw JRError.message("同一番号对应多个有效影片 ID，请在原生搜索中核对。")
+            case .miss: if !refresh { return nil }
+            }
+        }
+        if let flight = matchFlights[key] { return try await flight.value }
+        let epoch = generation, token = UUID(), account = matchAccount
+        let flight = Task<Movie?, Error>(priority: interactive ? .userInitiated : .utility) {
+            let deadline = Date().addingTimeInterval(12)
+            // Build 337: automatic verifications pass the shared throttle
+            // (one at a time, random spacing, 20 per minute). Interactive
+            // taps keep bypassing the queue — they are the user's own action.
+            if !interactive {
+                guard await VerificationThrottle.acquire(deadline: deadline) else { throw JRError.message("核验队列繁忙，请重试") }
+                defer { VerificationThrottle.release() }
+            }
+            try Task.checkCancellation()
+            let movie = try await withThrowingTaskGroup(of: Movie?.self) { group in
+                group.addTask { try await JavDBSDK.shared.exactMovie(code: code, refresh: refresh) }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 12_000_000_000)
+                    throw JRError.message("核验超时，请重试或使用原生搜索")
+                }
+                defer { group.cancelAll() }
+                return try await group.next()!
+            }
+            try Task.checkCancellation()
+            guard epoch == self.generation, account == APIClient.shared.token else { throw CancellationError() }
+            if self.matches.count >= 256, let oldest = self.matches.min(by: { $0.value.date < $1.value.date })?.key { self.matches[oldest] = nil }
+            // Do not retain misses: a retry must reach the native backend again.
+            if let movie { self.matches[key] = Match(movie: movie, date: Date()) }
+            return movie
+        }
+        matchFlights[key] = flight; matchTokens[key] = token
+        defer { if epoch == generation, matchTokens[key] == token { matchFlights[key] = nil; matchTokens[key] = nil } }
+        return try await flight.value
+    }
     private var pageDates: [String: Date] = [:]
     private var indexDates: [String: Date] = [:]
     private var pageFlights: [String: Task<JRPage, Error>] = [:]
     private var indexFlights: [String: Task<JRIndex, Error>] = [:]
     private func clear() {
-        previews.removeAll()
+        cancelMappings(); matches.removeAll(); feedMarks.removeAll(); feedMarksDate = nil; previews.removeAll()
         pageFlights.values.forEach { $0.cancel() }; indexFlights.values.forEach { $0.cancel() }
         pageFlights.removeAll(); indexFlights.removeAll()
         pages.removeAll(); indexes.removeAll(); pageDates.removeAll(); indexDates.removeAll()
@@ -224,6 +322,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.session?.invalidateAndCancel(); self.endpoint = nil; self.generation += 1
+                JavRankingSource.shared.cancelMappings()
                 if self.externalMode { self.updateExternal() }
                 else { self.endpoint = try? JRBackendPolicy.endpoint(defaults.string(forKey: "javranking.backendHTTPS") ?? ""); self.rebuild() }
             }
@@ -236,6 +335,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
     private func externalChanged() {
         guard externalMode else { return }
         endpoint = nil; rebuild(); generation += 1
+        JavRankingSource.shared.cancelMappings()
         updateExternal()
     }
     private func updateExternal() {
@@ -274,6 +374,7 @@ final class JRRedirectPolicy: NSObject, URLSessionDataDelegate, @unchecked Senda
         let next = try JRBackendPolicy.endpoint(input)
         externalMode = false; defaults.set(false, forKey: "javranking.externalMode")
         endpoint = next; rebuild(); generation += 1
+        JavRankingSource.shared.cancelMappings()
         defaults.set(next?.absoluteString ?? "", forKey: "javranking.backendHTTPS")
     }
     func fetch(_ route: String, query: [URLQueryItem] = []) async throws -> JRBackendEnvelope {
