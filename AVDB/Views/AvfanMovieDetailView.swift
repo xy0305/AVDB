@@ -316,9 +316,10 @@ struct AvfanMovieDetailView: View {
         pushingURL = magnet.url
         defer { pushingURL = nil }
         do {
+            let auth = settings.cookie
             let result = try await Pan115Client.shared.addOfflineTask(
                 url: magnet.url,
-                cookie: <redacted>
+                cookie: auth,
                 folderCID: settings.folderCID
             )
             toast = result.message
