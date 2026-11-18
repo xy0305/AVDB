@@ -5,7 +5,7 @@ import json, plistlib, re, shutil, subprocess, tempfile
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '352' and pbx.count('CURRENT_PROJECT_VERSION = 352;') == 2
+assert plist['CFBundleVersion'] == '353' and pbx.count('CURRENT_PROJECT_VERSION = 353;') == 2
 for name in ['ZhongZhiTongCatalog.swift in Sources', 'ZhongZhiTongRankingView.swift in Sources', 'ZhongZhiTongMonthly.json in Resources']:
     assert pbx.count(name) == 2, name
 
@@ -33,9 +33,9 @@ rankings = (r/'AVDB/Views/Rankings/RankingsView.swift').read_text()
 catalog = (r/'AVDB/Services/ZhongZhiTongCatalog.swift').read_text()
 assert 'case .zhongZhiTong: ZhongZhiTongRankingView()' in rankings and 'zzt-ranking-entry' in rankings
 assert 'Section("中指通")' in rankings
-# Codes resolve through the existing exact-code AVDB path; no source images used as covers.
-assert 'MissAVGrid(videos: videos, metadata: metadata, sourceName: "中指通"' in view
-assert 'enrichMissAV: false' in view and 'image: nil' in view
+# Build 353: codes resolve through the AVFan match store; no source images used as covers.
+assert 'AvfanBoardGrid(videos: videos, sourceName: "中指通"' in view
+assert 'AvfanMatchStore' in view and 'JavDBSDK' not in view and 'image: nil' in view
 assert 'zzt-month-picker' in view and '.pickerStyle(.menu)' in view
 assert 'raw.githubusercontent.com/xy0305/AVDB/main/AVDB/Resources/ZhongZhiTongMonthly.json' in catalog
 assert 'options: .atomic' in catalog and 'ZZTCatalog.preferred(current, remote)' in catalog

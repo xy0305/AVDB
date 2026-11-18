@@ -5,7 +5,7 @@ import FoundationNetworking // Linux test host only
 
 // Build 313: 中指通 (YouTube @fingermaster56) 每月作品精選 as a ranking source.
 // Only codes recorded in the bundled/remote JSON are shown; nothing is guessed at runtime.
-// Covers/details always come from the normal AVDB exact-code lookup (MissAVMetadata),
+// Covers/details come from the AVFan match (AvfanMatchStore, Build 353),
 // so image quality, caching and the ImageLoader pipeline are untouched.
 struct ZZTEntry: Codable, Hashable {
     let code: String

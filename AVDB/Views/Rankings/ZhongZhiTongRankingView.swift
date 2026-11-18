@@ -1,11 +1,11 @@
 import SwiftUI
 
 /// Build 313: 中指通每月作品精選 — month picker (newest first), the video's order kept.
-/// Each code is matched through the normal AVDB exact-code lookup, so tapping opens the
-/// usual MovieDetailView; unmatched codes still show 番号 + 女优 and the manual-check route.
+/// Build 353: each code is matched to AVFan instead of JavDB, so tapping opens the
+/// avfan detail; unmatched codes show 番号 + 女优 and the 「AVFan 暂无此作」 route.
 struct ZhongZhiTongRankingView: View {
     @EnvironmentObject private var appState: AppState
-    @StateObject private var metadata = MissAVMetadata(sourceName: "中指通", generation: { 0 }, enrichMissAV: false)
+    @ObservedObject private var matcher = AvfanMatchStore.shared
     @State private var catalog: ZZTCatalog?
     @State private var selectedMonth = ""
     @State private var loading = false
@@ -24,7 +24,7 @@ struct ZhongZhiTongRankingView: View {
                 if let current {
                     monthInfo(current)
                     let videos = current.entries.enumerated().map { index, entry in Self.video(entry, month: current.month, index: index) }
-                    MissAVGrid(videos: videos, metadata: metadata, sourceName: "中指通",
+                    AvfanBoardGrid(videos: videos, sourceName: "中指通",
                                ranks: Dictionary(uniqueKeysWithValues: videos.enumerated().map { ($1.path, $0 + 1) }),
                                identityPrefix: "zzt")
                         .id(current.month)
@@ -43,16 +43,11 @@ struct ZhongZhiTongRankingView: View {
         .refreshable { attempt += 1 }
         .task(id: attempt) { await load() }
         .task(id: selectedMonth) {
-            // Build 349: seed this month's server feed matches, if any.
-            if !selectedMonth.isEmpty,
-               let feed = await RankingFeedState.shared.ensure(board: "zhongzhitong", term: selectedMonth) {
-                metadata.applyFeed(feed)
+            // Build 353: queue this month's codes for avfan matching.
+            if let current {
+                matcher.enqueue(codes: current.entries.map(\.code))
             }
         }
-        .onChange(of: selectedMonth) { _, _ in metadata.suspend() }
-        .onDisappear { metadata.suspend() }
-        .onChange(of: appState.currentUser?.id) { _, _ in metadata.reset() }
-        .onChange(of: appState.isLoggedIn) { _, _ in metadata.reset() }
     }
 
     private var header: some View {
@@ -94,7 +89,7 @@ struct ZhongZhiTongRankingView: View {
             if !remoteNote.isEmpty {
                 Text(remoteNote).font(.caption2).foregroundStyle(.secondary)
             }
-            RankingFeedNote(board: "zhongzhitong", term: month.month)
+            if let status = matcher.statusText { Text(status).font(.caption2).foregroundStyle(.secondary) }
         }
         .padding(.horizontal)
     }
@@ -127,13 +122,10 @@ struct ZhongZhiTongRankingView: View {
         if selectedMonth.isEmpty || !months.contains(where: { $0.month == selectedMonth }) {
             selectedMonth = months.first?.month ?? ""
         }
-        // Build 349: feed matches are the primary source for this month;
-        // the bundled catalog still provides the code list itself, and
-        // any code the feed does not cover falls back to the metadata
-        // queue (MissAVMetadata with the shared VerificationThrottle).
-        if let month = current?.month,
-           let feed = await RankingFeedState.shared.ensure(board: "zhongzhitong", term: month) {
-            metadata.applyFeed(feed)
+        // Build 353: the bundled catalog provides the code list;
+        // matching is avfan-only (see the selectedMonth task too).
+        if let current {
+            matcher.enqueue(codes: current.entries.map(\.code))
         }
     }
 }

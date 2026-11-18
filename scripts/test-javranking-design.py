@@ -20,12 +20,12 @@ assert 'ForEach(Array(values.enumerated())' in backend
 assert 'items.prefix' not in backend.split('// Runtime fixtures')[0]
 assert 'JRHomePresentation.orderedSections(sections)' in backend
 assert 'JRHomePresentation.moreLink(section)' in backend
-assert '影片封面、演员与片名' in backend
-assert 'JRFilmArtwork(item: item, movie: movie' in backend
+assert '影片封面与片名来自 AVFan' in backend
+assert 'JRFilmArtwork(item: item, movie:' in backend
 assert 'JavDBImage(url: movie.coverURL, fallbackURL: movie.thumbURL' in backend
 assert 'movie?.actorNames' in backend and 'movie?.title' in backend
-assert 'source.matchedMovie(code: item.number' in backend
-assert 'MovieDetailView(movieID: movie.id)' in backend
+assert 'matcher.enqueue(codes: [item.number])' in backend  # Build 353: avfan matching
+assert 'AvfanMovieDetailView(card: card)' in backend
 assert 'rankContext' in backend and '来源未提供排名' in backend
 assert 'item.rank.map' in backend and 'item.score.map' in backend
 assert 'Date()' not in backend and 'Calendar' not in backend

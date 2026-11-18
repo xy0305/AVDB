@@ -103,42 +103,43 @@ private struct JRMeasuredGrid: View {
     let videos: [JRVideo]
     var onAppearLast: (() -> Void)? = nil
     @State private var width: CGFloat = 390
-    @ObservedObject private var source = JavRankingSource.shared
-    @State private var mapped: [String: Movie] = [:]
-    @State private var completed = Set<String>()
+    @ObservedObject private var matcher = AvfanMatchStore.shared
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
             ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
+                let match = matcher.match(forCode: video.code)
                 VStack(alignment: .leading, spacing: 4) {
                     NavigationLink { posterDestination(video) } label: {
-                        // Keep the source card geometry and metadata stable after verification.
-                        // Native metadata belongs in the destination, not a differently sized row.
-                        MoviePosterCard(movie: Movie(id: video.id, number: video.code, title: video.title, thumbURL: video.image, coverURL: video.image))
+                        // Keep the source card geometry and metadata stable after matching.
+                        MoviePosterCard(
+                            movie: Movie(
+                                id: match?.pathID ?? video.id,
+                                number: video.code,
+                                title: match?.title ?? video.title,
+                                thumbURL: match?.coverURL ?? video.image,
+                                coverURL: match?.coverURL ?? video.image
+                            ),
+                            upgradesVisibleHQ: false
+                        )
                     }.buttonStyle(.plain).accessibilityIdentifier("jr-poster-\(video.rank ?? 0)")
                     if let rank = video.rank { Text("来源排名 #\(rank)").font(.caption).foregroundStyle(.secondary) }
                     if !video.code.isEmpty {
-                        Text(mapped[video.path] != nil ? "完整番号已核验 · JavDB" : completed.contains(video.path) ? "点击重试核验 · 来源资料仅辅助" : "点击核验并打开原生详情")
+                        Text(match != nil ? "AVFan 已匹配" : matcher.isMiss(code: video.code) ? "AVFan 暂无此作" : "点击打开 AVFan 详情")
                             .font(.caption2).foregroundStyle(.secondary).lineLimit(2).frame(height: 30, alignment: .topLeading)
                     }
                 }.id(video.path).frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading).contentShape(Rectangle()).clipped()
-                .onAppear { if index == videos.count - 1 { onAppearLast?() } }
+                .onAppear {
+                    matcher.prioritize(codes: [video.code])
+                    if index == videos.count - 1 { onAppearLast?() }
+                }
             }
         }.scrollTargetLayout().padding(.horizontal, AdaptiveLayout.gridPadding)
         .background { GeometryReader { g in Color.clear.preference(key: JRWidthKey.self, value: g.size.width) } }
         .onPreferenceChange(JRWidthKey.self) { if $0 > 0 { width = $0 } }
-        .task(id: "\(source.generation):" + videos.map(\.path).joined(separator: ",")) {
-            // Build 349: the server feed pre-fills the shared match table
-            // first (no JavDB traffic); posters then read it through the
-            // same cachedMovie path as device-verified entries.
-            if let feed = await RankingFeedState.shared.ensure(board: "javranking", term: "explore") {
-                source.applyFeed(feed)
-            }
-            // Never launch speculative JavDB searches while posters are loading.
-            // Reuse only verified cache entries; an actual tap owns resolution.
-            mapped.removeAll(); completed.removeAll()
-            for video in videos {
-                if let movie = source.cachedMovie(code: video.code) { mapped[video.path] = movie }
-            }
+        .task(id: videos.map(\.path).joined(separator: ",")) {
+            // Build 353: queue avfan matching in display order; posters
+            // read the match store. No JavDB lookup happens here.
+            matcher.enqueue(codes: videos.map(\.code))
         }
 
     }
@@ -341,15 +342,12 @@ struct JRPageView: View {
                             Text(detail.code).font(.headline).foregroundStyle(.tint)
                             Text(detail.title).font(.title3.bold()).textSelection(.enabled)
                             ForEach(Array(page.metadata.enumerated()), id: \.offset) { _, text in Text(text).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled) }
-                            NavigationLink("核验并打开原生详情") { JRMovieRoute(video: detail) }
+                            NavigationLink("在 AVFan 打开详情") { JRMovieRoute(video: detail) }
                             if let url = URL(string: path, relativeTo: source.base)?.absoluteURL { Link("在外部浏览器查看来源页", destination: url).font(.footnote) }
                         }.padding(.horizontal, AdaptiveLayout.horizontalPadding)
                     }
                     if !page.videos.isEmpty {
                         Text(isPreview ? "首批 \(page.videos.count) 部 · 正在读取完整榜单" : "\(page.videos.count) 部公开影片（来源顺序）").font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                        if path.hasPrefix("/zh-hans/explore/") {
-                            RankingFeedNote(board: "javranking", term: "explore").padding(.horizontal)
-                        }
                         JRPosterGrid(videos: Array(page.videos.prefix(limit)), onAppearLast: {
                             if state.limit < page.videos.count { state.limit += 12 }
                         })
@@ -427,59 +425,31 @@ struct JRPageView: View {
 
 }
 
-// One gateway for every source movie entry. Only a verified JavDB identity may
-// instantiate the application's existing detail (including its 115 actions).
+// One gateway for every source movie entry. Build 353: the gateway
+// resolves through the avfan match store only — matched entries open
+// the avfan detail, unmatched ones say 「AVFan 暂无此作」; the source
+// page stays available as a read-only auxiliary. No JavDB request is
+// made on this path.
 struct JRMovieRoute: View {
     let video: JRVideo
-    @ObservedObject private var source = JavRankingSource.shared
-    @State private var movie: Movie?
-    @State private var message = ""
-    @State private var loading = true
-    @State private var attempt = 0
+    @ObservedObject private var matcher = AvfanMatchStore.shared
     private var code: String { JRPolicy.exactCode(video.code) != nil ? video.code : (JRPolicy.catalogueCode(video.title) ?? "") }
     var body: some View {
-        Group {
-            if let movie = movie ?? source.cachedMovie(code: code) {
-                MovieDetailView(movieID: movie.id)
-                    .toolbar { ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink { JRPageView(path: video.path, sourceOnly: true) } label: { Image(systemName: "info.circle") }
-                            .accessibilityLabel("榜单来源资料（辅助）")
-                    } }
-            } else {
-                VStack(spacing: 16) {
-                    Text(code.isEmpty ? "来源未提供可核验的完整番号" : code).font(.headline)
-                    if loading { ProgressView("正在核验 JavDB 完整番号…") }
-                    else {
-                        Text(message).font(.callout).multilineTextAlignment(.center)
-                        Button("重试核验") { attempt += 1 }
-                    }
+        if let card = matcher.card(forCode: code) {
+            AvfanMovieDetailView(card: card)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink { JRPageView(path: video.path, sourceOnly: true) } label: { Image(systemName: "info.circle") }
+                        .accessibilityLabel("榜单来源资料（辅助）")
+                } }
+        } else {
+            AvfanRouteView(
+                code: code,
+                title: video.title,
+                missDestination: AnyView(
                     NavigationLink("来源资料（辅助，只读）") { JRPageView(path: video.path, sourceOnly: true) }
-                }.padding().navigationTitle("影片核验")
-            }
+                )
+            )
         }
-        .task(id: "\(source.generation):\(attempt):\(video.path)") {
-            let epoch = source.generation, request = attempt
-            loading = true; message = ""
-            // A known verified ID already renders MovieDetailView above. Do not
-            // tear down that identity just because SwiftUI restarts this task.
-            if attempt == 0, let known = source.cachedMovie(code: code) {
-                movie = known; loading = false
-                return
-            }
-            movie = nil
-            defer { if epoch == source.generation, request == attempt { loading = false } }
-            guard !code.isEmpty else { message = "不能从标题猜测影片；请查看来源资料。"; return }
-            do {
-                let match = try await source.matchedMovie(code: code, refresh: attempt > 0, interactive: true)
-                guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
-                movie = match
-                if match == nil { message = "原生影片搜索前 3 页未找到番号 \(code) 的有效 ID 精确结果（不代表影片不存在）。请重试或在原生搜索中核对；不会自动打开辅助来源详情。" }
-            } catch {
-                guard !Task.isCancelled, epoch == source.generation, request == attempt else { return }
-                message = "番号 \(code) 核验失败：" + error.localizedDescription
-            }
-        }
-        .onDisappear { source.cancelMappings() }
     }
 }
 
@@ -697,7 +667,7 @@ struct JRBackendView: View {
             }.foregroundStyle(JRPalette.gold).accessibilityHidden(true)
             Text("不再纠结，从当前已缓存的榜单与代表作品中寻找今晚目标。")
                 .fixedSize(horizontal: false, vertical: true)
-            Text("原生影片资料 · 完整番号核验 · 不复制来源抽签算法")
+            Text("AVFan 影片资料 · 番号匹配 · 不复制来源抽签算法")
                 .font(.caption).foregroundStyle(JRPalette.muted)
             Button { pick = cachedPool(sections).randomElement() } label: {
                 Label(pick == nil ? "立即开抽" : "再抽一部", systemImage: "shuffle")
@@ -712,7 +682,7 @@ struct JRBackendView: View {
         VStack(alignment: .leading, spacing: 14) {
             Rectangle().fill(JRPalette.border).frame(height: 1)
             Text("JAV Ranking · 来源与导航").font(.title2.bold()).foregroundStyle(JRPalette.gold)
-            Text("本页使用来源缓存的顺序、排名与可用数值。影片封面、演员与片名来自您配置的原生资料库；战力积分不等于 AVDB 评分。缓存暂缺的字段不推算、不补造。")
+            Text("本页使用来源缓存的顺序、排名与可用数值。影片封面与片名来自 AVFan 按番号匹配；战力积分不等于评分。缓存暂缺的字段不推算、不补造。")
                 .font(.footnote).foregroundStyle(JRPalette.muted)
             homeActions
             NavigationLink("神作总榜") { JRBackendView(route: "page", title: "神作总榜", fixedQuery: [.init(name: "path", value: "/zh-hans/most-awarded-videos/")]) }
@@ -806,74 +776,56 @@ struct JRBackendView: View {
 
 private struct RankingActorMatchLink: View {
     let entity: JRBackendEntity
-    @State private var actor: Actor?
-    @State private var message = "尚未核验 AVDB 演员身份"
+    @ObservedObject private var matcher = AvfanMatchStore.shared
+    private var message: String {
+        if matcher.actorMatch(forName: entity.name) != nil { return "已匹配 AVFan 演员" }
+        if matcher.isActorMiss(name: entity.name) { return "未匹配；来源名次与人物页保留" }
+        return "等待 AVFan 匹配…"
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let actor {
-                NavigationLink { ActorDetailView(actorID: actor.id) } label: {
-                    Label("AVDB 演员资料", systemImage: "person.crop.circle")
+            if matcher.actorMatch(forName: entity.name) != nil {
+                NavigationLink { AvfanActorRouteView(name: entity.name) } label: {
+                    Label("AVFan 演员资料", systemImage: "person.crop.circle")
                 }.accessibilityIdentifier("jr-actor-\(entity.sourceID)")
             }
             Text(message).font(.caption).foregroundStyle(JRPalette.muted)
         }
-        .task(id: entity.sourcePath) {
-            let identity = ExternalActorIdentity.resolve(sourceName: entity.name, aliases: entity.aliases ?? [], catalog: .bundled())
-            guard identity.queries.count <= 4 else { message = "别名过多，保留来源人物页"; return }
-            do {
-                let match = try await ExternalActorResolver.resolve(identity: identity) { name, page in
-                    try await JavDBSDK.shared.searchActors(keyword: name, page: page, limit: 20)
-                }
-                actor = match?.actor
-                message = match == nil ? "未唯一匹配；来源名次与人物页保留" : "已核验唯一 AVDB 演员"
-            } catch is CancellationError {
-                return
-            } catch {
-                message = "演员核验失败；来源人物页保留"
-            }
-        }
+        .onAppear { matcher.enqueueActor(name: entity.name) }
     }
 }
 
 private struct JRBackendFilmCell: View {
     let item: JRBackendVideo
     var rankContext: String = "来源集合"
-    @ObservedObject private var source = JavRankingSource.shared
-    @State private var movie: Movie?
-    @State private var message = "等待原生核验"
-    @State private var attempt = 0
-    @State private var accountEpoch = 0
+    @ObservedObject private var matcher = AvfanMatchStore.shared
+    @State private var fixtureMovie: Movie?
+    private var message: String {
+        matcher.isMiss(code: item.number) ? "AVFan 暂无此作" : "等待 AVFan 匹配…"
+    }
     var body: some View {
         Group {
-            if let movie {
-                NavigationLink { MovieDetailView(movieID: movie.id) } label: { JRFilmArtwork(item: item, movie: movie, message: message, rankContext: rankContext) }.buttonStyle(.plain)
+            if let fixtureMovie {
+                NavigationLink { MovieDetailView(movieID: fixtureMovie.id) } label: { JRFilmArtwork(item: item, movie: fixtureMovie, message: "已核验 · 中性测试", rankContext: rankContext) }.buttonStyle(.plain)
+            } else if let card = matcher.card(forCode: item.number) {
+                NavigationLink { AvfanMovieDetailView(card: card) } label: {
+                    JRFilmArtwork(item: item, movie: Movie(id: card.pathID, number: card.code ?? item.number, title: card.title, coverURL: card.coverURL), message: "AVFan 已匹配", rankContext: rankContext)
+                }.buttonStyle(.plain)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     JRFilmArtwork(item: item, movie: nil, message: message, rankContext: rankContext)
-                    Button { attempt += 1 } label: { Text("重试完整番号核验").font(.caption).frame(minHeight: 45).contentShape(Rectangle()) }.padding(.horizontal, 12)
+                    Button { Task { _ = await matcher.resolveNow(code: item.number) } } label: { Text("重试 AVFan 匹配").font(.caption).frame(minHeight: 45).contentShape(Rectangle()) }.padding(.horizontal, 12)
                 }
             }
         }
         .background(JRPalette.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(JRPalette.border, lineWidth: 1) }
         .accessibilityIdentifier("jr-film-\(item.sourceID)")
-        .task(id: "\(source.generation):\(accountEpoch):\(attempt):\(item.sourcePath)") {
+        .task(id: item.sourcePath) {
             #if DEBUG
-            if JRDesignFixture.enabled { movie = JRDesignFixture.movie(item); message = "已核验 · 中性测试"; return }
+            if JRDesignFixture.enabled { fixtureMovie = JRDesignFixture.movie(item); return }
             #endif
-            let account = APIClient.shared.token
-            movie = nil; message = "核验中…"
-            do {
-                let found = try await source.matchedMovie(code: item.number, refresh: attempt > 0)
-                guard !Task.isCancelled, account == APIClient.shared.token else { return }
-                movie = found; message = found == nil ? "未找到唯一精确结果" : "已核验"
-            } catch {
-                guard !Task.isCancelled, account == APIClient.shared.token else { return }
-                message = "核验失败，可重试"
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
-            movie = nil; accountEpoch += 1; source.cancelMappings()
+            matcher.enqueue(codes: [item.number])
         }
     }
 }
@@ -906,12 +858,12 @@ private struct JRFilmArtwork: View {
                 Text(item.number).font(.headline).foregroundStyle(JRPalette.gold).fixedSize(horizontal: false, vertical: true)
                 Text(item.score.map { "来源战力：" + String(format: "%.0f 分", $0) } ?? "来源未提供战力积分").font(.caption).foregroundStyle(JRPalette.muted)
                 Text(actorText).font(.caption.weight(.semibold)).foregroundStyle(JRPalette.gold).fixedSize(horizontal: false, vertical: true)
-                Text(movie?.title?.isEmpty == false ? movie!.title! : "原生影片资料暂缺")
+                Text(movie?.title?.isEmpty == false ? movie!.title! : "AVFan 影片资料暂缺")
                     .font(.subheadline).foregroundStyle(JRPalette.ink).fixedSize(horizontal: false, vertical: true)
                 if let synopsis = movie?.summary ?? movie?.desc, !synopsis.isEmpty, synopsis != movie?.title {
                     Text(synopsis).font(.caption).foregroundStyle(JRPalette.muted).fixedSize(horizontal: false, vertical: true)
                 }
-                Text(item.rank.map { "来源 #\($0) · \(movie == nil ? "待核验" : "已核验")" } ?? "来源未提供排名")
+                Text(item.rank.map { "来源 #\($0) · \(movie == nil ? "待匹配" : "已匹配")" } ?? "来源未提供排名")
                     .font(.caption2).foregroundStyle(JRPalette.muted).fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(item.rank.map { "\(rankContext)，来源排名第 \($0)" } ?? "来源未提供排名")
                 if movie == nil { Text(message).font(.caption2).foregroundStyle(JRPalette.muted) }

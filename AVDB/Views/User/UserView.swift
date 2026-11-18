@@ -11,6 +11,9 @@ struct UserView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var pan115 = Pan115Settings.shared
     @State private var showLogin = false
+    // Build 353: avfan account (external boards' matching/detail login).
+    @ObservedObject private var avfanSession = AvfanSession.shared
+    @State private var showAvfanLogin = false
     // Build 352: unread dot for the JavDB notifications entry (fail-soft:
     // userAdditional() failing simply leaves the dot hidden).
     @State private var hasUnreadNotifications = false
@@ -296,6 +299,28 @@ struct UserView: View {
                     }
                 }
 
+                Section("avfan 账号") {
+                    Button {
+                        showAvfanLogin = true
+                    } label: {
+                        HStack {
+                            Label("avfan 登录", systemImage: "person.crop.circle")
+                            Spacer()
+                            Text(avfanSession.isSignedIn ? (avfanSession.displayName ?? "已登录") : "未登录")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("avfan-account-entry")
+                    if avfanSession.isSignedIn {
+                        Button("退出 avfan 登录", role: .destructive) {
+                            Task { await avfanSession.signOut() }
+                        }
+                    }
+                } footer: {
+                    Text("登录只让外接榜单的 AVFan 匹配与详情抓取带上登录态（磁链等更完整），不抓取账号页、不采集账号数据。")
+                }
+
                 Section("AI 翻译") {
                     NavigationLink {
                         XAISettingsView()
@@ -326,6 +351,9 @@ struct UserView: View {
             .modifier(PlaybackHistoryMenuDestinations())
             .sheet(isPresented: $showLogin) {
                 LoginView()
+            }
+            .sheet(isPresented: $showAvfanLogin) {
+                AvfanLoginView()
             }
             .task {
                 // Build 352: notification unread dot (best-effort only).

@@ -4,23 +4,7 @@ struct JAVLibraryRankingView: View {
     @ObservedObject private var settings = ExternalLibrarySettings.shared
     @EnvironmentObject private var appState: AppState
     @AppStorage("javlibrary.adultConfirmed") private var adultConfirmed = false
-    // Separate view-owned cache; same tested queue as MissAV, no MissAV enrichment.
-    @StateObject private var metadata = MissAVMetadata(sourceName: "JAVLibrary", generation: {
-        Int(truncatingIfNeeded: ExternalLibrarySettings.shared.revision)
-    }, enrichMissAV: false, resolver: Self.fixtureResolver)
-    private static var fixtureResolver: ((MissAVMetadata.Request) async throws -> MissAVMetadata.Result)? {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--javlibrary-navigation-fixture") {
-            return { request in
-                switch request {
-                case .movie(let video): return MissAVMetadata.Result(movie: Movie(id: video.path, number: video.code, title: "Synthetic AVDB metadata", coverURL: "fixture://poster/1"), loading: false)
-                case .actor: return MissAVMetadata.Result(message: "Synthetic unmatched actor (no network)", loading: false)
-                }
-            }
-        }
-        #endif
-        return nil
-    }
+    @ObservedObject private var matcher = AvfanMatchStore.shared
     @State private var kind: JAVLibraryKind = .mostwanted
     @State private var snapshot: JAVLibrarySnapshot?
     @State private var visibleCount = 25
@@ -41,9 +25,7 @@ struct JAVLibraryRankingView: View {
             }
         }
         .navigationTitle("JAVLibrary 排行")
-        .onDisappear { revision = UUID(); metadata.suspend() }
-        .onChange(of: appState.currentUser?.id) { _, _ in metadata.reset(); attempt += 1 }
-        .onChange(of: appState.isLoggedIn) { _, _ in metadata.reset(); attempt += 1 }
+        .onDisappear { revision = UUID() }
     }
     private var content: some View {
         ScrollView {
@@ -56,9 +38,9 @@ struct JAVLibraryRankingView: View {
                 }.padding(.horizontal)
                 CapsuleChipBar(tabs: JAVLibraryKind.allCases.map { ($0, $0.title) }, selection: $kind)
                     .accessibilityIdentifier("javlibrary-kinds")
-                Text("替换为 AVDB 资料，不替换排名。每 8 小时服务器刷新；不是日 / 周 / 月榜，也不自动订阅或下载。")
+                Text("封面与详情来自 AVFan 按番号匹配，不替换排名。每 8 小时服务器刷新快照；不是日 / 周 / 月榜，也不自动订阅或下载。")
                     .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                RankingFeedNote(board: "javlibrary", term: kind.rawValue).padding(.horizontal)
+                if let status = matcher.statusText { Text(status).font(.caption).foregroundStyle(.secondary).padding(.horizontal) }
                 if loading { ProgressView("载入 JAVLibrary 快照…") }
                 if !message.isEmpty {
                     Text(message).font(.callout).padding(.horizontal)
@@ -74,11 +56,11 @@ struct JAVLibraryRankingView: View {
                     if snapshot.items.isEmpty { Text("服务器当前快照为空") }
                     let entries = Array(snapshot.items.prefix(visibleCount))
                     if kind == .actors {
-                        MissAVActressGrid(actors: entries.map(\.actor), metadata: metadata, sourceName: "JAVLibrary", identityPrefix: "javlibrary", onAppearLast: {
+                        AvfanBoardActorGrid(actors: entries.map(\.actor), sourceName: "JAVLibrary", identityPrefix: "javlibrary", onAppearLast: {
                             if visibleCount < snapshot.items.count { visibleCount += 25 }
                         })
                     } else {
-                        MissAVGrid(videos: entries.map(\.video), metadata: metadata, sourceName: "JAVLibrary", ranks: Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.rank) }), identityPrefix: "javlibrary", onAppearLast: {
+                        AvfanBoardGrid(videos: entries.map(\.video), sourceName: "JAVLibrary", ranks: Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.rank) }), identityPrefix: "javlibrary", onAppearLast: {
                             if visibleCount < snapshot.items.count { visibleCount += 25 }
                         })
                     }
@@ -97,7 +79,7 @@ struct JAVLibraryRankingView: View {
     @MainActor private func reload() async {
         let token = UUID(); revision = token
         let generation = settings.revision, selected = kind
-        metadata.reset(); snapshot = nil; visibleCount = 25; message = ""; loading = true
+        snapshot = nil; visibleCount = 25; message = ""; loading = true
         defer { if revision == token { loading = false } }
         do {
             #if DEBUG
@@ -115,10 +97,11 @@ struct JAVLibraryRankingView: View {
             let value = try await ExternalLibraryClient.shared.javlibrary(selected)
             guard !Task.isCancelled, revision == token, generation == settings.revision, kind == selected else { return }
             snapshot = value; loadedKey = requestKey
-            // Build 349: seed whatever the server feed already resolved;
-            // the grids' enqueue() then only queues uncovered entries.
-            if let feed = await RankingFeedState.shared.ensure(board: "javlibrary", term: selected.rawValue) {
-                metadata.applyFeed(feed)
+            // Build 353: queue avfan matching in board order.
+            if selected == .actors {
+                for item in value.items { matcher.enqueueActor(name: item.actor.name) }
+            } else {
+                matcher.enqueue(codes: value.items.map { $0.video.code })
             }
         } catch {
             if !Task.isCancelled, revision == token, generation == settings.revision { message = error.localizedDescription }

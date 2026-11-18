@@ -12,16 +12,16 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '352' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 352;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '353' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 353;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 352' in wf and 'feat/recommender-throttle-337' in wf
+assert 'Home HQ posters App 353' in wf and 'feat/recommender-throttle-337' in wf
 assert 'feat/remove-javverse-336' in wf and 'feat/detail-api-335' in wf
 assert wf.count('python3 scripts/test-recommender-throttle337.py') == 5  # dedicated job + the three jobs that run the 336 gate + release regressions
-assert 'scripts/package-lut352.py' in wf and 'AVDB-352-release' in wf and 'AVDB-336-release' not in wf
-pkg = (r/'scripts/package-lut352.py').read_text()
-assert "=='352'" in pkg and 'AVDB-unsigned-1.0.2-352-endpoints.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut353.py' in wf and 'AVDB-353-release' in wf and 'AVDB-336-release' not in wf
+pkg = (r/'scripts/package-lut353.py').read_text()
+assert "=='353'" in pkg and 'AVDB-unsigned-1.0.2-353-avfanboards.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  recommender-throttle-337:' in wf and '  remove-javverse-336:' in wf
 
 doc = (r/'Build337-RecommenderThrottle.md').read_text()
@@ -52,8 +52,10 @@ throttle = (r/'AVDB/Services/VerificationThrottle.swift').read_text()
 assert 'static let perMinute = 20' in throttle and 'Double.random(in: 1.5...3.5)' in throttle
 assert 'VerificationThrottle.swift' in pbx
 jr = (r/'AVDB/Services/JavRankingSource.swift').read_text()
-assert 'VerificationThrottle.acquire(deadline: deadline)' in jr and 'activeMatches' not in jr
-assert 'if !interactive' in jr  # interactive taps keep bypassing
+# Build 353: the JAV Ranking board no longer verifies against JavDB at
+# all (avfan matching instead) — the throttle contract survives on the
+# remaining engines below, and this source must stay verification-free.
+assert 'VerificationThrottle' not in jr and 'JavDBSDK' not in jr and 'activeMatches' not in jr
 miss = (r/'AVDB/Services/MissAVMetadata.swift').read_text()
 assert 'VerificationThrottle.acquire()' in miss and 'tasks.count < 1' in miss
 mapper = (r/'AVDB/Services/JavVerseSource.swift').read_text()
@@ -63,5 +65,5 @@ follow = (r/'AVDB/Services/FollowUpdates.swift').read_text()
 assert 'VerificationThrottle.acquire()' in follow and 'requestSpacingSeconds' not in follow
 
 print('PASS test-recommender-throttle337: recommender is manual-only, randomly slow-spaced, '
-      'hard-capped at 10 requests per run; all ranking verifications pass the shared '
+      'hard-capped at 10 requests per run; remaining ranking verifications pass the shared '
       '1-wide / 20-per-minute / random-gap throttle, release 351')

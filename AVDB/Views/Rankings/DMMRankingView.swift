@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 @MainActor struct DMMRankingView: View {
     @StateObject private var store: DMMRankingStore
+    @ObservedObject private var matcher = AvfanMatchStore.shared
     init(store: DMMRankingStore? = nil) { _store = StateObject(wrappedValue: store ?? DMMRankingStore()) }
     @State private var importing = false
     @State private var importError: String?
@@ -34,7 +35,7 @@ import UniformTypeIdentifiers
             Text("\(store.kind.periodLabel) · \(store.kind.expectedCount)榜位 · 统计起止未知").font(.headline)
             Text(store.status).font(.footnote).foregroundStyle(.secondary)
                 .accessibilityIdentifier("dmm-source-status")
-            RankingFeedNote(board: "dmm", term: store.kind.rawValue)
+            if let status = matcher.statusText { Text(status).font(.caption).foregroundStyle(.secondary) }
             Toggle("我已满18岁，授权按官方自声明并记住选择", isOn: Binding(get: { adultAuthorization }, set: { value in
                 adultAuthorization = value; store.authorizeAdultDeclaration = value
                 if !value { Task { await store.forgetSession() } }
@@ -98,19 +99,19 @@ import UniformTypeIdentifiers
 
 @MainActor private struct DMMRankingPage: View {
     @ObservedObject var store: DMMRankingStore
-    @State private var manualSearch = false
     let rows: [DMMContentRow]
     let kind: DMMRankingKind
     var onNearEnd: () -> Void = {}
-    @StateObject private var mapper: JavVerseMapper
+    @ObservedObject private var matcher = AvfanMatchStore.shared
     private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3)
     init(store: DMMRankingStore, rows: [DMMContentRow], kind: DMMRankingKind, onNearEnd: @escaping () -> Void = {}) {
         self.store = store; self.rows = rows; self.kind = kind; self.onNearEnd = onNearEnd
-        _mapper = StateObject(wrappedValue: JavVerseMapper(scope: "dmm|\(kind.rawValue)|manufacturer-verified"))
     }
-    private func entry(_ row: DMMContentRow) -> JavVerseEntry? {
+    /// The maker code DMMRankingStore resolved for this row, if any.
+    /// Matching never derives a code from the CID.
+    private func code(_ row: DMMContentRow) -> String? {
         guard let item = store.evidence[row.cid], item.cid == row.cid else { return nil }
-        return JavVerseEntry(rank: row.rank, kind: "movie", label: item.code, sourceURL: row.sourceURL.absoluteString, code: item.code)
+        return item.code
     }
     var body: some View {
         ScrollView {
@@ -118,10 +119,8 @@ import UniformTypeIdentifiers
                 ForEach(rows) { row in
                     DMMMovieCard(
                         row: row,
-                        entry: entry(row),
-                        store: store,
-                        mapper: mapper,
-                        onManualSearch: { manualSearch = true }
+                        code: code(row),
+                        store: store
                     )
                     .onAppear {
                         if row.cid == rows.last?.cid { onNearEnd() }
@@ -131,49 +130,32 @@ import UniformTypeIdentifiers
             .padding(.vertical, 4)
         }
         .buttonStyle(.borderless)
-        .navigationDestination(isPresented: $manualSearch) { SearchView() }
-        .onAppear { resolveMapped() }
-        .onChange(of: store.evidence.count) { _, _ in resolveMapped() }
-        .onChange(of: rows.map(\.cid)) { _, _ in resolveMapped() }
-        .onDisappear { mapper.cancel() }
+        .onAppear { enqueueMatches() }
+        .onChange(of: store.evidence.count) { _, _ in enqueueMatches() }
+        .onChange(of: rows.map(\.cid)) { _, _ in enqueueMatches() }
     }
-    private func resolveMapped() {
-        let items = rows.compactMap(entry)
-        guard !items.isEmpty else { return }
-        // Build 349: server feed first; resolve() then only queues the
-        // entries the feed did not cover (its batch filter skips rows
-        // that already have a movie or a message).
-        let term = kind.rawValue
-        Task { @MainActor in
-            if let feed = await RankingFeedState.shared.ensure(board: "dmm", term: term) {
-                mapper.applyFeed(feed, for: items)
-            }
-            mapper.resolve(items, retry: false)
-        }
+    private func enqueueMatches() {
+        // Build 353: entries match avfan by their DMM maker code.
+        matcher.enqueue(codes: rows.compactMap { code($0) })
     }
 }
 
 @MainActor private struct DMMMovieCard: View {
     let row: DMMContentRow
-    let entry: JavVerseEntry?
+    let code: String?
     @ObservedObject var store: DMMRankingStore
-    @ObservedObject var mapper: JavVerseMapper
-    let onManualSearch: () -> Void
-    private var movie: Movie? { entry.flatMap(mapper.movie(for:)) }
-    private var codeLabel: String { entry?.label ?? row.cid }
+    @ObservedObject private var matcher = AvfanMatchStore.shared
+    private var match: AvfanMatchStore.MovieMatch? { code.flatMap { matcher.match(forCode: $0) } }
+    private var codeLabel: String { code ?? row.cid }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Group {
-                if let movie, let entry {
-                    NavigationLink { MovieDetailView(movieID: movie.id) } label: { poster(movie: movie) }
+                if let code {
+                    NavigationLink { AvfanRouteView(code: code, title: row.sourceTitle) } label: { poster }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("dmm-movie-\(row.rank)")
-                } else if let entry {
-                    Button { mapper.resolve([entry], retry: true) } label: { poster(movie: nil) }
-                        .buttonStyle(.plain)
-                        .disabled(mapper.busy)
                 } else {
-                    Button { store.request(row) } label: { poster(movie: nil) }
+                    Button { store.request(row) } label: { poster }
                         .buttonStyle(.plain)
                 }
             }
@@ -182,174 +164,48 @@ import UniformTypeIdentifiers
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .accessibilityIdentifier("dmm-rank-\(row.rank)")
-            if let entry {
-                Text(entry.label).font(.caption.weight(.semibold)).lineLimit(1)
-                if movie == nil {
-                    Text(mapper.messages[entry.id] ?? "未匹配 · 保留源榜位").font(.caption2).foregroundStyle(.secondary)
-                    Button("精确核对AVDB") { mapper.resolve([entry], retry: true) }
-                        .font(.caption2)
-                        .disabled(mapper.busy)
+            if let code {
+                Text(code).font(.caption.weight(.semibold)).lineLimit(1)
+                if match != nil {
+                    Text("AVFan 已匹配").font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                } else if matcher.isMiss(code: code) {
+                    Text("AVFan 暂无此作").font(.caption2).foregroundStyle(.secondary)
+                    Button("重试 AVFan 匹配") { matcher.retry(code: code) }.font(.caption2)
                 } else {
-                    Text(mapper.messages[entry.id] ?? "已核验").font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                    Text("等待 AVFan 匹配…").font(.caption2).foregroundStyle(.secondary)
                 }
             } else {
                 Text("厂家品番未知 · 未匹配").font(.caption.weight(.semibold)).lineLimit(2)
                 Text(store.messages[row.cid] ?? "按需核对，不从CID推号").font(.caption2).foregroundStyle(.secondary)
                 Button("获取 / 重试详情") { store.request(row) }.font(.caption2)
             }
-            Button("手动搜索核对（不自动认领）") { onManualSearch() }.font(.caption2)
         }
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
     }
-    @ViewBuilder private func poster(movie: Movie?) -> some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.secondary.opacity(0.12))
-                .aspectRatio(0.7, contentMode: .fit)
-                .overlay {
-                    if let movie, let cover = [movie.coverURL, movie.thumbURL].compactMap({ $0 }).first(where: { !$0.isEmpty }) {
-                        JavDBImage(url: cover, fallbackURL: movie.thumbURL, contentMode: .fit, frontPoster: true)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    } else if mapper.messages[entry?.id ?? ""] == "请求中…" || mapper.messages[entry?.id ?? ""] == "排队中" {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "film")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            Text("\(row.rank)")
-                .font(.caption2.bold())
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(row.rank <= 3 ? Color.orange.opacity(0.85) : Color.blue.opacity(0.75), in: Capsule())
-                .foregroundStyle(.white)
-                .padding(6)
-        }
-    }
-}
-
-@MainActor private final class DMMActressMapper: ObservableObject {
-    @Published var actors: [String: Actor] = [:]
-    @Published var candidates: [String: [Actor]] = [:]
-    @Published var messages: [String: String] = [:]
-    @Published var busy = false
-    private var generation = UUID()
-    private var task: Task<Void, Never>?
-    func cancel() {
-        task?.cancel(); task = nil; generation = UUID(); busy = false
-        for (key, value) in messages where value == "排队中" || value == "正在精确核对AVDB演员…" {
-            messages.removeValue(forKey: key)
-        }
-    }
-    /// Build 349: pre-fill from the server pre-matching feed (dmm-actress),
-    /// matched by actress name. Matched rows land in `actors`; while the
-    /// feed is fresh, miss/ambiguous verdicts land in `messages`, which
-    /// keeps them out of the automatic resolveVisible batch (ambiguous
-    /// stays fail-closed). A stale feed contributes only matched rows;
-    /// the rest falls back to the exact-name verification below.
-    func applyFeed(_ feed: RankingFeed, rows: [DMMActressRow]) {
-        let fresh = !feed.isStale
-        for row in rows where actors[row.actressID] == nil {
-            guard let found = feed.actorEntry(forNames: [row.name]), found.match.pending != true else { continue }
-            if let actor = found.makeActor() {
-                actors[row.actressID] = actor
-                messages[row.actressID] = "服务器预匹配 · AVDB 演员精确匹配"
-            } else if fresh {
-                switch found.match.status {
-                case "ambiguous": messages[row.actressID] = "服务器预匹配：多个精确姓名候选，未匹配"
-                case "miss": messages[row.actressID] = "服务器预匹配：未匹配唯一AVDB演员 · 保留源榜位"
-                default: break
-                }
-            }
-        }
-    }
-    func resolve(_ row: DMMActressRow, retry: Bool = false) {
-        resolveVisible([row], retry: retry)
-    }
-    func resolveVisible(_ rows: [DMMActressRow], retry: Bool = false) {
-        guard !busy else { return }
-        let batch = Array(rows.filter {
-            actors[$0.actressID] == nil && (retry || messages[$0.actressID] == nil)
-        }.prefix(20))
-        guard !batch.isEmpty else { return }
-        let epoch = generation
-        busy = true
-        for row in batch { messages[row.actressID] = "排队中" }
-        task = Task { [weak self] in
-            guard let self else { return }
-            defer {
-                if self.generation == epoch {
-                    self.busy = false; self.task = nil
-                    for (key, value) in self.messages where value == "排队中" || value == "正在精确核对AVDB演员…" {
-                        self.messages.removeValue(forKey: key)
-                    }
-                }
-            }
-            await withTaskGroup(of: Void.self) { group in
-                var index = 0
-                func startNext() {
-                    guard index < batch.count else { return }
-                    let row = batch[index]
-                    index += 1
-                    group.addTask { @MainActor in await self.verify(row, epoch: epoch) }
-                }
-                startNext(); startNext(); startNext(); startNext()
-                while await group.next() != nil {
-                    if Task.isCancelled || self.generation != epoch { break }
-                    startNext()
-                }
-            }
-        }
-    }
-    private func verify(_ row: DMMActressRow, epoch: UUID) async {
-        let key = row.actressID
-        messages[key] = "正在精确核对AVDB演员…"
-        do {
-            try Task.checkCancellation()
-            guard generation == epoch else { throw CancellationError() }
-            let identity = ExternalActorIdentity.resolve(sourceName: row.name, aliases: [], catalog: .bundled())
-            let resolution = try await ExternalActorResolver.inspect(identity: identity, search: { keyword, page in
-                try await JavDBSDK.shared.searchActors(keyword: keyword, page: page)
-            })
-            guard !Task.isCancelled, generation == epoch else { return }
-            switch resolution {
-            case .matched(let match):
-                actors[key] = match.actor
-                candidates[key] = []
-                messages[key] = "AVDB 演员精确匹配"
-            case .notFound:
-                actors.removeValue(forKey: key)
-                candidates[key] = []
-                messages[key] = "未匹配唯一AVDB演员 · 保留源榜位；不发明演员ID"
-            case .ambiguous(let list):
-                actors.removeValue(forKey: key)
-                candidates[key] = list
-                messages[key] = "多个精确姓名候选，待手动确认"
-            case .incomplete(let list, _):
-                actors.removeValue(forKey: key)
-                candidates[key] = list
-                messages[key] = "查询未完成 · 待手动核对；不发明演员ID"
-            }
-        } catch is CancellationError {
-            return
-        } catch {
-            guard !Task.isCancelled, generation == epoch else { return }
-            messages[key] = "演员核对失败 · 可重试；不发明演员ID"
-        }
+    private var poster: some View {
+        MoviePosterCard(
+            movie: Movie(
+                id: match?.pathID ?? "dmm:" + row.cid,
+                number: codeLabel,
+                title: match?.title ?? row.sourceTitle,
+                coverURL: match?.coverURL
+            ),
+            rank: row.rank,
+            upgradesVisibleHQ: false
+        )
     }
 }
 
 @MainActor private struct DMMActressRankingPage: View {
     let rows: [DMMActressRow]
     var onNearEnd: () -> Void = {}
-    @StateObject private var mapper = DMMActressMapper()
-    @State private var manualSearch = false
+    @ObservedObject private var matcher = AvfanMatchStore.shared
     private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: 3)
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                 ForEach(rows) { row in
-                    DMMActressCard(row: row, mapper: mapper, onManualSearch: { manualSearch = true })
+                    DMMActressCard(row: row)
                         .onAppear {
                             if row.actressID == rows.last?.actressID { onNearEnd() }
                         }
@@ -358,82 +214,51 @@ import UniformTypeIdentifiers
             .padding(.vertical, 4)
         }
         .buttonStyle(.borderless)
-        .navigationDestination(isPresented: $manualSearch) { SearchView() }
-        .onAppear { applyFeedThenResolve() }
-        .onChange(of: rows.map(\.actressID)) { _, _ in applyFeedThenResolve() }
-        .onDisappear { mapper.cancel() }
+        .onAppear { enqueueMatches() }
+        .onChange(of: rows.map(\.actressID)) { _, _ in enqueueMatches() }
     }
-    // Build 349: server feed first; resolveVisible then only queues the
-    // rows the feed did not cover.
-    private func applyFeedThenResolve() {
-        Task { @MainActor in
-            if let feed = await RankingFeedState.shared.ensure(board: "dmm", term: "actress") {
-                mapper.applyFeed(feed, rows: rows)
-            }
-            mapper.resolveVisible(rows, retry: false)
-        }
+    private func enqueueMatches() {
+        // Build 353: actresses match avfan by exact name.
+        for row in rows { matcher.enqueueActor(name: row.name) }
     }
 }
 
 @MainActor private struct DMMActressCard: View {
     let row: DMMActressRow
-    @ObservedObject var mapper: DMMActressMapper
-    let onManualSearch: () -> Void
-    private var actor: Actor? { mapper.actors[row.actressID] }
+    @ObservedObject private var matcher = AvfanMatchStore.shared
+    private var match: AvfanMatchStore.ActorMatch? { matcher.actorMatch(forName: row.name) }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Group {
-                if let actor {
-                    NavigationLink { ActorDetailView(actorID: actor.id) } label: { portrait(actor: actor) }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("dmm-actress-\(row.rank)")
-                } else {
-                    Button { mapper.resolve(row, retry: true) } label: { portrait(actor: nil) }
-                        .buttonStyle(.plain)
-                        .disabled(mapper.busy)
-                }
-            }
+            NavigationLink { AvfanActorRouteView(name: row.name) } label: { portrait }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("dmm-actress-\(row.rank)")
             Text("#\(row.rank) · DMM女優 · \(row.actressID)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .accessibilityIdentifier("dmm-actress-rank-\(row.rank)")
             Text(row.name).font(.caption.weight(.semibold)).lineLimit(2)
-            if let actor {
-                Text(actor.displayName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                Text(mapper.messages[row.actressID] ?? "已匹配").font(.caption2).foregroundStyle(.secondary)
-            } else if let choices = mapper.candidates[row.actressID], !choices.isEmpty {
-                Text(mapper.messages[row.actressID] ?? "候选待确认").font(.caption2)
-                ForEach(choices.prefix(3), id: \.id) { choice in
-                    NavigationLink { ActorDetailView(actorID: choice.id) } label: {
-                        Text(choice.displayName).font(.caption2)
-                    }
-                }
+            if match != nil {
+                Text("AVFan 已匹配").font(.caption2).foregroundStyle(.secondary)
+            } else if matcher.isActorMiss(name: row.name) {
+                Text("AVFan 暂无此演员").font(.caption2).foregroundStyle(.secondary)
+                Button("重试 AVFan 匹配") { matcher.retryActor(name: row.name) }.font(.caption2)
             } else {
-                Text(mapper.messages[row.actressID] ?? "未匹配 · 保留源榜位；按姓名精确核对，不发明演员ID")
-                    .font(.caption2).foregroundStyle(.secondary)
-                Button("精确核对AVDB演员") { mapper.resolve(row, retry: true) }
-                    .font(.caption2)
-                    .disabled(mapper.busy)
+                Text("等待 AVFan 匹配…").font(.caption2).foregroundStyle(.secondary)
             }
             Link("来源女优列表", destination: row.sourceURL).font(.caption2)
-            Button("手动搜索核对（不自动认领）") { onManualSearch() }.font(.caption2)
         }
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
     }
-    @ViewBuilder private func portrait(actor: Actor?) -> some View {
+    private var portrait: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.secondary.opacity(0.12))
                 .aspectRatio(0.75, contentMode: .fit)
                 .overlay {
-                    if let actor, let source = [actor.avatarURL, actor.coverURL].compactMap({ $0 }).first(where: { !$0.isEmpty }) {
-                        JavDBImage(url: source, contentMode: .fit)
+                    if let avatar = match?.avatarURL {
+                        JavDBImage(url: avatar, contentMode: .fit)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    } else if mapper.messages[row.actressID] == "请求中…"
-                                || mapper.messages[row.actressID] == "排队中"
-                                || mapper.messages[row.actressID] == "正在精确核对AVDB演员…" {
-                        ProgressView()
                     } else {
                         Image(systemName: "person.crop.square")
                             .foregroundStyle(.secondary)
