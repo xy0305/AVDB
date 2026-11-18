@@ -317,8 +317,9 @@ struct UserView: View {
                             Task { await avfanSession.signOut() }
                         }
                     }
-                } footer: {
                     Text("登录只让外接榜单的 AVFan 匹配与详情抓取带上登录态（磁链等更完整），不抓取账号页、不采集账号数据。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("AI 翻译") {
