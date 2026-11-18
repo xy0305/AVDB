@@ -1,7 +1,7 @@
-name: Home HQ posters App 351
+name: Home HQ posters App 352
 on:
   push:
-    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332, feat/home-hero-detail-333, feat/home-hero-parity-334, feat/detail-api-335, feat/remove-javverse-336, feat/recommender-throttle-337, feat/logout-access-338, feat/detail-glass-clear-339, feat/session-revalidate-340, feat/reviews-first-load-341, feat/reviews-panel-pending-342, feat/list-landscape-cover-343, feat/list-tabbar-clearance-344, feat/western-actor-ranking-345, feat/list-paging-repeat-346, feat/actor-ranking-period-347, feat/actor-grid-scroll-348, feat/feed-prefill-349, feat/rankings-auth-350, feat/enrichment-351]
+    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332, feat/home-hero-detail-333, feat/home-hero-parity-334, feat/detail-api-335, feat/remove-javverse-336, feat/recommender-throttle-337, feat/logout-access-338, feat/detail-glass-clear-339, feat/session-revalidate-340, feat/reviews-first-load-341, feat/reviews-panel-pending-342, feat/list-landscape-cover-343, feat/list-tabbar-clearance-344, feat/western-actor-ranking-345, feat/list-paging-repeat-346, feat/actor-ranking-period-347, feat/actor-grid-scroll-348, feat/feed-prefill-349, feat/rankings-auth-350, feat/enrichment-351, feat/all-endpoints-352]
 permissions:
   contents: read
 jobs:
@@ -300,7 +300,7 @@ jobs:
           test "$bytes" -gt 500000000
       - uses: actions/upload-artifact@v4
         with:
-          name: AVDB-351-release
+          name: AVDB-352-release
           path: |
             AVDB-unsigned-*.ipa
             evidence-release/*
@@ -310,7 +310,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: AVDB-351-release-logs
+          name: AVDB-352-release-logs
           path: |
             evidence-release/*
             fetch-live289.log
@@ -331,7 +331,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-cloud-tests
+          name: AVDB-352-cloud-tests
           path: evidence-cloud290/*
           if-no-files-found: warn
   ai-cover-settings-screenshots:
@@ -347,7 +347,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-ai-cover-cloud-screenshots
+          name: AVDB-352-ai-cover-cloud-screenshots
           path: |
             evidence-ai290ui/shots/*
             evidence-ai290ui/status.json
@@ -366,7 +366,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-live-subtitle-screenshots
+          name: AVDB-352-live-subtitle-screenshots
           path: |
             evidence-live287/ui/shots/*
             evidence-live287/ui/status.json
@@ -387,7 +387,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-production-controller-HLS
+          name: AVDB-352-production-controller-HLS
           path: |
             evidence-hls-app/*.json
             evidence-hls-app/*.log
@@ -415,7 +415,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-strict-runtime
+          name: AVDB-352-strict-runtime
           path: |
             evidence-hls-runtime/*.json
             evidence-hls-runtime/*.log
@@ -432,7 +432,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-hq-simulator
+          name: AVDB-352-home-hq-simulator
           path: evidence-homehq298/*
           if-no-files-found: warn
   home-hero-hq-screenshots:
@@ -486,7 +486,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-screenshots
+          name: AVDB-352-home-screenshots
           path: |
             evidence-home326/*
             home326-ui.log
@@ -534,7 +534,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-detail-auth-tests
+          name: AVDB-352-detail-auth-tests
           path: |
             detail327-ui.log
           if-no-files-found: warn
@@ -581,7 +581,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-hot-tests
+          name: AVDB-352-home-hot-tests
           path: |
             home328-ui.log
           if-no-files-found: warn
@@ -629,7 +629,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-hot-tests
+          name: AVDB-352-home-hot-tests
           path: |
             home329-ui.log
           if-no-files-found: warn
@@ -677,7 +677,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-chrome-tests
+          name: AVDB-352-home-chrome-tests
           path: |
             home330-ui.log
           if-no-files-found: warn
@@ -725,7 +725,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-hero-tests
+          name: AVDB-352-home-hero-tests
           path: |
             home331-ui.log
           if-no-files-found: warn
@@ -773,7 +773,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-hero-color-tests
+          name: AVDB-352-home-hero-color-tests
           path: |
             home332-ui.log
           if-no-files-found: warn
@@ -820,7 +820,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-hero-detail-tests
+          name: AVDB-352-home-hero-detail-tests
           path: |
             home333-ui.log
           if-no-files-found: warn
@@ -867,7 +867,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-351-home-hero-parity-tests
+          name: AVDB-352-home-hero-parity-tests
           path: |
             home334-ui.log
           if-no-files-found: warn

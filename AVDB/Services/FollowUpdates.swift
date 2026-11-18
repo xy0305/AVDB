@@ -317,6 +317,17 @@ final class FollowUpdateChecker: ObservableObject {
         guard !due.isEmpty else { status = all.isEmpty ? nil : "暂无需要检查的关注（每个关注 6 小时最多检查一次）"; return 0 }
         status = "正在检查 \(due.count) 个关注…"
         var found: [ReleaseFeedItem] = []
+        // Build 352: one server-side followed-feed request per run, through
+        // the same shared throttle as the per-target checks. Fail-soft: any
+        // error (or an endpoint that does not behave as the official client
+        // implies) leaves the per-target flow below completely untouched.
+        if only == nil, await VerificationThrottle.acquire() {
+            let followed = (try? await JavDBSDK.shared.followedMovies(page: 1, limit: 24)) ?? []
+            VerificationThrottle.release()
+            if !followed.isEmpty {
+                found += Self.followedFeedItems(followed)
+            }
+        }
         var failures = 0, checked = 0
         for target in due {
             if Task.isCancelled { break }
@@ -349,6 +360,32 @@ final class FollowUpdateChecker: ObservableObject {
             ? "检查失败（网络或 JavDB 会话问题），稍后自动重试"
             : (inserted.isEmpty ? "已检查 \(checked) 个关注，没有新作" : "发现 \(inserted.count) 部新作")
         return inserted.count
+    }
+
+    private static let followedSeenKey = "avdb.follow.followedSeen.v1"
+
+    /// Build 352: maps the server followed feed onto feed items. The first
+    /// successful fetch only records the baseline ids (the same anti-flood
+    /// rule per-target follows use); later runs surface only genuinely new
+    /// ids. ReleaseFeedStore.add still dedupes against the existing feed.
+    private static func followedFeedItems(_ movies: [Movie]) -> [ReleaseFeedItem] {
+        let defaults = UserDefaults.standard
+        var seenInFetch = Set<String>()
+        let unique = movies.filter { !$0.id.isEmpty && seenInFetch.insert($0.id).inserted }
+        let stored = defaults.stringArray(forKey: followedSeenKey)
+        guard let stored else {
+            defaults.set(Array(unique.map(\.id).prefix(300)), forKey: followedSeenKey)
+            return []
+        }
+        let known = Set(stored)
+        let fresh = unique.filter { !known.contains($0.id) }
+        defaults.set(Array((fresh.map(\.id) + stored).prefix(300)), forKey: followedSeenKey)
+        return fresh.map {
+            ReleaseFeedItem(movieID: $0.id, number: $0.displayNumber, title: $0.title ?? "",
+                            coverURL: $0.coverURL ?? $0.thumbURL, releaseDate: $0.releaseDate,
+                            followID: "server:followed", followName: "关注动态",
+                            kind: .actor, foundAt: Date())
+        }
     }
 
     private static func fetch(_ target: FollowTarget) async throws -> [Movie] {

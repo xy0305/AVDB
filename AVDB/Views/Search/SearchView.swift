@@ -45,6 +45,13 @@ struct SearchView: View {
     @State private var filterBy: MovieFilterBy = .all
     @State private var sortBy: MovieSortBy = .relevance
     @StateObject private var suggest = SearchSuggestStore.shared
+    // Build 352: live suggestions from /advanced_search/suggestions (debounced,
+    // fail-soft) and the 手气不错 lucky draw.
+    @State private var liveSuggestions: [String] = []
+    @State private var suggestionTask: Task<Void, Never>?
+    @State private var luckyLoading = false
+    @State private var luckyMessage: String?
+    @State private var luckyTarget: LuckyTarget?
     @FocusState private var isSearchFocused: Bool
     /// Build 299: home→search push + keyboard + tag cloud used to hitch together.
     /// Hold tags/keyboard until the navigation transition finishes.
@@ -63,12 +70,17 @@ struct SearchView: View {
 
             Group {
                 if submitted.isEmpty {
-                    if openSettled {
+                    if !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !liveSuggestions.isEmpty {
+                        suggestionList
+                    } else if openSettled {
                         SearchIdleView(
                             hotKeywords: suggest.hotKeywords,
                             history: suggest.history,
                             onPick: { pick($0) },
-                            onClearHistory: { suggest.clearHistory() }
+                            onClearHistory: { suggest.clearHistory() },
+                            onLucky: { Task { await runLucky() } },
+                            luckyLoading: luckyLoading,
+                            luckyMessage: luckyMessage
                         )
                     } else {
                         // Light placeholder while the push animates — no FlowLayout / glass chips.
@@ -104,6 +116,68 @@ struct SearchView: View {
             await hot
         }
         .modifier(HidesFloatingTabBar())
+        .navigationDestination(item: $luckyTarget) { target in
+            MovieDetailView(movieID: target.id)
+        }
+        .onChange(of: keyword) { _, newValue in
+            suggestionTask?.cancel()
+            let query = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty, submitted.isEmpty else {
+                liveSuggestions = []
+                return
+            }
+            suggestionTask = Task {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+                let words = (try? await JavDBSDK.shared.advancedSearchSuggestions(keyword: query)) ?? []
+                guard !Task.isCancelled,
+                      keyword.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
+                liveSuggestions = words
+            }
+        }
+    }
+
+    /// Build 352: live suggestion rows while typing (tap = search that word).
+    private var suggestionList: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(liveSuggestions, id: \.self) { word in
+                    Button {
+                        pick(word)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.secondary)
+                            Text(word)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    Divider()
+                }
+            }
+        }
+    }
+
+    /// Build 352: 手气不错 — one random movie from /movies/lucky, straight to detail.
+    private func runLucky() async {
+        guard !luckyLoading else { return }
+        luckyLoading = true
+        luckyMessage = nil
+        defer { luckyLoading = false }
+        do {
+            if let movie = try await JavDBSDK.shared.luckyMovie() {
+                luckyTarget = LuckyTarget(id: movie.id)
+            } else {
+                luckyMessage = "暂时没有抽到影片，请再试一次"
+            }
+        } catch {
+            luckyMessage = error.localizedDescription
+        }
     }
 
     /// 钉在顶部，不随列表滚动、不走系统 searchable。
@@ -260,16 +334,57 @@ struct SearchView: View {
     }
 }
 
+/// Build 352: navigation payload for the lucky draw.
+private struct LuckyTarget: Identifiable, Hashable {
+    let id: String
+}
+
 /// 空搜索页：近期热搜（startup.recent_keywords）+ 本地历史。
 private struct SearchIdleView: View {
     let hotKeywords: [String]
     let history: [String]
     let onPick: (String) -> Void
     let onClearHistory: () -> Void
+    // Build 352: 手气不错 entry (empty-state area).
+    let onLucky: () -> Void
+    let luckyLoading: Bool
+    let luckyMessage: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        GlassHaptic.tap()
+                        onLucky()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "dice")
+                                .font(.system(size: 17, weight: .medium))
+                            Text("手气不错")
+                                .font(.subheadline.weight(.medium))
+                            Spacer()
+                            if luckyLoading {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), elevation: 0.2, scrolling: true)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(luckyLoading)
+                    if let luckyMessage {
+                        Text(luckyMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 if !hotKeywords.isEmpty {
                     keywordSection(title: "近期熱搜", words: hotKeywords)
                 }
