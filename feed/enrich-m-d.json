@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-d",
- "generated_at": "2026-11-17T20:18:07+00:00",
+ "generated_at": "2026-11-18T20:13:35+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -116,6 +116,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00995/ipzz00995jp-15.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/GAQRMWMoaCXD0LWqiB1bgdwEyoNGySZqZAK8yLi4G8N2nWJg7c-79CuC_3XJGh/ipzz00995hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/DR6G85.jpg",
    "release_date": "2026-10-29",
    "enriched_at": "2026-11-17T19:11:10+00:00"
   },
@@ -143,6 +144,34 @@
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/LHQiRxAsU3k2CHwWLwFelvdMVYxY0ENOqlUH9svGFKDCzUKbPl3sHw1XwxqG/bijn2904k.mp4",
    "cover_hires_url": "http://163.47.40.207:8901/DR6Gx4.jpg",
    "enriched_at": "2026-11-15T04:09:54+00:00"
+  },
+  {
+   "javdb_id": "DR6a1p",
+   "code": "JUR872",
+   "plot": "順風満帆な夫婦生活が、ある日を境にぶち壊れる。会社を経営する夫は、信じていた友人の金貸しに裏切られ多額の借金を背負い倒産に追い込まれてしまう。なんとか幸せだったあの頃に戻りたい妻は、夫に内緒で金貸しに会う事に。「旦那を助けたかったら、週末だけ俺のオンナになれ！！」自分さえ我慢すれば…その想いを胸に、身体を捧げる決意をした妻。その日以来、孕むまで終わらない身代わり肉便器として屈辱的な週末が始まって…。",
+   "plot_source": "dmm",
+   "director": "豆沢豆太郎",
+   "maker": "マドンナ",
+   "series": "愛する夫の為に、身代わり週末肉便器。",
+   "duration_min": 125,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/jur00872/jur00872jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/FgZ4LxkqoA1ZJNjPBNw5SBOpdtM3upObiVMAo1aRc7RoDnJ2GX21hkMh727ET/jur00872hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/DR6a1p.jpg",
+   "release_date": "2026-11-05",
+   "enriched_at": "2026-11-18T19:11:22+00:00"
   },
   {
    "javdb_id": "DR6mrK",
@@ -511,6 +540,123 @@
    "enriched_at": "2026-11-17T19:11:09+00:00"
   },
   {
+   "javdb_id": "dO8YM",
+   "code": "FSDSS437",
+   "director": "カンナナ・ダイナナ",
+   "maker": "FALENO",
+   "duration_min": 120,
+   "cover_hires_url": "http://163.47.40.207:8901/dO8YM.jpg",
+   "release_date": "2022-07-07",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:B69DE9443149228483E7DB1E888287D6B91DCFB7&amp;dn=FSDSS-437",
+     "size": "1.34GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:EAA1E0B8995A16F187A7A011B24D341AD732F067&amp;dn=FSDSS-437-UC",
+     "size": "5.49GB",
+     "title": "FSDSS-437-UC"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:9C236A7C6820BFEF90F34A90708C3BD61E32C5C7&amp;dn=FSDSS-437",
+     "size": "1.79GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F5425A66F2F8B9A06E5A682BE1BDE2B2E0BE3D90&amp;dn=%40FSDSS437C",
+     "size": "2.59GB",
+     "title": "@FSDSS437C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:F68091A11CAAFCBBE29B9259F3358687E8136F77&amp;dn=FSDSS-437",
+     "size": "1.48GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:FEE7989B68071AD8367B061C8B16E348DAC2B41D&amp;dn=FSDSS-437-uncensored-HD",
+     "size": "3.44GB",
+     "title": "FSDSS-437-uncensored-HD"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:AB84053F8ECAA343F06B35571FD4314BDE4762D4&amp;dn=FSDSS-437",
+     "size": "3.71GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:85420124C3702D5AD8C686A6381ACBEB99077190&amp;dn=%5BMosaic+Removed+Uncensored+%5DFSDSS-437+%E3%83%80%E3%83%80%E6%BC%8F%E3%82%8C%E5%A4%B1%E7%A6%81%E3%80%81%E6%BD%AE%E5%90%B9%E3%81%8D%E4%B9%B1%E3%82%8C%EF%BC%81%E5%8F%B2%E4%B8%8A%E6%9C%80%E9%AB%98%E3%81%AB%E3%82%A4%E3%82%AD%E6%B1%81%E3%82%92%E5%99%B4%E5%B0%84%E3%81%99%E3%82%8B%E6%BF%80%E3%83%A4%E3%83%90%E3%82%B9%E3%83%97%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5%E3%82%A2%E3%82%AF%E3%83%A1+%E6%A9%8B%E6%9C%AC%E3%81%82%E3%82%8A%E3%81%AA.TS",
+     "size": "2.17GB",
+     "title": "[Mosaic Removed Uncensored ]FSDSS-437 ダダ漏れ失禁、潮吹き乱れ！史上最高にイキ汁を噴射する激ヤバスプラッシュアクメ 橋本ありな.TS"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:3568914CED5B17A4D42AB783F68DC60C3756E85B&amp;dn=FSDSS-437",
+     "size": "4.52GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:88E06217F01653E8912034A670FC2E669A728EC3&amp;dn=FSDSS-437+%E3%83%80%E3%83%80%E6%BC%8F%E3%82%8C%E5%A4%B1%E7%A6%81%E3%80%81%E6%BD%AE%E5%90%B9%E3%81%8D%E4%B9%B1%E3%82%8C+%E5%8F%B2%E4%B8%8A%E6%9C%80%E9%AB%98%E3%81%AB%E3%82%A4%E3%82%AD%E6%B1%81%E3%82%92%E5%99%B4%E5%B0%84%E3%81%99%E3%82%8B%E6%BF%80+%E6%A9%8B%E6%9C%AC%E3%81%82%E3%82%8A%E3%81%AA",
+     "size": "4.07GB",
+     "title": "FSDSS-437 ダダ漏れ失禁、潮吹き乱れ 史上最高にイキ汁を噴射する激 橋本ありな"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:85AFBE5BEC505B0F1EC977A8A09D76C3FE867E25&amp;dn=FSDSS-437-C",
+     "size": "5.34GB",
+     "title": "FSDSS-437-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:1F9E94B49C80B9C61A4E553A4AA9A1AF022CB980&amp;dn=FSDSS-437-C",
+     "size": "5.32GB",
+     "title": "FSDSS-437-C"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:725982F795FF4A67D7422BEBB975E7E3A26ACC32&amp;dn=FSDSS-437",
+     "size": "4.52GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:DCD526894F6475370831DD731C9DFF60B9FFF699&amp;dn=FSDSS-437",
+     "size": "4.52GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:8F7175DEC78F8968E03AD9E36E1B59A4D6990694&amp;dn=FSDSS-437",
+     "size": "4.52GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:B2E6A06BF507274DDBE34BF619177A36D0D65534&amp;dn=fsdss-437",
+     "size": "5.50GB",
+     "title": "fsdss-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:420E94DDBA363CD294A6EE6927DD852C7DE22FEE&amp;dn=fsdss-437",
+     "size": "5.28GB",
+     "title": "fsdss-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:141CBACCAE146EA25F4BF16EACFA6E43B612AA21&amp;dn=%40FSDSS437",
+     "size": "3.88GB",
+     "title": "@FSDSS437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:27193F1F5133F59C748A299A8659A4A145208B5E&amp;dn=FSDSS-437",
+     "size": "4.49GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:4A9B4642DB7C12FDC3E7C970962617183C906F61&amp;dn=FSDSS-437",
+     "size": "4.47GB",
+     "title": "FSDSS-437"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:C149962017CD1471D4D03C418DFD8A9D6ADEDC45&amp;dn=FSDSS-437",
+     "size": "2.25GB",
+     "title": "FSDSS-437"
+    }
+   ],
+   "enriched_at": "2026-11-18T19:10:55+00:00"
+  },
+  {
    "javdb_id": "deGkq0",
    "code": "HOIZ178",
    "plot": "みなさま、ごきげんよう。素人ホイホイtowerでございます。\n愛はお金で買えるのでございます。\n愛はお金を産みませんが、お金は尊敬を産み、尊敬は愛に変わります。\nと、大統領の第三夫人が申しておりました。\nつまり、お金で極上美人のハメ撮り映像は買えるのでございます。\n\n＃azami（23）\n＃保育士\n＃歪み性癖\n＃アナル舐め\n清純派アイドルフェイス、中身は性癖モンスター。\n\n＃yurina（29）\n＃ムチ尻\n＃露出\n＃性欲マシン\n愛嬌抜群の保育士さん、肉厚変態BODYのギャップ。\n\n＃kasumi（27）\n＃ファッションモデル\n＃超美形\n＃巨乳\n＃アート系エロス\n顔面、カラダ、エロス、すべてが超一級！右脳型の欲望。\n\n＃kinomi（25）\n＃変態\n＃露出狂\n＃爆乳\nエロスは狂気！超美人爆BODY、ネジの外れた性癖！\n\nわたくしはいつでもみなさんの射精を願っておりますわ。\nごきげんよう。",
@@ -600,6 +746,7 @@
     "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/ipzz00973/ipzz00973jp-15.jpg"
    ],
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/MAoEIGVRIMMU65cpotDmvpyq0_1sTrDb8wC8hWQKBzZra-nqyeSIWB6tkINW_n/ipzz00973hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/dePw8B.jpg",
    "release_date": "2026-10-08",
    "enriched_at": "2026-11-17T19:11:09+00:00"
   },
