@@ -1,21 +1,50 @@
 import SwiftUI
 
 /// Build 353: the avfan detail page the five external boards open.
-/// Hero cover is pinned to the card the user tapped; metadata, casts
-/// and this site's magnets (with sizes) come from the avfan detail
-/// page itself. Magnets can be pushed to the user's own 115 through
-/// AVDB's existing Pan115Client. Nothing here touches JavDB.
+/// Metadata, casts and this site's magnets (with sizes) come from
+/// the avfan detail page itself. Magnets can be pushed to the user's
+/// own 115 through AVDB's existing Pan115Client, and played through
+/// the same Pan115PlayerView the normal detail uses. Nothing here
+/// touches JavDB.
+/// Build 354: the hero and works posters run the standard poster
+/// chain by number (HD portrait over the stored JavDB feed cover
+/// over the avfan original) instead of pinning the tapped card's
+/// raw cover.
 struct AvfanMovieDetailView: View {
     let card: AvfanMovieCard
 
     @State private var detail: AvfanMovieDetail?
     @State private var failed = false
+    @State private var failureText = "AVFan 详情加载失败"
     @State private var toast: String?
     @State private var pushingURL: String?
+    @State private var playingMagnet: AvfanMagnetItem?
     @State private var showLogin = false
     @ObservedObject private var session = AvfanSession.shared
+    @ObservedObject private var matcher = AvfanMatchStore.shared
 
     private var heroCover: String? { card.coverURL ?? detail?.coverURL }
+    /// The poster-chain movie for the hero: identity stays the
+    /// tapped card's, the number drives the HD resolution.
+    private var heroMovie: Movie {
+        matcher.posterMovie(
+            id: card.pathID,
+            code: detail?.displayCode ?? card.displayCode,
+            title: card.title,
+            fallbackCover: heroCover
+        )
+    }
+    /// Identity the 115 player and its playback cache use for this
+    /// page — namespaced so it never collides with a JavDB movie id.
+    private var playerMovie: Movie {
+        Movie(
+            id: "avfan-" + card.pathID,
+            type: "0",
+            number: detail?.displayCode ?? card.displayCode,
+            title: heroTitle,
+            coverURL: heroCover
+        )
+    }
     private var heroTitle: String {
         if let detail, !detail.title.isEmpty { return detail.title }
         return card.titleWithoutCodePrefix
@@ -37,7 +66,7 @@ struct AvfanMovieDetailView: View {
                     }
                 } else if failed {
                     VStack(spacing: 10) {
-                        Text("AVFan 详情加载失败")
+                        Text(failureText)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Button("重试") { Task { await load(bypassCache: true) } }
@@ -66,24 +95,19 @@ struct AvfanMovieDetailView: View {
         .sheet(isPresented: $showLogin) {
             AvfanLoginView()
         }
+        .fullScreenCover(item: $playingMagnet) { magnet in
+            Pan115PlayerView(movie: playerMovie, magnetURL: magnet.url)
+        }
     }
 
     private var hero: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.secondary.opacity(0.12))
-                if let heroCover {
-                    JavDBImage(url: heroCover, contentMode: .fit)
-                        .aspectRatio(800.0 / 538.0, contentMode: .fit)
-                } else {
-                    Text(card.displayCode)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .aspectRatio(800.0 / 538.0, contentMode: .fit)
-                }
+            // Build 354: portrait HD hero like the normal detail —
+            // the poster chain resolves by number; the tapped card's
+            // raw avfan cover is only the last fallback.
+            ClippedAspectFill(aspectRatio: 0.7, cornerRadius: 12) {
+                MoviePosterImage(movie: heroMovie, maxPixelSize: 1200, upgradesVisibleHQ: true)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
             Text(heroTitle)
                 .font(.headline)
                 .textSelection(.enabled)
@@ -170,9 +194,22 @@ struct AvfanMovieDetailView: View {
             Text("磁力链接（AVFan）")
                 .font(.headline)
             if detail.magnets.isEmpty {
-                Text(session.isSignedIn ? "本站暂无磁链" : "未登录或本站暂无磁链，登录后可能更完整")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                // Explicit empty states: signed-in means the page
+                // truly lists none; signed-out points at the login,
+                // since avfan may only show magnets to members.
+                if session.isSignedIn {
+                    Text("本站暂无磁链")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("这个页面没有解析到磁链；avfan 的磁链可能需要登录后才显示。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button("登录 avfan 后查看") { showLogin = true }
+                            .font(.subheadline)
+                    }
+                }
             } else {
                 ForEach(detail.magnets) { magnet in
                     VStack(alignment: .leading, spacing: 6) {
@@ -206,6 +243,21 @@ struct AvfanMovieDetailView: View {
                             }
                             .font(.subheadline)
                             .disabled(pushingURL != nil)
+                            // Build 354: play, like the normal detail —
+                            // the player searches 115 by number first,
+                            // pushes this magnet if the file is not
+                            // there yet, then plays it.
+                            Button {
+                                let settings = Pan115Settings.shared
+                                if settings.isConfigured {
+                                    playingMagnet = magnet
+                                } else {
+                                    toast = settings.missingHint
+                                }
+                            } label: {
+                                Label("播放", systemImage: "play.circle")
+                            }
+                            .font(.subheadline)
                         }
                     }
                     .padding(10)
@@ -227,20 +279,17 @@ struct AvfanMovieDetailView: View {
                         AvfanMovieDetailView(card: item)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.secondary.opacity(0.12))
-                                if let cover = item.coverURL {
-                                    JavDBImage(url: cover, contentMode: .fit)
-                                        .aspectRatio(2.0 / 3.0, contentMode: .fit)
-                                } else {
-                                    Text(item.displayCode)
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                        .aspectRatio(2.0 / 3.0, contentMode: .fit)
-                                }
+                            ClippedAspectFill(aspectRatio: 2.0 / 3.0, cornerRadius: 8) {
+                                MoviePosterImage(
+                                    movie: matcher.posterMovie(
+                                        id: item.pathID,
+                                        code: item.displayCode,
+                                        title: item.title,
+                                        fallbackCover: item.coverURL
+                                    ),
+                                    upgradesVisibleHQ: true
+                                )
                             }
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
                             Text(item.displayCode)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.primary)
@@ -272,6 +321,7 @@ struct AvfanMovieDetailView: View {
     private func load(bypassCache: Bool = false) async {
         if detail != nil && !bypassCache { return }
         failed = false
+        matcher.ensureFeedCovers()
         do {
             let url = await AvfanClient.shared.movieURL(pathID: card.pathID)
             var html = try await AvfanClient.shared.html(for: url, expectCatalog: true, bypassCache: bypassCache)
@@ -299,6 +349,11 @@ struct AvfanMovieDetailView: View {
             }
             detail = parsed
         } catch {
+            if let avfanError = error as? AvfanError, case .rateLimited = avfanError {
+                failureText = "avfan 限流中，请约十分钟后再试"
+            } else {
+                failureText = "AVFan 详情加载失败"
+            }
             failed = true
         }
     }
@@ -322,6 +377,9 @@ struct AvfanMovieDetailView: View {
                 cookie: auth,
                 folderCID: settings.folderCID
             )
+            // Same bookkeeping as the normal detail's magnet rows:
+            // the player finds this magnet again by the movie id.
+            Pan115PlaybackCache.save(movieID: playerMovie.id, magnet: magnet.url)
             toast = result.message
         } catch {
             toast = error.localizedDescription
@@ -336,6 +394,8 @@ struct AvfanActorView: View {
 
     @State private var profile: AvfanCastProfile?
     @State private var failed = false
+    @State private var failureText = "演员页加载失败"
+    @ObservedObject private var matcher = AvfanMatchStore.shared
 
     private var displayName: String {
         if let profile, !profile.name.isEmpty { return profile.name }
@@ -379,20 +439,17 @@ struct AvfanActorView: View {
                                     AvfanMovieDetailView(card: item)
                                 } label: {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(Color.secondary.opacity(0.12))
-                                            if let cover = item.coverURL {
-                                                JavDBImage(url: cover, contentMode: .fit)
-                                                    .aspectRatio(2.0 / 3.0, contentMode: .fit)
-                                            } else {
-                                                Text(item.displayCode)
-                                                    .font(.caption.weight(.semibold))
-                                                    .foregroundStyle(.secondary)
-                                                    .aspectRatio(2.0 / 3.0, contentMode: .fit)
-                                            }
+                                        ClippedAspectFill(aspectRatio: 2.0 / 3.0, cornerRadius: 8) {
+                                            MoviePosterImage(
+                                                movie: matcher.posterMovie(
+                                                    id: item.pathID,
+                                                    code: item.displayCode,
+                                                    title: item.title,
+                                                    fallbackCover: item.coverURL
+                                                ),
+                                                upgradesVisibleHQ: true
+                                            )
                                         }
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
                                         Text(item.displayCode)
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(.primary)
@@ -405,7 +462,7 @@ struct AvfanActorView: View {
                     }
                 } else if failed {
                     VStack(spacing: 10) {
-                        Text("演员页加载失败")
+                        Text(failureText)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Button("重试") { Task { await load(bypassCache: true) } }
@@ -428,6 +485,7 @@ struct AvfanActorView: View {
     private func load(bypassCache: Bool = false) async {
         if profile != nil && !bypassCache { return }
         failed = false
+        matcher.ensureFeedCovers()
         do {
             let url = await AvfanClient.shared.pageURL(href)
             let html = try await AvfanClient.shared.html(for: url, bypassCache: bypassCache)
@@ -435,6 +493,11 @@ struct AvfanActorView: View {
                 AvfanHTMLParser.castProfile(in: html)
             }
         } catch {
+            if let avfanError = error as? AvfanError, case .rateLimited = avfanError {
+                failureText = "avfan 限流中，请约十分钟后再试"
+            } else {
+                failureText = "演员页加载失败"
+            }
             failed = true
         }
     }
@@ -458,7 +521,12 @@ struct AvfanRouteView: View {
             AvfanMovieDetailView(card: card)
         } else {
             VStack(spacing: 12) {
-                if matcher.isMiss(code: code) || attempted {
+                if matcher.rateLimitResumeAt != nil {
+                    ProgressView("avfan 限流中，约十分钟后自动恢复…")
+                    Text(code)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else if matcher.isMiss(code: code) || attempted {
                     Image(systemName: "film.slash")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)

@@ -20,17 +20,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '353' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 353;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '354' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 354;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 353' in wf and 'feat/reviews-first-load-341' in wf
+assert 'Home HQ posters App 354' in wf and 'feat/reviews-first-load-341' in wf
 assert 'feat/session-revalidate-340' in wf and 'feat/detail-glass-clear-339' in wf
 assert wf.count('python3 scripts/test-reviews-first-load341.py') == 5  # dedicated job + zzt-ranking list + remove-javverse/detail-api jobs + release regressions
 assert wf.count('python3 scripts/test-session-revalidate340.py') == 5  # the 340 gate keeps its 5 run lines
-assert 'scripts/package-lut353.py' in wf and 'AVDB-353-release' in wf and 'AVDB-340-release' not in wf
-pkg = (r/'scripts/package-lut353.py').read_text()
-assert "=='353'" in pkg and 'AVDB-unsigned-1.0.2-353-avfanboards.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut354.py' in wf and 'AVDB-354-release' in wf and 'AVDB-340-release' not in wf
+pkg = (r/'scripts/package-lut354.py').read_text()
+assert "=='354'" in pkg and 'AVDB-unsigned-1.0.2-354-avfanhdcovers.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  reviews-first-load-341:' in wf and '  session-revalidate-340:' in wf
 
 doc = (r/'Build341-ReviewsFirstLoad.md').read_text()

@@ -11,8 +11,11 @@ import WebKit
 //
 // Red lines (same as AVFan): public pages only; never /api/,
 // /autocomplete, /user/ or any login-gated account page; no UA
-// spoofing beyond the site's own mobile Safari string; serial lanes
-// with spacing; 403/429 stops and degrades instead of retry loops.
+// spoofing beyond the site's own mobile Safari string; one serial
+// lane at 1.2 s spacing (Build 354 — 353's 3 lanes × 0.4 s tripped
+// avfan's own rate limit on device); an avfan rate limit (HTTP 429
+// or its wait-page) trips a shared 10-minute gate over matching and
+// detail fetches alike instead of retry loops.
 // Login (Build 353 supplement) only makes these public fetches carry
 // the user's own session cookies — it never widens what is fetched,
 // and credentials pass through the real sign-in page in a WKWebView
@@ -108,11 +111,13 @@ struct AvfanCastProfile: Hashable {
 
 enum AvfanError: LocalizedError {
     case blocked(status: Int)
+    case rateLimited
     case transport(String)
     case emptyPage
     var errorDescription: String? {
         switch self {
         case .blocked(let status): return "avfan 暂时拒绝访问（HTTP \(status)），已暂停匹配"
+        case .rateLimited: return "avfan 限流中，已暂停全部请求，约十分钟后自动恢复"
         case .transport(let text): return text
         case .emptyPage: return "avfan 页面没有可解析的内容"
         }
@@ -1055,11 +1060,41 @@ actor AvfanClient {
     private var htmlCache: [String: (html: String, at: Date)] = [:]
     private let cacheLifetime: TimeInterval = 12 * 60
 
-    /// Matching engine lanes: at most `laneCount` concurrent fetches,
-    /// each lane keeps at least `laneInterval` between requests.
-    static let laneCount = 3
-    static let laneInterval: TimeInterval = 0.4
+    /// Build 354: ONE serial lane for every avfan fetch (matching and
+    /// detail alike), at least `laneInterval` between requests — the
+    /// same order of politeness as AVFan's own SiteClient (1.0 s),
+    /// slightly wider. This lane is the single place request spacing
+    /// is enforced; callers never add their own delays on top.
+    static let laneCount = 1
+    static let laneInterval: TimeInterval = 1.2
     private var laneFreeAt = [Date](repeating: .distantPast, count: AvfanClient.laneCount)
+
+    /// Build 354: avfan's own rate limit — HTTP 429, or a page telling
+    /// the visitor to come back in ten minutes — trips this gate.
+    /// While it is tripped, every fetch through this client refuses
+    /// locally (no request leaves the device, no probing), and the
+    /// gate lifts by itself when the cooldown ends. Pages already in
+    /// the HTML cache still serve; persisted matches are unaffected.
+    static let rateLimitCooldown: TimeInterval = 600
+    static let rateLimitMarkers = ["十分钟后再试", "十分鐘後再試", "10分钟后再试", "请求过于频繁", "請求過於頻繁", "操作太频繁", "操作太頻繁"]
+    private(set) var rateLimitedUntil: Date?
+
+    func isRateLimited() -> Bool {
+        guard let rateLimitedUntil else { return false }
+        return Date() < rateLimitedUntil
+    }
+
+    func rateLimitResumeDate() -> Date? {
+        isRateLimited() ? rateLimitedUntil : nil
+    }
+
+    private func tripRateLimit() {
+        rateLimitedUntil = Date().addingTimeInterval(Self.rateLimitCooldown)
+    }
+
+    static func isRateLimitPage(_ html: String) -> Bool {
+        rateLimitMarkers.contains { html.contains($0) }
+    }
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -1118,6 +1153,11 @@ actor AvfanClient {
            Date().timeIntervalSince(cached.at) < cacheLifetime {
             return cached.html
         }
+        // Build 354: the rate-limit gate refuses locally — no request
+        // is sent and nothing probes the site while it cools down.
+        if isRateLimited() {
+            throw AvfanError.rateLimited
+        }
         try await respectLane()
 
         var request = URLRequest(url: url)
@@ -1128,10 +1168,21 @@ actor AvfanClient {
             let (data, response) = try await session.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode
             let html = String(data: data, encoding: .utf8) ?? ""
+            // Build 354: avfan's rate limit is checked BEFORE the
+            // generic blocked path, so a wait-page never falls into
+            // the WebView fallback (that would be one more request).
+            if status == 429 || Self.isRateLimitPage(html) {
+                tripRateLimit()
+                throw AvfanError.rateLimited
+            }
             let blocked = AvfanHTMLParser.isBlocked(html, status: status)
             let emptyCatalog = expectCatalog && !AvfanHTMLParser.hasCatalogItems(html)
             if (blocked || emptyCatalog) && allowWebViewFallback {
                 let webHTML = try await AvfanWebViewFetcher.shared.html(for: url, ageCookie: nil)
+                if Self.isRateLimitPage(webHTML) {
+                    tripRateLimit()
+                    throw AvfanError.rateLimited
+                }
                 if !webHTML.isEmpty {
                     htmlCache[key] = (webHTML, Date())
                     await reportSignals(webHTML, url: url)
@@ -1152,6 +1203,10 @@ actor AvfanClient {
         } catch {
             if allowWebViewFallback {
                 let webHTML = try await AvfanWebViewFetcher.shared.html(for: url, ageCookie: nil)
+                if Self.isRateLimitPage(webHTML) {
+                    tripRateLimit()
+                    throw AvfanError.rateLimited
+                }
                 if !webHTML.isEmpty {
                     htmlCache[key] = (webHTML, Date())
                     await reportSignals(webHTML, url: url)

@@ -183,15 +183,21 @@ import UniformTypeIdentifiers
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
     }
     private var poster: some View {
+        // Build 354: with a maker code, the poster runs the standard
+        // chain (HD portrait by number over the stored JavDB feed
+        // cover over the avfan cover). Without one there is no number
+        // to resolve by, so the card keeps its placeholder.
         MoviePosterCard(
-            movie: Movie(
-                id: match?.pathID ?? "dmm:" + row.cid,
+            movie: code.map { code in
+                matcher.posterMovie(id: "dmm:" + row.cid, code: code, title: row.sourceTitle)
+            } ?? Movie(
+                id: "dmm:" + row.cid,
                 number: codeLabel,
-                title: match?.title ?? row.sourceTitle,
-                coverURL: match?.coverURL
+                title: row.sourceTitle,
+                coverURL: nil
             ),
             rank: row.rank,
-            upgradesVisibleHQ: false
+            upgradesVisibleHQ: true
         )
     }
 }

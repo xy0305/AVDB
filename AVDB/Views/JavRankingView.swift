@@ -105,21 +105,31 @@ private struct JRMeasuredGrid: View {
     @State private var width: CGFloat = 390
     @ObservedObject private var matcher = AvfanMatchStore.shared
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let status = matcher.statusText {
+                Text(status).font(.caption).foregroundStyle(.secondary).padding(.horizontal, AdaptiveLayout.gridPadding)
+            }
+            grid
+        }
+    }
+    private var grid: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12, alignment: .top), count: AdaptiveLayout.columnCount(width: width, padding: AdaptiveLayout.gridPadding, spacing: 12)), spacing: 16) {
             ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                 let match = matcher.match(forCode: video.code)
                 VStack(alignment: .leading, spacing: 4) {
                     NavigationLink { posterDestination(video) } label: {
                         // Keep the source card geometry and metadata stable after matching.
+                        // Build 354: poster via the standard chain (HD
+                        // portrait by number over the stored JavDB feed
+                        // cover over the avfan / source cover).
                         MoviePosterCard(
-                            movie: Movie(
-                                id: match?.pathID ?? video.id,
-                                number: video.code,
-                                title: match?.title ?? video.title,
-                                thumbURL: match?.coverURL ?? video.image,
-                                coverURL: match?.coverURL ?? video.image
+                            movie: matcher.posterMovie(
+                                id: video.id,
+                                code: video.code,
+                                title: video.title,
+                                fallbackCover: video.image
                             ),
-                            upgradesVisibleHQ: false
+                            upgradesVisibleHQ: true
                         )
                     }.buttonStyle(.plain).accessibilityIdentifier("jr-poster-\(video.rank ?? 0)")
                     if let rank = video.rank { Text("来源排名 #\(rank)").font(.caption).foregroundStyle(.secondary) }

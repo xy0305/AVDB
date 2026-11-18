@@ -6,8 +6,11 @@ import SwiftUI
 /// code placeholder, and every tap routes through AvfanRouteView —
 /// matched entries open the avfan detail, unmatched ones say
 /// 「AVFan 暂无此作」. No JavDB view, SDK call or verification appears
-/// anywhere in these paths (the poster card's HQ upgrade is disabled
-/// for the same reason).
+/// anywhere in these paths. Build 354: posters go through the
+/// standard poster chain (AvfanMatchStore.posterMovie) — the visible
+/// HQ upgrade resolves the DMM/MGS HD portrait by number (image CDN
+/// only, not a JavDB request), over the stored JavDB feed cover,
+/// over the avfan original cover.
 struct AvfanBoardGrid: View {
     let videos: [JRVideo]
     var sourceName = "MissAV"
@@ -35,13 +38,13 @@ struct AvfanBoardGrid: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             MoviePosterCard(
-                                movie: Movie(
-                                    id: match?.pathID ?? identityPrefix + ":" + video.path,
-                                    number: code,
-                                    title: match?.title ?? video.title,
-                                    coverURL: match?.coverURL ?? fixtureCover
+                                movie: matcher.posterMovie(
+                                    id: identityPrefix + ":" + video.path,
+                                    code: code,
+                                    title: video.title,
+                                    fallbackCover: fixtureCover
                                 ),
-                                upgradesVisibleHQ: false
+                                upgradesVisibleHQ: true
                             )
                             Text("\(sourceName) 顺序 \(rank)").font(.caption2).foregroundStyle(.secondary)
                             Text(statusText(match: match, miss: miss)).font(.caption2).foregroundStyle(.secondary).lineLimit(3)

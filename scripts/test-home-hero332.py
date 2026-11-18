@@ -11,20 +11,20 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '353' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 353;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '354' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 354;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 353' in wf and 'feat/home-hero-color-332' in wf
+assert 'Home HQ posters App 354' in wf and 'feat/home-hero-color-332' in wf
 assert 'feat/home-hero-crop-331' in wf and 'feat/home-chrome-330' in wf
 assert wf.count('python3 scripts/test-home-hero332.py') == 2  # zzt-ranking job + release regressions
 assert 'python3 scripts/test-home-hero331.py' in wf
-assert 'scripts/package-lut353.py' in wf and 'AVDB-353-release' in wf and 'AVDB-331-release' not in wf
-pkg = (r/'scripts/package-lut353.py').read_text()
-assert "=='353'" in pkg and 'AVDB-unsigned-1.0.2-353-avfanboards.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut354.py' in wf and 'AVDB-354-release' in wf and 'AVDB-331-release' not in wf
+pkg = (r/'scripts/package-lut354.py').read_text()
+assert "=='354'" in pkg and 'AVDB-unsigned-1.0.2-354-avfanhdcovers.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 job = wf.split('  home-hero-332:')[1]
 assert '-only-testing:DetailPosterQualityTests/HomeHero332Tests' in job
-assert 'AVDB-353-home-hero-tests' in job or 'AVDB-353-home-hero-color-tests' in job
+assert 'AVDB-354-home-hero-tests' in job or 'AVDB-354-home-hero-color-tests' in job
 assert '  home-hero-331:' in wf and 'home-chrome-330:' in wf and 'home-hot-329:' in wf
 
 doc = (r/'Build332-HomeHeroColor.md').read_text()
