@@ -1,7 +1,7 @@
-name: Home HQ posters App 352
+name: Home HQ posters App 353
 on:
   push:
-    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332, feat/home-hero-detail-333, feat/home-hero-parity-334, feat/detail-api-335, feat/remove-javverse-336, feat/recommender-throttle-337, feat/logout-access-338, feat/detail-glass-clear-339, feat/session-revalidate-340, feat/reviews-first-load-341, feat/reviews-panel-pending-342, feat/list-landscape-cover-343, feat/list-tabbar-clearance-344, feat/western-actor-ranking-345, feat/list-paging-repeat-346, feat/actor-ranking-period-347, feat/actor-grid-scroll-348, feat/feed-prefill-349, feat/rankings-auth-350, feat/enrichment-351, feat/all-endpoints-352]
+    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332, feat/home-hero-detail-333, feat/home-hero-parity-334, feat/detail-api-335, feat/remove-javverse-336, feat/recommender-throttle-337, feat/logout-access-338, feat/detail-glass-clear-339, feat/session-revalidate-340, feat/reviews-first-load-341, feat/reviews-panel-pending-342, feat/list-landscape-cover-343, feat/list-tabbar-clearance-344, feat/western-actor-ranking-345, feat/list-paging-repeat-346, feat/actor-ranking-period-347, feat/actor-grid-scroll-348, feat/feed-prefill-349, feat/rankings-auth-350, feat/enrichment-351, feat/all-endpoints-352, feat/avfan-boards-353]
 permissions:
   contents: read
 jobs:
@@ -53,6 +53,7 @@ jobs:
       - run: python3 scripts/test-feed-prefill349.py
       - run: python3 scripts/test-rankings-auth350.py
       - run: python3 scripts/test-enrichment351.py
+      - run: python3 scripts/test-avfan-boards353.py
   recommender-throttle-337:
     # Build 337: recommender manual-only + random slow spacing + 10-request cap.
     runs-on: macos-26
@@ -158,6 +159,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/test-enrichment351.py
+  avfan-boards-353:
+    # Build 353: five external boards match avfan instead of the JavDB feed; zero JavDB requests on board paths; avfan login in settings.
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/test-avfan-boards353.py
   remove-javverse-336:
     # Build 336: JavVerse ranking removed; shared entry-resolution layer kept for DMM.
     runs-on: macos-26
@@ -180,6 +188,7 @@ jobs:
       - run: python3 scripts/test-feed-prefill349.py
       - run: python3 scripts/test-rankings-auth350.py
       - run: python3 scripts/test-enrichment351.py
+      - run: python3 scripts/test-avfan-boards353.py
   detail-api-335:
     # Build 335: detail glass + API auth change (search token, 猜你喜欢 endpoint feed).
     runs-on: macos-26
@@ -203,6 +212,7 @@ jobs:
       - run: python3 scripts/test-feed-prefill349.py
       - run: python3 scripts/test-rankings-auth350.py
       - run: python3 scripts/test-enrichment351.py
+      - run: python3 scripts/test-avfan-boards353.py
   models:
     runs-on: macos-26
     timeout-minutes: 60
@@ -253,7 +263,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence-release
-          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; python3 scripts/test-zzt-ranking319.py; python3 scripts/test-zzt-ranking320.py; python3 scripts/test-zzt-ranking321.py; python3 scripts/test-zzt-ranking322.py; python3 scripts/test-player-chrome323.py; python3 scripts/test-home-hero-hq326.py; python3 scripts/test-detail-auth327.py; python3 scripts/test-home-hot328.py; python3 scripts/test-home-hot329.py; python3 scripts/test-home-chrome330.py; python3 scripts/test-home-hero331.py; python3 scripts/test-home-hero332.py; python3 scripts/test-home-hero333.py; python3 scripts/test-home-hero334.py; python3 scripts/test-detail-api335.py; python3 scripts/test-remove-javverse336.py; python3 scripts/test-recommender-throttle337.py; python3 scripts/test-logout-access338.py; python3 scripts/test-clear-glass339.py; python3 scripts/test-session-revalidate340.py; python3 scripts/test-reviews-first-load341.py; python3 scripts/test-reviews-panel-pending342.py; python3 scripts/test-list-landscape-cover343.py; python3 scripts/test-list-tabbar-clearance344.py; python3 scripts/test-western-actor-ranking345.py; python3 scripts/test-list-paging-repeat346.py; python3 scripts/test-actor-ranking-period347.py; python3 scripts/test-actor-grid-scroll348.py; python3 scripts/test-feed-prefill349.py; python3 scripts/test-rankings-auth350.py; python3 scripts/test-enrichment351.py; } 2>&1 | tee evidence-release/regressions.log
+          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; python3 scripts/test-zzt-ranking319.py; python3 scripts/test-zzt-ranking320.py; python3 scripts/test-zzt-ranking321.py; python3 scripts/test-zzt-ranking322.py; python3 scripts/test-player-chrome323.py; python3 scripts/test-home-hero-hq326.py; python3 scripts/test-detail-auth327.py; python3 scripts/test-home-hot328.py; python3 scripts/test-home-hot329.py; python3 scripts/test-home-chrome330.py; python3 scripts/test-home-hero331.py; python3 scripts/test-home-hero332.py; python3 scripts/test-home-hero333.py; python3 scripts/test-home-hero334.py; python3 scripts/test-detail-api335.py; python3 scripts/test-remove-javverse336.py; python3 scripts/test-recommender-throttle337.py; python3 scripts/test-logout-access338.py; python3 scripts/test-clear-glass339.py; python3 scripts/test-session-revalidate340.py; python3 scripts/test-reviews-first-load341.py; python3 scripts/test-reviews-panel-pending342.py; python3 scripts/test-list-landscape-cover343.py; python3 scripts/test-list-tabbar-clearance344.py; python3 scripts/test-western-actor-ranking345.py; python3 scripts/test-list-paging-repeat346.py; python3 scripts/test-actor-ranking-period347.py; python3 scripts/test-actor-grid-scroll348.py; python3 scripts/test-feed-prefill349.py; python3 scripts/test-rankings-auth350.py; python3 scripts/test-enrichment351.py; python3 scripts/test-avfan-boards353.py; } 2>&1 | tee evidence-release/regressions.log
       - name: Install actual pinned MediaPipe SDK
         run: |
           gem install cocoapods -v 1.16.2 --no-document
@@ -279,7 +289,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$app" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
-          python3 scripts/package-lut352.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
+          python3 scripts/package-lut353.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
           file "$app/AVDB" | tee evidence-release/macho.txt
           xcrun vtool -show-build "$app/AVDB" | tee -a evidence-release/macho.txt
           codesign -dv "$app" 2> evidence-release/codesign.txt || true
@@ -300,7 +310,7 @@ jobs:
           test "$bytes" -gt 500000000
       - uses: actions/upload-artifact@v4
         with:
-          name: AVDB-352-release
+          name: AVDB-353-release
           path: |
             AVDB-unsigned-*.ipa
             evidence-release/*
@@ -310,7 +320,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: AVDB-352-release-logs
+          name: AVDB-353-release-logs
           path: |
             evidence-release/*
             fetch-live289.log
@@ -331,7 +341,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-cloud-tests
+          name: AVDB-353-cloud-tests
           path: evidence-cloud290/*
           if-no-files-found: warn
   ai-cover-settings-screenshots:
@@ -347,7 +357,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-ai-cover-cloud-screenshots
+          name: AVDB-353-ai-cover-cloud-screenshots
           path: |
             evidence-ai290ui/shots/*
             evidence-ai290ui/status.json
@@ -366,7 +376,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-live-subtitle-screenshots
+          name: AVDB-353-live-subtitle-screenshots
           path: |
             evidence-live287/ui/shots/*
             evidence-live287/ui/status.json
@@ -387,7 +397,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-production-controller-HLS
+          name: AVDB-353-production-controller-HLS
           path: |
             evidence-hls-app/*.json
             evidence-hls-app/*.log
@@ -415,7 +425,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-strict-runtime
+          name: AVDB-353-strict-runtime
           path: |
             evidence-hls-runtime/*.json
             evidence-hls-runtime/*.log
@@ -432,7 +442,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-hq-simulator
+          name: AVDB-353-home-hq-simulator
           path: evidence-homehq298/*
           if-no-files-found: warn
   home-hero-hq-screenshots:
@@ -486,7 +496,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-screenshots
+          name: AVDB-353-home-screenshots
           path: |
             evidence-home326/*
             home326-ui.log
@@ -534,7 +544,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-detail-auth-tests
+          name: AVDB-353-detail-auth-tests
           path: |
             detail327-ui.log
           if-no-files-found: warn
@@ -581,7 +591,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-hot-tests
+          name: AVDB-353-home-hot-tests
           path: |
             home328-ui.log
           if-no-files-found: warn
@@ -629,7 +639,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-hot-tests
+          name: AVDB-353-home-hot-tests
           path: |
             home329-ui.log
           if-no-files-found: warn
@@ -677,7 +687,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-chrome-tests
+          name: AVDB-353-home-chrome-tests
           path: |
             home330-ui.log
           if-no-files-found: warn
@@ -725,7 +735,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-hero-tests
+          name: AVDB-353-home-hero-tests
           path: |
             home331-ui.log
           if-no-files-found: warn
@@ -773,7 +783,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-hero-color-tests
+          name: AVDB-353-home-hero-color-tests
           path: |
             home332-ui.log
           if-no-files-found: warn
@@ -820,7 +830,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-hero-detail-tests
+          name: AVDB-353-home-hero-detail-tests
           path: |
             home333-ui.log
           if-no-files-found: warn
@@ -867,7 +877,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-352-home-hero-parity-tests
+          name: AVDB-353-home-hero-parity-tests
           path: |
             home334-ui.log
           if-no-files-found: warn
