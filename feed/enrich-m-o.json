@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-o",
- "generated_at": "2026-11-19T19:55:05+00:00",
+ "generated_at": "2026-11-20T20:02:15+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -810,6 +810,43 @@
    "cover_hires_url": "http://163.47.40.207:8901/OXy6bO.jpg",
    "release_date": "2026-10-29",
    "enriched_at": "2026-11-17T19:11:10+00:00"
+  },
+  {
+   "javdb_id": "OXyD4O",
+   "code": "FNS267",
+   "director": "えび",
+   "maker": "FALENO",
+   "duration_min": 162,
+   "cover_hires_url": "http://163.47.40.207:8901/OXyD4O.jpg",
+   "release_date": "2026-11-19",
+   "magnets": [
+    {
+     "link": "magnet:?xt=urn:btih:C9581311F4CA100A57E829425AC690ACB012A9F9&amp;dn=FNS-267",
+     "size": "2.35GB",
+     "title": "FNS-267"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:B7579A1276B79363B1B66707939980AF7DADC554&amp;dn=FNS-267",
+     "size": "1.74GB",
+     "title": "FNS-267"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:B4441C11421DAD2C2949D73C2591BFF860293E11&amp;dn=FNS-267",
+     "size": "6.63GB",
+     "title": "FNS-267"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:0C62D9302B93143F7285A92B60F44EB0BB387D4B&amp;dn=FNS-267",
+     "size": "1.76GB",
+     "title": "FNS-267"
+    },
+    {
+     "link": "magnet:?xt=urn:btih:D3492C0B99B7C0811E3829AD350AFEC0E43C34BB&amp;dn=FNS-267",
+     "size": "6.63GB",
+     "title": "FNS-267"
+    }
+   ],
+   "enriched_at": "2026-11-20T19:09:29+00:00"
   },
   {
    "javdb_id": "OXyxYK",
