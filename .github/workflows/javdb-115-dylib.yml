@@ -1,0 +1,86 @@
+name: JavDB 115 dylib
+
+# Isolated plugin build. Triggers only on ci/javdb-115-dylib* branches and
+# this workflow file / plugins/javdb115 paths. Does not run on main, and
+# does not invoke AVDB app / IPA workflows.
+
+on:
+  push:
+    branches:
+      - "ci/javdb-115-dylib"
+      - "ci/javdb-115-dylib-*"
+    paths:
+      - "plugins/javdb115/**"
+      - ".github/workflows/javdb-115-dylib.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: javdb-115-dylib-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-tests:
+    name: Protocol and host crypto tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: plugins/javdb115
+      - name: Python protocol tests
+        run: python3 plugins/javdb115/tests/test_protocol.py
+      - name: Host 115 crypto fixture (OpenSSL)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libssl-dev gcc
+          gcc -O2 -Wall -o /tmp/test_crypto_host \
+            plugins/javdb115/host/test_crypto_host.c \
+            plugins/javdb115/host/avdb115_crypto.c \
+            -lcrypto
+          # fixture path: binary also looks in ../tests from its cwd
+          mkdir -p /tmp/115host/tests
+          cp plugins/javdb115/tests/115-crypto-fixture.json /tmp/115host/tests/
+          cp /tmp/test_crypto_host /tmp/115host/
+          /tmp/115host/test_crypto_host
+
+  dylib:
+    name: Build arm64 iOS dylib
+    needs: protocol-tests
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            plugins/javdb115
+            .github/workflows/javdb-115-dylib.yml
+      - name: Show SDK
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphoneos clang --version
+      - name: Compile AVDB115.dylib
+        run: bash plugins/javdb115/scripts/build-dylib.sh "$RUNNER_TEMP/AVDB115.dylib"
+      - name: Package sources
+        run: |
+          mkdir -p "$RUNNER_TEMP/srczip"
+          # Source-only zip: no IPA, no secrets, no binaries.
+          tar -C plugins/javdb115 -czf "$RUNNER_TEMP/srczip/avdb115-plugin-src.tar.gz" \
+            --exclude dist --exclude '*.dylib' --exclude '*.ipa' --exclude '__pycache__' \
+            .
+          (cd plugins/javdb115 && zip -r "$RUNNER_TEMP/srczip/avdb115-plugin-src.zip" \
+            src scripts tests host third_party README.md .gitignore \
+            -x '*.dylib' '*.ipa' '*__pycache__*')
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: avdb115-dylib-arm64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/AVDB115.dylib
+            ${{ runner.temp }}/srczip/avdb115-plugin-src.zip
+            ${{ runner.temp }}/srczip/avdb115-plugin-src.tar.gz

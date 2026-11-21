@@ -1,0 +1,7 @@
+dist/
+*.dylib
+*.ipa
+*.zip
+host/test_crypto_host
+__pycache__/
+.DS_Store
