@@ -30,7 +30,7 @@ static NSString *const kBlockAdsKey = @"avdb115.settings.blockAds";
     if (!self.enabled) {
         return @"广告拦截已关闭。";
     }
-    return @"已拦截可识别的原生广告请求（/api/v1/ads、/api/v1/ads/splash_log，仅 jdforrepam.com / letidi.com）。未发现 AdMob、Unity、穿山甲/Pangle、广点通等第三方 SDK。首页/开屏/磁力页广告由 Flutter Dart Dio 绘制，与封面相同走 dart:io TLS，原生层通常看不到，因此不能声称已屏蔽全部广告。不会修改会员或支付接口。";
+    return @"已拦截可识别的原生广告请求（/api/v1/ads、/api/v1/ads/splash_log，仅 jdforrepam.com / letidi.com）。启动后短时间内会尝试通过 FlutterEngine ensureSemanticsEnabled 激活开屏广告上可识别的「跳过」按钮，不会跳过 SplashPage 的域名探测/更新检查/本机认证，也不会清空首屏。未经真机验证，不能声称开屏广告已被移除。未发现 AdMob、Unity、穿山甲/Pangle、广点通等第三方 SDK。首页/磁力页广告仍由 Flutter Dart Dio 绘制，走 dart:io TLS，原生层通常看不到，因此不能声称已屏蔽全部广告。不会修改会员或支付接口。";
 }
 
 @end

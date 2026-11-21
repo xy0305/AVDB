@@ -11,6 +11,7 @@
 #import "AVDB115Settings.h"
 #import "AVDB115ExternalLibrary.h"
 #import "AVDB115AdBlock.h"
+#import "AVDB115SplashSkip.h"
 
 static void AVDB115SwizzleInstance(Class cls, SEL original, SEL replacement) {
     if (!cls) return;
@@ -175,6 +176,7 @@ static void AVDB115InstallHooks(void) {
         AVDB115SwizzleInstance(UIActivityViewController.class, @selector(initWithActivityItems:applicationActivities:), @selector(avdb115_initWithActivityItems:applicationActivities:));
         Class flutter = NSClassFromString(@"FlutterAppDelegate");
         [AVDB115AdBlockPolicy installNativeHooks];
+        [AVDB115SplashSkipPolicy install];
         AVDB115HookOrAdd(flutter,
                          @selector(application:didFinishLaunchingWithOptions:),
                          (IMP)AVDB115FlutterLaunch,
@@ -191,6 +193,7 @@ static void AVDB115Init(void) {
         [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
         [AVDB115OverlayController startWindowWatcher];
         [AVDB115OverlayController attachToKeyWindowIfNeeded];
+        [AVDB115SplashSkipPolicy install];
         NSNotificationCenter *c = NSNotificationCenter.defaultCenter;
         [c addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *n) {
             [AVDB115Settings synchronizeFromSystemSettings];
