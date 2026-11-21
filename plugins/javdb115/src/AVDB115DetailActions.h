@@ -21,6 +21,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface AVDB115DetailActions : NSObject
 + (void)install;
+/// Hide the UIKit overlay row when the Dart Wrap hook is live (scan still runs).
++ (void)setOverlayRowSuppressed:(BOOL)suppressed;
++ (void)performPushFromDartRow;
++ (void)performPlayFromDartRow;
 @end
 
 NS_ASSUME_NONNULL_END

@@ -2,8 +2,8 @@
 """Unit tests for movie-detail 115 chip policy: catalog-number extraction
 and action-row / tab label matching.
 
-These tests do not claim the native chips were laid out on a device, or that
-Flutter's MovieDetailLayout row can be inserted into from this dylib.
+These tests do not claim the Dart-row hook or the v6 overlay were laid out
+on a device.
 """
 from __future__ import annotations
 import re
@@ -143,7 +143,8 @@ def test_detail_page_heuristic():
 
 
 def test_does_not_claim_same_row_insertion():
-    # Invariant: policy identifies the Flutter row; it does not insert into it.
+    # Invariant: policy identifies the Flutter row. Device success of the
+    # v7 runtime hook is not claimed here.
     assert is_action_row_label("想看")
     assert catalog_number_in_text("MIDA-859") == "MIDA-859"
 
@@ -158,7 +159,7 @@ def main():
     ]:
         fn()
         print(f"PASS {fn.__name__}")
-    print("PASS: detail action policy (no device / same-row claim)")
+    print("PASS: detail action policy (no device-success claim)")
 
 
 if __name__ == "__main__":

@@ -155,9 +155,13 @@ static const NSInteger kAVDB115ColumnCount = 4;
 @property (nonatomic, strong) UIButton *settingsButton;
 @property (nonatomic, copy) NSString *currentNumber;
 @property (nonatomic, copy) NSArray<NSString *> *visibleLinks;
+@property (nonatomic, assign) BOOL suppressOverlayRow;
 @property (nonatomic, assign) BOOL installed;
 @property (nonatomic, assign) BOOL onDetail;
 @property (nonatomic, strong) NSTimer *timer;
+- (void)refresh;
+- (void)tapPush;
+- (void)tapPlay;
 @end
 
 @implementation AVDB115DetailActions
@@ -172,6 +176,27 @@ static const NSInteger kAVDB115ColumnCount = 4;
 + (void)install {
     [[self shared] install];
 }
+
++ (void)setOverlayRowSuppressed:(BOOL)suppressed {
+    AVDB115DetailActions *s = [self shared];
+    s.suppressOverlayRow = suppressed;
+    if (suppressed) {
+        s.row.hidden = YES;
+    }
+}
+
++ (void)performPushFromDartRow {
+    AVDB115DetailActions *s = [self shared];
+    [s refresh];
+    [s tapPush];
+}
+
++ (void)performPlayFromDartRow {
+    AVDB115DetailActions *s = [self shared];
+    [s refresh];
+    [s tapPlay];
+}
+
 
 - (void)install {
     if (self.installed) return;
@@ -469,6 +494,10 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
            actionFrames:(NSArray<NSValue *> *)actionFrames
               tabFrames:(NSArray<NSValue *> *)tabFrames
               vipFrames:(NSArray<NSValue *> *)vipFrames {
+    if (self.suppressOverlayRow) {
+        if (self.row) self.row.hidden = YES;
+        return;
+    }
     [self ensureRowInWindow:window];
     [window bringSubviewToFront:self.row];
     self.row.hidden = NO;
