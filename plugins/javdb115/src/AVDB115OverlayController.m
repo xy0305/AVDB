@@ -3,6 +3,8 @@
 #import "AVDB115Client.h"
 #import "AVDB115Link.h"
 #import "AVDB115PlayerViewController.h"
+#import "AVDB115LibraryViewController.h"
+#import "AVDB115CoverViewController.h"
 #import <objc/runtime.h>
 
 static const void *kButtonKey = &kButtonKey;
@@ -158,9 +160,9 @@ static const void *kButtonKey = &kButtonKey;
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.systemBackgroundColor;
-    self.title = @"115 离线（插件）";
+    self.title = @"AVDB 插件";
 
-    UILabel *hint = [self caption:@"只使用你自己的 115 Cookie。不会改 JavDB 原界面，也不会绕过 JavDB 会员。磁力来自你复制或分享的链接。"];
+    UILabel *hint = [self caption:@"115 推送与播放、外部数据库搜索、高清封面预览都在这个浮钮面板里。不会改 JavDB 原界面，不绕过 JavDB 会员，不替换原首页封面。115 Cookie 与外部库 Token 只存在本机钥匙串，不会互相发送。"];
     hint.numberOfLines = 0;
 
     self.cookieView = [[UITextView alloc] init];
@@ -191,6 +193,8 @@ static const void *kButtonKey = &kButtonKey;
     UIButton *push = [self button:@"推送到 115" action:@selector(pushOnly)];
     UIButton *play = [self button:@"推送并播放" action:@selector(pushAndPlay)];
     UIButton *search = [self button:@"按番号搜索播放" action:@selector(searchPlay)];
+    UIButton *library = [self button:@"外部数据库" action:@selector(openLibrary)];
+    UIButton *covers = [self button:@"高清封面源" action:@selector(openCovers)];
 
     self.statusLabel = [self caption:@""];
     self.statusLabel.numberOfLines = 0;
@@ -209,6 +213,9 @@ static const void *kButtonKey = &kButtonKey;
         [self caption:@"已在网盘中的文件"],
         self.keywordField,
         search,
+        [self caption:@"扩展（不改 JavDB 原界面）"],
+        library,
+        covers,
         self.spinner,
         self.statusLabel
     ]];
@@ -324,6 +331,22 @@ static const void *kButtonKey = &kButtonKey;
     if (keyword.length == 0) { [self setBusy:NO message:@"请填写番号"]; return; }
     AVDB115PlayerViewController *player = [[AVDB115PlayerViewController alloc] initWithKeyword:keyword magnet:nil];
     [self presentViewController:player animated:YES completion:nil];
+}
+
+
+- (void)openLibrary {
+    AVDB115LibraryViewController *vc = [[AVDB115LibraryViewController alloc] init];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    [self presentViewController:nav animated:YES completion:nil];
+}
+
+- (void)openCovers {
+    AVDB115CoverViewController *vc = [[AVDB115CoverViewController alloc] init];
+    vc.initialNumber = [self.keywordField.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    [self presentViewController:nav animated:YES completion:nil];
 }
 
 @end

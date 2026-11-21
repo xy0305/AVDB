@@ -1,0 +1,330 @@
+{
+  "abp": {
+    "prefix": "118",
+    "width": 5
+  },
+  "ang": {
+    "prefix": "1",
+    "width": 5
+  },
+  "baku": {
+    "prefix": "h_086",
+    "width": 5
+  },
+  "bskc": {
+    "prefix": "",
+    "width": 3
+  },
+  "chn": {
+    "prefix": "118",
+    "width": 5
+  },
+  "chuc": {
+    "prefix": "h_491",
+    "width": 5
+  },
+  "ddh": {
+    "prefix": "",
+    "width": 3
+  },
+  "debz": {
+    "prefix": "",
+    "width": 3
+  },
+  "dldss": {
+    "prefix": "1",
+    "width": 5
+  },
+  "docd": {
+    "prefix": "h_1711",
+    "width": 5
+  },
+  "drpt": {
+    "prefix": "1",
+    "width": 5
+  },
+  "dvdes": {
+    "prefix": "1",
+    "width": 5
+  },
+  "embm": {
+    "prefix": "h_1650",
+    "width": 5
+  },
+  "faleno": {
+    "prefix": "1",
+    "width": 5
+  },
+  "fcdss": {
+    "prefix": "1",
+    "width": 5
+  },
+  "fera": {
+    "prefix": "h_086",
+    "width": 5
+  },
+  "fgan": {
+    "prefix": "h_1440",
+    "width": 5
+  },
+  "flav": {
+    "prefix": "1",
+    "width": 5
+  },
+  "fns": {
+    "prefix": "1",
+    "width": 5
+  },
+  "fsbk": {
+    "prefix": "h_491",
+    "width": 5
+  },
+  "fsdss": {
+    "prefix": "1",
+    "width": 5
+  },
+  "fsnf": {
+    "prefix": "1",
+    "width": 5
+  },
+  "ftbd": {
+    "prefix": "5533",
+    "width": 5
+  },
+  "fthtd": {
+    "prefix": "1",
+    "width": 5
+  },
+  "ftkd": {
+    "prefix": "1",
+    "width": 5
+  },
+  "gass": {
+    "prefix": "71",
+    "width": 5
+  },
+  "goji": {
+    "prefix": "h_1729",
+    "width": 5
+  },
+  "gshrb": {
+    "prefix": "h_346",
+    "width": 5
+  },
+  "gsumk": {
+    "prefix": "h_1780",
+    "width": 5
+  },
+  "gvh": {
+    "prefix": "13",
+    "width": 5
+  },
+  "hmdnc": {
+    "prefix": "",
+    "width": 3
+  },
+  "hnamh": {
+    "prefix": "1",
+    "width": 5
+  },
+  "hnbr": {
+    "prefix": "h_1664",
+    "width": 5
+  },
+  "hodv": {
+    "prefix": "5642",
+    "width": 5
+  },
+  "hrsm": {
+    "prefix": "h_1745",
+    "width": 5
+  },
+  "hskvr": {
+    "prefix": "h_1840",
+    "width": 5
+  },
+  "hzgd": {
+    "prefix": "h_1100",
+    "width": 5
+  },
+  "iro": {
+    "prefix": "h_086",
+    "width": 5
+  },
+  "jera": {
+    "prefix": "1",
+    "width": 5
+  },
+  "jimmy": {
+    "prefix": "1",
+    "width": 5
+  },
+  "jrze": {
+    "prefix": "h_086",
+    "width": 5
+  },
+  "jura": {
+    "prefix": "h_086",
+    "width": 5
+  },
+  "lkb": {
+    "prefix": "1",
+    "width": 5
+  },
+  "lock": {
+    "prefix": "h_491",
+    "width": 5
+  },
+  "maan": {
+    "prefix": "h_1711",
+    "width": 5
+  },
+  "marn": {
+    "prefix": "5050",
+    "width": 5
+  },
+  "mbd": {
+    "prefix": "433",
+    "width": 5
+  },
+  "meko": {
+    "prefix": "h_1160",
+    "width": 5
+  },
+  "mfcw": {
+    "prefix": "",
+    "width": 3
+  },
+  "milk": {
+    "prefix": "h_1240",
+    "width": 5
+  },
+  "murikuri": {
+    "prefix": "1",
+    "width": 5
+  },
+  "mxgs": {
+    "prefix": "h_068",
+    "width": 5
+  },
+  "nacr": {
+    "prefix": "h_237",
+    "width": 5
+  },
+  "neo": {
+    "prefix": "433",
+    "width": 5
+  },
+  "nhdtc": {
+    "prefix": "1",
+    "width": 5
+  },
+  "nmsl": {
+    "prefix": "h_1814",
+    "width": 5
+  },
+  "nsm": {
+    "prefix": "h_1342",
+    "width": 5
+  },
+  "okk": {
+    "prefix": "1",
+    "width": 5
+  },
+  "oreco": {
+    "prefix": "",
+    "width": 3
+  },
+  "ozk": {
+    "prefix": "1",
+    "width": 5
+  },
+  "pts": {
+    "prefix": "h_021",
+    "width": 5
+  },
+  "rebd": {
+    "prefix": "h_346",
+    "width": 5
+  },
+  "rebdb": {
+    "prefix": "h_346",
+    "width": 5
+  },
+  "san": {
+    "prefix": "h_796",
+    "width": 5
+  },
+  "sbgvr": {
+    "prefix": "1",
+    "width": 5
+  },
+  "sbkd": {
+    "prefix": "",
+    "width": 3
+  },
+  "sdde": {
+    "prefix": "1",
+    "width": 5
+  },
+  "sdmu": {
+    "prefix": "1",
+    "width": 5
+  },
+  "skmj": {
+    "prefix": "h_1324",
+    "width": 5
+  },
+  "sods": {
+    "prefix": "1",
+    "width": 5
+  },
+  "spz": {
+    "prefix": "h_1664",
+    "width": 5
+  },
+  "ss": {
+    "prefix": "h_113",
+    "width": 5
+  },
+  "star": {
+    "prefix": "1",
+    "width": 5
+  },
+  "stars": {
+    "prefix": "1",
+    "width": 5
+  },
+  "start": {
+    "prefix": "1",
+    "width": 5
+  },
+  "sw": {
+    "prefix": "1",
+    "width": 5
+  },
+  "tmavr": {
+    "prefix": "55",
+    "width": 5
+  },
+  "totk": {
+    "prefix": "h_1133",
+    "width": 5
+  },
+  "tsds": {
+    "prefix": "5013",
+    "width": 5
+  },
+  "umd": {
+    "prefix": "125",
+    "width": 5
+  },
+  "wawa": {
+    "prefix": "1",
+    "width": 5
+  },
+  "wsa": {
+    "prefix": "2",
+    "width": 5
+  }
+}
