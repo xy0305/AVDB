@@ -14,9 +14,20 @@ static int expect_eq(const char *name, const uint8_t *a, const uint8_t *b, size_
     return 0;
 }
 
-int main(void) {
-    FILE *f = fopen("tests/115-crypto-fixture.json", "r");
-    if (!f) f = fopen("../tests/115-crypto-fixture.json", "r");
+int main(int argc, char **argv) {
+    const char *candidates[] = {
+        argc > 1 ? argv[1] : NULL,
+        "tests/115-crypto-fixture.json",
+        "../tests/115-crypto-fixture.json",
+        "plugins/javdb115/tests/115-crypto-fixture.json",
+        NULL
+    };
+    FILE *f = NULL;
+    for (int i = 0; candidates[i]; i++) {
+        if (!candidates[i][0]) continue;
+        f = fopen(candidates[i], "r");
+        if (f) break;
+    }
     if (!f) { perror("fixture"); return 1; }
     /* Minimal JSON number-array reader for the known fixture fields. */
     fseek(f, 0, SEEK_END);

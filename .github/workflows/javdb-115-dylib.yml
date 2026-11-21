@@ -41,10 +41,7 @@ jobs:
             plugins/javdb115/host/avdb115_crypto.c \
             -lcrypto
           # fixture path: binary also looks in ../tests from its cwd
-          mkdir -p /tmp/115host/tests
-          cp plugins/javdb115/tests/115-crypto-fixture.json /tmp/115host/tests/
-          cp /tmp/test_crypto_host /tmp/115host/
-          /tmp/115host/test_crypto_host
+          /tmp/test_crypto_host plugins/javdb115/tests/115-crypto-fixture.json
 
   dylib:
     name: Build arm64 iOS dylib
