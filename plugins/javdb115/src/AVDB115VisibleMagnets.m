@@ -5,7 +5,7 @@
 #import <string.h>
 #if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR || defined(__APPLE__)
 #import <mach/mach.h>
-#import <mach/mach_vm.h>
+#import <mach/vm_map.h>
 #endif
 
 // Verified from JavDB 1.9.41 App.framework (Blutter + toJson / detailLink).
@@ -268,16 +268,17 @@ static void AVDB115CollectFromRegion(const uint8_t *base, size_t len, uint64_t r
 + (NSArray<NSString *> *)residentLinksMatchingCatalog:(NSString *)number {
     NSMutableArray *links = [NSMutableArray array];
     NSMutableSet *seen = [NSMutableSet set];
-    mach_vm_address_t addr = 0;
-    mach_vm_size_t size = 0;
+    // iOS SDK does not support <mach/mach_vm.h>. Use the 64-bit vm_* APIs.
+    vm_address_t addr = 0;
+    vm_size_t size = 0;
     natural_t depth = 0;
-    mach_vm_size_t scanned = 0;
+    uint64_t scanned = 0;
     CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
     while (scanned < kAVDB115MaxScanBytes && (CFAbsoluteTimeGetCurrent() - start) < 0.20) {
         vm_region_submap_info_data_64_t info;
         mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_COUNT_64;
-        kern_return_t kr = mach_vm_region_recurse(mach_task_self(), &addr, &size, &depth,
-                                                  (vm_region_recurse_info_t)&info, &count);
+        kern_return_t kr = vm_region_recurse_64(mach_task_self(), &addr, &size, &depth,
+                                                (vm_region_recurse_info_t)&info, &count);
         if (kr != KERN_SUCCESS || size == 0) break;
         if (info.is_submap) {
             depth++;
@@ -289,13 +290,13 @@ static void AVDB115CollectFromRegion(const uint8_t *base, size_t len, uint64_t r
         if (readable && writable && size >= 64 && size <= 256ull * 1024ull * 1024ull) {
             vm_offset_t data = 0;
             mach_msg_type_number_t dataCnt = 0;
-            if (mach_vm_read(mach_task_self(), addr, size, &data, &dataCnt) == KERN_SUCCESS && dataCnt >= 64) {
+            if (vm_read(mach_task_self(), addr, size, &data, &dataCnt) == KERN_SUCCESS && dataCnt >= 64) {
                 AVDB115CollectFromRegion((const uint8_t *)data, (size_t)dataCnt, (uint64_t)addr, number, links, seen);
                 scanned += dataCnt;
                 vm_deallocate(mach_task_self(), data, dataCnt);
             }
         }
-        mach_vm_address_t next = addr + size;
+        vm_address_t next = addr + size;
         if (next <= addr) break;
         addr = next;
         depth = 0;
