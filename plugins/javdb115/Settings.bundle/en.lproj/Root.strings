@@ -1,0 +1,16 @@
+"115 Offline" = "115 Offline";
+"The system Settings app can only store the 115 Cookie in UserDefaults temporarily. When you return to JavDB, the plugin immediately moves it into the Keychain (ThisDeviceOnly) and deletes the plaintext. The text field will look empty afterwards; that does not mean the cookie was lost. It will not be written back to UserDefaults or logs. Use the floating-button panel to confirm. The folder CID is stored in UserDefaults (not a secret)." = "The system Settings app can only store the 115 Cookie in UserDefaults temporarily. When you return to JavDB, the plugin immediately moves it into the Keychain (ThisDeviceOnly) and deletes the plaintext. The text field will look empty afterwards; that does not mean the cookie was lost. It will not be written back to UserDefaults or logs. Use the floating-button panel to confirm. The folder CID is stored in UserDefaults (not a secret).";
+"Cookie status" = "Cookie status";
+"Not saved" = "Not saved";
+"115 Cookie" = "115 Cookie";
+"Offline folder CID" = "Offline folder CID";
+"Clear saved 115 Cookie" = "Clear saved 115 Cookie";
+"Ads" = "Ads";
+"Blocks only identified in-house ad API requests (/api/v1/ads and /api/v1/ads/splash_log on jdforrepam.com / letidi.com) if they go through a native hook. No AdMob/Unity/Pangle/GDT SDK was found. Home, splash, and magnet-page ads are Flutter-painted over dart:io TLS, so they usually cannot be blocked from this dylib. This does not unlock membership or touch payment/auth APIs." = "Blocks only identified in-house ad API requests (/api/v1/ads and /api/v1/ads/splash_log on jdforrepam.com / letidi.com) if they go through a native hook. No AdMob/Unity/Pangle/GDT SDK was found. Home, splash, and magnet-page ads are Flutter-painted over dart:io TLS, so they usually cannot be blocked from this dylib. This does not unlock membership or touch payment/auth APIs.";
+"Block identified ad requests" = "Block identified ad requests";
+"External library" = "External library";
+"The API token is also staged in UserDefaults by system Settings, then moved into the Keychain and deleted. The field will not show the token again. Changing the server URL requires entering a new token so the old token is never sent to a different host." = "The API token is also staged in UserDefaults by system Settings, then moved into the Keychain and deleted. The field will not show the token again. Changing the server URL requires entering a new token so the old token is never sent to a different host.";
+"Token status" = "Token status";
+"Enable external library" = "Enable external library";
+"Server root URL" = "Server root URL";
+"API Token" = "API Token";

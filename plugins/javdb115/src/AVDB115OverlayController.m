@@ -6,6 +6,8 @@
 #import "AVDB115LibraryViewController.h"
 #import "AVDB115CoverViewController.h"
 #import "AVDB115PageCover.h"
+#import "AVDB115AdBlock.h"
+#import "AVDB115ExternalLibrary.h"
 #import <objc/runtime.h>
 
 static const void *kButtonKey = &kButtonKey;
@@ -19,6 +21,8 @@ static const void *kButtonKey = &kButtonKey;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, strong) UISwitch *pageCoverSwitch;
 @property (nonatomic, strong) UILabel *pageCoverStatus;
+@property (nonatomic, strong) UISwitch *adBlockSwitch;
+@property (nonatomic, strong) UILabel *adBlockStatus;
 @end
 
 @implementation AVDB115OverlayController
@@ -162,10 +166,12 @@ static const void *kButtonKey = &kButtonKey;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    [AVDB115Settings synchronizeFromSystemSettings];
+    [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
     self.view.backgroundColor = UIColor.systemBackgroundColor;
     self.title = @"AVDB 插件";
 
-    UILabel *hint = [self caption:@"115 推送与播放、外部数据库搜索、高清封面预览都在这个浮钮面板里。不绕过 JavDB 会员或验证码。115 Cookie 与外部库 Token 只存在本机钥匙串，不会互相发送。原页封面替换见下方开关与说明。"];
+    UILabel *hint = [self caption:@"115 推送与播放、外部数据库、高清封面预览仍在此浮钮面板。也可在 iOS「设置 → JavDB」填写 115 Cookie 和目录 CID：系统设置只能暂存到 UserDefaults，回到 App 后会立即迁入钥匙串并删除明文，所以设置页文本框稍后可能是空的，并不代表丢失。不绕过会员或验证码。"];
     hint.numberOfLines = 0;
 
     self.cookieView = [[UITextView alloc] init];
@@ -208,6 +214,16 @@ static const void *kButtonKey = &kButtonKey;
     self.pageCoverStatus = [self caption:AVDB115PageCoverSettings.shared.hookStatus];
     self.pageCoverStatus.numberOfLines = 0;
 
+    self.adBlockSwitch = [[UISwitch alloc] init];
+    self.adBlockSwitch.on = AVDB115AdBlockSettings.shared.enabled;
+    [self.adBlockSwitch addTarget:self action:@selector(toggleAdBlock:) forControlEvents:UIControlEventValueChanged];
+    UILabel *adLabel = [self caption:@"拦截可识别的广告请求（默认开）"];
+    UIStackView *adRow = [[UIStackView alloc] initWithArrangedSubviews:@[adLabel, self.adBlockSwitch]];
+    adRow.axis = UILayoutConstraintAxisHorizontal;
+    self.adBlockStatus = [self caption:AVDB115AdBlockSettings.shared.status];
+    self.adBlockStatus.numberOfLines = 0;
+
+
 
     self.statusLabel = [self caption:@""];
     self.statusLabel.numberOfLines = 0;
@@ -231,6 +247,9 @@ static const void *kButtonKey = &kButtonKey;
         covers,
         pageCoverRow,
         self.pageCoverStatus,
+        adRow,
+        self.adBlockStatus,
+        [self caption:AVDB115Settings.shared.cookieStatus],
         self.spinner,
         self.statusLabel
     ]];
@@ -368,6 +387,12 @@ static const void *kButtonKey = &kButtonKey;
 - (void)togglePageCover:(UISwitch *)sender {
     AVDB115PageCoverSettings.shared.replaceEnabled = sender.on;
     self.pageCoverStatus.text = AVDB115PageCoverSettings.shared.hookStatus;
+}
+
+
+- (void)toggleAdBlock:(UISwitch *)sender {
+    AVDB115AdBlockSettings.shared.enabled = sender.on;
+    self.adBlockStatus.text = AVDB115AdBlockSettings.shared.status;
 }
 
 @end

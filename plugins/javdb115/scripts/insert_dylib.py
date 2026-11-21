@@ -161,7 +161,7 @@ def patch_macho(data: bytes, dylib: str) -> tuple[bytearray, list[str]]:
     return buf, notes
 
 
-def package_ipa(src_ipa: Path, dylib: Path, out_ipa: Path, exe_rel: str | None = None) -> None:
+def package_ipa(src_ipa: Path, dylib: Path, out_ipa: Path, exe_rel: str | None = None, settings_bundle: Path | None = None) -> None:
     import tempfile, zipfile, os, stat
 
     if out_ipa.exists():
@@ -180,6 +180,14 @@ def package_ipa(src_ipa: Path, dylib: Path, out_ipa: Path, exe_rel: str | None =
         dest = frameworks / dylib.name
         shutil.copy2(dylib, dest)
         dest.chmod(dest.stat().st_mode | stat.S_IXUSR)
+        if settings_bundle and settings_bundle.is_dir():
+            target = app / "Settings.bundle"
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(settings_bundle, target)
+            notes_settings = "Settings.bundle: " + str(settings_bundle)
+        else:
+            notes_settings = "Settings.bundle: not provided"
         if exe_rel:
             exe = app / exe_rel
         else:
@@ -193,6 +201,7 @@ def package_ipa(src_ipa: Path, dylib: Path, out_ipa: Path, exe_rel: str | None =
         original = exe.read_bytes()
         patched, notes = patch_macho(original, f"@executable_path/Frameworks/{dylib.name}")
         exe.write_bytes(patched)
+        notes.append(notes_settings)
         log = tmp_path / "AVDB115-insert-notes.txt"
         log.write_text("\n".join(notes) + "\n")
         # Zip with Payload at the root, like an IPA. No signing.
@@ -220,6 +229,7 @@ def main():
     p_ipa.add_argument("ipa")
     p_ipa.add_argument("dylib")
     p_ipa.add_argument("-o", "--output", required=True)
+    p_ipa.add_argument("--settings-bundle", help="Settings.bundle to copy into Runner.app")
 
     args = ap.parse_args()
     if args.cmd == "binary":
@@ -234,7 +244,8 @@ def main():
             print(n)
         print("wrote", dest)
     else:
-        package_ipa(Path(args.ipa), Path(args.dylib), Path(args.output))
+        bundle = Path(args.settings_bundle) if args.settings_bundle else Path(__file__).resolve().parents[1] / "Settings.bundle"
+        package_ipa(Path(args.ipa), Path(args.dylib), Path(args.output), settings_bundle=bundle if bundle.exists() else None)
 
 
 if __name__ == "__main__":

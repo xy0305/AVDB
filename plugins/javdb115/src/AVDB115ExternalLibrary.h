@@ -42,6 +42,8 @@ typedef NS_ENUM(NSInteger, AVDB115ExternalLibraryErrorCode) {
 - (nullable NSString *)tokenWithError:(NSError **)error;
 - (BOOL)saveBaseURL:(NSString *)raw enabled:(BOOL)enabled replacementToken:(NSString *)replacementToken error:(NSError **)error;
 - (BOOL)clearTokenWithError:(NSError **)error;
++ (void)synchronizeFromSystemSettings;
+@property (nonatomic, readonly) NSString *tokenStatus;
 @end
 
 typedef void (^AVDB115ExternalLibraryCompletion)(NSArray<AVDB115ExternalLink *> * _Nullable links, NSError * _Nullable error);

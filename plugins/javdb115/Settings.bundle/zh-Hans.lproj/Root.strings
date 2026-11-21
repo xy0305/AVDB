@@ -1,0 +1,16 @@
+"115 Offline" = "115 离线";
+"The system Settings app can only store the 115 Cookie in UserDefaults temporarily. When you return to JavDB, the plugin immediately moves it into the Keychain (ThisDeviceOnly) and deletes the plaintext. The text field will look empty afterwards; that does not mean the cookie was lost. It will not be written back to UserDefaults or logs. Use the floating-button panel to confirm. The folder CID is stored in UserDefaults (not a secret)." = "系统设置只能把 115 Cookie 临时写到 UserDefaults。回到 JavDB 后，插件会立即把它迁入本机钥匙串（ThisDeviceOnly）并删除明文。之后这个文本框可能是空的，不代表 Cookie 已丢失，也不会把完整 Cookie 写回 UserDefaults 或日志。请到浮钮面板确认。离线目录 CID 存在 UserDefaults（不是密钥）。";
+"Cookie status" = "Cookie 状态";
+"Not saved" = "未保存";
+"115 Cookie" = "115 Cookie";
+"Offline folder CID" = "离线目录 CID";
+"Clear saved 115 Cookie" = "清除已保存的 115 Cookie";
+"Ads" = "广告";
+"Blocks only identified in-house ad API requests (/api/v1/ads and /api/v1/ads/splash_log on jdforrepam.com / letidi.com) if they go through a native hook. No AdMob/Unity/Pangle/GDT SDK was found. Home, splash, and magnet-page ads are Flutter-painted over dart:io TLS, so they usually cannot be blocked from this dylib. This does not unlock membership or touch payment/auth APIs." = "仅拦截能识别的应用内广告接口（jdforrepam.com / letidi.com 上的 /api/v1/ads 与 /api/v1/ads/splash_log），且仅当请求走原生 hook。未发现 AdMob、Unity、穿山甲/Pangle、广点通等第三方 SDK。首页/开屏/磁力页广告由 Flutter 经 dart:io TLS 绘制，原生层通常看不到，因此不能声称已屏蔽全部广告。不会解锁会员，也不会改支付或登录接口。";
+"Block identified ad requests" = "拦截可识别的广告请求";
+"External library" = "外部数据库";
+"The API token is also staged in UserDefaults by system Settings, then moved into the Keychain and deleted. The field will not show the token again. Changing the server URL requires entering a new token so the old token is never sent to a different host." = "API Token 同样会先被系统设置暂存到 UserDefaults，再迁入钥匙串并删除明文。文本框不会回显 Token。更换服务器时必须重新输入令牌，避免把旧令牌发到新主机。";
+"Token status" = "令牌状态";
+"Enable external library" = "启用外部数据库";
+"Server root URL" = "服务器根地址";
+"API Token" = "API Token";

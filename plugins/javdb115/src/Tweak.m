@@ -8,6 +8,9 @@
 #import <objc/message.h>
 #import "AVDB115OverlayController.h"
 #import "AVDB115Link.h"
+#import "AVDB115Settings.h"
+#import "AVDB115ExternalLibrary.h"
+#import "AVDB115AdBlock.h"
 
 static void AVDB115SwizzleInstance(Class cls, SEL original, SEL replacement) {
     if (!cls) return;
@@ -154,6 +157,8 @@ static BOOL AVDB115FlutterLaunch(id self, SEL sel, UIApplication *application, N
         ok = msg(&super, sel, application, launchOptions);
     }
     dispatch_async(dispatch_get_main_queue(), ^{
+        [AVDB115Settings synchronizeFromSystemSettings];
+        [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
         [AVDB115OverlayController startWindowWatcher];
         [AVDB115OverlayController attachToKeyWindowIfNeeded];
     });
@@ -169,6 +174,7 @@ static void AVDB115InstallHooks(void) {
         AVDB115SwizzleInstance(UIApplication.class, @selector(openURL:options:completionHandler:), @selector(avdb115_openURL:options:completionHandler:));
         AVDB115SwizzleInstance(UIActivityViewController.class, @selector(initWithActivityItems:applicationActivities:), @selector(avdb115_initWithActivityItems:applicationActivities:));
         Class flutter = NSClassFromString(@"FlutterAppDelegate");
+        [AVDB115AdBlockPolicy installNativeHooks];
         AVDB115HookOrAdd(flutter,
                          @selector(application:didFinishLaunchingWithOptions:),
                          (IMP)AVDB115FlutterLaunch,
@@ -181,8 +187,19 @@ __attribute__((constructor))
 static void AVDB115Init(void) {
     AVDB115InstallHooks();
     void (^start)(void) = ^{
+        [AVDB115Settings synchronizeFromSystemSettings];
+        [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
         [AVDB115OverlayController startWindowWatcher];
         [AVDB115OverlayController attachToKeyWindowIfNeeded];
+        NSNotificationCenter *c = NSNotificationCenter.defaultCenter;
+        [c addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *n) {
+            [AVDB115Settings synchronizeFromSystemSettings];
+            [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
+        }];
+        [c addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *n) {
+            [AVDB115Settings synchronizeFromSystemSettings];
+            [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
+        }];
     };
     if ([NSThread isMainThread]) start();
     else dispatch_async(dispatch_get_main_queue(), start);

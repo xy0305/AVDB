@@ -5,6 +5,9 @@ static NSString *const kLegacyCookieDefaultsKey = @"avdb115.plugin.cookie";
 static NSString *const kFolderKey = @"avdb115.plugin.folderCID";
 static NSString *const kKeychainService = @"com.avdb115.plugin";
 static NSString *const kKeychainAccount = @"115-cookie";
+static NSString *const kSettingsCookieStagingKey = @"avdb115.settings.cookie";
+static NSString *const kCookieStatusKey = @"avdb115.settings.cookieStatus";
+static NSString *const kClearCookieKey = @"avdb115.settings.clearCookie";
 
 @implementation AVDB115Settings
 
@@ -32,6 +35,7 @@ static NSString *const kKeychainAccount = @"115-cookie";
             _cookie = @"";
         }
         _folderCID = [[NSUserDefaults standardUserDefaults] stringForKey:kFolderKey] ?: @"";
+        [self applySystemSettingsStaging];
     }
     return self;
 }
@@ -40,6 +44,8 @@ static NSString *const kKeychainAccount = @"115-cookie";
     _cookie = [AVDB115Settings normalizeCookie:cookie] ?: @"";
     [AVDB115Settings writeKeychainCookie:_cookie];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kLegacyCookieDefaultsKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kSettingsCookieStagingKey];
+    [AVDB115Settings writeCookieStatus:_cookie.length ? @"已保存到钥匙串" : @"未保存"];
 }
 
 - (void)setFolderCID:(NSString *)folderCID {
@@ -113,6 +119,41 @@ static NSString *const kKeychainAccount = @"115-cookie";
         (__bridge id)kSecValueData: [cookie dataUsingEncoding:NSUTF8StringEncoding],
     };
     SecItemAdd((__bridge CFDictionaryRef)add, NULL);
+}
+
+
++ (void)writeCookieStatus:(NSString *)status {
+    [[NSUserDefaults standardUserDefaults] setObject:status ?: @"" forKey:kCookieStatusKey];
+}
+
+- (NSString *)cookieStatus {
+    return [[NSUserDefaults standardUserDefaults] stringForKey:kCookieStatusKey] ?: (self.cookie.length ? @"已保存到钥匙串" : @"未保存");
+}
+
+- (void)applySystemSettingsStaging {
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    if ([d boolForKey:kClearCookieKey]) {
+        self.cookie = @"";
+        [d setBool:NO forKey:kClearCookieKey];
+        [d removeObjectForKey:kSettingsCookieStagingKey];
+        [AVDB115Settings writeCookieStatus:@"未保存"];
+    }
+    NSString *staging = [d stringForKey:kSettingsCookieStagingKey];
+    if (staging.length) {
+        self.cookie = staging; // setter writes Keychain and deletes staging / legacy keys
+    }
+    // Never copy the Keychain cookie back into UserDefaults for the Settings text field.
+    NSString *cid = [d stringForKey:kFolderKey];
+    if (cid) _folderCID = [cid stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"";
+    if (self.cookie.length) {
+        [AVDB115Settings writeCookieStatus:@"已保存到钥匙串（系统设置文本框不会回显明文）"];
+    } else {
+        [AVDB115Settings writeCookieStatus:@"未保存"];
+    }
+}
+
++ (void)synchronizeFromSystemSettings {
+    [AVDB115Settings.shared applySystemSettingsStaging];
 }
 
 @end

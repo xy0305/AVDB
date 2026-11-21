@@ -38,6 +38,7 @@ echo "sources:" "${SRCS[@]}"
   -framework AVKit \
   -framework Security \
   -framework QuartzCore \
+  -framework WebKit \
   -o "$OUT" \
   "${SRCS[@]}"
 

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>FooterText</key>
+			<string>The system Settings app can only store the 115 Cookie in UserDefaults temporarily. When you return to JavDB, the plugin immediately moves it into the Keychain (ThisDeviceOnly) and deletes the plaintext. The text field will look empty afterwards; that does not mean the cookie was lost. It will not be written back to UserDefaults or logs. Use the floating-button panel to confirm. The folder CID is stored in UserDefaults (not a secret).</string>
+			<key>Title</key>
+			<string>115 Offline</string>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+		</dict>
+		<dict>
+			<key>DefaultValue</key>
+			<string>Not saved</string>
+			<key>Key</key>
+			<string>avdb115.settings.cookieStatus</string>
+			<key>Title</key>
+			<string>Cookie status</string>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+		</dict>
+		<dict>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+			<key>DefaultValue</key>
+			<string></string>
+			<key>IsSecure</key>
+			<true/>
+			<key>Key</key>
+			<string>avdb115.settings.cookie</string>
+			<key>KeyboardType</key>
+			<string>Default</string>
+			<key>Title</key>
+			<string>115 Cookie</string>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+		</dict>
+		<dict>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+			<key>DefaultValue</key>
+			<string></string>
+			<key>IsSecure</key>
+			<false/>
+			<key>Key</key>
+			<string>avdb115.plugin.folderCID</string>
+			<key>KeyboardType</key>
+			<string>NumbersAndPunctuation</string>
+			<key>Title</key>
+			<string>Offline folder CID</string>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+		</dict>
+		<dict>
+			<key>DefaultValue</key>
+			<false/>
+			<key>Key</key>
+			<string>avdb115.settings.clearCookie</string>
+			<key>Title</key>
+			<string>Clear saved 115 Cookie</string>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+		</dict>
+		<dict>
+			<key>FooterText</key>
+			<string>Blocks only identified in-house ad API requests (/api/v1/ads and /api/v1/ads/splash_log on jdforrepam.com / letidi.com) if they go through a native hook. No AdMob/Unity/Pangle/GDT SDK was found. Home, splash, and magnet-page ads are Flutter-painted over dart:io TLS, so they usually cannot be blocked from this dylib. This does not unlock membership or touch payment/auth APIs.</string>
+			<key>Title</key>
+			<string>Ads</string>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+		</dict>
+		<dict>
+			<key>DefaultValue</key>
+			<true/>
+			<key>Key</key>
+			<string>avdb115.settings.blockAds</string>
+			<key>Title</key>
+			<string>Block identified ad requests</string>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+		</dict>
+		<dict>
+			<key>FooterText</key>
+			<string>The API token is also staged in UserDefaults by system Settings, then moved into the Keychain and deleted. The field will not show the token again. Changing the server URL requires entering a new token so the old token is never sent to a different host.</string>
+			<key>Title</key>
+			<string>External library</string>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+		</dict>
+		<dict>
+			<key>DefaultValue</key>
+			<string>Not saved</string>
+			<key>Key</key>
+			<string>avdb115.settings.externalTokenStatus</string>
+			<key>Title</key>
+			<string>Token status</string>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+		</dict>
+		<dict>
+			<key>DefaultValue</key>
+			<false/>
+			<key>Key</key>
+			<string>avdb115.externalLibrary.enabled</string>
+			<key>Title</key>
+			<string>Enable external library</string>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+		</dict>
+		<dict>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+			<key>DefaultValue</key>
+			<string>http://163.47.40.207:8000</string>
+			<key>IsSecure</key>
+			<false/>
+			<key>Key</key>
+			<string>avdb115.externalLibrary.baseURL</string>
+			<key>KeyboardType</key>
+			<string>URL</string>
+			<key>Title</key>
+			<string>Server root URL</string>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+		</dict>
+		<dict>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+			<key>DefaultValue</key>
+			<string></string>
+			<key>IsSecure</key>
+			<true/>
+			<key>Key</key>
+			<string>avdb115.settings.externalToken</string>
+			<key>KeyboardType</key>
+			<string>Default</string>
+			<key>Title</key>
+			<string>API Token</string>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+		</dict>
+	</array>
+	<key>StringsTable</key>
+	<string>Root</string>
+</dict>
+</plist>

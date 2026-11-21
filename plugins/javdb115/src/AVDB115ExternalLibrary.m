@@ -8,6 +8,8 @@ static NSString *const kExtBaseURLKey = @"avdb115.externalLibrary.baseURL";
 static NSString *const kExtEnabledKey = @"avdb115.externalLibrary.enabled";
 static NSString *const kExtKeychainService = @"com.avdb115.plugin.external-library";
 static NSString *const kExtKeychainAccount = @"api-token";
+static NSString *const kExtTokenStagingKey = @"avdb115.settings.externalToken";
+static NSString *const kExtTokenStatusKey = @"avdb115.settings.externalTokenStatus";
 
 static NSError *AVDB115ExtError(AVDB115ExternalLibraryErrorCode code, NSInteger http) {
     NSString *msg = @"";
@@ -252,6 +254,42 @@ static NSError *AVDB115ExtError(AVDB115ExternalLibraryErrorCode code, NSInteger 
     _revision += 1;
     [AVDB115ExternalLibraryClient.shared cancelRequests];
     return YES;
+}
+
+- (NSString *)tokenStatus {
+    return [[NSUserDefaults standardUserDefaults] stringForKey:kExtTokenStatusKey] ?: (self.hasToken ? @"已保存到钥匙串" : @"未保存");
+}
+
+- (void)writeTokenStatus:(NSString *)status {
+    [[NSUserDefaults standardUserDefaults] setObject:status ?: @"" forKey:kExtTokenStatusKey];
+}
+
+- (void)applySystemSettingsStaging {
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    NSString *staging = [d stringForKey:kExtTokenStagingKey] ?: @"";
+    BOOL enabled = [d objectForKey:kExtEnabledKey] ? [d boolForKey:kExtEnabledKey] : self.enabled;
+    NSString *url = [d stringForKey:kExtBaseURLKey] ?: self.baseURL;
+    if (staging.length) {
+        NSError *err = nil;
+        BOOL ok = [self saveBaseURL:url enabled:enabled replacementToken:staging error:&err];
+        [d removeObjectForKey:kExtTokenStagingKey];
+        if (ok) [self writeTokenStatus:@"已保存到钥匙串（系统设置文本框不会回显明文）"];
+        else [self writeTokenStatus:err.localizedDescription ?: @"保存失败"];
+        return;
+    }
+    // URL/enabled changes without a new token.
+    if (url.length && (![url isEqualToString:self.baseURL] || enabled != self.enabled)) {
+        NSError *err = nil;
+        BOOL ok = [self saveBaseURL:url enabled:enabled replacementToken:@"" error:&err];
+        if (!ok) [self writeTokenStatus:err.localizedDescription ?: @"保存失败"];
+        else [self writeTokenStatus:self.hasToken ? @"已保存到钥匙串（系统设置文本框不会回显明文）" : @"未保存"];
+        return;
+    }
+    [self writeTokenStatus:self.hasToken ? @"已保存到钥匙串（系统设置文本框不会回显明文）" : @"未保存"];
+}
+
++ (void)synchronizeFromSystemSettings {
+    [AVDB115ExternalLibrarySettings.shared applySystemSettingsStaging];
 }
 
 @end

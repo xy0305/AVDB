@@ -38,6 +38,8 @@ jobs:
         run: python3 plugins/javdb115/tests/test_reachability.py
       - name: Original-page cover policy (real JavDB URL forms)
         run: python3 plugins/javdb115/tests/test_page_cover.py
+      - name: Identified ad-request matching
+        run: python3 plugins/javdb115/tests/test_ad_block.py
       - name: Host 115 crypto fixture (OpenSSL)
         run: |
           sudo apt-get update -qq
@@ -66,24 +68,24 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-path
           xcrun --sdk iphoneos clang --version
       - name: Compile AVDB115.dylib
-        run: bash plugins/javdb115/scripts/build-dylib.sh "$RUNNER_TEMP/AVDB115-v3.dylib"
+        run: bash plugins/javdb115/scripts/build-dylib.sh "$RUNNER_TEMP/AVDB115-v4.dylib"
       - name: Package sources
         run: |
           mkdir -p "$RUNNER_TEMP/srczip"
           # Source-only zip: no IPA, no secrets, no binaries.
-          tar -C plugins/javdb115 -czf "$RUNNER_TEMP/srczip/avdb115-plugin-src-v3.tar.gz" \
+          tar -C plugins/javdb115 -czf "$RUNNER_TEMP/srczip/avdb115-plugin-src-v4.tar.gz" \
             --exclude dist --exclude '*.dylib' --exclude '*.ipa' --exclude '__pycache__' \
             .
-          (cd plugins/javdb115 && zip -r "$RUNNER_TEMP/srczip/avdb115-plugin-src-v3.zip" \
-            src scripts tests host third_party README.md .gitignore \
+          (cd plugins/javdb115 && zip -r "$RUNNER_TEMP/srczip/avdb115-plugin-src-v4.zip" \
+            src scripts tests host third_party Settings.bundle README.md .gitignore \
             -x '*.dylib' '*.ipa' '*__pycache__*')
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: avdb115-v3-dylib-arm64
+          name: avdb115-v4-dylib-arm64
           if-no-files-found: error
           retention-days: 14
           path: |
-            ${{ runner.temp }}/AVDB115-v3.dylib
-            ${{ runner.temp }}/srczip/avdb115-plugin-src-v3.zip
-            ${{ runner.temp }}/srczip/avdb115-plugin-src-v3.tar.gz
+            ${{ runner.temp }}/AVDB115-v4.dylib
+            ${{ runner.temp }}/srczip/avdb115-plugin-src-v4.zip
+            ${{ runner.temp }}/srczip/avdb115-plugin-src-v4.tar.gz

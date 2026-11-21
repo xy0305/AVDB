@@ -1,4 +1,4 @@
-# JavDB sidecar dylib (AVDB115) v3
+# JavDB sidecar dylib (AVDB115) v4
 
 Standalone Objective-C dylib that adds AVDB-style **115 push/play**, **External Library**, and **HQ cover preview** to the official JavDB iOS app (`com.javdb6.com`). It does **not** change AVDB itself, and it does not hook JavDB membership, payment, or magnet APIs. JavDB’s original UI is left alone.
 
@@ -8,6 +8,9 @@ This folder is the only AVDB-repo addition on the isolated `ci/javdb-115-dylib` 
 
 - Floating “115” button (Flutter-safe: window / scene notifications plus delayed attach).
 - Settings panel: 115 Cookie (Keychain, `ThisDeviceOnly`) and offline folder CID.
+- **iOS Settings app** (`Settings.bundle` injected into `Runner.app`): 115 Cookie, offline folder CID, identified-ad toggle, external-library URL/token. The system Settings text fields write UserDefaults only. On launch / foreground the plugin migrates the 115 Cookie and external token into Keychain and **deletes the plaintext**. The Settings field will then look empty; that is expected and the values are not written back. Folder CID stays in UserDefaults. The floating-button panel remains the fallback (it reads Keychain). JavDB’s own Flutter settings page was not patched.
+- **Identified ad blocking** (default on): no AdMob / Unity / Pangle / GDT / SKAdNetwork SDK was found. Ads are first-party (`/api/v1/ads`, `/api/v1/ads/splash_log`, Flutter `HomeAd` / `SplashAd`). Native hooks may cancel those API URLs on `jdforrepam.com` / `letidi.com` if they go through NSURLSession or `WKWebView loadRequest`. Home / splash / magnet-page ads are Flutter-painted over dart:io TLS, so they usually cannot be blocked; **this build does not claim all ads are blocked**. Payment, auth, movie, cover, and 115 URLs are never blocked. Membership is not unlocked.
+
 - Push magnet / ed2k the **user already copied or shared**; optional push-and-play.
 - Play via 115 original URL (m115 / 115driver MIT) with HLS fallback. Playback uses AVPlayer (JavDB has no KSPlayer).
 - **External database** (AVDB `ExternalLibraryClient`, not a local JSON file import):
@@ -31,21 +34,21 @@ Clipboard hooks only look for `magnet:` / `ed2k://` strings. Other clipboard con
 ## Build (macOS + iOS SDK)
 
 ```sh
-bash plugins/javdb115/scripts/build-dylib.sh dist/AVDB115-v3.dylib
+bash plugins/javdb115/scripts/build-dylib.sh dist/AVDB115-v4.dylib
 ```
 
-GitHub Actions on this branch compiles `AVDB115-v3.dylib` (arm64, iphoneos, install name `@executable_path/Frameworks/AVDB115.dylib`) and uploads it with a source zip. The workflow does not run on `main` and does not start AVDB app builds.
+GitHub Actions on this branch compiles `AVDB115-v4.dylib` (arm64, iphoneos, install name `@executable_path/Frameworks/AVDB115.dylib`) and uploads it with a source zip. The workflow does not run on `main` and does not start AVDB app builds.
 
 ## Inject locally (unsigned IPA)
 
 Do **not** put a JavDB IPA in this repository (the repo is public). On your machine:
 
 ```sh
-python3 plugins/javdb115/scripts/insert_dylib.py ipa /path/to/JavDB.ipa dist/AVDB115-v3.dylib \
-  -o dist/JavDB-1.9.41-AVDB115-v3-unsigned.ipa
+python3 plugins/javdb115/scripts/insert_dylib.py ipa /path/to/JavDB.ipa dist/AVDB115-v4.dylib \
+  -o dist/JavDB-1.9.41-AVDB115-v4-unsigned.ipa
 ```
 
-The script copies the dylib into `Runner.app/Frameworks`, inserts `LC_LOAD_DYLIB`, and writes an **unsigned** IPA. It will not pretend to codesign. Sideload signing is a separate step you do yourself.
+The script copies the dylib into `Runner.app/Frameworks`, copies `Settings.bundle` into `Runner.app` (iOS Settings page), inserts `LC_LOAD_DYLIB`, and writes an **unsigned** IPA. It will not pretend to codesign. Sideload signing is a separate step you do yourself.
 
 ## Tests
 
@@ -54,6 +57,7 @@ python3 plugins/javdb115/tests/test_protocol.py
 python3 plugins/javdb115/tests/test_external_covers.py
 python3 plugins/javdb115/tests/test_reachability.py
 python3 plugins/javdb115/tests/test_page_cover.py
+python3 plugins/javdb115/tests/test_ad_block.py
 ```
 
 Reachability checks public DMM/MGS URLs and the default External Library root. A 401 from the torrents API without a token is expected. JavBus challenge pages and Avbase 403s are reported and not bypassed.
