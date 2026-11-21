@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-b",
- "generated_at": "2026-11-20T20:02:15+00:00",
+ "generated_at": "2026-11-21T19:45:23+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -751,6 +751,30 @@
    "cover_hires_url": "http://163.47.40.207:8901/bKx2p0.jpg",
    "release_date": "2026-10-29",
    "enriched_at": "2026-11-19T19:11:12+00:00"
+  },
+  {
+   "javdb_id": "bKxBB0",
+   "code": "NSODN028",
+   "plot": "ここの結婚相談所は女性を紹介するだけでは終わらない。\n女性の扱い方、相手を満足させるセックスのテクニックまで実戦形式で教えてくれる。\n本当にこんな結婚相談所があるのか…。\n噂の婚活アドバイザー・アヤさんの実態を知る為に、我々はとある弱者男性に密着した。",
+   "plot_source": "dmm",
+   "maker": "ノンフィクション",
+   "duration_min": 116,
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/nsodn00028/nsodn00028jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/Gz86EGcibxse4FNjS_e02ZMdKYYXAZ0wyxSEWm7RyKTA0OrpY1jwkhYJlgW4hV6o/nsodn00028hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/bKxBB0.jpg",
+   "release_date": "2026-11-05",
+   "enriched_at": "2026-11-21T19:11:28+00:00"
   },
   {
    "javdb_id": "bKxBNa",
