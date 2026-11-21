@@ -1,5 +1,6 @@
 #import "AVDB115CoverViewController.h"
 #import "AVDB115CoverResolver.h"
+#import "AVDB115PageCover.h"
 
 @interface AVDB115CoverViewController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate>
 @property (nonatomic, strong) UITextField *keywordField;
@@ -23,7 +24,7 @@
     self.title = @"高清封面源";
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"关闭" style:UIBarButtonItemStylePlain target:self action:@selector(closePanel)];
 
-    UILabel *hint = [self caption:@"按 AVDB 已实现的公开封面规则预览候选图：DMM（awsimgsrc / pics.dmm.co.jp）、MGS Prestige 模板。Avbase / JavBus 仅在页面可达且非验证码时解析；验证或封禁会跳过，不绕过。可选 TPDB（需自备 Bearer）本版未接入。本功能不替换 JavDB 原首页或详情封面。"];
+    UILabel *hint = [self caption:@"按 AVDB 已实现的公开封面规则预览候选图：DMM（awsimgsrc / pics.dmm.co.jp）、MGS Prestige 模板。Avbase / JavBus 仅在页面可达且非验证码时解析；验证或封禁会跳过，不绕过。可选 TPDB（需自备 Bearer）本版未接入。插件面板可预览高清源。原页封面替换开关在主面板，默认开启；但 JavDB Flutter 原页当前无法被稳定替换，见主面板说明。"];
     hint.numberOfLines = 0;
 
     self.keywordField = [self field:@"番号，例如 SSIS-001" text:self.initialNumber ?: @""];

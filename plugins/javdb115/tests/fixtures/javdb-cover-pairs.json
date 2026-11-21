@@ -1,0 +1,34 @@
+{
+  "source": "Public javdb.com homepage cards observed 2026-11-21. Cover URL contains the movie UID only, not the catalog number.",
+  "pairs": [
+    {
+      "number": "SNOS-372",
+      "uid": "AqXeXO",
+      "cover_url": "https://c0.jdbstatic.com/covers/aq/AqXeXO.jpg"
+    },
+    {
+      "number": "MKON-146",
+      "uid": "bKzz9B",
+      "cover_url": "https://c0.jdbstatic.com/covers/bk/bKzz9B.jpg"
+    },
+    {
+      "number": "IPZZ-624",
+      "uid": "4DKg8v",
+      "cover_url": "https://c0.jdbstatic.com/covers/4d/4DKg8v.jpg"
+    },
+    {
+      "number": "ABF-015",
+      "uid": "9D7ewp",
+      "cover_url": "https://c0.jdbstatic.com/covers/9d/9D7ewp.jpg"
+    }
+  ],
+  "samples": [
+    "https://c0.jdbstatic.com/samples/aq/AqXeXO_l_0.jpg"
+  ],
+  "non_covers": [
+    "https://c0.jdbstatic.com/images/logo_120x120.png",
+    "https://jdforrepam.com/api/v1/movies/latest",
+    "https://jdforrepam.com/api/v2/plans/payment_order",
+    "https://jdforrepam.com/api/v1/auth/captcha"
+  ]
+}

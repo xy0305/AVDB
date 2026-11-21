@@ -5,6 +5,7 @@
 #import "AVDB115PlayerViewController.h"
 #import "AVDB115LibraryViewController.h"
 #import "AVDB115CoverViewController.h"
+#import "AVDB115PageCover.h"
 #import <objc/runtime.h>
 
 static const void *kButtonKey = &kButtonKey;
@@ -16,6 +17,8 @@ static const void *kButtonKey = &kButtonKey;
 @property (nonatomic, strong) UITextField *keywordField;
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
+@property (nonatomic, strong) UISwitch *pageCoverSwitch;
+@property (nonatomic, strong) UILabel *pageCoverStatus;
 @end
 
 @implementation AVDB115OverlayController
@@ -162,7 +165,7 @@ static const void *kButtonKey = &kButtonKey;
     self.view.backgroundColor = UIColor.systemBackgroundColor;
     self.title = @"AVDB 插件";
 
-    UILabel *hint = [self caption:@"115 推送与播放、外部数据库搜索、高清封面预览都在这个浮钮面板里。不会改 JavDB 原界面，不绕过 JavDB 会员，不替换原首页封面。115 Cookie 与外部库 Token 只存在本机钥匙串，不会互相发送。"];
+    UILabel *hint = [self caption:@"115 推送与播放、外部数据库搜索、高清封面预览都在这个浮钮面板里。不绕过 JavDB 会员或验证码。115 Cookie 与外部库 Token 只存在本机钥匙串，不会互相发送。原页封面替换见下方开关与说明。"];
     hint.numberOfLines = 0;
 
     self.cookieView = [[UITextView alloc] init];
@@ -196,6 +199,16 @@ static const void *kButtonKey = &kButtonKey;
     UIButton *library = [self button:@"外部数据库" action:@selector(openLibrary)];
     UIButton *covers = [self button:@"高清封面源" action:@selector(openCovers)];
 
+    self.pageCoverSwitch = [[UISwitch alloc] init];
+    self.pageCoverSwitch.on = AVDB115PageCoverSettings.shared.replaceEnabled;
+    [self.pageCoverSwitch addTarget:self action:@selector(togglePageCover:) forControlEvents:UIControlEventValueChanged];
+    UILabel *pageCoverLabel = [self caption:@"替换原页封面（默认开）"];
+    UIStackView *pageCoverRow = [[UIStackView alloc] initWithArrangedSubviews:@[pageCoverLabel, self.pageCoverSwitch]];
+    pageCoverRow.axis = UILayoutConstraintAxisHorizontal;
+    self.pageCoverStatus = [self caption:AVDB115PageCoverSettings.shared.hookStatus];
+    self.pageCoverStatus.numberOfLines = 0;
+
+
     self.statusLabel = [self caption:@""];
     self.statusLabel.numberOfLines = 0;
     self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
@@ -213,9 +226,11 @@ static const void *kButtonKey = &kButtonKey;
         [self caption:@"已在网盘中的文件"],
         self.keywordField,
         search,
-        [self caption:@"扩展（不改 JavDB 原界面）"],
+        [self caption:@"扩展"],
         library,
         covers,
+        pageCoverRow,
+        self.pageCoverStatus,
         self.spinner,
         self.statusLabel
     ]];
@@ -347,6 +362,12 @@ static const void *kButtonKey = &kButtonKey;
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
     nav.modalPresentationStyle = UIModalPresentationPageSheet;
     [self presentViewController:nav animated:YES completion:nil];
+}
+
+
+- (void)togglePageCover:(UISwitch *)sender {
+    AVDB115PageCoverSettings.shared.replaceEnabled = sender.on;
+    self.pageCoverStatus.text = AVDB115PageCoverSettings.shared.hookStatus;
 }
 
 @end
