@@ -16,8 +16,14 @@ series list and the maker/director/publisher detail calls send the
 token (the Build 335/350 pattern); the search UI shows a login prompt
 on auth failure in all four result tabs (the actor/named/list tabs no
 longer swallow errors with try?) and reloads after a successful login;
-still-anonymous endpoints stay anonymous. Static source contracts on
-Linux; behaviour verified on device."""
+still-anonymous endpoints stay anonymous. Completion round the same
+day (the user: 「查看 javdb 哪些接口要 token 全补上」): every SDK
+endpoint was re-tested anonymously three times; /api/v2/tags,
+/api/v1/movies/{id}/magnets and /api/v2/users/{id}/reviews are gated
+too and their SDK callers (tagGroups, tags, movieMagnets, userReviews)
+now send the token, as does codeDetail (same detail family, id not
+harvestable anonymously). Static source contracts on Linux; behaviour
+verified on device."""
 from pathlib import Path
 import plistlib
 
@@ -42,6 +48,7 @@ assert 'Muse' in doc and 'Kai' in doc and '352' in doc
 assert 'JWTVerificationError' in doc and 'unsigned' in doc.lower()
 # Credit the user's request.
 assert '现在搜索也要求登录' in doc
+assert '哪些接口要 token 全补上' in doc
 
 sdk = (r/'AVDB/Services/JavDBSDK.swift').read_text()
 
@@ -84,6 +91,18 @@ for sig, path in [('public func directorDetail(_ id: String)', '/api/v1/director
     body = func_body(sdk, sig)
     assert path in body and 'useToken: true' in body, sig
 
+# --- 2b. Completion round: tags, movie magnets, user reviews, code detail ---
+magnets = func_body(sdk, 'public func movieMagnets(_ id: String')
+assert 'magnets", query: ["page": "\\(page)"], useToken: true' in magnets
+tag_groups = func_body(sdk, 'public func tagGroups(type: String)')
+assert '"/api/v2/tags", query: ["type": type], useToken: true' in tag_groups
+plain_tags = func_body(sdk, 'public func tags()')
+assert '"/api/v2/tags", useToken: true' in plain_tags
+user_reviews = func_body(sdk, 'public func userReviews(_ userID: Int)')
+assert '"/api/v2/users/\\(userID)/reviews", useToken: true' in user_reviews
+code_detail = func_body(sdk, 'public func codeDetail(_ id: String)')
+assert '"/api/v1/codes/\\(id)", useToken: true' in code_detail
+
 # --- 3. Endpoints the audit found still anonymous stay anonymous ---
 assert '"/api/v1/movies/recommend", query: query)' in sdk
 assert '"/api/v1/movies/latest", query: query)' in sdk
@@ -103,4 +122,5 @@ assert 'try? await JavDBSDK.shared.searchLists' not in search
 assert search.count('publisher(for: .avdbCatalogAccountChanged)') == 4  # every tab reloads after login
 
 print('PASS test-search-auth352: search family fails fast logged out, movies/tags + series list + '
-      'maker/director/publisher detail send the token, search UI offers login in all four tabs, release 352')
+      'maker/director/publisher detail + v2/tags + movie magnets + user reviews + code detail send the token, '
+      'search UI offers login in all four tabs, release 352')

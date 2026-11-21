@@ -310,9 +310,10 @@ public final class JavDBSDK {
     }
 
     /// 磁力列表（GET /api/v1/movies/{id}/magnets）
+    /// Build 352 补：2026-11-21 复查实测该接口匿名已回 JWTVerificationError，改带 token。
     public func movieMagnets(_ id: String, page: Int = 1) async throws -> [Magnet] {
         let resp: JavDBResponse<MagnetListData> = try await client.get(
-            "/api/v1/movies/\(id)/magnets", query: ["page": "\(page)"])
+            "/api/v1/movies/\(id)/magnets", query: ["page": "\(page)"], useToken: true)
         return resp.data?.magnets ?? []
     }
 
@@ -653,8 +654,9 @@ public final class JavDBSDK {
     }
 
     /// 筛选项（GET /api/v2/tags）type: 0有码 1无码 2欧美 3 FC2
+    /// Build 352 补：2026-11-21 复查实测 /api/v2/tags 匿名已回 JWTVerificationError，改带 token。
     public func tagGroups(type: String) async throws -> [TagGroup] {
-        let resp: JavDBResponse<TagGroupListData> = try await client.get("/api/v2/tags", query: ["type": type])
+        let resp: JavDBResponse<TagGroupListData> = try await client.get("/api/v2/tags", query: ["type": type], useToken: true)
         return resp.data?.tags ?? []
     }
 
@@ -918,8 +920,9 @@ public final class JavDBSDK {
 
     /// 关注的标签（GET /api/v1/following_tags）
     /// 标签（GET /api/v2/tags）
+    /// Build 352 补：同 tagGroups，/api/v2/tags 已要求登录，改带 token。
     public func tags() async throws -> [Tag] {
-        let resp: JavDBResponse<TagListData> = try await client.get("/api/v2/tags")
+        let resp: JavDBResponse<TagListData> = try await client.get("/api/v2/tags", useToken: true)
         return resp.data?.tags ?? []
     }
 
@@ -1076,9 +1079,10 @@ public final class JavDBSDK {
     }
 
     /// 某用户的影评（GET /api/v2/users/{id}/reviews）
+    /// Build 352 补：2026-11-21 复查实测该接口匿名已回 JWTVerificationError，改带 token。
     public func userReviews(_ userID: Int) async throws -> [Review] {
         let resp: JavDBResponse<ReviewListData> = try await client.get(
-            "/api/v2/users/\(userID)/reviews")
+            "/api/v2/users/\(userID)/reviews", useToken: true)
         return resp.data?.reviews ?? []
     }
 
@@ -1133,9 +1137,10 @@ public final class JavDBSDK {
     }
 
     /// 番号详情（GET /api/v1/codes/{id}）
+    /// Build 352 补：匿名无从取得 code id 实测，与 makers/directors 详情同族一并改带 token。
     public func codeDetail(_ id: String) async throws -> Code? {
         struct CodeData: Decodable { let code: Code? }
-        let resp: JavDBResponse<CodeData> = try await client.get("/api/v1/codes/\(id)")
+        let resp: JavDBResponse<CodeData> = try await client.get("/api/v1/codes/\(id)", useToken: true)
         return resp.data?.code
     }
 
