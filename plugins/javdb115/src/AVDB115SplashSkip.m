@@ -77,15 +77,12 @@ static void AVDB115CollectViewControllers(UIViewController *vc, NSMutableArray *
     if (!flutterVC) return @[];
     NSMutableArray *found = [NSMutableArray array];
     NSMutableArray *all = [NSMutableArray array];
-    for (UIWindow *window in UIApplication.sharedApplication.windows) {
-        AVDB115CollectViewControllers(window.rootViewController, all);
-    }
-    if (@available(iOS 13.0, *)) {
-        for (UIWindowScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if (![scene isKindOfClass:[UIWindowScene class]]) continue;
-            for (UIWindow *window in scene.windows) {
-                AVDB115CollectViewControllers(window.rootViewController, all);
-            }
+    // iOS 15+ (deployment target): prefer window scenes so we do not use the
+    // deprecated UIApplication.windows API.
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+            AVDB115CollectViewControllers(window.rootViewController, all);
         }
     }
     for (UIViewController *vc in all) {
@@ -161,7 +158,7 @@ static void AVDB115VisitAccessibility(id el, NSMutableSet *seen, void (^visit)(i
 + (BOOL)scanAndActivateSkip {
     if (!AVDB115AdBlockSettings.shared.enabled) return NO;
     Class flutterViewClass = NSClassFromString(@"FlutterView");
-    BOOL activated = NO;
+    __block BOOL activated = NO;
     for (UIViewController *vc in [self flutterViewControllers]) {
         UIView *root = vc.view;
         if (!root) continue;
