@@ -2,6 +2,7 @@
 #import "AVDB115OverlayController.h"
 #import "AVDB115Catalog.h"
 #import "AVDB115Link.h"
+#import "AVDB115VisibleMagnets.h"
 #import "AVDB115Client.h"
 #import "AVDB115Settings.h"
 #import "AVDB115PlayerViewController.h"
@@ -318,11 +319,17 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     void (^consider)(id) = ^(id el) {
         NSString *label = [el respondsToSelector:@selector(accessibilityLabel)] ? [el accessibilityLabel] : nil;
         NSString *value = [el respondsToSelector:@selector(accessibilityValue)] ? [el accessibilityValue] : nil;
+        NSString *hint = [el respondsToSelector:@selector(accessibilityHint)] ? [el accessibilityHint] : nil;
+        NSString *ident = [el respondsToSelector:@selector(accessibilityIdentifier)] ? [el accessibilityIdentifier] : nil;
         if (label.length) [texts addObject:label];
         if (value.length) [texts addObject:value];
+        if (hint.length) [texts addObject:hint];
+        if (ident.length) [texts addObject:ident];
         if (label.length) [labels addObject:label];
         if (!number) number = [AVDB115DetailPagePolicy catalogNumberInText:label];
         if (!number) number = [AVDB115DetailPagePolicy catalogNumberInText:value];
+        if (!number) number = [AVDB115DetailPagePolicy catalogNumberInText:hint];
+        if (!number) number = [AVDB115DetailPagePolicy catalogNumberInText:ident];
         CGRect frame = CGRectZero;
         if ([el respondsToSelector:@selector(accessibilityFrame)]) frame = [el accessibilityFrame];
         if ([AVDB115DetailPagePolicy isActionRowLabel:label] && !CGRectIsEmpty(frame)) {
@@ -542,11 +549,19 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
         [self alert:@"115 播放" message:AVDB115Settings.shared.missingHint ?: @"请先在设置里填写 115 Cookie。也可点「115 设置」。"];
         return;
     }
-    NSString *magnet = self.visibleLinks.firstObject;
+    NSString *magnet = [AVDB115VisibleMagnets preferredLink:[self usableLinksForCurrentPage]
+                                            catalogNumber:number];
     UIViewController *top = [self presenter];
     if (!top) return;
     AVDB115PlayerViewController *player = [[AVDB115PlayerViewController alloc] initWithKeyword:number magnet:magnet];
     [top presentViewController:player animated:YES completion:nil];
+}
+
+- (NSArray<NSString *> *)usableLinksForCurrentPage {
+    [self refresh];
+    NSArray<NSString *> *fromTree = self.visibleLinks ?: @[];
+    NSArray<NSString *> *fromResident = [AVDB115VisibleMagnets residentLinksMatchingCatalog:self.currentNumber];
+    return [AVDB115VisibleMagnets mergeUniqueLinks:fromTree withLinks:fromResident];
 }
 
 - (void)tapPush {
@@ -555,12 +570,16 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
         [self alert:@"推送到 115" message:AVDB115Settings.shared.missingHint ?: @"请先在设置里填写 115 Cookie。也可点「115 设置」。"];
         return;
     }
-    NSArray<NSString *> *links = self.visibleLinks ?: @[];
-    if (links.count == 0) {
-        [self tryOpenMagnetTabThenPush:number];
+    // One-tap: pick a usable magnet/ed2k already shown or already resident
+    // (Magnets.detailLink reconstruction). Do not call getMovieMagnets.
+    NSArray<NSString *> *links = [self usableLinksForCurrentPage];
+    if (number.length == 0 && self.currentNumber.length) number = self.currentNumber;
+    NSString *pick = [AVDB115VisibleMagnets preferredLink:links catalogNumber:number];
+    if (pick.length) {
+        [self pushLink:pick];
         return;
     }
-    [self chooseAndPushLinks:links number:number];
+    [self tryOpenMagnetTabThenPush:number];
 }
 
 - (void)tryOpenMagnetTabThenPush:(NSString *)number {
@@ -575,8 +594,8 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     if (!top) return;
     NSString *clipboard = [AVDB115Link firstOfflineResourceIn:UIPasteboard.generalPasteboard.string];
     NSString *msg = number.length
-        ? [NSString stringWithFormat:@"当前页还看不到 %@ 的磁力/ed2k。打开「磁鏈下載」后再点推送，或使用已复制的链接。不会请求带签名的磁力接口。", number]
-        : @"当前页还看不到磁力/ed2k。打开「磁鏈下載」后再点推送，或使用已复制的链接。不会请求带签名的磁力接口。";
+        ? [NSString stringWithFormat:@"当前页还没有解析到 %@ 的 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。", number]
+        : @"当前页还没有解析到 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。";
     if (activated) {
         msg = [msg stringByAppendingString:@"\n已尝试切到「磁鏈下載」标签。若列表出现后请再点一次推送。"];
     }
