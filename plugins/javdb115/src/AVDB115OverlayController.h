@@ -9,6 +9,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)presentFromTop;
 + (void)promptForLink:(NSString *)link;
 + (UIViewController *)topViewController;
++ (nullable UIWindow *)keyWindow;
++ (BOOL)shouldSkipWindow:(nullable UIWindow *)window;
+/// Hide the floating 115 button while movie-detail chips are the primary actions.
++ (void)setFloatingButtonHidden:(BOOL)hidden;
 @end
 
 NS_ASSUME_NONNULL_END

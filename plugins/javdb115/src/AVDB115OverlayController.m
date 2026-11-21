@@ -115,6 +115,24 @@ static const void *kButtonKey = &kButtonKey;
     objc_setAssociatedObject(window, kButtonKey, btn, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
++ (NSArray<UIWindow *> *)allWindows {
+    NSMutableArray *out = [NSMutableArray array];
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        for (UIWindow *w in ((UIWindowScene *)scene).windows) {
+            if (![out containsObject:w]) [out addObject:w];
+        }
+    }
+    return out;
+}
+
++ (void)setFloatingButtonHidden:(BOOL)hidden {
+    for (UIWindow *window in [self allWindows]) {
+        UIButton *btn = objc_getAssociatedObject(window, kButtonKey);
+        if (btn) btn.hidden = hidden;
+    }
+}
+
 + (void)handlePan:(UIPanGestureRecognizer *)pan {
     UIView *btn = pan.view;
     UIView *superview = btn.superview;
