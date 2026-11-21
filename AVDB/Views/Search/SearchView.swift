@@ -402,6 +402,40 @@ struct SearchResultView: View {
     }
 }
 
+/// Build 352: JavDB now requires login for search (verified live
+/// 2026-11-21: anonymous /api/v2/search → JWTVerificationError). When a
+/// search fails with an auth error, every result tab shows this prompt
+/// with a login entry instead of a raw error string (movie tab) or a
+/// silent empty page (actor/named/list tabs swallowed errors with try?).
+/// Login posts .avdbCatalogAccountChanged, and the result views reload
+/// on it, so a successful login continues the search automatically.
+struct SearchLoginPrompt: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var showLogin = false
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text("搜索需要登录")
+                .font(.headline)
+            Text("JavDB 现在要求登录后才能搜索，登录成功后会自动重新加载。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("去登录") { showLogin = true }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("search-error-login")
+        }
+        .padding()
+        .sheet(isPresented: $showLogin) {
+            LoginView()
+                .environmentObject(appState)
+        }
+    }
+}
+
 /// 影片结果
 struct SearchMovieResultView: View {
     let keyword: String
@@ -443,16 +477,25 @@ struct SearchMovieResultView: View {
             if vm.movies.isEmpty, !vm.isLoading, let error = vm.errorMessage {
                 // Build 335: a failed search (e.g. the API's new login gate)
                 // must not render as a silent empty result page.
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding()
+                // Build 352: an auth failure gets the login prompt, not the
+                // server's raw「請登錄帳號」string.
+                if JavDBError.isAuthenticationMessage(error) {
+                    SearchLoginPrompt()
+                } else {
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                }
             }
             if vm.isLoading { ProgressView().padding() }
         }
         .task { if vm.movies.isEmpty { await vm.loadMore() } }
         .refreshable { await vm.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
+            Task { await vm.refresh() }
+        }
     }
 }
 
@@ -461,6 +504,8 @@ struct SearchActorResultView: View {
     let keyword: String
     @State private var actors: [Actor] = []
     @State private var loading = false
+    @State private var errorMessage: String?
+    @State private var needsLogin = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 14),
@@ -490,10 +535,26 @@ struct SearchActorResultView: View {
                 }
             }
             .padding(.horizontal, 12)
+            // Build 352: errors are no longer swallowed by try? — an auth
+            // failure shows the login prompt, anything else its message.
+            if actors.isEmpty, !loading {
+                if needsLogin {
+                    SearchLoginPrompt()
+                } else if let errorMessage {
+                    Text(errorMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                }
+            }
             if loading { ProgressView().padding() }
         }
         .task { await load() }
         .refreshable { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
+            Task { await reload() }
+        }
     }
 
     private func load() async {
@@ -504,8 +565,13 @@ struct SearchActorResultView: View {
     private func reload() async {
         loading = true
         defer { loading = false }
-        if let next = try? await JavDBSDK.shared.searchActors(keyword: keyword) {
-            actors = next
+        do {
+            actors = try await JavDBSDK.shared.searchActors(keyword: keyword)
+            errorMessage = nil
+            needsLogin = false
+        } catch {
+            needsLogin = JavDBError.isAuthenticationFailure(error)
+            errorMessage = error.localizedDescription
         }
     }
 }
@@ -516,6 +582,8 @@ struct SearchNamedResultView: View {
     let category: SearchCategory
     @State private var items: [NamedResult] = []
     @State private var loading = false
+    @State private var errorMessage: String?
+    @State private var needsLogin = false
 
     var body: some View {
         ScrollView {
@@ -547,10 +615,25 @@ struct SearchNamedResultView: View {
                 }
             }
             .padding(.horizontal, 16)
+            // Build 352: same error surfacing as the actor tab.
+            if items.isEmpty, !loading {
+                if needsLogin {
+                    SearchLoginPrompt()
+                } else if let errorMessage {
+                    Text(errorMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                }
+            }
             if loading { ProgressView().padding() }
         }
         .task { await load() }
         .refreshable { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
+            Task { await reload() }
+        }
     }
 
     @ViewBuilder
@@ -577,8 +660,13 @@ struct SearchNamedResultView: View {
     private func reload() async {
         loading = true
         defer { loading = false }
-        if let next = try? await JavDBSDK.shared.searchNamed(keyword: keyword, type: category.typeValue) {
-            items = next
+        do {
+            items = try await JavDBSDK.shared.searchNamed(keyword: keyword, type: category.typeValue)
+            errorMessage = nil
+            needsLogin = false
+        } catch {
+            needsLogin = JavDBError.isAuthenticationFailure(error)
+            errorMessage = error.localizedDescription
         }
     }
 }
@@ -588,6 +676,8 @@ struct SearchListResultView: View {
     let keyword: String
     @State private var lists: [MovieList] = []
     @State private var loading = false
+    @State private var errorMessage: String?
+    @State private var needsLogin = false
 
     var body: some View {
         ScrollView {
@@ -619,10 +709,25 @@ struct SearchListResultView: View {
                 }
             }
             .padding(.horizontal, 16)
+            // Build 352: same error surfacing as the actor tab.
+            if lists.isEmpty, !loading {
+                if needsLogin {
+                    SearchLoginPrompt()
+                } else if let errorMessage {
+                    Text(errorMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                }
+            }
             if loading { ProgressView().padding() }
         }
         .task { await load() }
         .refreshable { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .avdbCatalogAccountChanged)) { _ in
+            Task { await reload() }
+        }
     }
 
     private func load() async {
@@ -633,8 +738,13 @@ struct SearchListResultView: View {
     private func reload() async {
         loading = true
         defer { loading = false }
-        if let next = try? await JavDBSDK.shared.searchLists(keyword: keyword) {
-            lists = next
+        do {
+            lists = try await JavDBSDK.shared.searchLists(keyword: keyword)
+            errorMessage = nil
+            needsLogin = false
+        } catch {
+            needsLogin = JavDBError.isAuthenticationFailure(error)
+            errorMessage = error.localizedDescription
         }
     }
 }

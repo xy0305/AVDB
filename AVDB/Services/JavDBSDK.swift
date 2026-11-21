@@ -117,6 +117,11 @@ public final class JavDBSDK {
     /// client sends its token here too). Search therefore uses the account
     /// token like the detail calls have since Build 327; a missing/expired
     /// token surfaces the auth error instead of a silent empty result.
+    /// Build 352: re-verified live 2026-11-21 — anonymous search is still
+    /// rejected, and with no stored token the request can only fail
+    /// anonymously, so the search family fails fast with notLoggedIn and
+    /// lets the UI route the user to login instead of firing a request
+    /// that is guaranteed to be rejected.
     public func search(
         keyword: String,
         page: Int = 1,
@@ -126,6 +131,7 @@ public final class JavDBSDK {
         movieType: SearchMovieType = .all,
         limit: Int = 20
     ) async throws -> [Movie] {
+        guard client.token != nil else { throw JavDBError.notLoggedIn }
         // Bind results/cache writes to the account that issued this request.
         let requestAccount = client.token
         var query: [String: String] = [
@@ -184,6 +190,7 @@ public final class JavDBSDK {
     /// 分类搜索：按演员/系列/片商/导演/清单/番号 搜索。
     /// type 对应 /api/v2/search 的 type 参数：actor/series/maker/director/list/code。
     public func searchActors(keyword: String, page: Int = 1, limit: Int = 20) async throws -> [Actor] {
+        guard client.token != nil else { throw JavDBError.notLoggedIn }
         let query: [String: String] = [
             "q": keyword, "page": "\(page)", "type": "actor", "limit": "\(min(limit, 50))",
         ]
@@ -197,6 +204,7 @@ public final class JavDBSDK {
     /// 分类搜索：系列 / 片商 / 导演（都返回 {id,name,videos_count} 结构）。
     /// type 对应 /api/v2/search 的 type：series / maker / director。
     public func searchNamed(keyword: String, type: String, page: Int = 1, limit: Int = 20) async throws -> [NamedResult] {
+        guard client.token != nil else { throw JavDBError.notLoggedIn }
         let query: [String: String] = [
             "q": keyword, "page": "\(page)", "type": type, "limit": "\(min(limit, 50))",
         ]
@@ -209,6 +217,7 @@ public final class JavDBSDK {
 
     /// 分类搜索：清单（type=list，返回 {id,name,movies_count}）。
     public func searchLists(keyword: String, page: Int = 1, limit: Int = 20) async throws -> [MovieList] {
+        guard client.token != nil else { throw JavDBError.notLoggedIn }
         struct ListData: Decodable { let lists: [MovieList]? }
         let query: [String: String] = [
             "q": keyword, "page": "\(page)", "type": "list", "limit": "\(min(limit, 50))",
@@ -222,6 +231,7 @@ public final class JavDBSDK {
 
     /// 以图搜图（GET /api/v2/search_image）
     public func searchImage(_ imageURL: String) async throws -> [Movie] {
+        guard client.token != nil else { throw JavDBError.notLoggedIn }
         let resp: JavDBResponse<MovieListData> = try await client.get(
             "/api/v2/search_image", query: ["image_url": imageURL], useToken: true)
         let movies = resp.data?.movies ?? []
@@ -231,6 +241,7 @@ public final class JavDBSDK {
 
     /// 磁力搜索（GET /api/v1/search_magnet）— 350: 服务端已改为必须带 JWT
     public func searchMagnet(_ keyword: String, page: Int = 1) async throws -> [Magnet] {
+        guard client.token != nil else { throw JavDBError.notLoggedIn }
         let resp: JavDBResponse<MagnetListData> = try await client.get(
             "/api/v1/search_magnet", query: ["q": keyword, "page": "\(page)"], useToken: true)
         return resp.data?.magnets ?? []
@@ -412,7 +423,11 @@ public final class JavDBSDK {
         ]
         if let type { query["type"] = type }
         if let filterByTags, !filterByTags.isEmpty { query["filter_by_tags"] = filterByTags }
-        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query)
+        // Build 352: /api/v1/movies/tags is login-gated server-side now
+        // (verified live 2026-11-21: anonymous → JWTVerificationError).
+        // It backs category browsing, list pages and the recommender's tag
+        // path, so it must send the account token like search does.
+        let resp: JavDBResponse<MovieListData> = try await client.get("/api/v1/movies/tags", query: query, useToken: true)
         let movies = (resp.data?.movies ?? []).map { $0.withCatalogType(type) }
         rememberMovies(movies)
         return movies
@@ -542,8 +557,9 @@ public final class JavDBSDK {
     }
 
     /// 导演详情（GET /api/v1/directors/{id}）
+    /// Build 352: login-gated server-side now (verified live 2026-11-21).
     public func directorDetail(_ id: String) async throws -> Movie? {
-        let resp: JavDBResponse<MovieDetailData> = try await client.get("/api/v1/directors/\(id)")
+        let resp: JavDBResponse<MovieDetailData> = try await client.get("/api/v1/directors/\(id)", useToken: true)
         return resp.data?.movie
     }
 
@@ -564,11 +580,14 @@ public final class JavDBSDK {
     }
 
     /// 系列列表（GET /api/v1/series?type=N）type: 0有码 1无码 2欧美
+    /// Build 352: the list endpoint is login-gated server-side now
+    /// (verified live 2026-11-21; series detail/letters remain anonymous).
     public func series(type: String = "0", page: Int = 1, limit: Int = 50) async throws -> [Series] {
         struct SeriesList: Decodable { let series: [Series]? }
         let resp: JavDBResponse<SeriesList> = try await client.get(
             "/api/v1/series",
-            query: ["type": type, "page": "\(page)", "limit": "\(min(limit, 100))"])
+            query: ["type": type, "page": "\(page)", "limit": "\(min(limit, 100))"],
+            useToken: true)
         return resp.data?.series ?? []
     }
 
@@ -589,14 +608,17 @@ public final class JavDBSDK {
     }
 
     /// 片商详情（GET /api/v1/makers/{id}）
+    /// Build 352: login-gated server-side now (verified live 2026-11-21).
     public func makerDetail(_ id: String) async throws -> Movie? {
-        let resp: JavDBResponse<MovieDetailData> = try await client.get("/api/v1/makers/\(id)")
+        let resp: JavDBResponse<MovieDetailData> = try await client.get("/api/v1/makers/\(id)", useToken: true)
         return resp.data?.movie
     }
 
     /// 发行商详情（GET /api/v1/publishers/{id}）
+    /// Build 352: same detail family as makers/directors, which the server
+    /// now gates behind login (verified live 2026-11-21); send the token.
     public func publisherDetail(_ id: String) async throws -> Movie? {
-        let resp: JavDBResponse<MovieDetailData> = try await client.get("/api/v1/publishers/\(id)")
+        let resp: JavDBResponse<MovieDetailData> = try await client.get("/api/v1/publishers/\(id)", useToken: true)
         return resp.data?.movie
     }
 
