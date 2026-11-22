@@ -3,6 +3,7 @@
 #import "AVDB115Catalog.h"
 #import "AVDB115Link.h"
 #import "AVDB115VisibleMagnets.h"
+#import "AVDB115MagnetCache.h"
 #import "AVDB115Client.h"
 #import "AVDB115Settings.h"
 #import "AVDB115PlayerViewController.h"
@@ -565,15 +566,24 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
 
 - (NSArray<NSString *> *)usableLinksForCurrentPage {
     [self refresh];
+    NSArray<NSString *> *fromCache = @[];
+    @try {
+        fromCache = [[AVDB115MagnetCache shared] linksForCatalog:self.currentNumber] ?: @[];
+    } @catch (NSException *ex) {
+        fromCache = @[];
+    }
     NSArray<NSString *> *fromTree = self.visibleLinks ?: @[];
     NSArray<NSString *> *fromResident = @[];
-    @try {
-        fromResident = [AVDB115VisibleMagnets residentLinksMatchingCatalog:self.currentNumber
-                                                           visibleLabels:self.visibleLabels] ?: @[];
-    } @catch (NSException *ex) {
-        fromResident = @[];
+    if (fromCache.count == 0) {
+        @try {
+            fromResident = [AVDB115VisibleMagnets residentLinksMatchingCatalog:self.currentNumber
+                                                               visibleLabels:self.visibleLabels] ?: @[];
+        } @catch (NSException *ex) {
+            fromResident = @[];
+        }
     }
-    return [AVDB115VisibleMagnets mergeUniqueLinks:fromTree withLinks:fromResident];
+    return [AVDB115VisibleMagnets mergeUniqueLinks:fromCache
+                                         withLinks:[AVDB115VisibleMagnets mergeUniqueLinks:fromTree withLinks:fromResident]];
 }
 
 - (void)tapPush {

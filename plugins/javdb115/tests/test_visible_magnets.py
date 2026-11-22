@@ -308,6 +308,43 @@ def test_v11_recovers_with_smi_length_and_name_needles():
     assert "jdsignature" not in vis.lower()
 
 
+
+def test_v12_capture_at_load_not_getMovieMagnets():
+    """v11 still failed on a visible MFYD-211 list. Magnets.fromJson returns
+    null (x22); the instance is x1. MagnetListItem.build keeps the full
+    Magnets object at tagged 0x0f. Capture those entries; do not hook
+    getMovieMagnets. Slide must come from App.framework, not snapshot text alone.
+    """
+    src = Path(__file__).resolve().parents[1] / "src"
+    cap = (src / "AVDB115MagnetCaptureHook.m").read_text()
+    cache = (src / "AVDB115MagnetCache.m").read_text()
+    slide = (src / "AVDB115AppSlide.m").read_text()
+    hook = (src / "AVDB115DartRowHook.m").read_text()
+    act = (src / "AVDB115DetailActions.m").read_text()
+    tweak = (src / "Tweak.m").read_text()
+    assert "kVMMagnetsFromJson = 0x9c3fc" in cap
+    assert "kVMMagnetListItemBuild = 0x577acc" in cap
+    assert "0x2cba84" not in cap and "0x2c7a84" not in cap
+    assert "getMovieMagnets(" not in cap and "getMovieMagnets(" not in cache
+    assert "jdsignature" not in cap.lower() and "jdsignature" not in cache.lower()
+    assert "AVDB115CacheCaptureMagnets" in cap
+    assert "AVDB115CacheCaptureListItem" in cap
+    assert "kCidMagnetListItem = 4158" in cache
+    assert "kOffItemMagnets = 0x0f" in cache
+    assert "vm_read_overwrite" in cache
+    assert "word >> 1" in cache or "v = word >> 1" in cache
+    assert "AVDB115AppVmSlide" in slide
+    assert "_kDartSnapshotText" not in slide
+    assert "strcmp(base, \"App\")" in slide
+    assert "AVDB115AppVmSlide" in hook
+    assert "_kDartSnapshotText" not in hook
+    assert "linksForCatalog" in act
+    assert "[AVDB115MagnetCaptureHook install]" in tweak
+    # prologues stolen from the 1.9.41 App binary
+    assert "0xef, 0x61, 0x00, 0xd1, 0xe4, 0x03, 0x01, 0xaa" in cap  # fromJson sub #0x18; mov x4,x1
+    assert "0xef, 0x81, 0x02, 0xd1, 0xe0, 0x03, 0x01, 0xaa" in cap  # build sub #0xa0; mov x0,x1
+
+
 def test_src_does_not_call_getMovieMagnets():
     src = Path(__file__).resolve().parents[1] / "src"
     hook = (src / "AVDB115VisibleMagnets.m").read_text()
@@ -331,6 +368,7 @@ def main():
         test_dart_string_length_is_smi,
         test_v10_scan_is_crash_hardened,
         test_v11_recovers_with_smi_length_and_name_needles,
+        test_v12_capture_at_load_not_getMovieMagnets,
     ]:
         fn()
         print(f"PASS {fn.__name__}")

@@ -14,6 +14,7 @@
 #import "AVDB115SplashSkip.h"
 #import "AVDB115DetailActions.h"
 #import "AVDB115DartRowHook.h"
+#import "AVDB115MagnetCaptureHook.h"
 
 static void AVDB115SwizzleInstance(Class cls, SEL original, SEL replacement) {
     if (!cls) return;
@@ -179,6 +180,7 @@ static void AVDB115InstallHooks(void) {
         Class flutter = NSClassFromString(@"FlutterAppDelegate");
         [AVDB115AdBlockPolicy installNativeHooks];
         [AVDB115SplashSkipPolicy install];
+        [AVDB115MagnetCaptureHook install];
         [AVDB115DetailActions install];
         [AVDB115DartRowHook install];
         AVDB115HookOrAdd(flutter,
@@ -198,6 +200,7 @@ static void AVDB115Init(void) {
         [AVDB115OverlayController startWindowWatcher];
         [AVDB115OverlayController attachToKeyWindowIfNeeded];
         [AVDB115SplashSkipPolicy install];
+        [AVDB115MagnetCaptureHook install];
         [AVDB115DetailActions install];
         [AVDB115DartRowHook install];
         NSNotificationCenter *c = NSNotificationCenter.defaultCenter;

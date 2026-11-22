@@ -8,6 +8,7 @@
 
 #import "AVDB115DartRowHook.h"
 #import "AVDB115DetailActions.h"
+#import "AVDB115AppSlide.h"
 
 #import <dlfcn.h>
 #import <mach/mach.h>
@@ -396,21 +397,6 @@ uint64_t AVDB115Append115ChipsC(uint64_t wrap, uint64_t dart_sp, uint64_t x22,
 
 #pragma mark - Text patch
 
-static uint64_t AVDB115FindSlide(void) {
-    void *sym = dlsym(RTLD_DEFAULT, "_kDartSnapshotText");
-    if (sym) return (uint64_t)sym - 0x4000;
-    uint32_t count = _dyld_image_count();
-    for (uint32_t i = 0; i < count; i++) {
-        const char *name = _dyld_get_image_name(i);
-        if (!name) continue;
-        if (strstr(name, "App.framework") == NULL) continue;
-        const char *base = strrchr(name, '/');
-        base = base ? base + 1 : name;
-        if (strcmp(base, "App") != 0) continue;
-        return (uint64_t)_dyld_get_image_vmaddr_slide(i);
-    }
-    return 0;
-}
 
 static BOOL AVDB115Protect(uint64_t addr, size_t len, vm_prot_t prot) {
     uint64_t page = addr & ~((uint64_t)vm_page_size - 1);
@@ -446,14 +432,22 @@ static void AVDB115WriteAbsJump(uint8_t *dst, uint64_t dest) {
 
 static BOOL AVDB115InstallHook(void) {
     if (gInstalled) return YES;
-    gSlide = AVDB115FindSlide();
+    gSlide = AVDB115AppVmSlide();
     if (gSlide == 0) return NO;
     uint64_t entry = gSlide + kVMGetButtonLine;
-    if (memcmp((const void *)entry, "\xfd\x79\xbf\xa9\xfd\x03\x0f\xaa\xef\x41\x01\xd1\xa0\x13\x40\xf9", 16) != 0) {
+    static const uint8_t kPrologueGetButtonLine[16] = {
+        0xfd, 0x79, 0xbf, 0xa9, 0xfd, 0x03, 0x0f, 0xaa,
+        0xef, 0x41, 0x01, 0xd1, 0xa0, 0x13, 0x40, 0xf9
+    };
+    if (!AVDB115PrologueMatches(entry, kPrologueGetButtonLine, 16)) {
         // Prologue does not match JavDB 1.9.41; refuse to patch.
         return NO;
     }
-    memcpy(gStolen, (const void *)entry, 16);
+    vm_size_t stole_n = 0;
+    if (vm_read_overwrite(mach_task_self(), (vm_address_t)entry, 16,
+                          (vm_address_t)gStolen, &stole_n) != KERN_SUCCESS || stole_n < 16) {
+        return NO;
+    }
 
     gHookPage = AVDB115MapRX(vm_page_size);
     if (!gHookPage) return NO;
