@@ -26,6 +26,14 @@ NS_ASSUME_NONNULL_BEGIN
                        length:(NSUInteger)length
                   catalogHint:(nullable NSString *)hint;
 
+/// Walk already-cached movie list/detail JSON and record id↔番号 maps only.
+/// Does not invent magnets or issue requests.
++ (NSUInteger)ingestMovieIndexFromData:(nullable NSData *)data;
+
+/// Diagnostic line. If catalog is set, also reports how many usable cache
+/// rows matched that 番号 and which 番号 / movie ids are in the cache.
++ (NSString *)diagnosticLineForCatalog:(nullable NSString *)number;
+
 /// Snapshot used by the failure dialog so a device test can tell which
 /// path was empty. Does not include secrets.
 + (NSDictionary<NSString *, id> *)diagnosticSnapshot;

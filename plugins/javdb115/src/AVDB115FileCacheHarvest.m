@@ -1,5 +1,6 @@
 #import "AVDB115FileCacheHarvest.h"
 #import "AVDB115MagnetJSON.h"
+#import "AVDB115MagnetCache.h"
 
 static const unsigned long long kMaxFile = 2ull * 1024ull * 1024ull;
 static const unsigned long long kMaxTotal = 8ull * 1024ull * 1024ull;
@@ -56,8 +57,24 @@ static const NSUInteger kMaxFiles = 80;
                 interesting = YES;
             }
         }
+        if (!interesting) {
+            if ([probe containsString:@"\"number\""] || [probe containsString:@"\"code\""]) {
+                interesting = YES;
+            }
+        }
         if (!interesting) continue;
-        added += [AVDB115MagnetJSON ingestData:data url:nil catalogHint:nil];
+        NSDate *mtime = attr[NSFileModificationDate];
+        NSUInteger got = [AVDB115MagnetJSON ingestData:data url:nil catalogHint:nil];
+        added += got;
+        if (got) {
+            NSString *win = [[NSString alloc] initWithBytes:data.bytes
+                                                     length:MIN((NSUInteger)65536, data.length)
+                                                   encoding:NSISOLatin1StringEncoding];
+            NSString *mid = [AVDB115MagnetCache movieIdFromURLString:win];
+            if (mid.length) [[AVDB115MagnetCache shared] noteMagnetsMovieId:mid seenAt:mtime];
+        } else {
+            [AVDB115MagnetJSON ingestMovieIndexFromData:data];
+        }
     }
     return added;
 }
@@ -106,6 +123,7 @@ static const NSUInteger kMaxFiles = 80;
                         NSData *data = [NSData dataWithContentsOfFile:full options:NSDataReadingMappedIfSafe error:nil];
                         if (data.length && data.length <= kMaxFile) {
                             added += [AVDB115MagnetJSON ingestData:data url:nil catalogHint:nil];
+                            [AVDB115MagnetJSON ingestMovieIndexFromData:data];
                             files++;
                             total += data.length;
                         }

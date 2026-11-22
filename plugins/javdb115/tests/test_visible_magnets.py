@@ -408,6 +408,330 @@ def test_v13_native_intercept_not_app_framework_hook():
     assert any(l.lower().startswith("ed2k://") for l in links)
 
 
+
+# --- v15: attribute cached magnets by list-API movie id, not only 番号-in-name ---
+
+RESERVED_MOVIE_IDS = {
+    "latest", "recommend", "followed", "top", "tags", "lucky",
+    "may_also_like", "recommend_periods", "search", "popular",
+    "new", "index", "show", "magnets", "ranks", "rank",
+    "reviews", "comments", "lists", "focus", "new_arrival",
+}
+
+
+def movie_id_from_url(text: str | None) -> str | None:
+    if not text:
+        return None
+    best = None
+    for m in re.finditer(
+        r"/api/v[0-9]+/movies/([A-Za-z0-9_-]{2,64})(?:/magnets)?(?:\b|$|[/?#])",
+        text,
+        re.I,
+    ):
+        cand = m.group(1)
+        if cand.lower() in RESERVED_MOVIE_IDS:
+            continue
+        if not re.search(r"[A-Za-z]", cand):
+            continue
+        if "/magnets" in m.group(0).lower():
+            return cand
+        best = best or cand
+    return best
+
+
+class MagnetStore:
+    """Host model of AVDB115MagnetCache v15 attribution."""
+
+    def __init__(self):
+        self.rows: list[dict] = []
+        self.id_to_cat: dict[str, str] = {}
+        self.cat_to_id: dict[str, str] = {}
+        self.newest: str | None = None
+
+    def bind(self, mid: str | None, number: str | None) -> None:
+        if not mid or not number:
+            return
+        cat = identity_key(number) or number.upper()
+        if mid in self.id_to_cat and self.id_to_cat[mid] != cat:
+            return
+        self.id_to_cat[mid] = cat
+        self.cat_to_id[cat] = mid
+
+    def add(self, link: str, hint: str | None = None, movie_id: str | None = None) -> None:
+        if not is_offline(link):
+            return
+        mid = movie_id or movie_id_from_url(hint or "") or movie_id_from_url(link)
+        cat = None
+        if hint and not any(s in hint for s in ("/api/", "://", "/magnets")):
+            cat = catalog_number_in_text(hint) or identity_key(hint)
+        else:
+            cat = catalog_number_in_text(hint or "")
+        for row in self.rows:
+            if row["link"] == link:
+                if cat and not row.get("hint"):
+                    row["hint"] = cat
+                if mid and not row.get("movieId"):
+                    row["movieId"] = mid
+                return
+        self.rows.append({"link": link, "hint": cat or "", "movieId": mid})
+        if mid:
+            self.newest = mid
+
+    def ingest_magnets_blob(self, blob: str, url: str | None = None) -> int:
+        mid = movie_id_from_url(url or "") or movie_id_from_url(blob)
+        if mid:
+            self.newest = mid
+        # Same-unit movie index.
+        for m in re.finditer(
+            r'\{[^{}]{0,400}?"id"\s*:\s*"([A-Za-z0-9_-]{2,64})"[^{}]{0,400}?"number"\s*:\s*"([^"]+)"[^{}]{0,200}?\}',
+            blob,
+        ):
+            if not re.search(r'"hash"', m.group(0)):
+                self.bind(m.group(1), m.group(2))
+        for m in re.finditer(
+            r'\{[^{}]{0,400}?"number"\s*:\s*"([^"]+)"[^{}]{0,400}?"id"\s*:\s*"([A-Za-z0-9_-]{2,64})"[^{}]{0,200}?\}',
+            blob,
+        ):
+            if not re.search(r'"hash"', m.group(0)):
+                self.bind(m.group(2), m.group(1))
+        n = 0
+        import json as _json
+        # Prefer structured items so adjacent hashes in one blob are not
+        # collapsed by the 500-char regex window used in links_from_json_blob.
+        payload = blob
+        brace = blob.find("{")
+        if brace >= 0:
+            payload = blob[brace:]
+        items = []
+        try:
+            obj = _json.loads(payload)
+            stack = [obj]
+            while stack:
+                cur = stack.pop()
+                if isinstance(cur, dict):
+                    if cur.get("hash") or (str(cur.get("url") or "").lower().startswith("ed2k://")):
+                        items.append(cur)
+                    stack.extend(cur.values())
+                elif isinstance(cur, list):
+                    stack.extend(cur)
+        except Exception:
+            items = []
+        if items:
+            for it in items:
+                link = link_from_fields(
+                    hash_=it.get("hash"), name=it.get("name") or it.get("title"),
+                    type_=it.get("type"), url=it.get("url"),
+                )
+                if link and is_offline(link):
+                    self.add(link, hint=it.get("name"), movie_id=mid)
+                    n += 1
+        else:
+            for link in links_from_json_blob(blob, None):
+                self.add(link, hint=None, movie_id=mid)
+                n += 1
+        return n
+
+    def links_for(self, number: str | None, labels: list[str] | None = None, list_visible: bool = False) -> list[str]:
+        if not number:
+            return [r["link"] for r in self.rows if is_offline(r["link"])]
+        cat = identity_key(number) or number.upper()
+        mapped = self.cat_to_id.get(cat)
+        direct = []
+        for r in self.rows:
+            link = r["link"]
+            if not is_offline(link):
+                continue
+            name = None
+            m = re.search(r"[?&]dn=([^&]+)", link, re.I)
+            if m:
+                from urllib.parse import unquote
+                name = unquote(m.group(1))
+            elif link.lower().startswith(ED2K_PREFIX):
+                parts = link.split("|")
+                if len(parts) >= 3:
+                    name = parts[2]
+            match = (
+                text_matches_catalog(link, number)
+                or text_matches_catalog(name, number)
+                or text_matches_catalog(r.get("hint"), number)
+                or (mapped and r.get("movieId") == mapped)
+            )
+            if match:
+                direct.append(link)
+        if direct:
+            return list(dict.fromkeys(direct))
+        if list_visible and labels:
+            ids, named = set(), []
+            for r in self.rows:
+                name = r.get("hint") or ""
+                m = re.search(r"[?&]dn=([^&]+)", r["link"], re.I)
+                if m:
+                    from urllib.parse import unquote
+                    name = unquote(m.group(1)) or name
+                elif r["link"].lower().startswith(ED2K_PREFIX):
+                    parts = r["link"].split("|")
+                    if len(parts) >= 3:
+                        name = parts[2]
+                for lab in labels:
+                    if lab and len(lab) >= 4 and name and (name == lab or lab in name or name in lab):
+                        named.append(r["link"])
+                        if r.get("movieId"):
+                            ids.add(r["movieId"])
+                        break
+            if ids:
+                return [r["link"] for r in self.rows if r.get("movieId") in ids]
+            if named:
+                return list(dict.fromkeys(named))
+        if list_visible and self.newest:
+            bound = self.id_to_cat.get(self.newest)
+            other = bound and not text_matches_catalog(bound, number)
+            if not other:
+                self.bind(self.newest, number)
+                return [r["link"] for r in self.rows if r.get("movieId") == self.newest]
+        return []
+
+    def attribution(self, number: str) -> str:
+        cat = identity_key(number) or number.upper()
+        mapped = self.cat_to_id.get(cat)
+        matched = 0
+        cats, ids = [], []
+        for r in self.rows:
+            if not is_offline(r["link"]):
+                continue
+            name = r.get("hint")
+            if (
+                text_matches_catalog(r["link"], number)
+                or text_matches_catalog(name, number)
+                or (mapped and r.get("movieId") == mapped)
+            ):
+                matched += 1
+            if name:
+                cats.append(name)
+            if r.get("movieId"):
+                ids.append(r["movieId"])
+        cats = list(dict.fromkeys(cats))[:8] or ["(无)"]
+        ids = list(dict.fromkeys(list(self.id_to_cat) + ids))[:8] or ["(无)"]
+        return f"当前番号匹配={matched} 缓存番号={','.join(cats)} 缓存影片id={','.join(ids)}"
+
+
+def test_movie_id_from_magnets_url():
+    assert movie_id_from_url("https://jdforrepam.com/api/v2/movies/RoYdAbc/magnets") == "RoYdAbc"
+    assert movie_id_from_url("/api/v1/movies/latest") is None
+    assert movie_id_from_url("/api/v2/movies/12345/magnets") is None
+    # Path buried in a FileCacheStore record, no NSURL passed (v13 harvest).
+    blob = 'url="https://jdforrepam.com/api/v2/movies/RoYdAbc/magnets"\n{"data":[]}'
+    assert movie_id_from_url(blob) == "RoYdAbc"
+
+
+def test_v15_royd360_names_omit_catalog():
+    """Device dialog: fileCache=52 usableCache=18 but ROYD-360 did not match.
+    Magnet `name`s can omit the 番号; key by /movies/{id}/magnets + movie JSON.
+    """
+    store = MagnetStore()
+    # Leftover from an earlier title whose names *did* include the catalog.
+    store.ingest_magnets_blob(
+        '{"data":[{"name":"MFYD-211-C","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","type":"magnet","url":""}]}',
+        url="https://jdforrepam.com/api/v2/movies/MfydOld/magnets",
+    )
+    store.bind("MfydOld", "MFYD-211")
+    royd_blob = (
+        '{"data":['
+        '{"name":"清楚で超内気な義妹を連日.mp4","hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","type":"magnet","url":""},'
+        '{"name":"clear-sis-01","hash":"cccccccccccccccccccccccccccccccccccccccc","type":"magnet","url":""},'
+        '{"name":"something.mkv","hash":"","type":"ed2k","url":"ed2k://|file|something.mkv|1|0123456789abcdef0123456789abcdef|/"},'
+        '{"name":"row-four","hash":"dddddddddddddddddddddddddddddddddddddddd","type":"magnet","url":""}'
+        ']}'
+    )
+    # Harvest as v13 did: url=nil, but the cache file still contains the path.
+    wrapped = 'requestUrl":"https://jdforrepam.com/api/v2/movies/RoYdAbc/magnets"\n' + royd_blob
+    store.ingest_magnets_blob(wrapped, url=None)
+    # Filename filter alone cannot see ROYD-360.
+    assert links_from_json_blob(royd_blob, "ROYD-360") == []
+    # After binding the already-cached movie detail {id, number}.
+    store.ingest_magnets_blob('{"data":{"id":"RoYdAbc","number":"ROYD-360","title":"清楚で超内気な義妹を連日"}}')
+    got = store.links_for("ROYD-360")
+    assert len(got) == 4, got
+    assert not any("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" in x for x in got)
+    assert not any("MFYD-211" in x for x in got)
+    # Other title still resolves by catalog-in-name / its own id.
+    mfyd = store.links_for("MFYD-211")
+    assert len(mfyd) == 1
+    assert "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" in mfyd[0]
+    pick = preferred_link(got, "ROYD-360")
+    assert pick and pick.startswith("magnet:")
+
+
+def test_v15_visible_row_name_and_newest_batch():
+    store = MagnetStore()
+    store.ingest_magnets_blob(
+        '{"data":[{"name":"清楚で超内気な義妹を連日.mp4","hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","type":"magnet","url":""},'
+        '{"name":"row-two","hash":"cccccccccccccccccccccccccccccccccccccccc","type":"magnet","url":""}]}',
+        url="https://jdforrepam.com/api/v2/movies/RoYdAbc/magnets",
+    )
+    # No id↔番号 map yet; list is on screen and a row title is visible.
+    got = store.links_for(
+        "ROYD-360",
+        labels=["ROYD-360", "磁鏈下載 4", "清楚で超内気な義妹を連日.mp4", "2 個文件 / 1.78GB"],
+        list_visible=True,
+    )
+    assert len(got) == 2
+    # Newest magnets file while the list is visible, still unbound to another 番号.
+    store2 = MagnetStore()
+    store2.ingest_magnets_blob(
+        '{"data":[{"name":"untitled","hash":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","type":"magnet","url":""}]}',
+        url="https://jdforrepam.com/api/v2/movies/RoYdAbc/magnets",
+    )
+    got2 = store2.links_for("ROYD-360", list_visible=True)
+    assert len(got2) == 1
+    # Do not retarget a batch already bound to a different 番号.
+    store3 = MagnetStore()
+    store3.ingest_magnets_blob(
+        '{"data":[{"name":"MFYD-211-C","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","type":"magnet","url":""}]}',
+        url="https://jdforrepam.com/api/v2/movies/MfydOld/magnets",
+    )
+    store3.bind("MfydOld", "MFYD-211")
+    assert store3.links_for("ROYD-360", list_visible=True) == []
+
+
+def test_v15_diagnostic_shows_mismatch():
+    store = MagnetStore()
+    store.ingest_magnets_blob(
+        '{"data":[{"name":"MFYD-211-C","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","type":"magnet","url":""}]}',
+        url="https://jdforrepam.com/api/v2/movies/MfydOld/magnets",
+    )
+    store.bind("MfydOld", "MFYD-211")
+    line = store.attribution("ROYD-360")
+    assert "当前番号匹配=0" in line
+    assert "MFYD-211" in line
+    assert "MfydOld" in line
+
+
+def test_v15_src_attributes_by_movie_id_not_name_only():
+    src = Path(__file__).resolve().parents[1] / "src"
+    cache = (src / "AVDB115MagnetCache.m").read_text()
+    cache_h = (src / "AVDB115MagnetCache.h").read_text()
+    json_m = (src / "AVDB115MagnetJSON.m").read_text()
+    json_h = (src / "AVDB115MagnetJSON.h").read_text()
+    files = (src / "AVDB115FileCacheHarvest.m").read_text()
+    act = (src / "AVDB115DetailActions.m").read_text()
+    assert "movieIdFromURLString" in cache and ("/api/v2/movies/" in cache or "/api/v[0-9]+/movies/" in cache)
+    assert "bindMovieId:" in cache_h and "linksForCatalog:" in cache_h
+    assert "visibleLabels" in cache_h and "listVisible" in cache_h
+    assert "attributionDiagnosticForCatalog" in cache
+    assert "当前番号匹配=" in cache and "缓存番号=" in cache and "缓存影片id=" in cache
+    assert "ingestMovieIndexFromData" in json_h
+    assert "movieIdFromURLString" in json_m
+    assert "noteMagnetsMovieId" in files or "noteMagnetsMovieId" in json_m
+    assert "setLookupCatalog:" in act
+    assert "linksForCatalog:self.currentNumber" in act
+    assert "visibleLabels:self.visibleLabels" in act
+    assert "listVisible:self.magnetListVisible" in act
+    assert "diagnosticLineForCatalog:number" in act
+    assert "getMovieMagnets(" not in cache and "getMovieMagnets(" not in json_m
+    assert "jdsignature=" not in cache.lower() and "jdsignature=" not in json_m.lower()
+
+
+
 def main():
     for fn in [
         test_visible_rows_have_no_raw_uri_in_accessibility,
@@ -425,6 +749,11 @@ def main():
         test_v11_recovers_with_smi_length_and_name_needles,
         test_v12_capture_at_load_not_getMovieMagnets,
         test_v13_native_intercept_not_app_framework_hook,
+        test_movie_id_from_magnets_url,
+        test_v15_royd360_names_omit_catalog,
+        test_v15_visible_row_name_and_newest_batch,
+        test_v15_diagnostic_shows_mismatch,
+        test_v15_src_attributes_by_movie_id_not_name_only,
     ]:
         fn()
         print(f"PASS {fn.__name__}")

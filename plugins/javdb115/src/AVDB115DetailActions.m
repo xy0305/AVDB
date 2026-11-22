@@ -588,17 +588,29 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     [self refresh];
     // v13: native intercept cache first (HTTP / FileCacheStore / raw JSON).
     // These do not patch App.framework and do not call getMovieMagnets.
+    // v15: tell the cache which 番号 / 磁鏈下載 page is on screen *before*
+    // harvest, so a /api/v2/movies/{id}/magnets body can be attributed even
+    // when individual file names omit the catalog.
+    @try {
+        [[AVDB115MagnetCache shared] setLookupCatalog:self.currentNumber
+                                          listVisible:self.magnetListVisible
+                                        visibleLabels:self.visibleLabels];
+    } @catch (NSException *ex) {}
     @try { [AVDB115FileCacheHarvest harvest]; } @catch (NSException *ex) {}
     NSArray<NSString *> *fromCache = @[];
     @try {
-        fromCache = [[AVDB115MagnetCache shared] linksForCatalog:self.currentNumber] ?: @[];
+        fromCache = [[AVDB115MagnetCache shared] linksForCatalog:self.currentNumber
+                                                   visibleLabels:self.visibleLabels
+                                                     listVisible:self.magnetListVisible] ?: @[];
     } @catch (NSException *ex) {
         fromCache = @[];
     }
     if (fromCache.count == 0) {
         @try { [AVDB115PlaintextHarvest harvestMatchingCatalog:self.currentNumber]; } @catch (NSException *ex) {}
         @try {
-            fromCache = [[AVDB115MagnetCache shared] linksForCatalog:self.currentNumber] ?: @[];
+            fromCache = [[AVDB115MagnetCache shared] linksForCatalog:self.currentNumber
+                                                       visibleLabels:self.visibleLabels
+                                                         listVisible:self.magnetListVisible] ?: @[];
         } @catch (NSException *ex) {
             fromCache = fromCache ?: @[];
         }
@@ -649,14 +661,14 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     NSString *clipboard = [AVDB115Link firstOfflineResourceIn:UIPasteboard.generalPasteboard.string];
     NSString *msg;
     if (self.magnetListVisible) {
-        NSString *diag = [AVDB115MagnetJSON diagnosticLine];
+        NSString *diag = [AVDB115MagnetJSON diagnosticLineForCatalog:number];
         msg = number.length
             ? [NSString stringWithFormat:@"「磁鏈下載」列表已在当前页，但仍未能还原 %@ 的 magnet/ed2k（不会请求带签名的磁力接口）。%@ 若列表里有复制按钮，可先复制一条再点「使用剪贴板链接」。", number, diag]
             : [NSString stringWithFormat:@"「磁鏈下載」列表已在当前页，但仍未能还原 magnet/ed2k（不会请求带签名的磁力接口）。%@ 若列表里有复制按钮，可先复制一条再点「使用剪贴板链接」。", diag];
     } else if (number.length) {
-        msg = [NSString stringWithFormat:@"当前页还没有解析到 %@ 的 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。%@ 若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。", number, [AVDB115MagnetJSON diagnosticLine]];
+        msg = [NSString stringWithFormat:@"当前页还没有解析到 %@ 的 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。%@ 若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。", number, [AVDB115MagnetJSON diagnosticLineForCatalog:number]];
     } else {
-        msg = [NSString stringWithFormat:@"当前页还没有解析到 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。%@ 若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。", [AVDB115MagnetJSON diagnosticLine]];
+        msg = [NSString stringWithFormat:@"当前页还没有解析到 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。%@ 若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。", [AVDB115MagnetJSON diagnosticLineForCatalog:number]];
     }
     if (activated && !self.magnetListVisible) {
         msg = [msg stringByAppendingString:@"\n已尝试切到「磁鏈下載」标签。若列表出现后请再点一次推送。"];
