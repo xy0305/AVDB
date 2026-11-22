@@ -15,6 +15,8 @@
 #import "AVDB115DetailActions.h"
 #import "AVDB115DartRowHook.h"
 #import "AVDB115MagnetCaptureHook.h"
+#import "AVDB115HttpIntercept.h"
+#import "AVDB115FileCacheHarvest.h"
 
 static void AVDB115SwizzleInstance(Class cls, SEL original, SEL replacement) {
     if (!cls) return;
@@ -179,6 +181,7 @@ static void AVDB115InstallHooks(void) {
         AVDB115SwizzleInstance(UIActivityViewController.class, @selector(initWithActivityItems:applicationActivities:), @selector(avdb115_initWithActivityItems:applicationActivities:));
         Class flutter = NSClassFromString(@"FlutterAppDelegate");
         [AVDB115AdBlockPolicy installNativeHooks];
+        [AVDB115HttpIntercept install];
         [AVDB115SplashSkipPolicy install];
         [AVDB115MagnetCaptureHook install];
         [AVDB115DetailActions install];
@@ -199,6 +202,7 @@ static void AVDB115Init(void) {
         [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
         [AVDB115OverlayController startWindowWatcher];
         [AVDB115OverlayController attachToKeyWindowIfNeeded];
+        [AVDB115HttpIntercept install];
         [AVDB115SplashSkipPolicy install];
         [AVDB115MagnetCaptureHook install];
         [AVDB115DetailActions install];
@@ -211,6 +215,9 @@ static void AVDB115Init(void) {
         [c addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *n) {
             [AVDB115Settings synchronizeFromSystemSettings];
             [AVDB115ExternalLibrarySettings synchronizeFromSystemSettings];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+                @try { [AVDB115FileCacheHarvest harvest]; } @catch (NSException *ex) {}
+            });
         }];
     };
     if ([NSThread isMainThread]) start();

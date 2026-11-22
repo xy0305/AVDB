@@ -351,6 +351,61 @@ def test_src_does_not_call_getMovieMagnets():
     assert "getMovieMagnets(" not in hook
     assert "jdsignature" not in hook.lower()
     assert "off += 8" in hook or "off += 8;" in hook
+    for name in (
+        "AVDB115MagnetJSON.m",
+        "AVDB115HttpIntercept.m",
+        "AVDB115FileCacheHarvest.m",
+        "AVDB115PlaintextHarvest.m",
+        "AVDB115DetailActions.m",
+        "Tweak.m",
+    ):
+        text = (src / name).read_text()
+        assert "getMovieMagnets(" not in text
+        # Must not forge the signed request header.
+        assert "jdsignature=" not in text.lower()
+        assert "forged jdsignature" not in text.lower()
+
+
+
+def test_v13_native_intercept_not_app_framework_hook():
+    """v12 still failed on a freshly resigned install (「还是一样」) with the
+    same 未能还原 dialog. v7–v12 screenshots still showed the v6 overlay, so
+    App.framework vm_protect entry hooks did not install. v13's primary path
+    must intercept the already-loaded list at a native layer (NSURL / file
+    cache / raw JSON) and must not depend on patching App.framework TEXT.
+    """
+    src = Path(__file__).resolve().parents[1] / "src"
+    json_m = (src / "AVDB115MagnetJSON.m").read_text()
+    http = (src / "AVDB115HttpIntercept.m").read_text()
+    files = (src / "AVDB115FileCacheHarvest.m").read_text()
+    raw = (src / "AVDB115PlaintextHarvest.m").read_text()
+    act = (src / "AVDB115DetailActions.m").read_text()
+    tweak = (src / "Tweak.m").read_text()
+    assert "/api/v2/movies/" in (src / "AVDB115HttpIntercept.h").read_text() or "/magnets" in http
+    assert "isMagnetListURL" in json_m and "/magnets" in json_m
+    assert "buildMagnetLink" in (src / "AVDB115MagnetJSON.h").read_text() or "magnetLinkWithHash" in json_m
+    assert "linkFromMagnetHash" in json_m
+    assert "NSURLProtocol" in http and "dataTaskWithRequest:completionHandler:" in http
+    assert "vm_protect" not in http
+    assert "vm_protect" not in json_m
+    assert "http_cache" in files and "dio_cache.hive" in files
+    assert "vm_read_overwrite" in raw and "vm_protect" not in raw
+    assert "[AVDB115HttpIntercept install]" in tweak
+    assert "[AVDB115FileCacheHarvest harvest]" in act
+    assert "[AVDB115PlaintextHarvest harvestMatchingCatalog" in act
+    assert "diagnosticLine" in act and "拦截缓存=" in json_m
+    assert "不会请求带签名的磁力接口" in act
+    # official link rules still reject a non-hash
+    assert link_from_fields(hash_="not-a-hash", name="MFYD-211") is None
+    blob = (
+        '{"data":[{"id":"1","name":"MFYD-211-C","hash":"0123456789ABCDEF0123456789ABCDEF01234567",'
+        '"type":"magnet","url":""},'
+        '{"id":"2","name":"MFYD-211.mkv","hash":"",'
+        '"type":"ed2k","url":"ed2k://|file|MFYD-211.mkv|1|0123456789abcdef0123456789abcdef|/"}]}'
+    )
+    links = links_from_json_blob(blob, "MFYD-211")
+    assert any(l.startswith("magnet:?xt=urn:btih:0123456789abcdef") for l in links)
+    assert any(l.lower().startswith("ed2k://") for l in links)
 
 
 def main():
@@ -369,6 +424,7 @@ def main():
         test_v10_scan_is_crash_hardened,
         test_v11_recovers_with_smi_length_and_name_needles,
         test_v12_capture_at_load_not_getMovieMagnets,
+        test_v13_native_intercept_not_app_framework_hook,
     ]:
         fn()
         print(f"PASS {fn.__name__}")
