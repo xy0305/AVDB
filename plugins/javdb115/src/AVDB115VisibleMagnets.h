@@ -30,6 +30,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// Scan already-mapped process memory for live Magnets objects and
 /// already-materialized magnet/ed2k strings. Does not request any API.
 + (NSArray<NSString *> *)residentLinksMatchingCatalog:(nullable NSString *)number;
++ (NSArray<NSString *> *)residentLinksMatchingCatalog:(nullable NSString *)number
+                                       visibleLabels:(nullable NSArray<NSString *> *)labels;
 
 /// YES when accessibility already shows the 磁鏈下載 list (tab + ED2K / catalog filenames).
 + (BOOL)labelsSuggestVisibleMagnetList:(nullable NSArray<NSString *> *)labels

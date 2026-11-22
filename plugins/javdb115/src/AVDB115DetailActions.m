@@ -156,6 +156,7 @@ static const NSInteger kAVDB115ColumnCount = 4;
 @property (nonatomic, strong) UIButton *settingsButton;
 @property (nonatomic, copy) NSString *currentNumber;
 @property (nonatomic, copy) NSArray<NSString *> *visibleLinks;
+@property (nonatomic, copy) NSArray<NSString *> *visibleLabels;
 @property (nonatomic, assign) BOOL magnetListVisible;
 @property (nonatomic, assign) BOOL suppressOverlayRow;
 @property (nonatomic, assign) BOOL installed;
@@ -386,6 +387,7 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     self.onDetail = YES;
     self.currentNumber = number;
     self.visibleLinks = links;
+    self.visibleLabels = [labels copy];
     self.magnetListVisible = [AVDB115VisibleMagnets labelsSuggestVisibleMagnetList:labels catalogNumber:number];
     objc_setAssociatedObject(self, kAVDB115MagnetTabKey, magnetTabElements, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [AVDB115OverlayController setFloatingButtonHidden:YES];
@@ -400,6 +402,7 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     }
     self.currentNumber = nil;
     self.visibleLinks = @[];
+    self.visibleLabels = @[];
     self.magnetListVisible = NO;
     self.row.hidden = YES;
 }
@@ -565,7 +568,8 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     NSArray<NSString *> *fromTree = self.visibleLinks ?: @[];
     NSArray<NSString *> *fromResident = @[];
     @try {
-        fromResident = [AVDB115VisibleMagnets residentLinksMatchingCatalog:self.currentNumber] ?: @[];
+        fromResident = [AVDB115VisibleMagnets residentLinksMatchingCatalog:self.currentNumber
+                                                           visibleLabels:self.visibleLabels] ?: @[];
     } @catch (NSException *ex) {
         fromResident = @[];
     }

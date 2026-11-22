@@ -113,16 +113,28 @@ static const NSUInteger kAVDB115MaxStringChars = 512;
 
 #if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR || defined(__APPLE__)
 
-// v9 crashed on tap: AVDB115Mem (96 * 16KB page slots) was a ~1.5MB *stack*
-// local in residentLinksMatchingCatalog. The iOS main-thread stack is about
-// 1MB, so memset/entry overflowed and the app died (闪退). v10 keeps that
-// state on the heap, reads only through vm_read_overwrite into a single
-// page-sized buffer, never dereferences foreign pointers, and only follows
-// addresses that already sit inside enumerated RW regions.
+// v11: v10 stopped the 闪退, but a visible 磁鏈下載 list (e.g. MFYD-211)
+// still could not be turned into a magnet/ed2k. Two concrete bugs:
+//
+// 1) Dart String length at untagged+8 is a Smi (n << 1). v10 treated it as
+//    a raw count, so a 40-char hash was read as 80 bytes and failed the
+//    hex check — even if a Magnets object was found.
+// 2) The walk was budgeted at 0.15s / 24MB and skipped regions larger than
+//    512MB or with pages_resident==0. The Dart heap is often one large
+//    reserved mapping, so the scanner never reached live Magnets / name
+//    strings. JSON may already have been GC'd; MagnetListItem still does
+//    not materialize magnet:/ed2k://.
+//
+// v11 keeps v10 crash safety (heap-allocated state, vm_read_overwrite only,
+// no raw deref, IOKit/guard skipped, @try → dialog) and recovers links by
+// searching for the catalog / visible row names first, decoding Smi
+// lengths, then following tagged string pointers back to Magnets (cid 2678,
+// size 0x70, tagged name 0x17 / hash 0x1f / type 0x5f / url 0x67).
 
-static const unsigned kAVDB115MaxRegions = 192;
-static const uint64_t kAVDB115MaxScanBytesV10 = 24ull * 1024ull * 1024ull;
-static const CFTimeInterval kAVDB115MaxScanSeconds = 0.15;
+static const unsigned kAVDB115MaxRegions = 384;
+static const unsigned kAVDB115MaxTagged = 64;
+static const uint64_t kAVDB115MaxScanBytesV11 = 128ull * 1024ull * 1024ull;
+static const CFTimeInterval kAVDB115MaxScanSeconds = 0.40;
 
 typedef struct {
     uint64_t start;
@@ -130,7 +142,7 @@ typedef struct {
 } AVDB115Region;
 
 typedef struct {
-    AVDB115Region regions[192];
+    AVDB115Region regions[384];
     unsigned nregions;
     uint8_t *pagebuf;
     vm_size_t pagesz;
@@ -139,6 +151,8 @@ typedef struct {
     BOOL cached_ok;
     uint64_t scanned;
     CFAbsoluteTime start;
+    uint64_t tagged[64];
+    unsigned ntagged;
 } AVDB115Mem;
 
 static uint32_t AVDB115HeaderCid(uint64_t header) {
@@ -153,16 +167,25 @@ static BOOL AVDB115IsHeapPtr(uint64_t tagged) {
     return (tagged & 1ull) == 1ull && tagged > 0x10000ull;
 }
 
+// Dart String/Array length words are Smis: low bit 0, value in the upper bits.
+static BOOL AVDB115SmiLength(uint64_t word, uint64_t *out) {
+    if ((word & 1ull) != 0ull) return NO;
+    uint64_t n = word >> 1;
+    if (n == 0 || n > kAVDB115MaxStringChars) return NO;
+    *out = n;
+    return YES;
+}
+
 static BOOL AVDB115BudgetLeft(const AVDB115Mem *m) {
     if (!m || !m->pagebuf) return NO;
-    if (m->scanned >= kAVDB115MaxScanBytesV10) return NO;
+    if (m->scanned >= kAVDB115MaxScanBytesV11) return NO;
     if ((CFAbsoluteTimeGetCurrent() - m->start) > kAVDB115MaxScanSeconds) return NO;
     return YES;
 }
 
 static BOOL AVDB115InRegions(const AVDB115Mem *m, uint64_t addr, size_t n) {
     if (n == 0) return NO;
-    if (addr + n < addr) return NO; // overflow
+    if (addr + n < addr) return NO;
     uint64_t last = addr + n;
     for (unsigned i = 0; i < m->nregions; i++) {
         if (addr >= m->regions[i].start && last <= m->regions[i].end) return YES;
@@ -211,18 +234,16 @@ static AVDB115Mem *AVDB115MemNew(void) {
         uint64_t start = (uint64_t)addr;
         uint64_t end = start + (uint64_t)size;
         BOOL skipSpecial = NO;
-#ifdef SM_EMPTY
-        if (info.share_mode == SM_EMPTY) skipSpecial = YES;
-#endif
 #ifdef VM_MEMORY_IOKIT
         if (info.user_tag == VM_MEMORY_IOKIT) skipSpecial = YES;
 #endif
 #ifdef VM_MEMORY_GUARD
         if (info.user_tag == VM_MEMORY_GUARD) skipSpecial = YES;
 #endif
-        if (info.pages_resident == 0) skipSpecial = YES;
-        if (readable && writable && !executable && !skipSpecial && end > start && size >= 64 &&
-            size <= (512ull * 1024ull * 1024ull)) {
+        // Do not skip SM_EMPTY, pages_resident==0, or huge reservations:
+        // the Dart heap is often one large mapping with uncommitted holes.
+        // Unreadable pages are skipped later when vm_read_overwrite fails.
+        if (readable && writable && !executable && !skipSpecial && end > start && size >= 64) {
             m->regions[m->nregions].start = start;
             m->regions[m->nregions].end = end;
             m->nregions++;
@@ -234,8 +255,6 @@ static AVDB115Mem *AVDB115MemNew(void) {
     return m;
 }
 
-// Copy one page (or the remainder of a region) via vm_read_overwrite into
-// our heap buffer. Never dereference the foreign address itself.
 static BOOL AVDB115MemFill(AVDB115Mem *m, uint64_t page) {
     if (!m || !m->pagebuf) return NO;
     if (m->cached_ok && m->cached_page == page) return YES;
@@ -296,10 +315,17 @@ static uint64_t AVDB115MemU64(AVDB115Mem *m, uint64_t addr, BOOL *ok) {
     return v;
 }
 
+static void AVDB115RememberTagged(AVDB115Mem *m, uint64_t tagged) {
+    if (!m || !AVDB115IsHeapPtr(tagged) || m->ntagged >= kAVDB115MaxTagged) return;
+    for (unsigned i = 0; i < m->ntagged; i++) {
+        if (m->tagged[i] == tagged) return;
+    }
+    m->tagged[m->ntagged++] = tagged;
+}
+
 static NSString *AVDB115StringAtMem(AVDB115Mem *m, uint64_t tagged) {
     if (!AVDB115IsHeapPtr(tagged)) return nil;
     uint64_t untagged = tagged - 1;
-    // Header + length word must already lie in a known RW region.
     if (!AVDB115InRegions(m, untagged, 16)) return nil;
     BOOL ok = NO;
     uint64_t header = AVDB115MemU64(m, untagged, &ok);
@@ -307,25 +333,20 @@ static NSString *AVDB115StringAtMem(AVDB115Mem *m, uint64_t tagged) {
     uint64_t lengthWord = AVDB115MemU64(m, untagged + 8, &ok);
     if (!ok) return nil;
     uint32_t cid = AVDB115HeaderCid(header);
-    uint64_t n = lengthWord;
-    if (n > kAVDB115MaxStringChars) return nil;
-    if (n == 0) return nil;
+    uint64_t n = 0;
+    if (!AVDB115SmiLength(lengthWord, &n)) return nil;
 
     BOOL latin1 = YES;
-    uint64_t dataAddr = 0;
-    // Dart 3.13 predefined string cids are 93–95 (String/OneByte/TwoByte).
-    // Do not chase "external" string pointers; those cids are not strings here.
     if (cid == kAVDB115OneByteStringCid || cid == 93) {
         latin1 = YES;
-        dataAddr = untagged + 0x10;
     } else if (cid == kAVDB115TwoByteStringCid) {
         latin1 = NO;
-        dataAddr = untagged + 0x10;
     } else {
         return nil;
     }
     size_t nbytes = latin1 ? (size_t)n : (size_t)n * 2;
     if (nbytes == 0 || nbytes > kAVDB115MaxStringChars * 2) return nil;
+    uint64_t dataAddr = untagged + 0x10;
     if (!AVDB115InRegions(m, dataAddr, nbytes)) return nil;
     uint8_t buf[1024 + 8];
     if (nbytes > sizeof(buf)) return nil;
@@ -368,7 +389,6 @@ static NSString *AVDB115JSONStringValue(NSString *window, NSString *key) {
 static void AVDB115CollectJSONFromBytes(const uint8_t *base, size_t len, NSString *number,
                                         NSMutableArray *links, NSMutableSet *seen) {
     if (!base || len < 16 || len > (64u * 1024u)) return;
-    // Cheap prefilter so we do not build/regex every binary page.
     if (!memmem(base, len, "\"hash\"", 6) && !memmem(base, len, "ed2k://", 7)) return;
     NSString *blob = [[NSString alloc] initWithBytes:base length:len encoding:NSISOLatin1StringEncoding];
     if (blob.length == 0) return;
@@ -426,34 +446,141 @@ static void AVDB115CollectURIsFromBytes(const uint8_t *base, size_t len, NSStrin
     }
 }
 
+static BOOL AVDB115TryAddMagnetsAt(AVDB115Mem *mem, uint64_t base, NSString *number,
+                                   NSMutableArray *links, NSMutableSet *seen) {
+    if (!AVDB115InRegions(mem, base, 0x70)) return NO;
+    BOOL ok = NO;
+    uint64_t header = AVDB115MemU64(mem, base, &ok);
+    if (!ok) return NO;
+    if (AVDB115HeaderCid(header) != kAVDB115MagnetsCid) return NO;
+    uint32_t stag = AVDB115HeaderSizeTag(header);
+    if (stag != kAVDB115MagnetsSizeTag && stag != 0) return NO;
+    uint64_t nameT = AVDB115MemU64(mem, base + 0x18, &ok); if (!ok) return NO;
+    uint64_t hashT = AVDB115MemU64(mem, base + 0x20, &ok); if (!ok) return NO;
+    uint64_t typeT = AVDB115MemU64(mem, base + 0x60, &ok); if (!ok) return NO;
+    uint64_t urlT  = AVDB115MemU64(mem, base + 0x68, &ok); if (!ok) return NO;
+    NSString *name = AVDB115StringAtMem(mem, nameT);
+    NSString *hash = AVDB115StringAtMem(mem, hashT);
+    NSString *type = AVDB115StringAtMem(mem, typeT);
+    NSString *url  = AVDB115StringAtMem(mem, urlT);
+    if (name.length == 0 && hash.length == 0 && url.length == 0) return NO;
+    NSString *link = [AVDB115VisibleMagnets linkFromMagnetHash:hash name:name type:type url:url];
+    NSUInteger before = links.count;
+    AVDB115AddLink(links, seen, link, number, name);
+    return links.count > before;
+}
+
 static void AVDB115CollectMagnetsOnPage(AVDB115Mem *mem, uint64_t page, size_t len, NSString *number,
                                         NSMutableArray *links, NSMutableSet *seen) {
     if (!mem || len < 0x70) return;
-    // Step 8: visit new-space (8 mod 16) and old-space (0 mod 16).
     for (size_t off = 0; off + 0x70 <= len; off += 8) {
         if (!AVDB115BudgetLeft(mem)) return;
-        uint64_t base = page + off;
-        // The whole 0x70-byte Magnets object must lie in a known region.
-        if (!AVDB115InRegions(mem, base, 0x70)) continue;
-        BOOL ok = NO;
-        uint64_t header = AVDB115MemU64(mem, base, &ok);
-        if (!ok) continue;
-        if (AVDB115HeaderCid(header) != kAVDB115MagnetsCid) continue;
-        // Require the verified size tag (7). Do not accept 0: it matches too
-        // much random memory and led v9 to chase garbage pointers.
-        if (AVDB115HeaderSizeTag(header) != kAVDB115MagnetsSizeTag) continue;
-        uint64_t nameT = AVDB115MemU64(mem, base + 0x18, &ok); if (!ok) continue;
-        uint64_t hashT = AVDB115MemU64(mem, base + 0x20, &ok); if (!ok) continue;
-        uint64_t typeT = AVDB115MemU64(mem, base + 0x60, &ok); if (!ok) continue;
-        uint64_t urlT  = AVDB115MemU64(mem, base + 0x68, &ok); if (!ok) continue;
-        NSString *name = AVDB115StringAtMem(mem, nameT);
-        NSString *hash = AVDB115StringAtMem(mem, hashT);
-        NSString *type = AVDB115StringAtMem(mem, typeT);
-        NSString *url  = AVDB115StringAtMem(mem, urlT);
-        if (name.length == 0 && hash.length == 0 && url.length == 0) continue;
-        NSString *link = [AVDB115VisibleMagnets linkFromMagnetHash:hash name:name type:type url:url];
-        AVDB115AddLink(links, seen, link, number, name);
+        AVDB115TryAddMagnetsAt(mem, page + off, number, links, seen);
     }
+}
+
+// If `hit` lands inside a Dart One/TwoByteString payload, remember the tagged pointer.
+static void AVDB115NoteDartStringContaining(AVDB115Mem *mem, uint64_t hit, size_t needleLen) {
+    if (!mem || needleLen == 0) return;
+    uint64_t aligned = hit & ~7ull;
+    for (unsigned back = 0; back < 64; back++) {
+        if (aligned < (uint64_t)back * 8ull) break;
+        uint64_t data = aligned - (uint64_t)back * 8ull;
+        if (data > hit) continue;
+        uint64_t untagged = data - 0x10;
+        if (!AVDB115InRegions(mem, untagged, 16)) continue;
+        BOOL ok = NO;
+        uint64_t header = AVDB115MemU64(mem, untagged, &ok);
+        if (!ok) continue;
+        uint32_t cid = AVDB115HeaderCid(header);
+        BOOL latin1 = (cid == kAVDB115OneByteStringCid || cid == 93);
+        BOOL utf16 = (cid == kAVDB115TwoByteStringCid);
+        if (!latin1 && !utf16) continue;
+        uint64_t lengthWord = AVDB115MemU64(mem, untagged + 8, &ok);
+        if (!ok) continue;
+        uint64_t n = 0;
+        if (!AVDB115SmiLength(lengthWord, &n)) continue;
+        size_t nbytes = latin1 ? (size_t)n : (size_t)n * 2;
+        if (data + nbytes < hit + needleLen) continue;
+        if (hit < data) continue;
+        AVDB115RememberTagged(mem, untagged + 1);
+        return;
+    }
+}
+
+static void AVDB115ScanNeedlesOnPage(AVDB115Mem *mem, const uint8_t *data, size_t len, uint64_t page,
+                                     NSArray<NSData *> *needles) {
+    if (!mem || !data || len == 0) return;
+    for (NSData *nd in needles) {
+        const uint8_t *nb = nd.bytes;
+        size_t nl = nd.length;
+        if (!nb || nl == 0 || nl > len) continue;
+        const uint8_t *p = data, *end = data + len;
+        while (p + nl <= end) {
+            const uint8_t *found = memmem(p, (size_t)(end - p), nb, nl);
+            if (!found) break;
+            uint64_t hit = page + (uint64_t)(found - data);
+            AVDB115NoteDartStringContaining(mem, hit, nl);
+            p = found + 1;
+        }
+    }
+}
+
+static const uint64_t kAVDB115MagnetFieldOffs[] = { 0x08, 0x10, 0x18, 0x20, 0x58, 0x60, 0x68 };
+
+static void AVDB115FollowTaggedOnPage(AVDB115Mem *mem, const uint8_t *data, size_t len, uint64_t page,
+                                      NSString *number, NSMutableArray *links, NSMutableSet *seen) {
+    if (!mem || !data || mem->ntagged == 0) return;
+    for (unsigned ti = 0; ti < mem->ntagged; ti++) {
+        uint64_t tagged = mem->tagged[ti];
+        uint8_t needle[8];
+        memcpy(needle, &tagged, 8); // little-endian host = arm64
+        const uint8_t *p = data, *end = data + len;
+        while (p + 8 <= end) {
+            const uint8_t *found = memmem(p, (size_t)(end - p), needle, 8);
+            if (!found) break;
+            uint64_t addr = page + (uint64_t)(found - data);
+            for (size_t fi = 0; fi < sizeof(kAVDB115MagnetFieldOffs) / sizeof(kAVDB115MagnetFieldOffs[0]); fi++) {
+                uint64_t off = kAVDB115MagnetFieldOffs[fi];
+                if (addr < off) continue;
+                AVDB115TryAddMagnetsAt(mem, addr - off, number, links, seen);
+            }
+            p = found + 1;
+        }
+    }
+}
+
+static NSArray<NSData *> *AVDB115NeedleDatas(NSString *number, NSArray<NSString *> *labels) {
+    NSMutableArray<NSData *> *out = [NSMutableArray array];
+    NSMutableSet *seen = [NSMutableSet set];
+    void (^add)(NSString *) = ^(NSString *s) {
+        if (s.length < 4 || s.length > 180) return;
+        NSString *key = s;
+        if ([seen containsObject:key]) return;
+        [seen addObject:key];
+        NSData *latin = [s dataUsingEncoding:NSISOLatin1StringEncoding allowLossyConversion:NO];
+        if (latin.length >= 4) [out addObject:latin];
+        NSData *utf16 = [s dataUsingEncoding:NSUTF16LittleEndianStringEncoding];
+        if (utf16.length >= 8) [out addObject:utf16];
+    };
+    if (number.length) {
+        add(number);
+        add(number.uppercaseString);
+        add(number.lowercaseString);
+        NSString *compact = [[number.uppercaseString stringByReplacingOccurrencesOfString:@"-" withString:@""]
+                             stringByReplacingOccurrencesOfString:@"_" withString:@""];
+        if (compact.length >= 4) add(compact);
+    }
+    for (NSString *raw in labels) {
+        if (![AVDB115VisibleMagnets text:raw matchesCatalog:number]) continue;
+        if (raw.length <= number.length) continue;
+        NSString *norm = raw;
+        if ([norm.uppercaseString isEqualToString:@"ED2K"]) continue;
+        if ([norm containsString:@"推送到"] || [norm containsString:@"115 播放"]) continue;
+        if ([norm isEqualToString:@"磁鏈下載"] || [norm isEqualToString:@"磁链下载"]) continue;
+        add(raw);
+    }
+    return out;
 }
 
 + (BOOL)labelsSuggestVisibleMagnetList:(NSArray<NSString *> *)labels catalogNumber:(NSString *)number {
@@ -470,16 +597,18 @@ static void AVDB115CollectMagnetsOnPage(AVDB115Mem *mem, uint64_t page, size_t l
     return (tab && (ed2k || named)) || (ed2k && named);
 }
 
-+ (NSArray<NSString *> *)avdb115_residentLinksSafe:(NSString *)number {
++ (NSArray<NSString *> *)avdb115_residentLinksSafe:(NSString *)number visibleLabels:(NSArray<NSString *> *)labels {
     NSMutableArray *links = [NSMutableArray array];
     NSMutableSet *seen = [NSMutableSet set];
     AVDB115Mem *mem = AVDB115MemNew();
     if (!mem) return links;
+    NSArray<NSData *> *needles = AVDB115NeedleDatas(number, labels);
 
     uint8_t overlap[600];
     size_t overlapLen = 0;
     uint64_t prevRegionEnd = 0;
 
+    // Pass 1: copy pages, parse JSON/URI, record Dart string pointers for catalog / row names.
     for (unsigned i = 0; i < mem->nregions && AVDB115BudgetLeft(mem); i++) {
         uint64_t start = mem->regions[i].start;
         uint64_t end = mem->regions[i].end;
@@ -490,9 +619,9 @@ static void AVDB115CollectMagnetsOnPage(AVDB115Mem *mem, uint64_t page, size_t l
                 overlapLen = 0;
                 continue;
             }
-            AVDB115CollectMagnetsOnPage(mem, page, (size_t)mem->cached_len, number, links, seen);
             const uint8_t *data = mem->pagebuf;
             size_t len = (size_t)mem->cached_len;
+            AVDB115ScanNeedlesOnPage(mem, data, len, page, needles);
             if (overlapLen) {
                 size_t comb = overlapLen + len;
                 if (comb >= overlapLen && comb <= 600 + (size_t)mem->pagesz) {
@@ -509,8 +638,6 @@ static void AVDB115CollectMagnetsOnPage(AVDB115Mem *mem, uint64_t page, size_t l
                 AVDB115CollectJSONFromBytes(data, len, number, links, seen);
                 AVDB115CollectURIsFromBytes(data, len, number, links, seen);
             }
-            // Re-fill: CollectMagnetsOnPage may have replaced the cached page
-            // while following string pointers.
             if (!(mem->cached_ok && mem->cached_page == page)) {
                 if (!AVDB115MemFill(mem, page) || !mem->cached_ok) {
                     overlapLen = 0;
@@ -523,13 +650,45 @@ static void AVDB115CollectMagnetsOnPage(AVDB115Mem *mem, uint64_t page, size_t l
             if (overlapLen) memcpy(overlap, data + (len - overlapLen), overlapLen);
         }
     }
+
+    // Pass 2: follow tagged name/hash strings back to Magnets objects.
+    if (mem->ntagged && AVDB115BudgetLeft(mem)) {
+        for (unsigned i = 0; i < mem->nregions && AVDB115BudgetLeft(mem); i++) {
+            uint64_t start = mem->regions[i].start;
+            uint64_t end = mem->regions[i].end;
+            for (uint64_t page = start; page < end && AVDB115BudgetLeft(mem); page += mem->pagesz) {
+                if (!AVDB115MemFill(mem, page) || !mem->cached_ok) continue;
+                AVDB115FollowTaggedOnPage(mem, mem->pagebuf, (size_t)mem->cached_len, page, number, links, seen);
+            }
+        }
+    }
+
+    // Pass 3: if still empty, walk Magnets cid on remaining budget (Smi lengths now correct).
+    if (links.count == 0 && AVDB115BudgetLeft(mem)) {
+        for (unsigned i = 0; i < mem->nregions && AVDB115BudgetLeft(mem); i++) {
+            uint64_t start = mem->regions[i].start;
+            uint64_t end = mem->regions[i].end;
+            for (uint64_t page = start; page < end && AVDB115BudgetLeft(mem); page += mem->pagesz) {
+                if (!AVDB115MemFill(mem, page) || !mem->cached_ok) continue;
+                AVDB115CollectMagnetsOnPage(mem, page, (size_t)mem->cached_len, number, links, seen);
+                if (links.count) break;
+            }
+            if (links.count) break;
+        }
+    }
+
     AVDB115MemFree(mem);
     return links;
 }
 
 + (NSArray<NSString *> *)residentLinksMatchingCatalog:(NSString *)number {
+    return [self residentLinksMatchingCatalog:number visibleLabels:nil];
+}
+
++ (NSArray<NSString *> *)residentLinksMatchingCatalog:(NSString *)number
+                                       visibleLabels:(NSArray<NSString *> *)labels {
     @try {
-        return [self avdb115_residentLinksSafe:number] ?: @[];
+        return [self avdb115_residentLinksSafe:number visibleLabels:labels] ?: @[];
     } @catch (NSException *ex) {
         return @[];
     }
@@ -544,6 +703,12 @@ static void AVDB115CollectMagnetsOnPage(AVDB115Mem *mem, uint64_t page, size_t l
 
 + (NSArray<NSString *> *)residentLinksMatchingCatalog:(NSString *)number {
     (void)number;
+    return @[];
+}
+
++ (NSArray<NSString *> *)residentLinksMatchingCatalog:(NSString *)number
+                                       visibleLabels:(NSArray<NSString *> *)labels {
+    (void)number; (void)labels;
     return @[];
 }
 

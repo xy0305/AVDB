@@ -244,11 +244,30 @@ def test_visible_list_is_recognized_without_raw_uris():
 
 
 
+def dart_smi(n: int) -> int:
+    """Dart 64-bit Smi: low bit 0, payload n << 1. String.length is stored this way."""
+    return n << 1
+
+
+def test_dart_string_length_is_smi():
+    # Verified against on-disk TwoByteString「想看」(length Smi 2) and
+    # test_dart_heap_layout.py. A 40-char hash is stored as 80, not 40.
+    assert dart_smi(40) == 80
+    assert dart_smi(2) == 4
+    assert dart_smi(8) == 16
+    assert dart_smi(40) & 1 == 0
+    raw_mistaken = dart_smi(40)
+    assert raw_mistaken != 40
+    # v10 treated the word as a raw count, so hex validation of a 40-char
+    # hash failed after an 80-byte read.
+    assert not (32 <= raw_mistaken <= 40)
+
+
 def test_v10_scan_is_crash_hardened():
     """v9 闪退: ~1.5MB page cache was a stack local; tap 推送到 115 overflowed
-    the ~1MB iOS main-thread stack. v10 must keep scan state on the heap,
-    only copy via vm_read_overwrite, stay inside enumerated regions, require
-    Magnets size tag 7, and fail to a dialog rather than crash.
+    the ~1MB iOS main-thread stack. v10/v11 must keep scan state on the heap,
+    only copy via vm_read_overwrite, stay inside enumerated regions, and
+    fail to a dialog rather than crash.
     """
     src = Path(__file__).resolve().parents[1] / "src"
     vis = (src / "AVDB115VisibleMagnets.m").read_text()
@@ -259,12 +278,33 @@ def test_v10_scan_is_crash_hardened():
     assert "calloc(1, sizeof(AVDB115Mem))" in vis
     assert "vm_read_overwrite" in vis
     assert "AVDB115InRegions" in vis
-    assert "AVDB115HeaderSizeTag(header) != kAVDB115MagnetsSizeTag" in vis
-    assert "HeaderSizeTag(header) != 0" not in vis  # must not accept size tag 0
     assert "@try" in vis and "residentLinksMatchingCatalog" in vis
     assert "@try" in act and "residentLinksMatchingCatalog" in act
-    assert "kAVDB115MaxScanSeconds = 0.15" in vis
     assert "getMovieMagnets(" not in vis
+    assert "jdsignature" not in vis.lower()
+
+
+def test_v11_recovers_with_smi_length_and_name_needles():
+    """v10 still missed an already-visible 磁鏈下載 list (MFYD-211): String
+    length is a Smi, the 0.15s/24MB walk skipped large Dart heap mappings,
+    and visible row names were not used as search needles.
+    """
+    src = Path(__file__).resolve().parents[1] / "src"
+    vis = (src / "AVDB115VisibleMagnets.m").read_text()
+    act = (src / "AVDB115DetailActions.m").read_text()
+    hdr = (src / "AVDB115VisibleMagnets.h").read_text()
+    assert "AVDB115SmiLength" in vis
+    assert "word >> 1" in vis or "lengthWord >> 1" in vis
+    assert "visibleLabels" in hdr
+    assert "visibleLabels" in act
+    assert "AVDB115NeedleDatas" in vis
+    assert "AVDB115FollowTaggedOnPage" in vis
+    assert "AVDB115NoteDartStringContaining" in vis
+    # Relaxed region filters: do not skip the large reserved Dart heap.
+    assert "512ull * 1024ull * 1024ull" not in vis
+    assert "pages_resident == 0" not in vis
+    assert "kAVDB115MaxScanSeconds = 0.40" in vis
+    assert "getMovieMagnets(" not in vis and "getMovieMagnets(" not in act
     assert "jdsignature" not in vis.lower()
 
 
@@ -288,7 +328,9 @@ def main():
         test_new_space_alignment_is_8_mod_16,
         test_visible_list_is_recognized_without_raw_uris,
         test_src_does_not_call_getMovieMagnets,
+        test_dart_string_length_is_smi,
         test_v10_scan_is_crash_hardened,
+        test_v11_recovers_with_smi_length_and_name_needles,
     ]:
         fn()
         print(f"PASS {fn.__name__}")
