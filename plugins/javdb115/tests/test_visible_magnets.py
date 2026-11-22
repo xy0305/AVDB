@@ -243,6 +243,31 @@ def test_visible_list_is_recognized_without_raw_uris():
     assert first_offline("\n".join(SCREENSHOT_LABELS)) is None
 
 
+
+def test_v10_scan_is_crash_hardened():
+    """v9 闪退: ~1.5MB page cache was a stack local; tap 推送到 115 overflowed
+    the ~1MB iOS main-thread stack. v10 must keep scan state on the heap,
+    only copy via vm_read_overwrite, stay inside enumerated regions, require
+    Magnets size tag 7, and fail to a dialog rather than crash.
+    """
+    src = Path(__file__).resolve().parents[1] / "src"
+    vis = (src / "AVDB115VisibleMagnets.m").read_text()
+    act = (src / "AVDB115DetailActions.m").read_text()
+    assert "data[16384]" not in vis
+    assert "slot[96]" not in vis
+    assert "AVDB115Mem *mem = AVDB115MemNew()" in vis or "AVDB115Mem *mem = AVDB115MemNew(" in vis
+    assert "calloc(1, sizeof(AVDB115Mem))" in vis
+    assert "vm_read_overwrite" in vis
+    assert "AVDB115InRegions" in vis
+    assert "AVDB115HeaderSizeTag(header) != kAVDB115MagnetsSizeTag" in vis
+    assert "HeaderSizeTag(header) != 0" not in vis  # must not accept size tag 0
+    assert "@try" in vis and "residentLinksMatchingCatalog" in vis
+    assert "@try" in act and "residentLinksMatchingCatalog" in act
+    assert "kAVDB115MaxScanSeconds = 0.15" in vis
+    assert "getMovieMagnets(" not in vis
+    assert "jdsignature" not in vis.lower()
+
+
 def test_src_does_not_call_getMovieMagnets():
     src = Path(__file__).resolve().parents[1] / "src"
     hook = (src / "AVDB115VisibleMagnets.m").read_text()
@@ -263,6 +288,7 @@ def main():
         test_new_space_alignment_is_8_mod_16,
         test_visible_list_is_recognized_without_raw_uris,
         test_src_does_not_call_getMovieMagnets,
+        test_v10_scan_is_crash_hardened,
     ]:
         fn()
         print(f"PASS {fn.__name__}")

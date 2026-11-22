@@ -563,7 +563,12 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
 - (NSArray<NSString *> *)usableLinksForCurrentPage {
     [self refresh];
     NSArray<NSString *> *fromTree = self.visibleLinks ?: @[];
-    NSArray<NSString *> *fromResident = [AVDB115VisibleMagnets residentLinksMatchingCatalog:self.currentNumber];
+    NSArray<NSString *> *fromResident = @[];
+    @try {
+        fromResident = [AVDB115VisibleMagnets residentLinksMatchingCatalog:self.currentNumber] ?: @[];
+    } @catch (NSException *ex) {
+        fromResident = @[];
+    }
     return [AVDB115VisibleMagnets mergeUniqueLinks:fromTree withLinks:fromResident];
 }
 
