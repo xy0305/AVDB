@@ -1,4 +1,4 @@
-# JavDB sidecar dylib (AVDB115) v8
+# JavDB sidecar dylib (AVDB115) v9
 
 Standalone Objective-C dylib that adds AVDB-style **115 push/play**, **External Library**, and **HQ cover preview** to the official JavDB iOS app (`com.javdb6.com`). It does **not** change AVDB itself, and it does not hook JavDB membership, payment, or magnet APIs. The only intentional UI change on the official movie-detail page is two extra action chips, described below.
 
@@ -14,7 +14,7 @@ This folder is the only AVDB-repo addition on the isolated `ci/javdb-115-dylib` 
 
 - **Movie-detail 115 chips — runtime Dart-row hook (v7), with v6 UIKit overlay fallback**: static analysis of JavDB 1.9.41 shows the visible 想看 / 看过 / 存入清單 row is assembled by Flutter `MoviePageState._getButtonLine` (`package:astarte/home/movie_page.dart`) into a `Wrap`. The fourth child is a `Consumer<MoviePageProvider>` (not a raw 離線觀看 chip). This build installs a 16-byte entry wrapper at `_getButtonLine` (FAT `0x3c1144` / VM `0x3bd144`) after verifying the 16-byte prologue. When the original function returns a `Wrap`, the hook allocates a length-6 Array, copies the existing four children, appends two cloned `MyInkWell` chips labeled **推送到 115** and **115 播放** after the Consumer, and updates the GrowableObjectArray. It does **not** replace 離線觀看, does **not** hook `getMovieMagnets`, and does not touch payment, VIP, or auth. Taps `dispatch_async` to the existing push/play actions. If the hook installs, the v6 UIKit overlay row is hidden (catalog/magnet scan continues; **115 设置** remains in iOS Settings and the floating chip). If the prologue does not match or `vm_protect` / `VM_PROT_COPY` fails, the hook is left uninstalled and the v6 overlay stays as the fallback. **This has not been device-tested.** Text-segment protect, Dart heap allocation, write-barrier abort, and C `sp` when entering from Dart remain hypotheses.
 - **v6 UIKit overlay** (fallback only when the Dart hook is not installed): a second row of capsule buttons (height 32, pill radius, 13pt medium) is attached to the key window just above the bottom tabs when the page looks like a movie detail (catalog number from the nav title or「番號/番号」 field, plus those action labels). The chips are labeled **推送到 115**, **115 播放**, and a lighter **115 设置**. They do not cover 購買VIP, the cover play control, or the original four buttons. Flutter scroll would not reliably move a mid-page overlay, so the dock is stable rather than chasing the action row. **推送** reuses `addOfflineTask` on magnet/ed2k already visible in the FlutterView accessibility tree (or a confirmed clipboard link); it does not call `getMovieMagnets` or forge `jdsignature`. If no link is visible it can try to activate the 磁鏈下載 tab and ask the user to tap 推送 again. **115 播放** reuses the existing player with the bound catalog number (magnet optional).
-- **One-tap 推送到 115** (v8): JavDB `MagnetListItem` shows `name` (e.g. `MIDA-859-U.LTX…`), an `ED2K` type badge, and `files_count`, not a raw `magnet:` / `ed2k://` URI. v7 only scanned accessibility labels/values for those URI prefixes, so a tap on an already-open 磁鏈下載 list could still show the “看不到磁力/ed2k” dialog. v8 reconstructs the same link as JavDB `Magnets.detailLink` (`buildMagnetLink(hash, name)` or the already-resident `url` for ed2k) from live `Magnets` objects (cid 2678) and already-materialized URI strings in process memory, filtered by the current catalog number. It then calls the existing `addOfflineTask`. It does **not** hook or call `getMovieMagnets`, forge `jdsignature`, or touch payment/VIP/auth. **離線觀看 is left intact.** If several links match, one catalog-matching magnet is preferred (then a matching ed2k). 115 播放 still searches 115 by catalog number and will pass a preferred magnet when one was found. This has not been re-tested as a successful device push; the v7 device screenshot only showed that the magnet list was already visible when the old dialog appeared.
+- **One-tap 推送到 115** (v9): JavDB `MagnetListItem` shows `name` (e.g. `MIDA-859-U.LTX…`), an `ED2K` type badge, and `files_count`, not a raw `magnet:` / `ed2k://` URI. v7 only scanned accessibility labels/values for those URI prefixes, so a tap on an already-open 磁鏈下載 list could still show the “看不到磁力/ed2k” dialog. v8 reconstructs the same link as JavDB `Magnets.detailLink` (`buildMagnetLink(hash, name)` or the already-resident `url` for ed2k) from live `Magnets` objects (cid 2678) and already-materialized URI strings in process memory, filtered by the current catalog number. It then calls the existing `addOfflineTask`. It does **not** hook or call `getMovieMagnets`, forge `jdsignature`, or touch payment/VIP/auth. **離線觀看 is left intact.** If several links match, one catalog-matching magnet is preferred (then a matching ed2k). 115 播放 still searches 115 by catalog number and will pass a preferred magnet when one was found. v8 still missed already-open lists because it only walked 16-byte-aligned (old-space) addresses, required `Magnets` string fields to sit in the same `vm_read` buffer, and looked for raw `magnet:` / `ed2k://` text that `MagnetListItem.build` never materializes. v9 walks 8-byte alignment (new-space and old-space), reads string fields across heap pages, and also reconstructs links from already-resident JSON (`hash` / `name` / `url`). If the 磁鏈下載 list is already on screen and a link still cannot be parsed, the dialog no longer tells the user to open the tab first. This has not been re-tested as a successful device push; the v7 screenshot only showed that the list was already visible when the old scanner missed it.
 - Push magnet / ed2k the **user already copied or shared** remains a fallback if no on-page / already-resident link can be parsed; optional push-and-play.
 - Play via 115 original URL (m115 / 115driver MIT) with HLS fallback. Playback uses AVPlayer (JavDB has no KSPlayer).
 - **External database** (AVDB `ExternalLibraryClient`, not a local JSON file import):
@@ -38,18 +38,18 @@ Clipboard hooks only look for `magnet:` / `ed2k://` strings. Other clipboard con
 ## Build (macOS + iOS SDK)
 
 ```sh
-bash plugins/javdb115/scripts/build-dylib.sh dist/AVDB115-v8.dylib
+bash plugins/javdb115/scripts/build-dylib.sh dist/AVDB115-v9.dylib
 ```
 
-GitHub Actions on this branch compiles `AVDB115.dylib` (packaged locally as `AVDB115-v8.dylib`) (arm64, iphoneos, install name `@executable_path/Frameworks/AVDB115.dylib`) and uploads it with a source zip. The workflow does not run on `main` and does not start AVDB app builds.
+GitHub Actions on this branch compiles `AVDB115.dylib` (packaged locally as `AVDB115-v9.dylib`) (arm64, iphoneos, install name `@executable_path/Frameworks/AVDB115.dylib`) and uploads it with a source zip. The workflow does not run on `main` and does not start AVDB app builds.
 
 ## Inject locally (unsigned IPA)
 
 Do **not** put a JavDB IPA in this repository (the repo is public). On your machine:
 
 ```sh
-python3 plugins/javdb115/scripts/insert_dylib.py ipa /path/to/JavDB.ipa dist/AVDB115-v8.dylib \
-  -o dist/JavDB-1.9.41-AVDB115-v8-unsigned.ipa
+python3 plugins/javdb115/scripts/insert_dylib.py ipa /path/to/JavDB.ipa dist/AVDB115-v9.dylib \
+  -o dist/JavDB-1.9.41-AVDB115-v9-unsigned.ipa
 ```
 
 The script copies the dylib into `Runner.app/Frameworks`, copies `Settings.bundle` into `Runner.app` (iOS Settings page), inserts `LC_LOAD_DYLIB`, and writes an **unsigned** IPA. It will not pretend to codesign. Sideload signing is a separate step you do yourself.

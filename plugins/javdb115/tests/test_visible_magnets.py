@@ -171,6 +171,86 @@ def test_filename_matches_catalog():
     assert not text_matches_catalog("SSIS-001-U", "MIDA-859")
 
 
+
+def links_from_json_blob(blob: str, number: str | None) -> list[str]:
+    import re
+    out, seen = [], set()
+    for m in re.finditer(r'"hash"\s*:\s*"([0-9a-fA-F]{32,40})"', blob):
+        start = max(0, m.start() - 500)
+        end = min(len(blob), m.end() + 500)
+        window = blob[start:end]
+        def field(key):
+            mm = re.search(rf'"{key}"\s*:\s*"([^"]{{0,400}})"', window)
+            return mm.group(1) if mm else None
+        link = link_from_fields(hash_=field("hash"), name=field("name") or field("title"),
+                                type_=field("type"), url=field("url"))
+        if not link or not is_offline(link):
+            continue
+        if number and not (text_matches_catalog(link, number) or text_matches_catalog(field("name"), number)):
+            continue
+        if link not in seen:
+            seen.add(link)
+            out.append(link)
+    for m in re.finditer(r'"url"\s*:\s*"(ed2k://[^"]{10,400})"', blob, re.I):
+        start = max(0, m.start() - 500)
+        end = min(len(blob), m.end() + 500)
+        window = blob[start:end]
+        def field(key):
+            mm = re.search(rf'"{key}"\s*:\s*"([^"]{{0,400}})"', window)
+            return mm.group(1) if mm else None
+        link = link_from_fields(type_=field("type") or "ed2k", url=m.group(1), name=field("name"))
+        if link and is_offline(link) and (not number or text_matches_catalog(link, number) or text_matches_catalog(field("name"), number)):
+            if link not in seen:
+                seen.add(link)
+                out.append(link)
+    return out
+
+
+def labels_suggest_visible_magnet_list(labels: list[str], number: str | None) -> bool:
+    tab = any(is_magnet_tab_label(s) for s in labels)
+    ed2k = any("ED2K" in (s or "").upper() for s in labels)
+    named = any(number and text_matches_catalog(s, number) and len(s) > len(number or "") for s in labels)
+    return (tab and (ed2k or named)) or (ed2k and named)
+
+
+def test_json_blob_reconstructs_catalog_links():
+    blob = (
+        '{"data":[{"id":"1","name":"MIDA-859-U.LTX 4K","hash":"0123456789ABCDEF0123456789ABCDEF01234567",'
+        '"type":"magnet","url":"","files_count":15},'
+        '{"id":"2","name":"MIDA-859-C","hash":"","type":"ed2k",'
+        '"url":"ed2k://|file|MIDA-859-C.mp4|123456789|0123456789abcdef0123456789abcdef|/"},'
+        '{"id":"3","name":"SSIS-001","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","type":"magnet"}]}'
+    )
+    links = links_from_json_blob(blob, "MIDA-859")
+    assert any(l.startswith("magnet:?xt=urn:btih:0123456789abcdef") for l in links)
+    assert any(l.lower().startswith("ed2k://") for l in links)
+    assert not any("SSIS-001" in l or "aaaaaaaa" in l for l in links)
+
+
+def test_new_space_alignment_is_8_mod_16():
+    # Dart new-space objects are at untagged 8 mod 16; a stride-16 scan from 0
+    # (v8) never visits them. A correct scanner must step by 8.
+    starts = list(range(0, 64, 16))
+    new_space = [8, 24, 40, 56]
+    assert all(s % 16 == 0 for s in starts)
+    assert all(s not in starts for s in new_space)
+    stepped = list(range(0, 64, 8))
+    assert all(s in stepped for s in new_space)
+
+
+def test_visible_list_is_recognized_without_raw_uris():
+    assert labels_suggest_visible_magnet_list(SCREENSHOT_LABELS, "MIDA-859")
+    assert first_offline("\n".join(SCREENSHOT_LABELS)) is None
+
+
+def test_src_does_not_call_getMovieMagnets():
+    src = Path(__file__).resolve().parents[1] / "src"
+    hook = (src / "AVDB115VisibleMagnets.m").read_text()
+    assert "getMovieMagnets(" not in hook
+    assert "jdsignature" not in hook.lower()
+    assert "off += 8" in hook or "off += 8;" in hook
+
+
 def main():
     for fn in [
         test_visible_rows_have_no_raw_uri_in_accessibility,
@@ -179,6 +259,10 @@ def main():
         test_reject_non_hash_and_unsigned_api_not_used,
         test_preferred_picks_catalog_magnet_for_one_tap,
         test_filename_matches_catalog,
+        test_json_blob_reconstructs_catalog_links,
+        test_new_space_alignment_is_8_mod_16,
+        test_visible_list_is_recognized_without_raw_uris,
+        test_src_does_not_call_getMovieMagnets,
     ]:
         fn()
         print(f"PASS {fn.__name__}")

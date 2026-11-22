@@ -156,6 +156,7 @@ static const NSInteger kAVDB115ColumnCount = 4;
 @property (nonatomic, strong) UIButton *settingsButton;
 @property (nonatomic, copy) NSString *currentNumber;
 @property (nonatomic, copy) NSArray<NSString *> *visibleLinks;
+@property (nonatomic, assign) BOOL magnetListVisible;
 @property (nonatomic, assign) BOOL suppressOverlayRow;
 @property (nonatomic, assign) BOOL installed;
 @property (nonatomic, assign) BOOL onDetail;
@@ -385,6 +386,7 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     self.onDetail = YES;
     self.currentNumber = number;
     self.visibleLinks = links;
+    self.magnetListVisible = [AVDB115VisibleMagnets labelsSuggestVisibleMagnetList:labels catalogNumber:number];
     objc_setAssociatedObject(self, kAVDB115MagnetTabKey, magnetTabElements, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [AVDB115OverlayController setFloatingButtonHidden:YES];
     [self showRowInWindow:window actionFrames:actionFrames tabFrames:tabFrames vipFrames:vipFrames];
@@ -398,6 +400,7 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     }
     self.currentNumber = nil;
     self.visibleLinks = @[];
+    self.magnetListVisible = NO;
     self.row.hidden = YES;
 }
 
@@ -593,10 +596,17 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
     UIViewController *top = [self presenter];
     if (!top) return;
     NSString *clipboard = [AVDB115Link firstOfflineResourceIn:UIPasteboard.generalPasteboard.string];
-    NSString *msg = number.length
-        ? [NSString stringWithFormat:@"当前页还没有解析到 %@ 的 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。", number]
-        : @"当前页还没有解析到 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。";
-    if (activated) {
+    NSString *msg;
+    if (self.magnetListVisible) {
+        msg = number.length
+            ? [NSString stringWithFormat:@"「磁鏈下載」列表已在当前页，但仍未能还原 %@ 的 magnet/ed2k（不会请求带签名的磁力接口）。若列表里有复制按钮，可先复制一条再点「使用剪贴板链接」。", number]
+            : @"「磁鏈下載」列表已在当前页，但仍未能还原 magnet/ed2k（不会请求带签名的磁力接口）。若列表里有复制按钮，可先复制一条再点「使用剪贴板链接」。";
+    } else if (number.length) {
+        msg = [NSString stringWithFormat:@"当前页还没有解析到 %@ 的 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。", number];
+    } else {
+        msg = @"当前页还没有解析到 magnet/ed2k（已扫描无障碍树和已载入的列表数据，不会请求带签名的磁力接口）。若「磁鏈下載」列表尚未打开，请先打开后再点一次推送，或使用已复制的链接。";
+    }
+    if (activated && !self.magnetListVisible) {
         msg = [msg stringByAppendingString:@"\n已尝试切到「磁鏈下載」标签。若列表出现后请再点一次推送。"];
     }
     UIAlertController *a = [UIAlertController alertControllerWithTitle:@"推送到 115" message:msg preferredStyle:UIAlertControllerStyleAlert];

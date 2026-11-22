@@ -31,6 +31,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// already-materialized magnet/ed2k strings. Does not request any API.
 + (NSArray<NSString *> *)residentLinksMatchingCatalog:(nullable NSString *)number;
 
+/// YES when accessibility already shows the 磁鏈下載 list (tab + ED2K / catalog filenames).
++ (BOOL)labelsSuggestVisibleMagnetList:(nullable NSArray<NSString *> *)labels
+                        catalogNumber:(nullable NSString *)number;
+
 + (NSArray<NSString *> *)mergeUniqueLinks:(NSArray<NSString *> *)a
                                  withLinks:(NSArray<NSString *> *)b;
 

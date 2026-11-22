@@ -3,6 +3,7 @@
 #import "AVDB115Catalog.h"
 #import <TargetConditionals.h>
 #import <string.h>
+#import <stdlib.h>
 #if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR || defined(__APPLE__)
 #import <mach/mach.h>
 #import <mach/vm_map.h>
@@ -110,6 +111,31 @@ static const uint64_t kAVDB115MaxScanBytes = 96ull * 1024ull * 1024ull;
 
 #if TARGET_OS_IPHONE || TARGET_OS_SIMULATOR || defined(__APPLE__)
 
+// Dart 3.13.7 iOS 64-bit: new-space objects sit at 8-mod-16, old-space at
+// 0-mod-16 (pointer_tagging.h). v8 stepped by 16 from offset 0, so it
+// skipped every new-space Magnets instance — the usual case right after
+// the 磁鏈下載 list is built. String fields also live on other heap pages;
+// v8 only decoded strings inside the same vm_read buffer, so even a hit
+// usually produced no link. MagnetListItem.build never calls detailLink,
+// so a raw magnet:/ed2k:// prefix scan is empty until the user copies.
+
+static const size_t kAVDB115Page = 16384;
+static const NSInteger kAVDB115PageCache = 96;
+
+typedef struct {
+    uint64_t page;
+    size_t len;
+    BOOL valid;
+    uint8_t data[16384];
+} AVDB115PageSlot;
+
+typedef struct {
+    AVDB115PageSlot slot[96];
+    uint32_t clock;
+    uint64_t scanned;
+    CFAbsoluteTime start;
+} AVDB115Mem;
+
 static uint32_t AVDB115HeaderCid(uint64_t header) {
     return (uint32_t)((header >> 12) & 0xFFFFF);
 }
@@ -122,189 +148,275 @@ static BOOL AVDB115IsHeapPtr(uint64_t tagged) {
     return (tagged & 1ull) == 1ull && tagged > 0x1000ull;
 }
 
-static BOOL AVDB115ReadU64(const uint8_t *base, size_t len, uint64_t addr, uint64_t regionStart, uint64_t *out) {
-    if (addr < regionStart) return NO;
-    uint64_t off = addr - regionStart;
-    if (off + 8 > len) return NO;
-    memcpy(out, base + off, 8);
+static BOOL AVDB115MemFill(AVDB115Mem *m, uint64_t page, AVDB115PageSlot *s) {
+    if (s->valid && s->page == page) return YES;
+    vm_offset_t data = 0;
+    mach_msg_type_number_t cnt = 0;
+    kern_return_t kr = vm_read(mach_task_self(), (vm_address_t)page, (vm_size_t)kAVDB115Page, &data, &cnt);
+    if (kr != KERN_SUCCESS || cnt == 0 || data == 0) {
+        s->page = page;
+        s->len = 0;
+        s->valid = NO;
+        return NO;
+    }
+    size_t n = cnt > kAVDB115Page ? kAVDB115Page : (size_t)cnt;
+    memcpy(s->data, (const void *)data, n);
+    s->page = page;
+    s->len = n;
+    s->valid = YES;
+    m->scanned += n;
+    vm_deallocate(mach_task_self(), data, cnt);
     return YES;
 }
 
-static NSString *AVDB115StringAt(const uint8_t *base, size_t len, uint64_t tagged, uint64_t regionStart) {
+static BOOL AVDB115MemRead(AVDB115Mem *m, uint64_t addr, void *dst, size_t n) {
+    uint8_t *out = dst;
+    while (n) {
+        uint64_t page = addr & ~((uint64_t)kAVDB115Page - 1ull);
+        uint64_t off = addr - page;
+        AVDB115PageSlot *s = &m->slot[(page / kAVDB115Page) % kAVDB115PageCache];
+        if (!(s->valid && s->page == page)) {
+            if (m->scanned >= kAVDB115MaxScanBytes) return NO;
+            if ((CFAbsoluteTimeGetCurrent() - m->start) > 0.60) return NO;
+            if (!AVDB115MemFill(m, page, s)) return NO;
+        }
+        if (!s->valid || off >= s->len) return NO;
+        size_t take = s->len - (size_t)off;
+        if (take > n) take = n;
+        memcpy(out, s->data + off, take);
+        out += take;
+        addr += take;
+        n -= take;
+    }
+    return YES;
+}
+
+static uint64_t AVDB115MemU64(AVDB115Mem *m, uint64_t addr, BOOL *ok) {
+    uint64_t v = 0;
+    *ok = AVDB115MemRead(m, addr, &v, 8);
+    return v;
+}
+
+static NSString *AVDB115StringAtMem(AVDB115Mem *m, uint64_t tagged) {
     if (!AVDB115IsHeapPtr(tagged)) return nil;
     uint64_t untagged = tagged - 1;
-    uint64_t header = 0, lengthWord = 0;
-    if (!AVDB115ReadU64(base, len, untagged, regionStart, &header)) return nil;
-    if (!AVDB115ReadU64(base, len, untagged + 8, regionStart, &lengthWord)) return nil;
+    BOOL ok = NO;
+    uint64_t header = AVDB115MemU64(m, untagged, &ok);
+    if (!ok) return nil;
+    uint64_t lengthWord = AVDB115MemU64(m, untagged + 8, &ok);
+    if (!ok) return nil;
     uint32_t cid = AVDB115HeaderCid(header);
     uint64_t n = lengthWord;
-    // Smi length is unexpected but accept a small even Smi just in case.
     if (n > kAVDB115MaxStringChars && (n & 1ull) == 0ull && (n >> 1) <= kAVDB115MaxStringChars) n >>= 1;
     if (n == 0 || n > kAVDB115MaxStringChars) return nil;
 
-    const uint8_t *data = NULL;
-    size_t nbytes = 0;
     BOOL latin1 = YES;
+    uint64_t dataAddr = 0;
     if (cid == kAVDB115OneByteStringCid || cid == kAVDB115TwoByteStringCid) {
         latin1 = (cid == kAVDB115OneByteStringCid);
-        uint64_t dataAddr = untagged + 0x10;
-        if (dataAddr < regionStart) return nil;
-        uint64_t off = dataAddr - regionStart;
-        nbytes = latin1 ? (size_t)n : (size_t)n * 2;
-        if (off + nbytes > len) return nil;
-        data = base + off;
+        dataAddr = untagged + 0x10;
     } else if (cid == kAVDB115ExternalOneByteStringCid || cid == kAVDB115ExternalTwoByteStringCid) {
+        // Dart 3.13 predefined strings are 93–95; keep a conservative external path.
         latin1 = (cid == kAVDB115ExternalOneByteStringCid);
-        uint64_t ptr = 0;
-        if (!AVDB115ReadU64(base, len, untagged + 0x10, regionStart, &ptr) || ptr == 0) return nil;
-        if (ptr < regionStart) return nil;
-        uint64_t off = ptr - regionStart;
-        nbytes = latin1 ? (size_t)n : (size_t)n * 2;
-        if (off + nbytes > len) return nil;
-        data = base + off;
+        dataAddr = AVDB115MemU64(m, untagged + 0x10, &ok);
+        if (!ok || dataAddr == 0) return nil;
     } else {
         return nil;
     }
+    size_t nbytes = latin1 ? (size_t)n : (size_t)n * 2;
+    if (nbytes == 0 || nbytes > kAVDB115MaxStringChars * 2) return nil;
+    uint8_t buf[1024 + 8];
+    if (nbytes > sizeof(buf)) return nil;
+    if (!AVDB115MemRead(m, dataAddr, buf, nbytes)) return nil;
     if (latin1) {
         for (size_t i = 0; i < nbytes; i++) {
-            if (data[i] < 0x09) return nil;
+            if (buf[i] < 0x09) return nil;
         }
-        return [[NSString alloc] initWithBytes:data length:nbytes encoding:NSISOLatin1StringEncoding];
+        return [[NSString alloc] initWithBytes:buf length:nbytes encoding:NSISOLatin1StringEncoding];
     }
-    return [[NSString alloc] initWithBytes:data length:nbytes encoding:NSUTF16LittleEndianStringEncoding];
+    return [[NSString alloc] initWithBytes:buf length:nbytes encoding:NSUTF16LittleEndianStringEncoding];
 }
 
-static void AVDB115CollectFromRegion(const uint8_t *base, size_t len, uint64_t regionStart,
-                                     NSString *number, NSMutableArray *links, NSMutableSet *seen) {
-    // 1) Reconstruct from live Magnets objects (cid 2678, size 0x70).
-    if (len >= 0x70) {
-        size_t maxOff = len - 0x70;
-        for (size_t off = 0; off + 8 <= len && off <= maxOff; off += 16) {
-            uint64_t header = 0;
-            memcpy(&header, base + off, 8);
-            if (AVDB115HeaderCid(header) != kAVDB115MagnetsCid) continue;
-            if (AVDB115HeaderSizeTag(header) != kAVDB115MagnetsSizeTag) continue;
-            uint64_t nameT = 0, hashT = 0, typeT = 0, urlT = 0;
-            memcpy(&nameT, base + off + 0x18, 8);
-            memcpy(&hashT, base + off + 0x20, 8);
-            memcpy(&typeT, base + off + 0x60, 8);
-            memcpy(&urlT,  base + off + 0x68, 8);
-            NSString *name = AVDB115StringAt(base, len, nameT, regionStart);
-            NSString *hash = AVDB115StringAt(base, len, hashT, regionStart);
-            NSString *type = AVDB115StringAt(base, len, typeT, regionStart);
-            NSString *url  = AVDB115StringAt(base, len, urlT, regionStart);
-            if (name.length == 0 && hash.length == 0 && url.length == 0) continue;
-            if (number.length && ![AVDB115VisibleMagnets text:name matchesCatalog:number] &&
-                ![AVDB115VisibleMagnets text:url matchesCatalog:number]) {
-                continue;
-            }
-            NSString *link = [AVDB115VisibleMagnets linkFromMagnetHash:hash name:name type:type url:url];
-            if (link.length && ![seen containsObject:link]) {
-                [seen addObject:link];
-                [links addObject:link];
-            }
-        }
+static void AVDB115AddLink(NSMutableArray *links, NSMutableSet *seen, NSString *link, NSString *number, NSString *nameHint) {
+    if (![AVDB115Link isOfflineResource:link]) return;
+    if (number.length) {
+        BOOL match = [AVDB115VisibleMagnets text:link matchesCatalog:number] ||
+                     [AVDB115VisibleMagnets text:[AVDB115Link displayNameFromLink:link] matchesCatalog:number] ||
+                     [AVDB115VisibleMagnets text:nameHint matchesCatalog:number];
+        if (!match) return;
     }
+    if ([seen containsObject:link]) return;
+    [seen addObject:link];
+    [links addObject:link];
+}
 
-    // 2) Already-materialized URI strings (ASCII and UTF-16LE).
+static NSString *AVDB115JSONStringValue(NSString *window, NSString *key) {
+    NSString *pat = [NSString stringWithFormat:@"\"%@\"\\s*:\\s*\"([^\"]{0,400})\"", key];
+    NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:pat options:0 error:nil];
+    NSTextCheckingResult *m = [re firstMatchInString:window options:0 range:NSMakeRange(0, window.length)];
+    if (!m || m.numberOfRanges < 2) return nil;
+    return [window substringWithRange:[m rangeAtIndex:1]];
+}
+
+static void AVDB115CollectJSONFromBytes(const uint8_t *base, size_t len, NSString *number,
+                                        NSMutableArray *links, NSMutableSet *seen) {
+    if (!base || len < 16) return;
+    NSString *blob = [[NSString alloc] initWithBytes:base length:len encoding:NSISOLatin1StringEncoding];
+    if (blob.length == 0) return;
+    static NSRegularExpression *hashRe, *ed2kRe;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        hashRe = [NSRegularExpression regularExpressionWithPattern:@"\"hash\"\\s*:\\s*\"([0-9a-fA-F]{32,40})\"" options:0 error:nil];
+        ed2kRe = [NSRegularExpression regularExpressionWithPattern:@"\"url\"\\s*:\\s*\"(ed2k://[^\"]{10,400})\"" options:NSRegularExpressionCaseInsensitive error:nil];
+    });
+    void (^consider)(NSRange) = ^(NSRange pos) {
+        NSUInteger start = pos.location > 500 ? pos.location - 500 : 0;
+        NSUInteger end = MIN(blob.length, pos.location + pos.length + 500);
+        NSString *window = [blob substringWithRange:NSMakeRange(start, end - start)];
+        NSString *name = AVDB115JSONStringValue(window, @"name") ?: AVDB115JSONStringValue(window, @"title");
+        NSString *type = AVDB115JSONStringValue(window, @"type");
+        NSString *url = AVDB115JSONStringValue(window, @"url");
+        NSString *hash = AVDB115JSONStringValue(window, @"hash");
+        NSString *link = [AVDB115VisibleMagnets linkFromMagnetHash:hash name:name type:type url:url];
+        AVDB115AddLink(links, seen, link, number, name);
+    };
+    NSArray *hm = [hashRe matchesInString:blob options:0 range:NSMakeRange(0, blob.length)];
+    for (NSTextCheckingResult *m in hm) consider(m.range);
+    NSArray *em = [ed2kRe matchesInString:blob options:0 range:NSMakeRange(0, blob.length)];
+    for (NSTextCheckingResult *m in em) consider(m.range);
+}
+
+static void AVDB115CollectURIsFromBytes(const uint8_t *base, size_t len, NSString *number,
+                                        NSMutableArray *links, NSMutableSet *seen) {
+    if (!base || len < 12) return;
     void (^addFromText)(NSString *) = ^(NSString *text) {
         if (text.length < 12) return;
         for (NSString *l in [AVDB115Link offlineResourcesIn:text]) {
-            if (number.length && ![AVDB115VisibleMagnets text:l matchesCatalog:number] &&
-                ![AVDB115VisibleMagnets text:[AVDB115Link displayNameFromLink:l] matchesCatalog:number]) {
-                continue;
-            }
-            if (![seen containsObject:l]) {
-                [seen addObject:l];
-                [links addObject:l];
-            }
+            AVDB115AddLink(links, seen, l, number, [AVDB115Link displayNameFromLink:l]);
         }
     };
-
-    // ASCII / Latin-1
     const char *needles[2] = { "magnet:?xt=urn:btih:", "ed2k://|file|" };
     for (int ni = 0; ni < 2; ni++) {
-        const char *needle = needles[ni];
-        size_t nlen = strlen(needle);
-        const uint8_t *p = base;
-        const uint8_t *end = base + len;
+        size_t nlen = strlen(needles[ni]);
+        const uint8_t *p = base, *end = base + len;
         while (p + nlen < end) {
-            const uint8_t *found = memmem(p, (size_t)(end - p), needle, nlen);
+            const uint8_t *found = memmem(p, (size_t)(end - p), needles[ni], nlen);
             if (!found) break;
-            size_t remain = (size_t)(end - found);
-            size_t take = remain > 1024 ? 1024 : remain;
-            NSString *chunk = [[NSString alloc] initWithBytes:found length:take encoding:NSISOLatin1StringEncoding];
-            addFromText(chunk);
+            size_t take = (size_t)(end - found);
+            if (take > 1024) take = 1024;
+            addFromText([[NSString alloc] initWithBytes:found length:take encoding:NSISOLatin1StringEncoding]);
             p = found + nlen;
         }
     }
-    // UTF-16LE of the same prefixes
-    static const uint8_t mag16[] = {
-        'm',0,'a',0,'g',0,'n',0,'e',0,'t',0,':',0,'?',0,'x',0,'t',0,'=',0,
-        'u',0,'r',0,'n',0,':',0,'b',0,'t',0,'i',0,'h',0,':',0
-    };
-    static const uint8_t ed16[] = {
-        'e',0,'d',0,'2',0,'k',0,':',0,'/',0,'/',0,'|',0,'f',0,'i',0,'l',0,'e',0,'|',0
-    };
-    const uint8_t *need16[2] = { mag16, ed16 };
-    size_t n16len[2] = { sizeof(mag16), sizeof(ed16) };
-    for (int ni = 0; ni < 2; ni++) {
-        const uint8_t *p = base;
-        const uint8_t *end = base + len;
-        size_t nlen = n16len[ni];
-        while (p + nlen < end) {
-            const uint8_t *found = memmem(p, (size_t)(end - p), need16[ni], nlen);
-            if (!found) break;
-            size_t remain = (size_t)(end - found);
-            size_t take = remain > 2048 ? 2048 : remain;
-            if (take % 2) take--;
-            NSString *chunk = [[NSString alloc] initWithBytes:found length:take encoding:NSUTF16LittleEndianStringEncoding];
-            addFromText(chunk);
-            p = found + nlen;
-        }
+}
+
+static void AVDB115CollectMagnetsOnPage(AVDB115Mem *mem, uint64_t page, size_t len, NSString *number,
+                                        NSMutableArray *links, NSMutableSet *seen) {
+    // Step 8 so both old-space (0 mod 16) and new-space (8 mod 16) are visited.
+    size_t maxOff = len;
+    for (size_t off = 0; off + 8 <= maxOff; off += 8) {
+        BOOL ok = NO;
+        uint64_t header = AVDB115MemU64(mem, page + off, &ok);
+        if (!ok) break;
+        if (AVDB115HeaderCid(header) != kAVDB115MagnetsCid) continue;
+        uint32_t stag = AVDB115HeaderSizeTag(header);
+        if (stag != kAVDB115MagnetsSizeTag && stag != 0) continue;
+        uint64_t base = page + off;
+        uint64_t nameT = AVDB115MemU64(mem, base + 0x18, &ok);
+        if (!ok) continue;
+        uint64_t hashT = AVDB115MemU64(mem, base + 0x20, &ok);
+        if (!ok) continue;
+        uint64_t typeT = AVDB115MemU64(mem, base + 0x60, &ok);
+        if (!ok) continue;
+        uint64_t urlT = AVDB115MemU64(mem, base + 0x68, &ok);
+        if (!ok) continue;
+        NSString *name = AVDB115StringAtMem(mem, nameT);
+        NSString *hash = AVDB115StringAtMem(mem, hashT);
+        NSString *type = AVDB115StringAtMem(mem, typeT);
+        NSString *url  = AVDB115StringAtMem(mem, urlT);
+        if (name.length == 0 && hash.length == 0 && url.length == 0) continue;
+        NSString *link = [AVDB115VisibleMagnets linkFromMagnetHash:hash name:name type:type url:url];
+        AVDB115AddLink(links, seen, link, number, name);
     }
+}
+
++ (BOOL)labelsSuggestVisibleMagnetList:(NSArray<NSString *> *)labels catalogNumber:(NSString *)number {
+    BOOL tab = NO, ed2k = NO, named = NO;
+    for (NSString *raw in labels) {
+        NSString *norm = [[raw componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] componentsJoinedByString:@" "];
+        while ([norm containsString:@"  "]) norm = [norm stringByReplacingOccurrencesOfString:@"  " withString:@" "];
+        if ([norm isEqualToString:@"磁鏈下載"] || [norm isEqualToString:@"磁链下载"] ||
+            [norm hasPrefix:@"磁鏈下載 "] || [norm hasPrefix:@"磁链下载 "]) tab = YES;
+        NSString *s = raw.uppercaseString ?: @"";
+        if ([s isEqualToString:@"ED2K"] || [s containsString:@"ED2K"]) ed2k = YES;
+        if (number.length && [self text:raw matchesCatalog:number] && raw.length > number.length) named = YES;
+    }
+    return (tab && (ed2k || named)) || (ed2k && named);
 }
 
 + (NSArray<NSString *> *)residentLinksMatchingCatalog:(NSString *)number {
     NSMutableArray *links = [NSMutableArray array];
     NSMutableSet *seen = [NSMutableSet set];
-    // iOS SDK does not support <mach/mach_vm.h>. Use the 64-bit vm_* APIs.
+    AVDB115Mem mem;
+    memset(&mem, 0, sizeof(mem));
+    mem.start = CFAbsoluteTimeGetCurrent();
+
     vm_address_t addr = 0;
-    vm_size_t size = 0;
-    natural_t depth = 0;
-    uint64_t scanned = 0;
-    CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
-    while (scanned < kAVDB115MaxScanBytes && (CFAbsoluteTimeGetCurrent() - start) < 0.20) {
-        vm_region_submap_info_data_64_t info;
-        mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_COUNT_64;
-        kern_return_t kr = vm_region_recurse_64(mach_task_self(), &addr, &size, &depth,
-                                                (vm_region_recurse_info_t)&info, &count);
+    while (mem.scanned < kAVDB115MaxScanBytes && (CFAbsoluteTimeGetCurrent() - mem.start) < 0.60) {
+        vm_size_t size = 0;
+        vm_region_basic_info_data_64_t info;
+        mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+        mach_port_t object = MACH_PORT_NULL;
+        kern_return_t kr = vm_region_64(mach_task_self(), &addr, &size, VM_REGION_BASIC_INFO_64,
+                                        (vm_region_info_t)&info, &count, &object);
         if (kr != KERN_SUCCESS || size == 0) break;
-        if (info.is_submap) {
-            depth++;
-            continue;
-        }
         BOOL readable = (info.protection & VM_PROT_READ) != 0;
         BOOL writable = (info.protection & VM_PROT_WRITE) != 0;
-        // Dart heap and Dio JSON buffers are readable+writable user memory.
-        if (readable && writable && size >= 64 && size <= 256ull * 1024ull * 1024ull) {
-            vm_offset_t data = 0;
-            mach_msg_type_number_t dataCnt = 0;
-            if (vm_read(mach_task_self(), addr, size, &data, &dataCnt) == KERN_SUCCESS && dataCnt >= 64) {
-                AVDB115CollectFromRegion((const uint8_t *)data, (size_t)dataCnt, (uint64_t)addr, number, links, seen);
-                scanned += dataCnt;
-                vm_deallocate(mach_task_self(), data, dataCnt);
+        BOOL executable = (info.protection & VM_PROT_EXECUTE) != 0;
+        // Dart heap / Dio JSON: readable+writable, not executable. Skip RX images
+        // (they only contain the constant URI prefixes, not live hashes).
+        if (readable && writable && !executable) {
+            uint64_t start = (uint64_t)addr;
+            uint64_t end = start + (uint64_t)size;
+            uint8_t overlap[600];
+            size_t overlapLen = 0;
+            for (uint64_t page = start; page < end; page += kAVDB115Page) {
+                if (mem.scanned >= kAVDB115MaxScanBytes) break;
+                if ((CFAbsoluteTimeGetCurrent() - mem.start) > 0.60) break;
+                AVDB115PageSlot *s = &mem.slot[(page / kAVDB115Page) % kAVDB115PageCache];
+                if (!AVDB115MemFill(&mem, page, s)) { overlapLen = 0; continue; }
+                AVDB115CollectMagnetsOnPage(&mem, page, s->len, number, links, seen);
+                if (overlapLen) {
+                    size_t comb = overlapLen + s->len;
+                    uint8_t *tmp = (uint8_t *)malloc(comb);
+                    if (tmp) {
+                        memcpy(tmp, overlap, overlapLen);
+                        memcpy(tmp + overlapLen, s->data, s->len);
+                        AVDB115CollectJSONFromBytes(tmp, comb, number, links, seen);
+                        AVDB115CollectURIsFromBytes(tmp, comb, number, links, seen);
+                        free(tmp);
+                    }
+                } else {
+                    AVDB115CollectJSONFromBytes(s->data, s->len, number, links, seen);
+                    AVDB115CollectURIsFromBytes(s->data, s->len, number, links, seen);
+                }
+                overlapLen = s->len > 600 ? 600 : s->len;
+                memcpy(overlap, s->data + (s->len - overlapLen), overlapLen);
             }
         }
         vm_address_t next = addr + size;
         if (next <= addr) break;
         addr = next;
-        depth = 0;
     }
     return links;
 }
 
 #else
+
++ (BOOL)labelsSuggestVisibleMagnetList:(NSArray<NSString *> *)labels catalogNumber:(NSString *)number {
+    (void)labels; (void)number;
+    return NO;
+}
 
 + (NSArray<NSString *> *)residentLinksMatchingCatalog:(NSString *)number {
     (void)number;
