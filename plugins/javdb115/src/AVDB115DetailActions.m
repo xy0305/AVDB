@@ -163,6 +163,7 @@ static const NSInteger kAVDB115ColumnCount = 4;
 @property (nonatomic, copy) NSArray<NSString *> *visibleLabels;
 @property (nonatomic, assign) BOOL magnetListVisible;
 @property (nonatomic, assign) BOOL suppressOverlayRow;
+@property (nonatomic, assign) BOOL playbackChromeHidden;
 @property (nonatomic, assign) BOOL installed;
 @property (nonatomic, assign) BOOL onDetail;
 @property (nonatomic, strong) NSTimer *timer;
@@ -189,6 +190,17 @@ static const NSInteger kAVDB115ColumnCount = 4;
     s.suppressOverlayRow = suppressed;
     if (suppressed) {
         s.row.hidden = YES;
+    }
+}
+
++ (void)setPlaybackChromeHidden:(BOOL)hidden {
+    AVDB115DetailActions *s = [self shared];
+    s.playbackChromeHidden = hidden;
+    if (hidden) {
+        if (s.row) s.row.hidden = YES;
+        [AVDB115OverlayController setFloatingButtonHidden:YES];
+    } else {
+        [s refresh];
     }
 }
 
@@ -309,6 +321,11 @@ static void AVDB115VisitAcc(id el, NSMutableSet *seen, void (^visit)(id)) {
 #pragma mark Scan
 
 - (void)refresh {
+    if (self.playbackChromeHidden) {
+        if (self.row) self.row.hidden = YES;
+        [AVDB115OverlayController setFloatingButtonHidden:YES];
+        return;
+    }
     if (NSClassFromString(@"FlutterViewController")) [self ensureSemantics];
     UIWindow *window = [self keyWindow];
     if (!window) return;

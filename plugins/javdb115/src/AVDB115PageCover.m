@@ -31,19 +31,18 @@ static NSString *const kReplaceKey = @"avdb115.pageCover.replaceEnabled";
 }
 
 - (BOOL)hookArmed {
-    // JavDB 1.9.41 loads covers through Dart Dio (IOHttpClientAdapter / dart:io
-    // SecureSocket). Flutter.framework in this IPA has no NSURLSession symbols.
-    // Cover URLs are https://c0.jdbstatic.com/covers/{xx}/{uid}.jpg and do not
-    // contain a catalog number. No narrow native hook can rewrite the original
-    // home/list/detail images without a global Dart TLS MITM, which is not installed.
-    return NO;
+    // Flutter image bytes still cannot be rewritten: Dio / dart:io TLS is not
+    // visible to NSURLSession, and App.framework / Flutter TEXT hooks do not
+    // install on the resigned sideload (vm_protect RX→RWX denied). v14 arms a
+    // native accessibility-grid overlay instead — no TEXT patch.
+    return YES;
 }
 
 - (NSString *)hookStatus {
     if (!self.replaceEnabled) {
         return @"原页封面替换已关闭。插件面板的高清预览仍可用。JavDB 首页/列表/详情封面保持原样。";
     }
-    return @"原页封面替换开关为开，但当前无法对 JavDB 原页生效：封面由 Flutter Dart Dio / dart:io TLS 加载（非 NSURLSession/UIImage），API 需要 jdsignature，且 c0.jdbstatic.com/covers/{uid}.jpg 不含番号。未安装全局网络 hook。失败时会继续显示原封面。请在「高清封面源」面板按番号预览。";
+    return @"已安装网格高清封面叠加（v14）：按屏幕可见番号匹配，使用插件已有的 DMM/MGS 等高清封面源画在首页「近期可播放更新」等电影网格上。不改写 Dart Dio / dart:io 图片字节（该路径仍需 App/Flutter TEXT hook，侧载无法 vm_protect）。详情页大图不叠加。对齐依赖无障碍树，滑动时可能短暂错位；失败或源不可达时保持原封面。未在真机验证本路径。";
 }
 
 @end

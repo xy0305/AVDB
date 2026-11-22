@@ -23,6 +23,8 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)install;
 /// Hide the UIKit overlay row when the Dart Wrap hook is live (scan still runs).
 + (void)setOverlayRowSuppressed:(BOOL)suppressed;
+/// Hide the v6 chip row (and keep it hidden) while the plugin 115 player is up.
++ (void)setPlaybackChromeHidden:(BOOL)hidden;
 + (void)performPushFromDartRow;
 + (void)performPlayFromDartRow;
 @end

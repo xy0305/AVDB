@@ -1,5 +1,6 @@
 #import "AVDB115PlayerViewController.h"
 #import "AVDB115Settings.h"
+#import "AVDB115Playback.h"
 #import <AVFoundation/AVFoundation.h>
 #import <AVKit/AVKit.h>
 
@@ -76,6 +77,34 @@
     ]];
 
     [self start];
+}
+
+- (BOOL)shouldAutorotate { return YES; }
+
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations {
+    return [AVDB115Playback playerOrientationMask];
+}
+
+- (UIInterfaceOrientation)preferredInterfaceOrientationForPresentation {
+    return [AVDB115Playback preferredPlayerOrientation];
+}
+
+- (BOOL)prefersStatusBarHidden { return YES; }
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [AVDB115Playback playerWillAppearInView:self.view];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // iOS 16 geometry updates are more reliable after the VC is in the hierarchy.
+    [AVDB115Playback playerWillAppearInView:self.view];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [AVDB115Playback playerWillDisappearFromView:self.view];
 }
 
 - (void)setStatus:(NSString *)text {

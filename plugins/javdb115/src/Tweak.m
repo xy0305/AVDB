@@ -17,6 +17,8 @@
 #import "AVDB115MagnetCaptureHook.h"
 #import "AVDB115HttpIntercept.h"
 #import "AVDB115FileCacheHarvest.h"
+#import "AVDB115Playback.h"
+#import "AVDB115HomeCoverOverlay.h"
 
 static void AVDB115SwizzleInstance(Class cls, SEL original, SEL replacement) {
     if (!cls) return;
@@ -171,6 +173,18 @@ static BOOL AVDB115FlutterLaunch(id self, SEL sel, UIApplication *application, N
     return ok;
 }
 
+
+static UIInterfaceOrientationMask (*AVDB115OrigAppOrient)(id, SEL, id, id);
+static UIInterfaceOrientationMask AVDB115AppOrient(id self, SEL sel, id app, id window) {
+    if ([AVDB115Playback isPlayerPresented]) {
+        return [AVDB115Playback playerOrientationMask];
+    }
+    if (AVDB115OrigAppOrient) return AVDB115OrigAppOrient(self, sel, app, window);
+    return UIInterfaceOrientationMaskPortrait
+        | UIInterfaceOrientationMaskLandscapeLeft
+        | UIInterfaceOrientationMaskLandscapeRight;
+}
+
 static void AVDB115InstallHooks(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -185,12 +199,18 @@ static void AVDB115InstallHooks(void) {
         [AVDB115SplashSkipPolicy install];
         [AVDB115MagnetCaptureHook install];
         [AVDB115DetailActions install];
+        [AVDB115HomeCoverOverlay install];
         [AVDB115DartRowHook install];
         AVDB115HookOrAdd(flutter,
                          @selector(application:didFinishLaunchingWithOptions:),
                          (IMP)AVDB115FlutterLaunch,
                          (IMP *)&AVDB115OrigFlutterLaunch,
                          "B@:@@");
+        AVDB115HookOrAdd(flutter,
+                         @selector(application:supportedInterfaceOrientationsForWindow:),
+                         (IMP)AVDB115AppOrient,
+                         (IMP *)&AVDB115OrigAppOrient,
+                         "Q@:@@");
     });
 }
 
@@ -206,6 +226,7 @@ static void AVDB115Init(void) {
         [AVDB115SplashSkipPolicy install];
         [AVDB115MagnetCaptureHook install];
         [AVDB115DetailActions install];
+        [AVDB115HomeCoverOverlay install];
         [AVDB115DartRowHook install];
         NSNotificationCenter *c = NSNotificationCenter.defaultCenter;
         [c addObserverForName:UIApplicationWillEnterForegroundNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *n) {
