@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-5",
- "generated_at": "2026-11-21T19:45:23+00:00",
+ "generated_at": "2026-11-22T19:51:45+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -438,6 +438,34 @@
    "cover_hires_url": "http://163.47.40.207:8901/5nDxvY.jpg",
    "release_date": "2026-11-06",
    "enriched_at": "2026-11-16T19:11:42+00:00"
+  },
+  {
+   "javdb_id": "5nGJRz",
+   "code": "ROE563",
+   "plot": "上司・桃子のパワハラじみた指導にすっかり慣れてしまった新卒2年目のハジメ。だが上司としてはムカつきながらも、女としては魅力的な彼女に少なからず惹かれていた。ある時、日帰り出張で終電に間に合わず相部屋宿泊になって…。普段の厳しい様子と違い、妊活に悩むプライベートな姿を見せた桃子に欲情したハジメは「俺が種付けしてあげます」といきなり押し倒した。今まで事務的なSEXしかしてこなかった桃子は、久しぶりに求められる歓びを感じて…。",
+   "plot_source": "dmm",
+   "director": "朝霧浄",
+   "maker": "マドンナ",
+   "series": "部長、僕の子種で孕んでください…。",
+   "duration_min": 124,
+   "score": 4.5,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/roe00563/roe00563jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/DQkQFioJtNYcymkuBsTBr0RtAouYbjxKor_rfhUTMDZAwA5cC4uTuk4F1lRF8/roe00563hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/5nGJRz.jpg",
+   "release_date": "2026-10-22",
+   "enriched_at": "2026-11-22T19:11:48+00:00"
   },
   {
    "javdb_id": "5nWxY",
