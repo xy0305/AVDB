@@ -1,0 +1,619 @@
+diff --git a/include/mpv/frame_output.h b/include/mpv/frame_output.h
+new file mode 100644
+index 0000000..ed2a506
+--- /dev/null
++++ b/include/mpv/frame_output.h
+@@ -0,0 +1,114 @@
++/*
++ * frame_output.h — host ABI of the frame_output VO (59 vendored patch).
++ *
++ * This header is part of mpv.
++ *
++ * mpv is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * mpv is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with mpv.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * The frame_output video output delivers decoded frames to the host
++ * application as CVPixelBuffers instead of drawing them itself.  It is
++ * the iOS counterpart of the original MPlayKit design (a private
++ * frame_output vo feeding an AVSampleBufferDisplayLayer), restored by
++ * the AVFan Build 59 patch series; it is not part of upstream mpv.
++ *
++ * Usage:
++ *   1. The host registers a consumer for a sink name with
++ *      mp_frame_output_register() (usually before creating the player).
++ *   2. The player is created with --vo=frame_output and
++ *      --vo-frame-output-sink=<name> so the VO instance finds its
++ *      consumer.
++ *   3. For every presented frame the VO invokes the callback twice at
++ *      most: once with kind=MP_FRAME_OUTPUT_SUBTITLE (a transparent
++ *      BGRA image with the subtitle/OSD bitmaps for that frame,
++ *      rendered by mpv's own OSD layer at the subtitle render size)
++ *      and once with kind=MP_FRAME_OUTPUT_VIDEO (the video frame).
++ *      Subtitle images are only produced for non-repeat frames.
++ *
++ * Ownership: pixel_buffer is handed over with one retain owned by the
++ * callee; the consumer must CFRelease it exactly once.  For
++ * hardware-decoded (VideoToolbox) frames the buffer is the decoder's
++ * own CVPixelBuffer (zero copy); for software frames the VO packs the
++ * planes into a freshly created CVPixelBuffer.
++ *
++ * Threading: the callback runs on mpv's VO thread.  It must not block
++ * and must not call back into the client API of the same player.
++ * Retain the buffer and hand it to your own queue if processing takes
++ * time.
++ *
++ * The subtitle render size can be changed at runtime with
++ * mp_frame_output_set_subtitle_size(); it is deliberately decoupled
++ * from the video frame size (a picture-in-picture window renders its
++ * subtitles at its own render size).  0 restores "same as video".
++ */
++
++#ifndef MPV_FRAME_OUTPUT_H
++#define MPV_FRAME_OUTPUT_H
++
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++enum mp_frame_output_kind {
++    MP_FRAME_OUTPUT_VIDEO = 0,
++    MP_FRAME_OUTPUT_SUBTITLE = 1,
++};
++
++typedef struct mp_frame_output_info {
++    /* enum mp_frame_output_kind */
++    int kind;
++    /* CVPixelBufferRef; one retain is transferred to the callee. */
++    void *pixel_buffer;
++    /* Realtime presentation timestamp of the frame (vo_frame pts, in
++     * nanoseconds on the mp_time_ns() clock); 0 means "present as
++     * soon as possible". */
++    int64_t pts_ns;
++    /* Stream timestamp of the frame in seconds (mp_image pts);
++     * negative if the frame carries no timestamp. */
++    double pts_seconds;
++    /* Approximate frame duration in seconds; 0 if unknown. */
++    double duration_seconds;
++    int width;
++    int height;
++    /* True for repeated/redrawn frames (video kind only). */
++    int repeat;
++    /* Monotonic frame id of the video frame this delivery belongs
++     * to (vo_frame frame_id); subtitle deliveries carry the id of
++     * the video frame they were rendered for. */
++    uint64_t frame_id;
++} mp_frame_output_info;
++
++typedef void (*mp_frame_output_callback)(void *opaque,
++                                         const mp_frame_output_info *info);
++
++/* Register (or replace) the consumer for a sink name.  Returns 0 on
++ * success, -1 on invalid arguments or when the registry is full. */
++int mp_frame_output_register(const char *sink, void *opaque,
++                             mp_frame_output_callback cb);
++
++/* Remove the consumer for a sink name, if any. */
++void mp_frame_output_unregister(const char *sink);
++
++/* Set the subtitle render size override for a sink (0 = video size).
++ * Thread-safe; takes effect on the next rendered subtitle image. */
++void mp_frame_output_set_subtitle_size(const char *sink, int width, int height);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* MPV_FRAME_OUTPUT_H */
+diff --git a/meson.build b/meson.build
+index fb10be5..68e69be 100644
+--- a/meson.build
++++ b/meson.build
+@@ -243,6 +243,7 @@ sources = files(
+     'video/out/vo_image.c',
+     'video/out/vo_lavc.c',
+     'video/out/vo_libmpv.c',
++    'video/out/vo_frame_output.c',
+     'video/out/vo_null.c',
+     'video/out/vo_tct.c',
+     'video/out/vo_kitty.c',
+@@ -1796,7 +1797,8 @@ if get_option('libmpv')
+                  description: 'mpv media player client library')
+ 
+     headers = ['include/mpv/client.h', 'include/mpv/render.h',
+-               'include/mpv/render_gl.h', 'include/mpv/stream_cb.h']
++               'include/mpv/render_gl.h', 'include/mpv/stream_cb.h',
++               'include/mpv/frame_output.h']
+     install_headers(headers, subdir: 'mpv')
+ 
+     # Allow projects to build with libmpv by cloning into ./subprojects/mpv
+diff --git a/video/out/vo.c b/video/out/vo.c
+index c9cde30..6b658a2 100644
+--- a/video/out/vo.c
++++ b/video/out/vo.c
+@@ -53,6 +53,7 @@ extern const struct vo_driver video_out_xv;
+ extern const struct vo_driver video_out_gpu;
+ extern const struct vo_driver video_out_gpu_next;
+ extern const struct vo_driver video_out_libmpv;
++extern const struct vo_driver video_out_frame_output;
+ extern const struct vo_driver video_out_null;
+ extern const struct vo_driver video_out_image;
+ extern const struct vo_driver video_out_lavc;
+@@ -102,6 +103,7 @@ static const struct vo_driver *const video_out_drivers[] =
+ #endif
+     &video_out_libmpv,
+     &video_out_null,
++    &video_out_frame_output,
+ 
+     // should not be auto-selected
+     &video_out_image,
+diff --git a/video/out/vo_frame_output.c b/video/out/vo_frame_output.c
+new file mode 100644
+index 0000000..c420718
+--- /dev/null
++++ b/video/out/vo_frame_output.c
+@@ -0,0 +1,451 @@
++/*
++ * vo_frame_output.c — pixel-frame video output (59 vendored patch).
++ *
++ * This file is part of mpv.
++ *
++ * mpv is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * mpv is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with mpv.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * frame_output: deliver decoded frames to the host application as
++ * CVPixelBuffers (see include/mpv/frame_output.h for the host ABI)
++ * instead of drawing them.  This mirrors the original MPlayKit iOS
++ * design — a private frame_output vo whose frames flow
++ * CVPixelBuffer -> CMSampleBuffer -> AVSampleBufferDisplayLayer —
++ * and is what allows picture-in-picture on top of libmpv: the main
++ * display chain is a pixel-frame chain, not a GL render chain.
++ *
++ * Frame sources, in order of preference:
++ *   - IMGFMT_VIDEOTOOLBOX: planes[3] already is the decoder's
++ *     CVPixelBufferRef (same convention as hwdec_ios_gl); handed
++ *     over zero-copy with one extra retain.
++ *   - Software formats (NV12 / P010 / 420P / BGRA / RGBA): planes
++ *     are packed into a freshly created CVPixelBuffer.
++ * Anything else is dropped (query_format() only advertises the
++ * formats above, so the filter chain converts before delivery).
++ *
++ * Subtitles are NOT composited into the video frame.  They are
++ * rendered by mpv's OSD layer (osd_draw_on_image, OSD_DRAW_SUB_ONLY)
++ * onto a separate transparent BGRA image at the subtitle render
++ * size — which is decoupled from the video size — and delivered as
++ * their own channel, so the host can host them in an independent
++ * CALayer and migrate that layer (e.g. into a PiP host view).
++ *
++ * Apple-only: this VO is part of the AVFan Build 59 patch series and
++ * is only ever built for iOS by that pipeline.
++ */
++
++#include <pthread.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include <CoreVideo/CoreVideo.h>
++#include <libplacebo/colors.h>
++
++#include "common/common.h"
++#include "common/msg.h"
++#include "mpv/frame_output.h"
++#include "options/m_option.h"
++#include "sub/osd.h"
++#include "video/img_format.h"
++#include "video/mp_image.h"
++#include "video/out/vo.h"
++
++// ---------------------------------------------------------------- registry
++
++#define FO_MAX_SINKS 8
++
++struct fo_sink {
++    char name[64];
++    void *opaque;
++    mp_frame_output_callback cb;
++    int sub_w, sub_h; // runtime subtitle-size override (0 = unset)
++};
++
++static pthread_mutex_t fo_registry_lock = PTHREAD_MUTEX_INITIALIZER;
++static struct fo_sink fo_registry[FO_MAX_SINKS];
++
++int mp_frame_output_register(const char *sink, void *opaque,
++                             mp_frame_output_callback cb)
++{
++    if (!sink || !sink[0] || !cb)
++        return -1;
++    pthread_mutex_lock(&fo_registry_lock);
++    int free_slot = -1;
++    for (int i = 0; i < FO_MAX_SINKS; i++) {
++        struct fo_sink *s = &fo_registry[i];
++        if (s->cb && strcmp(s->name, sink) == 0) {
++            s->opaque = opaque;
++            s->cb = cb;
++            pthread_mutex_unlock(&fo_registry_lock);
++            return 0;
++        }
++        if (!s->cb && free_slot < 0)
++            free_slot = i;
++    }
++    if (free_slot < 0) {
++        pthread_mutex_unlock(&fo_registry_lock);
++        return -1;
++    }
++    struct fo_sink *s = &fo_registry[free_slot];
++    snprintf(s->name, sizeof(s->name), "%s", sink);
++    s->opaque = opaque;
++    s->cb = cb;
++    s->sub_w = 0;
++    s->sub_h = 0;
++    pthread_mutex_unlock(&fo_registry_lock);
++    return 0;
++}
++
++void mp_frame_output_unregister(const char *sink)
++{
++    if (!sink)
++        return;
++    pthread_mutex_lock(&fo_registry_lock);
++    for (int i = 0; i < FO_MAX_SINKS; i++) {
++        struct fo_sink *s = &fo_registry[i];
++        if (s->cb && strcmp(s->name, sink) == 0) {
++            s->cb = NULL;
++            s->opaque = NULL;
++            s->name[0] = '\0';
++            s->sub_w = 0;
++            s->sub_h = 0;
++        }
++    }
++    pthread_mutex_unlock(&fo_registry_lock);
++}
++
++void mp_frame_output_set_subtitle_size(const char *sink, int width, int height)
++{
++    if (!sink)
++        return;
++    pthread_mutex_lock(&fo_registry_lock);
++    for (int i = 0; i < FO_MAX_SINKS; i++) {
++        struct fo_sink *s = &fo_registry[i];
++        if (s->cb && strcmp(s->name, sink) == 0) {
++            s->sub_w = width;
++            s->sub_h = height;
++        }
++    }
++    pthread_mutex_unlock(&fo_registry_lock);
++}
++
++struct fo_consumer {
++    void *opaque;
++    mp_frame_output_callback cb;
++    int sub_w, sub_h;
++};
++
++static bool fo_lookup(const char *sink, struct fo_consumer *out)
++{
++    bool found = false;
++    pthread_mutex_lock(&fo_registry_lock);
++    for (int i = 0; i < FO_MAX_SINKS; i++) {
++        struct fo_sink *s = &fo_registry[i];
++        if (s->cb && strcmp(s->name, sink) == 0) {
++            out->opaque = s->opaque;
++            out->cb = s->cb;
++            out->sub_w = s->sub_w;
++            out->sub_h = s->sub_h;
++            found = true;
++            break;
++        }
++    }
++    pthread_mutex_unlock(&fo_registry_lock);
++    return found;
++}
++
++// ------------------------------------------------------------------- priv
++
++struct priv {
++    char *sink;             // --vo-frame-output-sink (NULL = "default")
++    int subtitle_width;     // --vo-frame-output-subtitle-width (0 = video)
++    int subtitle_height;    // --vo-frame-output-subtitle-height
++
++    struct mp_image_params params;
++    bool have_params;
++
++    int64_t delivered;
++    int64_t dropped;
++    bool warned_no_consumer;
++};
++
++static const char *fo_sink_name(struct priv *p)
++{
++    return p->sink && p->sink[0] ? p->sink : "default";
++}
++
++// ------------------------------------------------------- CVPixelBuffer pack
++
++// Pack a software mp_image into a new CVPixelBuffer (+1, transferred
++// to the caller).  Only called for formats query_format() advertises.
++static CVPixelBufferRef fo_pack_image(struct mp_image *img)
++{
++    OSType ostype;
++    switch (img->imgfmt) {
++    case IMGFMT_NV12:
++        ostype = img->params.color.levels == PL_COLOR_LEVELS_FULL
++            ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
++            : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
++        break;
++    case IMGFMT_P010:
++        ostype = kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange;
++        break;
++    case IMGFMT_420P:
++        ostype = kCVPixelFormatType_420YpCbCr8Planar;
++        break;
++    case IMGFMT_BGRA:
++        ostype = kCVPixelFormatType_32BGRA;
++        break;
++    case IMGFMT_RGBA:
++        ostype = kCVPixelFormatType_32RGBA;
++        break;
++    default:
++        return NULL;
++    }
++
++    CVPixelBufferRef pb = NULL;
++    CVReturn rc = CVPixelBufferCreate(NULL, img->w, img->h, ostype,
++                                      NULL, &pb);
++    if (rc != kCVReturnSuccess || !pb)
++        return NULL;
++    if (CVPixelBufferLockBaseAddress(pb, 0) != kCVReturnSuccess) {
++        CFRelease(pb);
++        return NULL;
++    }
++
++    size_t plane_count = CVPixelBufferGetPlaneCount(pb);
++    if (plane_count == 0) {
++        // Packed format (BGRA/RGBA): a single plane.
++        uint8_t *dst = CVPixelBufferGetBaseAddress(pb);
++        size_t dst_stride = CVPixelBufferGetBytesPerRow(pb);
++        size_t row_bytes = (size_t)img->w * 4;
++        size_t copy = row_bytes;
++        if (copy > dst_stride)
++            copy = dst_stride;
++        if (copy > (size_t)img->stride[0])
++            copy = (size_t)img->stride[0];
++        for (int y = 0; y < img->h; y++) {
++            memcpy(dst + (size_t)y * dst_stride,
++                   img->planes[0] + (size_t)y * img->stride[0], copy);
++        }
++    } else {
++        for (size_t i = 0; i < plane_count; i++) {
++            if (i >= (size_t)img->num_planes || !img->planes[i])
++                continue;
++            uint8_t *dst = CVPixelBufferGetBaseAddressOfPlane(pb, i);
++            size_t dst_stride = CVPixelBufferGetBytesPerRowOfPlane(pb, i);
++            size_t rows = CVPixelBufferGetHeightOfPlane(pb, i);
++            // Copying min(src_stride, dst_stride) per row always covers
++            // the content: both strides are >= the plane's content row
++            // width for the same pixel format, and any extra copied
++            // bytes land in destination padding.
++            size_t copy = (size_t)img->stride[i];
++            if (copy > dst_stride)
++                copy = dst_stride;
++            for (size_t y = 0; y < rows; y++) {
++                memcpy(dst + y * dst_stride,
++                       img->planes[i] + y * (size_t)img->stride[i], copy);
++            }
++        }
++    }
++
++    CVPixelBufferUnlockBaseAddress(pb, 0);
++    return pb;
++}
++
++// ------------------------------------------------------------ frame delivery
++
++static void fo_deliver(struct vo *vo, struct priv *p,
++                       const struct fo_consumer *consumer,
++                       int kind, CVPixelBufferRef pb,
++                       struct vo_frame *frame, struct mp_image *img)
++{
++    mp_frame_output_info info = {
++        .kind = kind,
++        .pixel_buffer = (void *)pb, // one retain transferred to callee
++        .pts_ns = frame ? frame->pts : 0,
++        .pts_seconds = img && img->pts != MP_NOPTS_VALUE ? img->pts : -1,
++        .duration_seconds = frame ? frame->duration : 0,
++        .width = img ? img->w : (int)CVPixelBufferGetWidth(pb),
++        .height = img ? img->h : (int)CVPixelBufferGetHeight(pb),
++        .repeat = frame && frame->repeat ? 1 : 0,
++        .frame_id = frame ? frame->frame_id : 0,
++    };
++    consumer->cb(consumer->opaque, &info);
++    p->delivered++;
++}
++
++// Render the subtitle channel for this frame and deliver it.  The
++// subtitle image is rendered at the decoupled subtitle size (runtime
++// override wins over the VO option, which wins over the video size).
++static void fo_deliver_subtitle(struct vo *vo, struct priv *p,
++                                const struct fo_consumer *consumer,
++                                struct vo_frame *frame,
++                                struct mp_image *img)
++{
++    int w = consumer->sub_w > 0 ? consumer->sub_w
++          : p->subtitle_width > 0 ? p->subtitle_width : img->w;
++    int h = consumer->sub_h > 0 ? consumer->sub_h
++          : p->subtitle_height > 0 ? p->subtitle_height : img->h;
++    if (w <= 0 || h <= 0)
++        return;
++
++    struct mp_image *sub = mp_image_alloc(IMGFMT_BGRA, w, h);
++    if (!sub)
++        return;
++    for (int i = 0; i < sub->num_planes; i++)
++        memset(sub->planes[i], 0, (size_t)sub->stride[i] * sub->h);
++
++    struct mp_osd_res res = osd_res_from_image_params(&img->params);
++    // Same idiom as libmpv_sw: the OSD "screen" follows the target
++    // image size, margins/display_par stay from the video params.
++    res.w = w;
++    res.h = h;
++    osd_draw_on_image(vo->osd, res, img->pts, OSD_DRAW_SUB_ONLY, sub);
++
++    CVPixelBufferRef pb = fo_pack_image(sub);
++    mp_image_unrefp(&sub);
++    if (!pb) {
++        p->dropped++;
++        return;
++    }
++    mp_frame_output_info info = {
++        .kind = MP_FRAME_OUTPUT_SUBTITLE,
++        .pixel_buffer = (void *)pb,
++        .pts_ns = frame->pts,
++        .pts_seconds = img->pts != MP_NOPTS_VALUE ? img->pts : -1,
++        .duration_seconds = frame->duration,
++        .width = w,
++        .height = h,
++        .repeat = 0,
++        .frame_id = frame->frame_id,
++    };
++    consumer->cb(consumer->opaque, &info);
++    p->delivered++;
++}
++
++// -------------------------------------------------------------- vo callbacks
++
++static bool draw_frame(struct vo *vo, struct vo_frame *frame)
++{
++    struct priv *p = vo->priv;
++    struct mp_image *img = frame->current;
++
++    struct fo_consumer consumer;
++    if (!fo_lookup(fo_sink_name(p), &consumer)) {
++        if (!p->warned_no_consumer) {
++            p->warned_no_consumer = true;
++            MP_WARN(vo, "no consumer registered for sink '%s'; "
++                    "frames are dropped\n", fo_sink_name(p));
++        }
++        p->dropped++;
++        return VO_TRUE;
++    }
++
++    if (!img) {
++        // OSD-only redraw (idle / force-window): no video frame and
++        // no reference image to derive subtitle geometry from, so
++        // there is nothing meaningful to deliver.
++        return VO_TRUE;
++    }
++
++    if (!frame->repeat)
++        fo_deliver_subtitle(vo, p, &consumer, frame, img);
++
++    CVPixelBufferRef pb = NULL;
++    if (img->imgfmt == IMGFMT_VIDEOTOOLBOX) {
++        // planes[3] is the decoder's CVPixelBufferRef (the same
++        // convention hwdec_ios_gl uses); retain for the handover.
++        pb = (CVPixelBufferRef)img->planes[3];
++        if (pb)
++            CFRetain(pb);
++    } else {
++        pb = fo_pack_image(img);
++    }
++    if (!pb) {
++        p->dropped++;
++        return VO_TRUE;
++    }
++    fo_deliver(vo, p, &consumer, MP_FRAME_OUTPUT_VIDEO, pb, frame, img);
++    return VO_TRUE;
++}
++
++static void flip_page(struct vo *vo)
++{
++    // Delivery happens in draw_frame(); nothing is queued here.
++}
++
++static int query_format(struct vo *vo, int format)
++{
++    switch (format) {
++    case IMGFMT_VIDEOTOOLBOX:
++    case IMGFMT_NV12:
++    case IMGFMT_P010:
++    case IMGFMT_420P:
++    case IMGFMT_BGRA:
++    case IMGFMT_RGBA:
++        return 1;
++    }
++    return 0;
++}
++
++static int reconfig(struct vo *vo, struct mp_image_params *params)
++{
++    struct priv *p = vo->priv;
++    p->params = *params;
++    p->have_params = true;
++    return 0;
++}
++
++static int control(struct vo *vo, uint32_t request, void *data)
++{
++    return VO_NOTIMPL;
++}
++
++static int preinit(struct vo *vo)
++{
++    return 0;
++}
++
++static void uninit(struct vo *vo)
++{
++    struct priv *p = vo->priv;
++    MP_VERBOSE(vo, "frame_output: delivered=%lld dropped=%lld\n",
++               (long long)p->delivered, (long long)p->dropped);
++}
++
++#define OPT_BASE_STRUCT struct priv
++const struct vo_driver video_out_frame_output = {
++    .description = "Pixel-frame output to host application",
++    .name = "frame_output",
++    .preinit = preinit,
++    .query_format = query_format,
++    .reconfig = reconfig,
++    .control = control,
++    .draw_frame = draw_frame,
++    .flip_page = flip_page,
++    .uninit = uninit,
++    .priv_size = sizeof(struct priv),
++    .options = (const struct m_option[]) {
++        {"sink", OPT_STRING(sink)},
++        {"subtitle-width", OPT_INT(subtitle_width), M_RANGE(0, 16384)},
++        {"subtitle-height", OPT_INT(subtitle_height), M_RANGE(0, 16384)},
++        {0},
++    },
++    .options_prefix = "vo-frame-output",
++};

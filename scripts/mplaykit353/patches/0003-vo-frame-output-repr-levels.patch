@@ -1,0 +1,21 @@
+vo_frame_output.c: read the NV12 range from params.repr.levels.
+
+The 0001 patch tested img->params.color.levels, but in the pinned
+mpv 0.41.0 + libplacebo 7.387.0 combination pl_color_space has no
+levels member — the range lives in struct pl_color_repr, which
+mp_image_params carries as params.repr (video/mp_image.h).  CI round
+11: "vo_frame_output.c:201:36: error: no member named 'levels' in
+'struct pl_color_space'".  The file's only other member access of
+this kind was checked the same way; this was the sole misuse.
+
+diff --git a/video/out/vo_frame_output.c b/video/out/vo_frame_output.c
+--- a/video/out/vo_frame_output.c
++++ b/video/out/vo_frame_output.c
+@@ -199,6 +199,6 @@
+     switch (img->imgfmt) {
+     case IMGFMT_NV12:
+-        ostype = img->params.color.levels == PL_COLOR_LEVELS_FULL
++        ostype = img->params.repr.levels == PL_COLOR_LEVELS_FULL
+             ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+             : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+         break;

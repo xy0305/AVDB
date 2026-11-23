@@ -253,7 +253,7 @@ jobs:
           compression-level: 0
           retention-days: 3
   libmpv-353:
-    # Build 353: Libmpv.xcframework for the MPlayKit core (FFmpeg 8.0.1 + mpv 0.42.0 + libplacebo 7.387.0 + dav1d 1.5.1 + libass 0.17.4 stack, every source sha256-pinned in scripts/mplaykit353/build_libmpv.py). Cached by build-script hash; a cold build is long, warm runs restore the tree and Vendor/Libmpv.xcframework.
+    # Build 353: Libmpv.xcframework for the MPlayKit core (FFmpeg 8.0.1 + mpv 0.41.0 + libplacebo 7.387.0 + dav1d 1.5.1 + libass 0.17.4 + uchardet 0.0.8 + lcms2 2.16 stack, every source sha256-pinned in scripts/mplaykit353/build_libmpv.py; mpv carries the vendored frame_output vo patches and is built -Dgl=disabled -Dios-gl=disabled). Cached by build-script hash (key v2: mpv 0.41.0 + patches + ios-gl fix); a cold build is long, warm runs restore the tree and Vendor/Libmpv.xcframework.
     runs-on: macos-26
     timeout-minutes: 240
     steps:
@@ -265,7 +265,7 @@ jobs:
           path: |
             .cache353
             Vendor/Libmpv.xcframework
-          key: libmpv-353-v1-${{ hashFiles('scripts/mplaykit353/**') }}
+          key: libmpv-353-v2-${{ hashFiles('scripts/mplaykit353/**') }}
       - name: Build Libmpv.xcframework (pinned sources, sha256-verified)
         if: steps.libmpv-cache.outputs.cache-hit != 'true'
         run: python3 scripts/mplaykit353/build_libmpv.py "$GITHUB_WORKSPACE"
@@ -275,8 +275,45 @@ jobs:
           path: Vendor/Libmpv.xcframework
           compression-level: 0
           retention-days: 3
+  spatial-353:
+    # Build 353 stage D: spatial-audio decoder xcframeworks for the MPlayKit
+    # full restoration (LibTrueHD @ 3eab2e7c + LibDTSX @ 6f0b321e, AetherEngine
+    # @ fc6b412e for the silent-Atmos sample only; pins live in
+    # scripts/mplaykit353/build_spatial.py). Ported from AVFan's verified
+    # spatial steps (AVFan run 45239463298). Produces Vendor/TrueHD.xcframework
+    # + Vendor/DTSX.xcframework (+ Vendor/mplay-silent-atmos.mp4 when the
+    # generator runs); the artifact root is the Vendor/ contents, so consumers
+    # download it to path Vendor/ and the two frameworks land in place.
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache spatial decoder xcframeworks
+        id: spatial-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache353/spatial
+            Vendor/TrueHD.xcframework
+            Vendor/DTSX.xcframework
+          key: spatial-353-v1-${{ hashFiles('scripts/mplaykit353/build_spatial.py') }}
+          restore-keys: |
+            spatial-353-v1-
+      - name: Build spatial decoder xcframeworks (pinned sources, stage D)
+        if: steps.spatial-cache.outputs.cache-hit != 'true'
+        run: python3 scripts/mplaykit353/build_spatial.py "$GITHUB_WORKSPACE"
+      - name: Assert spatial xcframeworks exist
+        run: |
+          test -d Vendor/TrueHD.xcframework
+          test -d Vendor/DTSX.xcframework
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
+          compression-level: 0
+          retention-days: 3
   release:
-    needs: [models, libmpv-353]
+    needs: [models, libmpv-353, spatial-353]
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -289,6 +326,15 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
+      - name: Assert Libmpv + spatial xcframeworks exist
+        run: |
+          test -d Vendor/Libmpv.xcframework
+          test -d Vendor/TrueHD.xcframework
+          test -d Vendor/DTSX.xcframework
       - name: Fetch sherpa-onnx iOS/macOS xcframeworks + SenseVoice-Small int8 (sha256-pinned); drop bundled turbo (on-demand in 289)
         run: |
           set -euo pipefail
@@ -483,7 +529,7 @@ jobs:
           path: evidence-homehq298/*
           if-no-files-found: warn
   home-hero-hq-screenshots:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 326: production HomeView (neutral --home326-fixture 700×1000 B-tier rasters, no network)
     # on an iPhone simulator; screenshots of the full-bleed HQ hero and the rails.
     runs-on: macos-26
@@ -494,6 +540,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -545,7 +595,7 @@ jobs:
           if-no-files-found: warn
 
   detail-auth-327:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 327: detail-page token + visible auth errors (unit + UI, no live network)
     runs-on: macos-26
     timeout-minutes: 60
@@ -555,6 +605,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -597,7 +651,7 @@ jobs:
           if-no-files-found: warn
 
   home-hot-328:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 328: playback hero + vertical swipe policy + stuck-source deadline (unit + UI)
     runs-on: macos-26
     timeout-minutes: 60
@@ -607,6 +661,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -649,7 +707,7 @@ jobs:
           if-no-files-found: warn
 
   home-hot-329:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 329: unblurred hero floor, 3×3 grids, delayed CDN upgrade, preheat, offline floor (unit + UI)
     # HomeHot329Tests: test329DelayedCDNPaintsSharpFloorThenUpgrades, test329PreheatFollowingDTOThumbs, test329OfflineColdStartRestoresSharpFloor, test329RailFloorAccepts147ThumbAnd360IsPreferenceOnly, test329HeroCIDMapReadsDTOAndCache
     runs-on: macos-26
@@ -660,6 +718,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -702,7 +764,7 @@ jobs:
           if-no-files-found: warn
 
   home-chrome-330:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 330: 44 pt liquid-glass search, overlay-tap hero navigation, official DetailPosterResolver portrait, liquid-glass shortcuts (unit)
     # HomeChrome330Tests: test330CleanTapOpensDetailAndPageCommitDoesNot, test330DTOFloorPaintsThenUpgradesToResolverWinner, test330CacheHitUsedImmediately, test330EnrichMergedDetailCoverIsMiddleStep, test330BackdropPLIsNotPrimaryOverOfficialPortrait
     runs-on: macos-26
@@ -713,6 +775,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -755,7 +821,7 @@ jobs:
           if-no-files-found: warn
 
   home-hero-331:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 331: home hero front crop — two-level floor (front-cropped cover_url / thumb → official DetailPosterResolver winner), disk-only restores, per-item enrich → resolver pipeline (unit)
     # HomeHero331Tests: test331ColdStartFirstFrameIsFrontPortrait, test331SwipeToFourthAndBackKeepsSharpWinner, test331OfflineColdStartShowsDetailWinner, test331LandscapeFixtureNeverShowsUncroppedLayer, test331ResolverNeverCompletesStaysOnSharpFrontFloor, test331EvictedWinnerRestoresWithZeroNetwork, test331SetCurrentIndexKeepsMergedFields, test331DetailWinnerSharedByMovieID
     runs-on: macos-26
@@ -766,6 +832,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -808,7 +878,7 @@ jobs:
           if-no-files-found: warn
 
   home-hero-332:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 332: home hero paints the original decoded bitmap (display-time front window, 32 pt overlap, sRGB translate-redraw crop, ICC-preserving JPEG)
     # HomeHero332Tests: test332FloorIsOriginalBitmapAndWindowIsFront, test332SnosWinnerRenderDeltaEAgainstReferenceImage, test332VisibleWindowHidesBackCoverOnThreeFixtures, test332FloorToWinnerCrossfadeKeepsColorTemperature, test332OverlapKeepsBottomUIAndFacesVisible, test332LoadPosterCropIsPackedSRGBAndDeltaEUnder2, test332HeroCoverDiskJPEGPreservesSRGBProfile
     runs-on: macos-26
@@ -819,6 +889,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -860,7 +934,7 @@ jobs:
             home332-ui.log
           if-no-files-found: warn
   home-hero-333:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 333: home hero paints the detail page display image (art.image) with a detail-style bottom gradient (floor transition kept)
     # HomeHero333Tests: test333SharpLayerIsDetailDisplayImageNotRawEnvelope, test333JacketWinnerShowsFrontDisplayRaster, test333DiskRestoreReturnsDisplayImage, test333BottomChromeInsetsAboveFadeBand
     runs-on: macos-26
@@ -871,6 +945,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -912,7 +990,7 @@ jobs:
             home333-ui.log
           if-no-files-found: warn
   home-hero-334:
-    needs: libmpv-353
+    needs: [libmpv-353, spatial-353]
     # Build 334: home hero height mirrors DetailPortraitGeometry (detail parity); HomeHero334Tests compile fix
     # HomeHero334Tests: test334HeroHeightMatchesDetailPortraitGeometry, test334IPadHeroHeightUnchanged
     runs-on: macos-26
@@ -923,6 +1001,10 @@ jobs:
         with:
           name: AVDB-353-libmpv
           path: Vendor/Libmpv.xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-spatial
+          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
