@@ -131,25 +131,28 @@ platform-forced or evidence-forced and are **not** faked as 1:1.
     always nil. Rotation, duration and cover-art extraction are real.
 11. **ncnn.** Present in the original `.so` with no visible purpose in
     the evidence; not introduced.
-12. **mpv `avfoundation` AO disabled (differs from the original's
-    embedded `-Davfoundation=enabled`).** The original is a modified
-    fork; we compile stock mpv 0.42.0. In stock mpv (0.41.0 and
-    0.42.0 alike, sources verified) the avfoundation feature is
-    `auto` and autodetects ON against the iOS SDK, which breaks the
-    iOS build twice: `ao_avfoundation.m` calls
-    `setAudioOutputDeviceUniqueID:`, `API_UNAVAILABLE` on iOS, and
+12. **mpv `avfoundation` AO disabled — UNRESOLVED difference, not an
+    accepted deviation.** The original's embedded meson string has
+    `-Davfoundation=enabled` and the original fork's ao code compiles
+    on iOS; stock mpv 0.42.0's does not (0.41.0 and 0.42.0 alike,
+    sources verified): the feature is `auto`, autodetects ON against
+    the iOS SDK, and then `ao_avfoundation.m` calls
+    `setAudioOutputDeviceUniqueID:`, `API_UNAVAILABLE` on iOS, while
     `HAVE_AVFOUNDATION` un-guards the macOS-only `AudioDeviceID` /
     `AudioStreamID` declarations in `ao_coreaudio_utils.h` /
     `ao_coreaudio_chmap.h`, which `ao_audiounit.m` includes
     unconditionally (CI round 6: 11 errors, all in the
     ao_avfoundation translation unit and its included headers).
-    The build therefore sets `-Davfoundation=disabled` explicitly;
+    The build therefore sets `-Davfoundation=disabled` explicitly as
+    the only currently viable route to a compiling stock mpv;
     `coreaudio` was already disabled, and `audiounit` — the iOS AO —
     stays enabled: everything it calls from the shared headers is
     declared outside that guard, and the shared utils/chmap sources
-    compile with both guards off. Not claimed as 1:1 with the
-    original's flags; the fork's ao code evidently differs from
-    stock.
+    compile with both guards off. This item stays open: effect-level
+    equivalence (audio output path and perceived sound) is to be
+    judged by a same-title on-device A/B against the original
+    player, and if it falls short, the iOS-usable parts of the
+    original's ao are to be ported following its symbol surface.
 
 ## CI first-run checklist （待 CI 首跑验证）
 

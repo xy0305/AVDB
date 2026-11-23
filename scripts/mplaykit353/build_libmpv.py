@@ -42,8 +42,14 @@ Platform notes (verified against mpv 0.42 meson.build, not guessed):
     11 errors in ao_avfoundation.m).  With coreaudio and avfoundation
     both off, everything ao_audiounit calls from those headers is
     declared outside the guard, and the shared utils/chmap sources
-    compile clean.  Deliberate divergence from the original's flags,
-    recorded in Build353-MPlayKit.md deviation 12.
+    compile clean.  This is an UNRESOLVED difference, not an
+    accepted deviation: the original fork's ao code compiles on
+    iOS, stock mpv's does not; whether the audio output path and
+    perceived sound are equivalent to the original's is to be
+    judged by a same-title device A/B against the original player,
+    and if they are not, the iOS-usable parts of that ao are to be
+    ported following the original's symbol surface.  Recorded in
+    Build353-MPlayKit.md deviation 12.
   * Every optional mpv/libplacebo/libass/... -D flag goes through
     meson_args(), which greps the extracted meson.options /
     meson_options.txt first and only passes options that actually exist,
