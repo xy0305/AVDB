@@ -1,0 +1,44 @@
+# Meson cross file TEMPLATE — iOS device, arm64 (Build 353, Libmpv pipeline).
+#
+# This file is a template, not a ready-to-use cross file: meson cross files
+# cannot run commands, so the placeholders below are substituted by
+# build_libmpv.py at runtime with the values `xcrun` reports on the actual
+# CI runner, and the result is written to .cache353/cross/:
+#
+#   __SDK_PATH__   xcrun --sdk iphoneos --show-sdk-path
+#   __SDK_NAME__   iphoneos
+#   __CLANG__      xcrun --sdk iphoneos -f clang
+#   __CLANGXX__    xcrun --sdk iphoneos -f clang++
+#   __AR__         xcrun --sdk iphoneos -f ar
+#   __RANLIB__     xcrun --sdk iphoneos -f ranlib
+#   __STRIP__      xcrun --sdk iphoneos -f strip
+#   __MIN_FLAG__   -mios-version-min=17.0
+#
+# Never hard-code /Applications/Xcode.app/... paths here; SDK locations
+# differ between runners.
+
+[binaries]
+c = '__CLANG__'
+cpp = '__CLANGXX__'
+ar = '__AR__'
+ranlib = '__RANLIB__'
+strip = '__STRIP__'
+pkg-config = 'pkg-config'
+
+[properties]
+sys_root = '__SDK_PATH__'
+needs_exe_wrapper = true
+
+[host_machine]
+system = 'darwin'
+cpu_family = 'aarch64'
+cpu = 'arm64'
+endian = 'little'
+
+[built-in options]
+c_args = ['-arch', 'arm64', '__MIN_FLAG__', '-isysroot', '__SDK_PATH__']
+c_link_args = ['-arch', 'arm64', '__MIN_FLAG__', '-isysroot', '__SDK_PATH__']
+cpp_args = ['-arch', 'arm64', '__MIN_FLAG__', '-isysroot', '__SDK_PATH__']
+cpp_link_args = ['-arch', 'arm64', '__MIN_FLAG__', '-isysroot', '__SDK_PATH__']
+objc_args = ['-arch', 'arm64', '__MIN_FLAG__', '-isysroot', '__SDK_PATH__']
+objc_link_args = ['-arch', 'arm64', '__MIN_FLAG__', '-isysroot', '__SDK_PATH__']
