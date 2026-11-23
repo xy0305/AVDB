@@ -33,6 +33,13 @@ Platform notes (verified against mpv 0.42 meson.build, not guessed):
     meson_args(), which greps the extracted meson.options /
     meson_options.txt first and only passes options that actually exist,
     so an unknown option can never fail the configure step.
+  * pkg-config supply (fixed after the first CI run): PKG_CONFIG_LIBDIR
+    is pinned to the vendored prefix, so the SDK's system zlib — named
+    in freetype2.pc's Requires.private — is described by a hand-written
+    zlib.pc (write_system_pcs), and the cross files set no sys_root,
+    because meson would export it as PKG_CONFIG_SYSROOT_DIR and
+    pkg-config would relocate the prefix's own absolute paths into the
+    SDK, breaking every vendored .pc lookup.
 
 This script is written on Linux and has never run end-to-end: the whole
 pipeline is 待 CI 首跑验证 on a macos-26 runner with Xcode.  See README.md
@@ -247,6 +254,36 @@ def pkg_env(prefix, env):
     e["PKG_CONFIG_LIBDIR"] = pc
     return e
 
+def write_system_pcs(prefix, sdk):
+    """Hand-written .pc files for system libraries that chain members
+    resolve through pkg-config (same pattern as libxxhash.pc below).
+
+    pkg_env() pins PKG_CONFIG_LIBDIR to the vendored prefix, which
+    hides the SDK's own pkg-config files entirely — so when an
+    installed .pc names a system library in Requires.private
+    (freetype2.pc -> zlib: freetype is built FT_WITH_ZLIB=ON against
+    the SDK's libz), pkg-config fails the whole lookup ("Package
+    'zlib', required by 'freetype2', not found") and meson reports the
+    *consumer's* dependency as missing — that is what killed the
+    harfbuzz stage in the first CI run.  mpv's dependency('zlib')
+    (required, both 0.41 and 0.42) and FFmpeg's check_pkg_config(zlib)
+    hit the same wall.  Describe the SDK's system zlib with absolute
+    paths (the cross files deliberately set no sys_root, so nothing
+    relocates them).  Written unconditionally at platform start so a
+    cached prefix from an earlier, failed run picks the file up
+    without --force."""
+    pc_dir = prefix / "lib" / "pkgconfig"
+    pc_dir.mkdir(parents=True, exist_ok=True)
+    (pc_dir / "zlib.pc").write_text(
+        f"prefix={sdk}/usr\nlibdir=${{prefix}}/lib\n"
+        f"includedir=${{prefix}}/include\n\n"
+        f"Name: zlib\n"
+        f"Description: zlib compression library (system library from "
+        f"the iOS SDK)\n"
+        # == version CMake's FindZLIB reports for the SDK's libz.tbd.
+        f"Version: 1.2.12\n"
+        f"Libs: -L${{libdir}} -lz\nCflags: -I${{includedir}}\n")
+
 # ------------------------------------------------------------- stages -------
 def build_xxhash(src, build_dir, prefix, platform, env):
     """xxHash is a single C file: compile libxxhash.a directly and write
@@ -320,6 +357,7 @@ def build_platform(platform, srcs, cache, env, force):
         for s in build_dir.glob("*.stamp"): s.unlink()
     cross, sdk = write_cross_file(cache, platform, env)
     penv = pkg_env(prefix, env)
+    write_system_pcs(prefix, sdk)
 
     build_xxhash(srcs["xxhash"], build_dir, prefix, platform, env)
 

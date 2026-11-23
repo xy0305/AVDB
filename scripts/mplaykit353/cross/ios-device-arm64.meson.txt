@@ -26,7 +26,14 @@ strip = '__STRIP__'
 pkg-config = 'pkg-config'
 
 [properties]
-sys_root = '__SDK_PATH__'
+# No sys_root here on purpose: meson exports it as
+# PKG_CONFIG_SYSROOT_DIR, and pkg-config then relocates EVERY absolute
+# -I/-L path from .pc files into the SDK — including the vendored
+# prefix's own paths (all dependencies live in <prefix>/lib/pkgconfig),
+# which breaks e.g. harfbuzz's freetype2 lookup.  The SDK location
+# reaches the compilers via -isysroot in the *_args below, and the one
+# system library resolved through pkg-config (zlib) gets a hand-written
+# .pc with absolute SDK paths from build_libmpv.py instead.
 needs_exe_wrapper = true
 
 [host_machine]
