@@ -416,11 +416,19 @@ def build_platform(platform, srcs, cache, env, force):
     build_freetype(srcs["freetype"], build_dir, prefix, platform, env,
                    with_harfbuzz=False, tag="ft1")
     if not skip_if_stamped(build_dir, "harfbuzz"):
+        # gpu disabled: harfbuzz 15.2.0's gpu feature defaults to
+        # enabled, and on darwin its util/meson.build then calls
+        # add_languages('objcpp', required: true) — which the cross
+        # files deliberately do not provide.  The feature builds only
+        # the separate experimental libharfbuzz-gpu (src/meson.build);
+        # libharfbuzz / libharfbuzz-subset, the only outputs freetype
+        # and libass resolve via pkg-config, are unaffected.
         meson_build(srcs["harfbuzz"], build_dir / "harfbuzz", prefix, cross,
                     penv,
                     {"freetype": "enabled", "glib": "disabled",
                      "gobject": "disabled", "icu": "disabled",
-                     "cairo": "disabled", "tests": "disabled",
+                     "cairo": "disabled", "gpu": "disabled",
+                     "tests": "disabled",
                      "docs": "disabled", "benchmark": "disabled",
                      "introspection": "disabled"}, "harfbuzz")
         stamp(build_dir, "harfbuzz")
@@ -514,6 +522,12 @@ def build_mpv(src, build_dir, prefix, cross, penv):
     # disabled is legitimate — see module docstring.  gl-cocoa/cocoa and
     # coreaudio are macOS-only and must not be probed on iOS.
     wanted = {
+        # cplayer off: it defaults to true in mpv's meson.options,
+        # and the CLI executable is dead weight in a libmpv-only
+        # pipeline — worse, on darwin mpv then also wires the
+        # osxbundle/macos-bundle targets and links an iOS executable
+        # with the macOS-SDK -isysroot its objc probe injects.
+        "cplayer": False,
         "libmpv": True, "plain-gl": "enabled", "videotoolbox": "enabled",
         "audiounit": "enabled",
         "vulkan": "disabled", "gl-cocoa": "disabled", "cocoa": "disabled",

@@ -17,9 +17,21 @@
 # Never hard-code /Applications/Xcode.app/... paths here; SDK locations
 # differ between runners.
 
+# objc is defined (same clang binary; objc_args below already carry
+# -arch/-isysroot) because mpv's meson.build calls
+# add_languages('objc', native: false) on every darwin configure once
+# it detects the runner's macOS SDK (TOOLS/macos-sdk-version.py), and
+# its audiounit/avfoundation sources are .m files.  objcpp is
+# deliberately NOT defined: the only consumer in the chain was
+# harfbuzz's gpu feature (util/meson.build calls
+# add_languages('objcpp', required: true) on darwin), and that feature
+# is disabled in the harfbuzz stage instead — it builds only the
+# separate experimental libharfbuzz-gpu, which nothing here links.
+
 [binaries]
 c = '__CLANG__'
 cpp = '__CLANGXX__'
+objc = '__CLANG__'
 ar = '__AR__'
 ranlib = '__RANLIB__'
 strip = '__STRIP__'
