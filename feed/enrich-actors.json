@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "actors",
- "generated_at": "2026-11-22T19:22:20+00:00",
+ "generated_at": "2026-11-23T19:12:25+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -1795,6 +1795,21 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-Diaz/%E5%AE%AE%E9%87%8E%E6%A1%9C.jpg",
    "gender": "female",
    "enriched_at": "2026-11-20T19:15:19+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "寺島志保",
+   "birthday": "1979-06-21",
+   "height_cm": 157,
+   "bust": 108,
+   "waist": 73,
+   "hip": 98,
+   "cup": "J",
+   "birthplace": "日本",
+   "bio": "寺島 志保（てらしま しほ、6月21日 - ）は、日本のAV女優。プロダクションALIVE所属。\n\n身長158cm、108cm（Jカップ）血液型A型。趣味は読書、映画、旅行、御朱印集め、料理、パン作り、乗馬。 好きな食べ物はうなぎ、肉。 嫌いな食べ物は牡蠣、あわび、ホルモン等。\n\nAVデビュー時は大森あづさ（おおもりあづさ）\n\n2011年8月20日デビュー。\n\n後に寺島志保と改名する。\n\n2024年2月、4年ぶりに復帰 。\n\n同年7月31日より東京・レフカダ新宿にて、トークイベント『てらっしーのわがままボディーナイト①』を開催\n\n2025年6月よりタカラ映像専属女優\n\n2026年 Xのアカウント乗っ取りにより新アカウントを作る。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Madonna/%E5%AF%BA%E5%B3%B6%E5%BF%97%E4%BF%9D.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-23T19:11:49+00:00"
   },
   {
    "javdb_id": null,
