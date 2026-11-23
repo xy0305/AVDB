@@ -156,6 +156,51 @@ def tool_path(name, sdk):
     return out(["xcrun", "--sdk", sdk, "-f", name], "tool-path")
 
 # ------------------------------------------------------------ fetch/src ----
+# Fallback download URLs, verified byte-identical to the pinned sha256
+# (downloaded and hashed by hand on 2026-11-23).  Only freetype has one:
+# the GitHub release asset 404s, ftp.gnu.org/kernel.org don't mirror
+# freetype, and the GitHub/GitLab archives of libplacebo/dav1d hash
+# differently from their release tarballs — those stay retry-only.
+FALLBACK_URLS = {
+    "freetype": [
+        "https://download-mirror.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz",
+    ],
+}
+
+
+def download_with_retries(urls, dst, attempts=4):
+    """Download dst, trying each URL in order.  Savannah (freetype's host)
+    answered HTTP 504 twice in CI on 2026-11-23 and the old code died on
+    the first failure with no retry.  5xx and connection errors are
+    retried with exponential back-off (2/4/8 s); 4xx is not retryable on
+    the same URL.  A partial file is deleted before every retry, and
+    fetch_all() still verifies the sha256 afterwards."""
+    import time
+    import urllib.error
+    import urllib.request
+    last_err = None
+    for url in urls:
+        for i in range(attempts):
+            try:
+                print(f"download {url} (try {i + 1}/{attempts})", flush=True)
+                urllib.request.urlretrieve(url, dst)
+                return
+            except urllib.error.HTTPError as e:
+                last_err = e
+                if e.code < 500:
+                    break
+                print(f"download {url}: HTTP {e.code}, retrying", flush=True)
+            except (urllib.error.URLError, TimeoutError, ConnectionError,
+                    OSError) as e:
+                last_err = e
+                print(f"download {url}: {e}, retrying", flush=True)
+            if dst.exists():
+                dst.unlink()
+            time.sleep(2 ** (i + 1))
+        print(f"download {url}: exhausted retries", flush=True)
+    raise last_err
+
+
 def fetch_all(cache):
     import urllib.request
     dl, src_root = cache / "downloads", cache / "src"
@@ -164,8 +209,7 @@ def fetch_all(cache):
     for name, ver, url, sha in COMPONENTS:
         dst = dl / url.rsplit("/", 1)[1]
         if not dst.exists() or sha256_of(dst) != sha:
-            print("download", url, flush=True)
-            urllib.request.urlretrieve(url, dst)
+            download_with_retries([url] + FALLBACK_URLS.get(name, []), dst)
         got = sha256_of(dst)
         assert got == sha, (name, got, sha)
         dest = src_root / f"{name}-{ver}"

@@ -483,12 +483,17 @@ jobs:
           path: evidence-homehq298/*
           if-no-files-found: warn
   home-hero-hq-screenshots:
+    needs: libmpv-353
     # Build 326: production HomeView (neutral --home326-fixture 700×1000 B-tier rasters, no network)
     # on an iPhone simulator; screenshots of the full-bleed HQ hero and the rails.
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -540,11 +545,16 @@ jobs:
           if-no-files-found: warn
 
   detail-auth-327:
+    needs: libmpv-353
     # Build 327: detail-page token + visible auth errors (unit + UI, no live network)
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -587,11 +597,16 @@ jobs:
           if-no-files-found: warn
 
   home-hot-328:
+    needs: libmpv-353
     # Build 328: playback hero + vertical swipe policy + stuck-source deadline (unit + UI)
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -634,12 +649,17 @@ jobs:
           if-no-files-found: warn
 
   home-hot-329:
+    needs: libmpv-353
     # Build 329: unblurred hero floor, 3×3 grids, delayed CDN upgrade, preheat, offline floor (unit + UI)
     # HomeHot329Tests: test329DelayedCDNPaintsSharpFloorThenUpgrades, test329PreheatFollowingDTOThumbs, test329OfflineColdStartRestoresSharpFloor, test329RailFloorAccepts147ThumbAnd360IsPreferenceOnly, test329HeroCIDMapReadsDTOAndCache
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -682,12 +702,17 @@ jobs:
           if-no-files-found: warn
 
   home-chrome-330:
+    needs: libmpv-353
     # Build 330: 44 pt liquid-glass search, overlay-tap hero navigation, official DetailPosterResolver portrait, liquid-glass shortcuts (unit)
     # HomeChrome330Tests: test330CleanTapOpensDetailAndPageCommitDoesNot, test330DTOFloorPaintsThenUpgradesToResolverWinner, test330CacheHitUsedImmediately, test330EnrichMergedDetailCoverIsMiddleStep, test330BackdropPLIsNotPrimaryOverOfficialPortrait
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -730,12 +755,17 @@ jobs:
           if-no-files-found: warn
 
   home-hero-331:
+    needs: libmpv-353
     # Build 331: home hero front crop — two-level floor (front-cropped cover_url / thumb → official DetailPosterResolver winner), disk-only restores, per-item enrich → resolver pipeline (unit)
     # HomeHero331Tests: test331ColdStartFirstFrameIsFrontPortrait, test331SwipeToFourthAndBackKeepsSharpWinner, test331OfflineColdStartShowsDetailWinner, test331LandscapeFixtureNeverShowsUncroppedLayer, test331ResolverNeverCompletesStaysOnSharpFrontFloor, test331EvictedWinnerRestoresWithZeroNetwork, test331SetCurrentIndexKeepsMergedFields, test331DetailWinnerSharedByMovieID
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -778,12 +808,17 @@ jobs:
           if-no-files-found: warn
 
   home-hero-332:
+    needs: libmpv-353
     # Build 332: home hero paints the original decoded bitmap (display-time front window, 32 pt overlap, sRGB translate-redraw crop, ICC-preserving JPEG)
     # HomeHero332Tests: test332FloorIsOriginalBitmapAndWindowIsFront, test332SnosWinnerRenderDeltaEAgainstReferenceImage, test332VisibleWindowHidesBackCoverOnThreeFixtures, test332FloorToWinnerCrossfadeKeepsColorTemperature, test332OverlapKeepsBottomUIAndFacesVisible, test332LoadPosterCropIsPackedSRGBAndDeltaEUnder2, test332HeroCoverDiskJPEGPreservesSRGBProfile
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -825,12 +860,17 @@ jobs:
             home332-ui.log
           if-no-files-found: warn
   home-hero-333:
+    needs: libmpv-353
     # Build 333: home hero paints the detail page display image (art.image) with a detail-style bottom gradient (floor transition kept)
     # HomeHero333Tests: test333SharpLayerIsDetailDisplayImageNotRawEnvelope, test333JacketWinnerShowsFrontDisplayRaster, test333DiskRestoreReturnsDisplayImage, test333BottomChromeInsetsAboveFadeBand
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -872,12 +912,17 @@ jobs:
             home333-ui.log
           if-no-files-found: warn
   home-hero-334:
+    needs: libmpv-353
     # Build 334: home hero height mirrors DetailPortraitGeometry (detail parity); HomeHero334Tests compile fix
     # HomeHero334Tests: test334HeroHeightMatchesDetailPortraitGeometry, test334IPadHeroHeightUnchanged
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AVDB-353-libmpv
+          path: Vendor/Libmpv.xcframework
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
