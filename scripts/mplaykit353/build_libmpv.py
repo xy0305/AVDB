@@ -29,6 +29,21 @@ Platform notes (verified against mpv 0.42 meson.build, not guessed):
     (macOS-only) OpenGL framework via gl-cocoa, so -Dgl-cocoa=disabled.
   * ao_audiounit (audiounit) only requires darwin and works on iOS;
     coreaudio does not exist on iOS.
+  * avfoundation (mpv's AVFoundation AO) is explicitly disabled.
+    The original's embedded meson string enables it, but the original
+    is a modified fork; in stock mpv (0.41.0 and 0.42.0 alike, sources
+    verified) the feature is `auto` and autodetects ON against the
+    iOS SDK, which breaks the build twice over: ao_avfoundation.m
+    calls setAudioOutputDeviceUniqueID:, API_UNAVAILABLE on iOS, and
+    HAVE_AVFOUNDATION un-guards the macOS-only AudioDeviceID /
+    AudioStreamID declarations in ao_coreaudio_utils.h /
+    ao_coreaudio_chmap.h, which ao_audiounit.m includes
+    unconditionally — so even the iOS AO stops compiling (CI round 6:
+    11 errors in ao_avfoundation.m).  With coreaudio and avfoundation
+    both off, everything ao_audiounit calls from those headers is
+    declared outside the guard, and the shared utils/chmap sources
+    compile clean.  Deliberate divergence from the original's flags,
+    recorded in Build353-MPlayKit.md deviation 12.
   * Every optional mpv/libplacebo/libass/... -D flag goes through
     meson_args(), which greps the extracted meson.options /
     meson_options.txt first and only passes options that actually exist,
@@ -622,6 +637,8 @@ def build_mpv(src, build_dir, prefix, cross, penv):
     # audiounit on; everything platform-foreign or doc/test off.  vulkan
     # disabled is legitimate — see module docstring.  gl-cocoa/cocoa and
     # coreaudio are macOS-only and must not be probed on iOS.
+    # avfoundation is off for a proven stock-source reason, not
+    # preference — see the module docstring's avfoundation bullet.
     wanted = {
         # cplayer off: it defaults to true in mpv's meson.options,
         # and the CLI executable is dead weight in a libmpv-only
@@ -632,7 +649,8 @@ def build_mpv(src, build_dir, prefix, cross, penv):
         "libmpv": True, "plain-gl": "enabled", "videotoolbox": "enabled",
         "audiounit": "enabled",
         "vulkan": "disabled", "gl-cocoa": "disabled", "cocoa": "disabled",
-        "coreaudio": "disabled", "sdl2": "disabled",
+        "coreaudio": "disabled", "avfoundation": "disabled",
+        "sdl2": "disabled",
         "lua": "disabled", "javascript": "disabled",
         "libbluray": "disabled", "uchardet": "disabled",
         "rubberband": "disabled", "vapoursynth": "disabled",
