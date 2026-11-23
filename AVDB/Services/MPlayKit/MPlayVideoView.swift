@@ -2,290 +2,317 @@
 //  MPlayVideoView.swift
 //  AVDB
 //
-//  Build 353: MPlayKit 的画面视图，对应原版 SenPlayerView 的视频 Surface
-//  （RE 报告 1.1/二.1；原版双 Surface 中的字幕面是 Android 自研扩展，
-//  iOS/libmpv 无对应物，这里只有视频一面，字幕由 mpv 在同一帧内合成）。
-//  渲染走 libmpv render API 的标准 iOS 用法（render.h / render_gl.h）：
-//  CAEAGLLayer + 自建 FBO，update 回调只负责唤醒主线程的重绘调度，
-//  所有 mpv_render_* 与 GL 调用都在共享的 render 队列上、setCurrent
-//  共享 EAGLContext 之后执行。
+//  Build 353 full restoration, stage A: the display view of the
+//  pixel-frame pipeline.  This replaces the GL implementation that
+//  used to live here (libmpv render API + CAEAGLLayer) — that path
+//  is retired and deleted, per the original's architecture
+//  (IOS-FINDINGS §1/§3: the original builds mpv with -Dgl=disabled
+//  and displays through a private frame_output vo feeding an
+//  AVSampleBufferDisplayLayer; there is no GL anywhere in its main
+//  display chain).
 //
-//  生命周期：detach() 必须先于 player.close() 调用——render context
-//  要在 mpv core 销毁之前 free（render.h 的明确要求）。
+//  Shape (mirrors the original's FrameOutputView):
+//  - The view's backing layer IS an AVSampleBufferDisplayLayer.
+//  - Frames arrive from the player's frame_output vo through an
+//    MPlayFrameSink registered under the player's sink name; the
+//    FrameStore routes video frames to the FrameOutputScheduler
+//    (which wraps them as CMSampleBuffers) and subtitle frames to
+//    the independent subtitle layer.
+//  - The subtitle layer is a sublayer of the display layer by
+//    default — that is what lets sample-buffer PiP carry subtitles
+//    with the picture — and can be reparented to an external host
+//    view via moveSubtitleLayerToPictureInPictureHost(_:) /
+//    moveSubtitleLayerToInlineHost() (the original's method names;
+//    stage B drives them around PiP transitions).
+//  - Time sync: the scheduler's control timebase is re-aligned from
+//    the frame path (each enqueued frame nudges it when drift
+//    exceeds a quarter second) and on explicit syncPlaybackTime
+//    calls from the chrome's transport handling.
 //
 
-import Darwin
+import AVFoundation
+import CoreVideo
 import Foundation
-import Libmpv
-import OpenGLES
+import QuartzCore
 import UIKit
 
-/// mpv_opengl_init_params.get_proc_address 的实现（文件级 @convention(c)
-/// 相容函数，不能捕获上下文）：RTLD_DEFAULT 在 Darwin 上是 (void *)-2，
-/// 即在已加载的全部镜像里按名查符号（OpenGLES 的函数都在其中）。
-private func mplayGLGetProcAddress(_ context: UnsafeMutableRawPointer?,
-                                   _ name: UnsafePointer<CChar>?) -> UnsafeMutableRawPointer? {
-    guard let name else { return nil }
-    return dlsym(UnsafeMutableRawPointer(bitPattern: -2), name)
-}
-
-/// render update 回调：只转投主线程触发一次重绘调度，不在回调里调 mpv。
-private func mplayRenderUpdateCallback(_ context: UnsafeMutableRawPointer?) {
-    guard let context else { return }
-    let view = Unmanaged<MPlayVideoView>.fromOpaque(context).takeUnretainedValue()
-    DispatchQueue.main.async { [weak view] in
-        view?.scheduleRender()
-    }
-}
-
-/// CADisplayLink 的弱代理，避免 link 强持有视图造成循环引用。
-private final class MPlayDisplayLinkProxy: NSObject {
-    weak var view: MPlayVideoView?
-
-    @objc func tick(_ link: CADisplayLink) {
-        view?.displayLinkTicked()
-    }
-}
-
 final class MPlayVideoView: UIView {
-    override class var layerClass: AnyClass { CAEAGLLayer.self }
+    override class var layerClass: AnyClass {
+        AVSampleBufferDisplayLayer.self
+    }
 
-    private var glLayer: CAEAGLLayer { layer as! CAEAGLLayer }
+    var displayLayer: AVSampleBufferDisplayLayer {
+        layer as! AVSampleBufferDisplayLayer
+    }
 
-    private let proxy = MPlayDisplayLinkProxy()
+    let frameStore = MPlayFrameStore()
+    let subtitleLayerController = MPlaySubtitleLayerController()
+    private(set) var scheduler: MPlayFrameOutputScheduler!
+
+    /// Stage B: PiP controller bound to (player, view) on attach.
+    let pictureInPictureController = MPlayPictureInPictureController()
+
+    private var sink: MPlayFrameSink?
+    private weak var attachedPlayer: MPlayPlayer?
+    private var lastSyncedRate: Double = -1
+    private var lastSyncHostTime: CFTimeInterval = 0
+
+    /// Mirrored output (the original's setMirroredRenderView): a
+    /// second view fed the same post-chain frames this view enqueues.
+    /// Weak — the host owns the mirror.
+    private weak var mirrorView: MPlayVideoView?
+
+    /// Display matching state (see refreshDisplayCriteria).
     private var displayLink: CADisplayLink?
+    private var displayCriteriaAppliedGeneration: UInt64 = .max
 
-    // 以下渲染状态只在 renderContext.queue 上读写（attach/detach 把值
-    // 快照进队列块里带走，避免跨线程直接碰）。
-    private var attachedPlayer: MPlayPlayer?
-    private var renderQueue: DispatchQueue?
-    private var glContext: EAGLContext?
-    private var renderContextPointer: OpaquePointer?
-    private var framebuffer: GLuint = 0
-    private var renderbuffer: GLuint = 0
-    private var lastPixelWidth: Int32 = 0
-    private var lastPixelHeight: Int32 = 0
-    private var surfaceErrorReported = false
+    /// Host view that receives the subtitle layer when it is moved
+    /// out of the display layer (stage B: the PiP host).  Nil means
+    /// the layer's external home is this view itself (an overlay
+    /// above the display layer, same bounds).
+    private weak var externalSubtitleHost: UIView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        commonInit()
+        scheduler = MPlayFrameOutputScheduler(displayLayer: displayLayer)
+        scheduler.onLayerError = { [weak self] message in
+            self?.attachedPlayer?.noteSurfaceError(message)
+        }
+        frameStore.onVideoFrame = { [weak self] frame in
+            guard let self else { return }
+            // Stage C: the Metal post chain sits between the store
+            // and the scheduler (frame-after domain).  Disabled =
+            // direct enqueue, zero added latency.
+            let chain = MPlayPostChain.shared
+            if chain.isEnabled {
+                chain.process(frame) { [weak self] frames in
+                    guard let self else { return }
+                    for processed in frames {
+                        self.scheduler.enqueue(processed)
+                        self.mirrorView?.receiveMirroredFrame(processed)
+                    }
+                    if let last = frames.last {
+                        self.nudgeTimeSync(with: last)
+                    }
+                }
+            } else {
+                self.scheduler.enqueue(frame)
+                self.mirrorView?.receiveMirroredFrame(frame)
+                self.nudgeTimeSync(with: frame)
+            }
+        }
+        frameStore.onSubtitleFrame = { [weak self] frame in
+            self?.subtitleLayerController.update(frame)
+        }
+        subtitleLayerController.onRenderSizeChanged = { [weak self] size in
+            self?.attachedPlayer?.setSubtitleRenderSize(
+                width: Int(size.width), height: Int(size.height)
+            )
+        }
+        // Default parent: the display layer itself (PiP-visible).
+        displayLayer.addSublayer(subtitleLayerController.layer)
+        backgroundColor = .black
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        commonInit()
+        fatalError("init(coder:) has not been implemented")
     }
 
-    private func commonInit() {
-        proxy.view = self
-        contentScaleFactor = UIScreen.main.scale
-        layer.contentsScale = UIScreen.main.scale
-        glLayer.isOpaque = true
-        glLayer.drawableProperties = [
-            kEAGLDrawablePropertyRetainedBacking: false,
-            kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8,
-        ] as [String: Any]
-    }
+    // MARK: - Attach / detach (contract kept from the GL view)
 
-    deinit {
+    /// Bind to a player: register the frame sink under the player's
+    /// sink name so its frame_output vo starts delivering here.
+    /// Idempotent for the same player; switching players detaches
+    /// the old binding first — except during an active PiP session,
+    /// where the stage D takeover path applies: the PiP session and
+    /// the queued frames survive, only the sink registration and the
+    /// PiP controller's player reference move to the promoted
+    /// preloaded player (the display layer never changes hands).
+    func attach(player: MPlayPlayer) {
+        if attachedPlayer === player, sink != nil {
+            return
+        }
+        if attachedPlayer != nil, pictureInPictureController.isPictureInPictureActive {
+            sink?.unregister()
+            attachedPlayer = player
+            installSink(for: player)
+            wireSubtitleGain(player)
+            pictureInPictureController.rebindPlayer(player)
+            return
+        }
         detach()
+        attachedPlayer = player
+        installSink(for: player)
+        wireSubtitleGain(player)
+        // Initial subtitle render size follows the current bounds.
+        subtitleLayerController.setRenderSize(bounds.size)
+        player.setSubtitleRenderSize(
+            width: Int(bounds.width), height: Int(bounds.height)
+        )
+        pictureInPictureController.bind(player: player, videoView: self)
     }
+
+    private func wireSubtitleGain(_ player: MPlayPlayer) {
+        player.onSubtitleGainChange = { [weak self] gain in
+            self?.subtitleLayerController.brightnessGain = gain
+        }
+        player.onSubtitleOpacityChange = { [weak self] opacity in
+            self?.subtitleLayerController.layer.opacity = Float(opacity)
+        }
+    }
+
+    private func installSink(for player: MPlayPlayer) {
+        let newSink = MPlayFrameSink(name: player.frameSinkName)
+        newSink.onFrame = { [weak self] frame in
+            self?.frameStore.update(frame)
+        }
+        newSink.register()
+        sink = newSink
+    }
+
+    /// Unbind: unregister the sink FIRST (the vo must stop calling
+    /// into this view), then flush pending frames.  The player core
+    /// itself is closed by the owner after detach, as before.
+    /// PiP: the dismantle path defers detach() until PiP has stopped,
+    /// so an active PiP is never torn down from here in the normal
+    /// flow; if detach is called while PiP is active anyway (player
+    /// switch), unbind stops PiP first.
+    func detach() {
+        pictureInPictureController.unbind()
+        sink?.unregister()
+        sink = nil
+        scheduler.flush()
+        frameStore.flush()
+        subtitleLayerController.clear()
+        attachedPlayer?.onSubtitleGainChange = nil
+        attachedPlayer?.onSubtitleOpacityChange = nil
+        attachedPlayer = nil
+        displayLink?.invalidate()
+        displayLink = nil
+        displayCriteriaAppliedGeneration = .max
+        lastSyncedRate = -1
+    }
+
+    // MARK: - Time sync
+
+    /// Explicit re-sync from the chrome (transport events, seeks).
+    func syncPlaybackTime(position: Double, rate: Double) {
+        scheduler.syncPlaybackTime(position: position, rate: rate)
+        lastSyncedRate = rate
+        lastSyncHostTime = CACurrentMediaTime()
+    }
+
+    /// Per-frame drift control: re-align the timebase when the
+    /// player's rate changed since the last sync, or when a second
+    /// has passed (cheap drift correction without a separate timer).
+    private func nudgeTimeSync(with frame: MPlayFrame) {
+        guard let player = attachedPlayer, frame.ptsSeconds >= 0 else { return }
+        let state = player.state()
+        let rate = state.paused ? 0 : 1.0
+        let now = CACurrentMediaTime()
+        if rate != lastSyncedRate || now - lastSyncHostTime > 1.0 {
+            scheduler.syncPlaybackTime(position: frame.ptsSeconds, rate: rate)
+            lastSyncedRate = rate
+            lastSyncHostTime = now
+            // Keep the post chain's DV profile current (drives the
+            // Profile 5 correction pass; changes only per file).
+            MPlayPostChain.shared.dolbyProfile = player.dolbyVisionProfile()?.profile ?? 0
+            refreshDisplayCriteria()
+        }
+    }
+
+    // MARK: - Mirrored output / display matching
+
+    /// Feed this view's post-chain frames to a second view as well
+    /// (the original's setMirroredRenderView(FrameOutputView?)).
+    func setMirroredRenderView(_ view: MPlayVideoView?) {
+        mirrorView = view
+    }
+
+    /// Intake for mirrored frames; enqueues directly (the mirror
+    /// shows the primary's already-processed output).
+    func receiveMirroredFrame(_ frame: MPlayFrame) {
+        scheduler.enqueue(frame)
+    }
+
+    /// Display matching (the original's setFrameRateMatchingEnabled
+    /// + clearDisplayCriteriaImmediately): when the player has
+    /// matching enabled, a CADisplayLink carries the content frame
+    /// rate as its preferred range — the iOS/ProMotion form of the
+    /// original's display-criteria application (tvOS's
+    /// AVDisplayCriteria has no iOS equivalent).  The criteria
+    /// generation counter is the invalidation channel: changing the
+    /// flag or clearing criteria bumps it, and the next 1-second
+    /// nudge re-applies.  The link's tick also gives display-layer
+    /// failure recovery a cadence independent of frame arrival.
+    private func refreshDisplayCriteria() {
+        guard let player = attachedPlayer else { return }
+        let generation = player.displayCriteriaGeneration
+        guard generation != displayCriteriaAppliedGeneration else { return }
+        displayCriteriaAppliedGeneration = generation
+        let fps = player.doubleProperty("container-fps") ?? 0
+        if player.frameRateMatchingEnabled, fps > 0 {
+            let link = displayLink ?? CADisplayLink(
+                target: self, selector: #selector(displayLinkTick))
+            displayLink = link
+            let maxFPS = Double(UIScreen.main.maximumFramesPerSecond)
+            let clamped = maxFPS > 0 ? min(fps, maxFPS) : fps
+            link.preferredFrameRateRange = CAFrameRateRange(
+                minimum: Float(clamped), maximum: Float(clamped),
+                preferred: Float(clamped))
+            if link.isPaused {
+                link.add(to: .main, forMode: .common)
+                link.isPaused = false
+            }
+        } else {
+            displayLink?.invalidate()
+            displayLink = nil
+        }
+    }
+
+    @objc private func displayLinkTick() {
+        if displayLayer.status == .failed {
+            scheduler.flush()
+        }
+    }
+
+    // MARK: - Subtitle layer hosting (original: FrameOutputView)
+
+    /// The view subtitles render into when the layer is not parented
+    /// to the display layer.  Exposed for stage B (PiP host wiring).
+    var subtitleLayer: CALayer {
+        subtitleLayerController.layer
+    }
+
+    /// Move the subtitle layer into an external host view (PiP).
+    /// The render size follows the host's bounds from here on.
+    func moveSubtitleLayerToPictureInPictureHost(_ host: UIView) {
+        externalSubtitleHost = host
+        subtitleLayerController.layer.removeFromSuperlayer()
+        host.layer.addSublayer(subtitleLayerController.layer)
+        subtitleLayerController.layer.frame = host.bounds
+        subtitleLayerController.setRenderSize(host.bounds.size)
+    }
+
+    /// Move the subtitle layer back to its inline home (the display
+    /// layer) and restore the inline render size.
+    func moveSubtitleLayerToInlineHost() {
+        externalSubtitleHost = nil
+        subtitleLayerController.layer.removeFromSuperlayer()
+        displayLayer.addSublayer(subtitleLayerController.layer)
+        subtitleLayerController.layer.frame = displayLayer.bounds
+        subtitleLayerController.setRenderSize(bounds.size)
+    }
+
+    // MARK: - Layout
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        // 尺寸变了就请求一帧；renderFrame 里按像素尺寸决定是否重建 FBO。
-        scheduleRender()
-    }
-
-    // MARK: - Attach / detach
-
-    func attach(player: MPlayPlayer) {
-        if attachedPlayer != nil {
-            detach()
+        if externalSubtitleHost == nil {
+            // Parented to the display layer: track its bounds.
+            subtitleLayerController.layer.frame = displayLayer.bounds
+            subtitleLayerController.setRenderSize(bounds.size)
         }
-        attachedPlayer = player
-        surfaceErrorReported = false
-        guard let shared = player.renderContext, let core = player.core else {
-            player.noteSurfaceError("MPlayKit render context unavailable")
-            return
-        }
-        renderQueue = shared.queue
-        glContext = shared.glContext
-
-        let setupLink = { [weak self] in
-            guard let self, self.displayLink == nil else { return }
-            let link = CADisplayLink(target: self.proxy,
-                                     selector: #selector(MPlayDisplayLinkProxy.tick(_:)))
-            link.isPaused = true
-            link.add(to: .main, forMode: .common)
-            self.displayLink = link
-        }
-        if Thread.isMainThread {
-            setupLink()
-        } else {
-            DispatchQueue.main.async(execute: setupLink)
-        }
-
-        shared.queue.async { [weak self] in
-            guard let self, self.attachedPlayer === player else { return }
-            _ = EAGLContext.setCurrent(shared.glContext)
-            // API_TYPE 的 data 按 render.h 约定直接是 char* 本身（C 示例
-            // 即把 MPV_RENDER_API_TYPE_OPENGL 字面量指针放进 data）。
-            let apiType = strdup(MPV_RENDER_API_TYPE_OPENGL)
-            defer { free(apiType) }
-            var initParams = mpv_opengl_init_params(
-                get_proc_address: mplayGLGetProcAddress,
-                get_proc_address_ctx: nil)
-            var params: [mpv_render_param] = [
-                mpv_render_param(type: MPV_RENDER_PARAM_API_TYPE,
-                                 data: UnsafeMutableRawPointer(apiType)),
-                mpv_render_param(type: MPV_RENDER_PARAM_OPENGL_INIT_PARAMS,
-                                 data: &initParams),
-                mpv_render_param(type: MPV_RENDER_PARAM_INVALID, data: nil),
-            ]
-            var newContext: OpaquePointer?
-            let rc = mpv_render_context_create(&newContext, core, &params)
-            guard rc == 0, let newContext else {
-                player.noteSurfaceError("mpv_render_context_create failed rc=\(rc)")
-                return
-            }
-            self.renderContextPointer = newContext
-            mpv_render_context_set_update_callback(
-                newContext, mplayRenderUpdateCallback,
-                Unmanaged.passUnretained(self).toOpaque())
-            self.scheduleRender()
-        }
-    }
-
-    func detach() {
-        let link = displayLink
-        displayLink = nil
-        if Thread.isMainThread {
-            link?.invalidate()
-        } else if let link {
-            DispatchQueue.main.async { link.invalidate() }
-        }
-        attachedPlayer = nil
-        // 把指针快照带进 render 队列收尾：先清 update 回调，再删 GL 对象，
-        // 最后 free render context。此后队列上排着的 attach 创建块会因
-        // attachedPlayer 已变而自行放弃。
-        let contextPointer = renderContextPointer
-        renderContextPointer = nil
-        let queue = renderQueue
-        renderQueue = nil
-        glContext = nil
-        guard let contextPointer, let queue else { return }
-        let framebufferToDelete = framebuffer
-        let renderbufferToDelete = renderbuffer
-        framebuffer = 0
-        renderbuffer = 0
-        lastPixelWidth = 0
-        lastPixelHeight = 0
-        queue.async {
-            mpv_render_context_set_update_callback(contextPointer, nil, nil)
-            if framebufferToDelete != 0 {
-                var value = framebufferToDelete
-                glDeleteFramebuffers(1, &value)
-            }
-            if renderbufferToDelete != 0 {
-                var value = renderbufferToDelete
-                glDeleteRenderbuffers(1, &value)
-            }
-            mpv_render_context_free(contextPointer)
-        }
-    }
-
-    // MARK: - 重绘调度（主线程）
-
-    /// update 回调与 layoutSubviews 的统一入口：唤醒 display link 画一帧。
-    func scheduleRender() {
-        if Thread.isMainThread {
-            displayLink?.isPaused = false
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                self?.displayLink?.isPaused = false
-            }
-        }
-    }
-
-    func displayLinkTicked() {
-        displayLink?.isPaused = true
-        let width = bounds.width * contentScaleFactor
-        let height = bounds.height * contentScaleFactor
-        guard width >= 1, height >= 1, let queue = renderQueue else { return }
-        let pixelWidth = Int32(width)
-        let pixelHeight = Int32(height)
-        queue.async { [weak self] in
-            self?.renderFrame(pixelWidth: pixelWidth, pixelHeight: pixelHeight)
-        }
-    }
-
-    // MARK: - 渲染（render 队列）
-
-    private func renderFrame(pixelWidth: Int32, pixelHeight: Int32) {
-        guard pixelWidth > 0, pixelHeight > 0,
-              let renderContextPointer, let glContext,
-              let player = attachedPlayer else { return }
-        _ = EAGLContext.setCurrent(glContext)
-
-        if framebuffer == 0 || pixelWidth != lastPixelWidth || pixelHeight != lastPixelHeight {
-            rebuildFramebuffer(pixelWidth: pixelWidth, pixelHeight: pixelHeight)
-        }
-        guard framebuffer != 0, renderbuffer != 0 else { return }
-        // FBO 实际像素尺寸以 renderbuffer 的回读值为准（drawable 可能
-        // 按 contentsScale 取整，与请求值差一两像素）。
-        var actualWidth: GLint = 0
-        var actualHeight: GLint = 0
-        glGetRenderbufferParameteriv(GLenum(GL_RENDERBUFFER), GLenum(GL_RENDERBUFFER_WIDTH), &actualWidth)
-        glGetRenderbufferParameteriv(GLenum(GL_RENDERBUFFER), GLenum(GL_RENDERBUFFER_HEIGHT), &actualHeight)
-        let width = actualWidth > 0 ? actualWidth : pixelWidth
-        let height = actualHeight > 0 ? actualHeight : pixelHeight
-
-        var fbo = mpv_opengl_fbo(fbo: Int32(framebuffer), w: width, h: height, internal_format: 0)
-        var flipY: Int32 = 1
-        var params: [mpv_render_param] = [
-            mpv_render_param(type: MPV_RENDER_PARAM_OPENGL_FBO, data: &fbo),
-            mpv_render_param(type: MPV_RENDER_PARAM_FLIP_Y, data: &flipY),
-            mpv_render_param(type: MPV_RENDER_PARAM_INVALID, data: nil),
-        ]
-        let rc = mpv_render_context_render(renderContextPointer, &params)
-        if rc < 0 {
-            reportSurfaceError(player: player, message: "mpv_render_context_render failed rc=\(rc)")
-            return
-        }
-        glBindRenderbuffer(GLenum(GL_RENDERBUFFER), renderbuffer)
-        _ = glContext.presentRenderbuffer(Int(EAGL_RENDER_BUFFER))
-    }
-
-    /// 尺寸变化时重建 renderbuffer + framebuffer 对（render 队列上调用，
-    /// 当前 GL 上下文已 setCurrent）。
-    private func rebuildFramebuffer(pixelWidth: Int32, pixelHeight: Int32) {
-        if framebuffer != 0 {
-            var value = framebuffer
-            glDeleteFramebuffers(1, &value)
-            framebuffer = 0
-        }
-        if renderbuffer != 0 {
-            var value = renderbuffer
-            glDeleteRenderbuffers(1, &value)
-            renderbuffer = 0
-        }
-        glGenRenderbuffers(1, &renderbuffer)
-        glBindRenderbuffer(GLenum(GL_RENDERBUFFER), renderbuffer)
-        _ = glContext?.renderbufferStorage(Int(EAGL_RENDER_BUFFER), from: glLayer)
-        glGenFramebuffers(1, &framebuffer)
-        glBindFramebuffer(GLenum(GL_FRAMEBUFFER), framebuffer)
-        glFramebufferRenderbuffer(GLenum(GL_FRAMEBUFFER), GLenum(GL_COLOR_ATTACHMENT0),
-                                  GLenum(GL_RENDERBUFFER), renderbuffer)
-        lastPixelWidth = pixelWidth
-        lastPixelHeight = pixelHeight
-    }
-
-    /// 渲染错误只记首次，避免每帧刷一条 surfaceError。
-    private func reportSurfaceError(player: MPlayPlayer, message: String) {
-        guard !surfaceErrorReported else { return }
-        surfaceErrorReported = true
-        player.noteSurfaceError(message)
     }
 }

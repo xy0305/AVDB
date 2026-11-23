@@ -46,6 +46,7 @@ struct MPlayProgress {
     var fileSize: Int64 = 0
     var cacheDuration: Double = 0
     var cacheEnd: Double = 0
+    var cacheSpeed: Int64 = 0
     var estimatedFrameRate: Double = 0
     var cacheEOF: Bool = false
     var pausedForCache: Bool = false

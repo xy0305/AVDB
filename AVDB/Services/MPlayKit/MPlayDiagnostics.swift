@@ -26,6 +26,12 @@ enum MPlayDiagnostics {
         return formatter
     }()
 
+    /// 简便入口：info 级别 + 通用 tag。各调用点多为单行状态打点，
+    /// 写的都是这个单参形态；需要区分级别/来源时用全形 log(level:tag:_:)。
+    static func log(_ message: String) {
+        log(level: 2, tag: "mplaykit", message)
+    }
+
     static func log(level: Int, tag: String, _ message: String) {
         lock.lock()
         let entry = "\(formatter.string(from: Date())) level=\(level) tag=\(tag) \(message)"
