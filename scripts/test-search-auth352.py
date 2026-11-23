@@ -30,17 +30,17 @@ import plistlib
 r = Path(__file__).resolve().parents[1]
 plist = plistlib.loads((r/'AVDB/Resources/Info.plist').read_bytes())
 pbx = (r/'AVDB.xcodeproj/project.pbxproj').read_text()
-assert plist['CFBundleVersion'] == '352' and plist['CFBundleShortVersionString'] == '1.0.2'
-assert pbx.count('CURRENT_PROJECT_VERSION = 352;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
+assert plist['CFBundleVersion'] == '353' and plist['CFBundleShortVersionString'] == '1.0.2'
+assert pbx.count('CURRENT_PROJECT_VERSION = 353;') == 2 and pbx.count('MARKETING_VERSION = 1.0.2;') == 2
 
 wf = (r/'.github/workflows/home-hq298.yml').read_text()
-assert 'Home HQ posters App 352' in wf and 'feat/search-auth-352' in wf
+assert 'Home HQ posters App 353' in wf and 'feat/search-auth-352' in wf
 assert 'feat/enrichment-351' in wf and 'revert/to-build-351' in wf
 assert wf.count('python3 scripts/test-search-auth352.py') == 5  # dedicated job + shared lists + release regressions
 assert wf.count('python3 scripts/test-enrichment351.py') == 5  # the 351 gate keeps its 5 run lines
-assert 'scripts/package-lut352.py' in wf and 'AVDB-352-release' in wf and 'AVDB-351-release' not in wf
-pkg = (r/'scripts/package-lut352.py').read_text()
-assert "=='352'" in pkg and 'AVDB-unsigned-1.0.2-352-searchauth.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
+assert 'scripts/package-lut353.py' in wf and 'AVDB-353-release' in wf and 'AVDB-351-release' not in wf
+pkg = (r/'scripts/package-lut353.py').read_text()
+assert "=='353'" in pkg and 'AVDB-unsigned-1.0.2-353-mplaykit.ipa' in pkg and "MinimumOSVersion']=='17.0'" in pkg
 assert '  search-auth-352:' in wf and '  enrichment-351:' in wf
 
 doc = (r/'Build352-SearchAuth.md').read_text()
@@ -123,4 +123,4 @@ assert search.count('publisher(for: .avdbCatalogAccountChanged)') == 4  # every 
 
 print('PASS test-search-auth352: search family fails fast logged out, movies/tags + series list + '
       'maker/director/publisher detail + v2/tags + movie magnets + user reviews + code detail send the token, '
-      'search UI offers login in all four tabs, release 352')
+      'search UI offers login in all four tabs, release 353')
