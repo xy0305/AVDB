@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-n",
- "generated_at": "2026-11-23T19:18:41+00:00",
+ "generated_at": "2026-11-24T19:35:51+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -1440,6 +1440,33 @@
    "cover_hires_url": "http://163.47.40.207:8901/nK7kBY.jpg",
    "release_date": "2026-10-01",
    "enriched_at": "2026-11-19T19:11:12+00:00"
+  },
+  {
+   "javdb_id": "nK7mNX",
+   "code": "SNOS377",
+   "plot": "普段は高嶺の花の客室乗務員を務めている彩花。\n愛しているからこそ、乱暴に扱って欲しい…。\nそんな彼女の一挙一動が、男のS心を掻き立たせる。\n\n双方が信頼し、求め合う’純愛×SMプレイ。\n苦しければ苦しいほど分泌される脳内麻薬ー\n河北彩花、新境地のドM覚醒。",
+   "plot_source": "dmm",
+   "director": "イナバール",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 161,
+   "score": 4.69,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00377/snos00377jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/PC0wEx8PEjyfLkq5ZHWe3b65z3Vz4WB4Xv1Vzof2TNwkAidrttQUZ2k3Fmmtb9/snos00377hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/nK7mNX.jpg",
+   "release_date": "2026-09-17",
+   "enriched_at": "2026-11-24T19:11:40+00:00"
   },
   {
    "javdb_id": "nK7y8w",

@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-j",
- "generated_at": "2026-11-23T19:18:41+00:00",
+ "generated_at": "2026-11-24T19:35:51+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -132,6 +132,32 @@
    "cover_hires_url": "http://163.47.40.207:8901/J0M4zR.jpg",
    "release_date": "2026-10-23",
    "enriched_at": "2026-11-22T19:11:48+00:00"
+  },
+  {
+   "javdb_id": "J0MwO8",
+   "code": "SNOS338",
+   "plot": "「男性経験はまだ1人だけ…」。\n少し震える声で語る彼女は、\n長野から上京したばかりの現役女子大生 。\n\n名前は「蒼井すず」。\n年齢は20歳。\n\nカメラの前でのぎこちない笑顔や、\n初めての快感に戸惑い恥じらう等身大の素顔には、\n一切擦れていない本物の少女性が宿っている。\n過剰な装飾はなく、\nむしろ削ぎ落としたからこそ尊い、\nその圧倒的な清純。\n\n普通の女の子に見えて、\nその顔立ち、豊満な乳房_\n実は普通ではないのだ。\n観る者の胸を締め付ける、\n奇跡のドキュメンタリーデビュー作。\n\n※本商品は通常版です。特典映像が収録された【特典版】はこちらからご覧ください。",
+   "plot_source": "dmm",
+   "director": "TAKE-D",
+   "maker": "エスワン ナンバーワンスタイル",
+   "series": "新人NO.1 STYLE",
+   "duration_min": 118,
+   "score": 4.79,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00338/snos00338jp-8.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/Tx15TCpc6Z09y8ZOXEOba4vbpvf31UkjLVeHvKHSVQn8qlSupAl65LBcAOLgk2/snos00338hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/J0MwO8.jpg",
+   "release_date": "2026-10-08",
+   "enriched_at": "2026-11-24T19:11:40+00:00"
   },
   {
    "javdb_id": "J0Zrpd",

@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "actors",
- "generated_at": "2026-11-23T19:12:25+00:00",
+ "generated_at": "2026-11-24T19:17:41+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -23,6 +23,12 @@
    "name": "JULIA",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/2-Juicy-Honey/JULIA.jpg",
    "enriched_at": "2026-11-16T19:12:36+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "RION",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/RION.jpg",
+   "enriched_at": "2026-11-24T19:13:00+00:00"
   },
   {
    "javdb_id": null,
@@ -2209,6 +2215,20 @@
   },
   {
    "javdb_id": null,
+   "name": "希望みう",
+   "birthday": "2006-01-01",
+   "height_cm": 160,
+   "bust": 104,
+   "waist": 60,
+   "hip": 92,
+   "cup": "I",
+   "birthplace": "東京都",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E5%B8%8C%E6%9C%9B%E3%81%BF%E3%81%86.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-24T19:14:22+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "常夏もか",
    "hip": 100,
    "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/138/857138.jpg",
@@ -2507,6 +2527,20 @@
   },
   {
    "javdb_id": null,
+   "name": "明日花キララ",
+   "birthday": "1988-10-02",
+   "height_cm": 163,
+   "bust": 93,
+   "waist": 57,
+   "hip": 88,
+   "cup": "I",
+   "birthplace": "北海道",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E6%98%8E%E6%97%A5%E8%8A%B1%E3%82%AD%E3%83%A9%E3%83%A9.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-24T19:14:59+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "明日葉みつは",
    "birthday": "2000-01-30",
    "height_cm": 175,
@@ -2577,6 +2611,21 @@
    "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/017/708017.jpg",
    "gender": "female",
    "enriched_at": "2026-11-17T19:15:28+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "星野ナミ",
+   "birthday": "1992-07-03",
+   "height_cm": 152,
+   "bust": 90,
+   "waist": 59,
+   "hip": 90,
+   "cup": "G",
+   "birthplace": "愛媛県",
+   "bio": "星野娜美（日语：星野ナミ；英语：Nami Hoshino，1992年7月3日—），福冈县出身的日本AV女优，曾是二代“惠比寿★麝香葡萄”成员，曾为“S1”专属女优，所属事务所为“Sun Promotion（サンプロ）”。\n\n星野娜美在2012年8月透过 AV片商“h.m.p”出道成为专属 AV 女优，同年9月曾参与演出 Android 版手机游戏“おっぱいソムリエ PREMIUM”。2013年3月，她发表第一本写真集《Rabpara》，同年4月获提名《日本成人广播奖2013》的新人女优奖，至8月则转投另一AV 片商“S1”，继续担任专属女优。\n\n2015年9月24日，星野娜美加入第二代惠比寿★麝香葡萄，成为要员之一；2016年9月1日便毕业于（退出）该女子音乐组合，2019年11月便再转到ATTACKERS担任专属女优。另外，其兴趣是烹饪，擅长表演杂技。",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E6%98%9F%E9%87%8E%E3%83%8A%E3%83%9F.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-24T19:15:15+00:00"
   },
   {
    "javdb_id": null,
@@ -4632,6 +4681,19 @@
   },
   {
    "javdb_id": null,
+   "name": "藍沢潤",
+   "birthday": "1994-11-17",
+   "height_cm": 154,
+   "bust": 84,
+   "waist": 59,
+   "hip": 83,
+   "birthplace": "神奈川県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E8%97%8D%E6%B2%A2%E6%BD%A4.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-24T19:17:30+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "藍芽みずき",
    "birthday": "2000-06-28",
    "height_cm": 158,
@@ -5036,6 +5098,20 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E9%88%B4%E3%81%AE%E5%AE%B6%E3%82%8A%E3%82%93.jpg",
    "gender": "female",
    "enriched_at": "2026-11-17T19:22:12+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "鈴木希",
+   "birthday": "2004-08-24",
+   "height_cm": 163,
+   "bust": 87,
+   "waist": 59,
+   "hip": 88,
+   "cup": "G",
+   "birthplace": "静岡県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E9%88%B4%E6%9C%A8%E5%B8%8C.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-24T19:17:41+00:00"
   },
   {
    "javdb_id": null,
