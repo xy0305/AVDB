@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-q",
- "generated_at": "2026-11-24T19:35:51+00:00",
+ "generated_at": "2026-11-25T19:20:14+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -917,6 +917,39 @@
    "cover_hires_url": "http://163.47.40.207:8901/qA75G6.jpg",
    "release_date": "2026-09-24",
    "enriched_at": "2026-11-18T19:11:22+00:00"
+  },
+  {
+   "javdb_id": "qAGOMD",
+   "code": "SNOS420",
+   "plot": "私は、大好きな彼のためなら何でもできた。\n「明日からさ、コレ着て登校してくれる？」\n渡されたのは…スクール水着だった。\n恥ずかしいけど、好きピに頼まれたら断る選択肢などなかった。\n\n翌日、スク水の上に羽織ったジャージを電車の中で脱いだ。\n\n好きピが遠くから見ている。\n\n知らない男たちがたくさん群がってきた。\n\n触られて、貪られて、悲しいけど気持ちよかった。\n\n好きピが、笑ってる。\n\n咲花、嬉しい。",
+   "plot_source": "dmm",
+   "director": "ヒモパン・オブ・ジョイトイ",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 120,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-12.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-13.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-14.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-15.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00420/snos00420jp-16.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/Px8jOTo2FXjLiRulGIRS7pjLakpKAU2AAxpz9EhWrTiWIaT3tawcCp7LLJInhx/snos00420hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/qAGOMD.jpg",
+   "release_date": "2026-10-22",
+   "enriched_at": "2026-11-25T19:11:27+00:00"
   },
   {
    "javdb_id": "qAGPpD",

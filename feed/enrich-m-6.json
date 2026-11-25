@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-6",
- "generated_at": "2026-11-24T19:35:51+00:00",
+ "generated_at": "2026-11-25T19:20:13+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -198,6 +198,37 @@
     }
    ],
    "enriched_at": "2026-11-16T19:11:10+00:00"
+  },
+  {
+   "javdb_id": "6dNx8D",
+   "code": "SNOS413",
+   "plot": "図書委員の早坂と、放課後に2人きりに…。\n「先生ともっと一緒にいたいです…」\n\n現れたのは男の本能を刺激する、\n真っ白でウブなカラダ\n\n慣れない誘惑でモジモジ赤面する姿を見た教師の俺は…\n\n奥手な女子生徒が\n必死に欲情ぶつけてくる不器用な姿に\n一線を超えて沼った禁断の関係",
+   "plot_source": "dmm",
+   "director": "ぬまモン",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 155,
+   "score": 4.88,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-12.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-13.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00413/snos00413jp-14.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/QB8DJj9T9XJSl7nr_ktwR7jySbSqIGuuU77C3GxcpEI-gEfzO1k61kHeiTvEWo/snos00413hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/6dNx8D.jpg",
+   "release_date": "2026-10-22",
+   "enriched_at": "2026-11-25T19:11:27+00:00"
   },
   {
    "javdb_id": "6dQXB9",

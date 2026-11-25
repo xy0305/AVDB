@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-m",
- "generated_at": "2026-11-24T19:35:51+00:00",
+ "generated_at": "2026-11-25T19:20:14+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -717,6 +717,33 @@
     }
    ],
    "enriched_at": "2026-11-15T19:07:41+00:00"
+  },
+  {
+   "javdb_id": "MbyxNP",
+   "code": "SNOS425",
+   "plot": "ミスキャンパスやアイドル出身者など毎年超難関の採用面接を潜り抜け到達できるキー局女子アナ。その中でも人気になるのはほんの一握り。園梨音、通称・りのぱんは今やお茶の間でも大人気、スキャンダル一切なしの清純派アナウンサーとして局の看板を背負う。ただ一つ悩みがある、上司の名物中年アナウンサーがセクハラまがいのことをする…局内ではうまくいなして事なきを得ているのだが、お泊まりロケの仕事。嫌な予感はしていた、でも会社員として断れず、いつも通りうまくかわせばいい事。ロケが終わり宿泊する部屋はまさかの相部屋。絶対に強い気持ちでと思いいつも通りガードを固めていたのに、いたのに…\n下品にお股ゆるゆるにしておち●ぽしゅきしゅきって清純を売りにしているアナウンサーが不本意にアヘイキ。\n密室空間では手も足も出せずただただその状況に従わざるおえず、遂にケダモノのように貪り合う始末。こんな自分がチョロいなんて思っていなかった…。",
+   "plot_source": "dmm",
+   "director": "きとるね川口",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 121,
+   "score": 4.75,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00425/snos00425jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/Mh8YKgNUKXQ_P0EXE2YNyS1P2353tOpSn0WITYpDu_HlWZG-V9wryDabuuAHDq/snos00425hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/MbyxNP.jpg",
+   "release_date": "2026-11-05",
+   "enriched_at": "2026-11-25T19:11:27+00:00"
   },
   {
    "javdb_id": "MbyxkJ",

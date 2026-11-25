@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-p",
- "generated_at": "2026-11-24T19:35:51+00:00",
+ "generated_at": "2026-11-25T19:20:14+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -1490,6 +1490,37 @@
    "cover_hires_url": "http://163.47.40.207:8901/pkY1Mw.jpg",
    "release_date": "2026-10-22",
    "enriched_at": "2026-11-22T19:11:48+00:00"
+  },
+  {
+   "javdb_id": "pkYaRB",
+   "code": "SNOS426",
+   "plot": "当番組では、ご主人様からの厳しいご命令、理不尽な制裁を随時お待ちしております。\n私のプライドを粉々に打ち砕くような、冷酷な制裁を……どうか、どうかよろしくお願いいたします。\n\nそれでは皆様、また明日、この『公開調教』の時間にお会いしましょう。\n\n本日は最後まで私の無様な姿をご覧いただき、誠にありがとうございました。",
+   "plot_source": "dmm",
+   "director": "イナバール",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 124,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-12.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-13.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00426/snos00426jp-14.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/GiYYLwUPcaQZVkt0QwNJ8vSCnVKj9dYtexSyuAdQjHTpcjPS4m0_rJ9gQuJ1ZX/snos00426hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/pkYaRB.jpg",
+   "release_date": "2026-11-05",
+   "enriched_at": "2026-11-25T19:11:27+00:00"
   },
   {
    "javdb_id": "pkYaae",
