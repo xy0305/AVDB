@@ -1,7 +1,7 @@
-name: Home HQ posters App 353
+name: Home HQ posters App 352
 on:
   push:
-    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332, feat/home-hero-detail-333, feat/home-hero-parity-334, feat/detail-api-335, feat/remove-javverse-336, feat/recommender-throttle-337, feat/logout-access-338, feat/detail-glass-clear-339, feat/session-revalidate-340, feat/reviews-first-load-341, feat/reviews-panel-pending-342, feat/list-landscape-cover-343, feat/list-tabbar-clearance-344, feat/western-actor-ranking-345, feat/list-paging-repeat-346, feat/actor-ranking-period-347, feat/actor-grid-scroll-348, feat/feed-prefill-349, feat/rankings-auth-350, feat/enrichment-351, revert/to-build-351, feat/search-auth-352, feat/mplaykit-353]
+    branches: [feat/home-hq-posters-from297, feat/home-load-312, feat/zzt-ranking-313, feat/zzt-ranking-314, feat/zzt-ranking-315, feat/zzt-ranking-316, feat/zzt-ranking-317, feat/zzt-ranking-318, feat/zzt-ranking-319, feat/zzt-ranking-320, feat/zzt-ranking-321, feat/zzt-ranking-322, feat/player-chrome-323, feat/home-hero-324, feat/home-immersive-325, feat/home-hero-hq-326, feat/detail-auth-327, feat/home-hot-328, feat/home-hot-329, feat/home-chrome-330, feat/home-hero-crop-331, feat/home-hero-color-332, feat/home-hero-detail-333, feat/home-hero-parity-334, feat/detail-api-335, feat/remove-javverse-336, feat/recommender-throttle-337, feat/logout-access-338, feat/detail-glass-clear-339, feat/session-revalidate-340, feat/reviews-first-load-341, feat/reviews-panel-pending-342, feat/list-landscape-cover-343, feat/list-tabbar-clearance-344, feat/western-actor-ranking-345, feat/list-paging-repeat-346, feat/actor-ranking-period-347, feat/actor-grid-scroll-348, feat/feed-prefill-349, feat/rankings-auth-350, feat/enrichment-351, revert/to-build-351, feat/search-auth-352]
 permissions:
   contents: read
 jobs:
@@ -54,7 +54,6 @@ jobs:
       - run: python3 scripts/test-rankings-auth350.py
       - run: python3 scripts/test-enrichment351.py
       - run: python3 scripts/test-search-auth352.py
-      - run: python3 scripts/test-mplaykit353.py
   recommender-throttle-337:
     # Build 337: recommender manual-only + random slow spacing + 10-request cap.
     runs-on: macos-26
@@ -167,13 +166,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/test-search-auth352.py
-  mplaykit-353:
-    # Build 353: MPlayKit (libmpv) playback core restored from the reverse-engineered Android MPlayKit; KSPlayer remains the default kernel, MPlayKit is opt-in in Settings.
-    runs-on: macos-26
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - run: python3 scripts/test-mplaykit353.py
   remove-javverse-336:
     # Build 336: JavVerse ranking removed; shared entry-resolution layer kept for DMM.
     runs-on: macos-26
@@ -197,7 +189,6 @@ jobs:
       - run: python3 scripts/test-rankings-auth350.py
       - run: python3 scripts/test-enrichment351.py
       - run: python3 scripts/test-search-auth352.py
-      - run: python3 scripts/test-mplaykit353.py
   detail-api-335:
     # Build 335: detail glass + API auth change (search token, 猜你喜欢 endpoint feed).
     runs-on: macos-26
@@ -222,7 +213,6 @@ jobs:
       - run: python3 scripts/test-rankings-auth350.py
       - run: python3 scripts/test-enrichment351.py
       - run: python3 scripts/test-search-auth352.py
-      - run: python3 scripts/test-mplaykit353.py
   models:
     runs-on: macos-26
     timeout-minutes: 60
@@ -252,68 +242,8 @@ jobs:
           path: AVDB/Resources/LiveModels
           compression-level: 0
           retention-days: 3
-  libmpv-353:
-    # Build 353: Libmpv.xcframework for the MPlayKit core (FFmpeg 8.0.1 + mpv 0.41.0 + libplacebo 7.387.0 + dav1d 1.5.1 + libass 0.17.4 + uchardet 0.0.8 + lcms2 2.16 stack, every source sha256-pinned in scripts/mplaykit353/build_libmpv.py; mpv carries the vendored frame_output vo patches and is built -Dgl=disabled -Dios-gl=disabled). Cached by build-script hash (key v2: mpv 0.41.0 + patches + ios-gl fix); a cold build is long, warm runs restore the tree and Vendor/Libmpv.xcframework.
-    runs-on: macos-26
-    timeout-minutes: 240
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache Libmpv sources, build tree and xcframework
-        id: libmpv-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .cache353
-            Vendor/Libmpv.xcframework
-          key: libmpv-353-v2-${{ hashFiles('scripts/mplaykit353/**') }}
-      - name: Build Libmpv.xcframework (pinned sources, sha256-verified)
-        if: steps.libmpv-cache.outputs.cache-hit != 'true'
-        run: python3 scripts/mplaykit353/build_libmpv.py "$GITHUB_WORKSPACE"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-          compression-level: 0
-          retention-days: 3
-  spatial-353:
-    # Build 353 stage D: spatial-audio decoder xcframeworks for the MPlayKit
-    # full restoration (LibTrueHD @ 3eab2e7c + LibDTSX @ 6f0b321e, AetherEngine
-    # @ fc6b412e for the silent-Atmos sample only; pins live in
-    # scripts/mplaykit353/build_spatial.py). Ported from AVFan's verified
-    # spatial steps (AVFan run 45239463298). Produces Vendor/TrueHD.xcframework
-    # + Vendor/DTSX.xcframework (+ Vendor/mplay-silent-atmos.mp4 when the
-    # generator runs); the artifact root is the Vendor/ contents, so consumers
-    # download it to path Vendor/ and the two frameworks land in place.
-    runs-on: macos-26
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cache spatial decoder xcframeworks
-        id: spatial-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .cache353/spatial
-            Vendor/TrueHD.xcframework
-            Vendor/DTSX.xcframework
-          key: spatial-353-v1-${{ hashFiles('scripts/mplaykit353/build_spatial.py') }}
-          restore-keys: |
-            spatial-353-v1-
-      - name: Build spatial decoder xcframeworks (pinned sources, stage D)
-        if: steps.spatial-cache.outputs.cache-hit != 'true'
-        run: python3 scripts/mplaykit353/build_spatial.py "$GITHUB_WORKSPACE"
-      - name: Assert spatial xcframeworks exist
-        run: |
-          test -d Vendor/TrueHD.xcframework
-          test -d Vendor/DTSX.xcframework
-      - uses: actions/upload-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
-          compression-level: 0
-          retention-days: 3
   release:
-    needs: [models, libmpv-353, spatial-353]
+    needs: models
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -322,19 +252,6 @@ jobs:
         with:
           name: live287-models
           path: AVDB/Resources/LiveModels
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
-      - name: Assert Libmpv + spatial xcframeworks exist
-        run: |
-          test -d Vendor/Libmpv.xcframework
-          test -d Vendor/TrueHD.xcframework
-          test -d Vendor/DTSX.xcframework
       - name: Fetch sherpa-onnx iOS/macOS xcframeworks + SenseVoice-Small int8 (sha256-pinned); drop bundled turbo (on-demand in 289)
         run: |
           set -euo pipefail
@@ -346,7 +263,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence-release
-          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; python3 scripts/test-zzt-ranking319.py; python3 scripts/test-zzt-ranking320.py; python3 scripts/test-zzt-ranking321.py; python3 scripts/test-zzt-ranking322.py; python3 scripts/test-player-chrome323.py; python3 scripts/test-home-hero-hq326.py; python3 scripts/test-detail-auth327.py; python3 scripts/test-home-hot328.py; python3 scripts/test-home-hot329.py; python3 scripts/test-home-chrome330.py; python3 scripts/test-home-hero331.py; python3 scripts/test-home-hero332.py; python3 scripts/test-home-hero333.py; python3 scripts/test-home-hero334.py; python3 scripts/test-detail-api335.py; python3 scripts/test-remove-javverse336.py; python3 scripts/test-recommender-throttle337.py; python3 scripts/test-logout-access338.py; python3 scripts/test-clear-glass339.py; python3 scripts/test-session-revalidate340.py; python3 scripts/test-reviews-first-load341.py; python3 scripts/test-reviews-panel-pending342.py; python3 scripts/test-list-landscape-cover343.py; python3 scripts/test-list-tabbar-clearance344.py; python3 scripts/test-western-actor-ranking345.py; python3 scripts/test-list-paging-repeat346.py; python3 scripts/test-actor-ranking-period347.py; python3 scripts/test-actor-grid-scroll348.py; python3 scripts/test-feed-prefill349.py; python3 scripts/test-rankings-auth350.py; python3 scripts/test-enrichment351.py; python3 scripts/test-search-auth352.py; python3 scripts/test-mplaykit353.py; } 2>&1 | tee evidence-release/regressions.log
+          { python3 scripts/test-watch-history277.py; python3 scripts/test-playback-history.py; python3 scripts/test-progress-tap277.py; python3 scripts/test-player-gestures.py; python3 scripts/test-seek-preview.py; python3 scripts/test-native-lut.py; python3 scripts/test-mediapipe-parity.py; python3 scripts/test-hls-safety273.py; python3 scripts/test-resume-follow280.py; python3 scripts/test-recommender281.py; python3 scripts/test-dmm-covers282.py; python3 scripts/test-tangxin-dns283.py; python3 scripts/test-dmm-covers284.py; python3 scripts/test-ai-cover286.py; python3 scripts/test-player-regressions.py; python3 scripts/test-live289.py; python3 scripts/test-ai-cover289.py; AVDB_CLOUD290_SERVER_OPTIONAL=1 python3 scripts/test-cloud290.py; python3 scripts/test-live291.py; python3 scripts/test-live292.py; python3 scripts/test-live293.py; python3 scripts/test-live294.py; python3 scripts/test-live295.py; python3 scripts/test-live296.py; python3 scripts/test-live297.py; python3 scripts/test-home-hq298.py; python3 scripts/test-search-open299.py; python3 scripts/test-list-hd300.py; python3 scripts/test-category-filter302.py; python3 scripts/test-list-hq-fast303.py; python3 scripts/test-category-filter304.py; python3 scripts/test-category-filter307.py; python3 scripts/test-one308.py; python3 scripts/test-tangxin-full311.py; python3 scripts/test-home-load312.py; python3 scripts/test-zzt-ranking313.py; python3 scripts/test-zzt-ranking314.py; python3 scripts/test-zzt-ranking315.py; python3 scripts/test-zzt-ranking316.py; python3 scripts/test-zzt-ranking317.py; python3 scripts/test-zzt-ranking318.py; python3 scripts/test-zzt-ranking319.py; python3 scripts/test-zzt-ranking320.py; python3 scripts/test-zzt-ranking321.py; python3 scripts/test-zzt-ranking322.py; python3 scripts/test-player-chrome323.py; python3 scripts/test-home-hero-hq326.py; python3 scripts/test-detail-auth327.py; python3 scripts/test-home-hot328.py; python3 scripts/test-home-hot329.py; python3 scripts/test-home-chrome330.py; python3 scripts/test-home-hero331.py; python3 scripts/test-home-hero332.py; python3 scripts/test-home-hero333.py; python3 scripts/test-home-hero334.py; python3 scripts/test-detail-api335.py; python3 scripts/test-remove-javverse336.py; python3 scripts/test-recommender-throttle337.py; python3 scripts/test-logout-access338.py; python3 scripts/test-clear-glass339.py; python3 scripts/test-session-revalidate340.py; python3 scripts/test-reviews-first-load341.py; python3 scripts/test-reviews-panel-pending342.py; python3 scripts/test-list-landscape-cover343.py; python3 scripts/test-list-tabbar-clearance344.py; python3 scripts/test-western-actor-ranking345.py; python3 scripts/test-list-paging-repeat346.py; python3 scripts/test-actor-ranking-period347.py; python3 scripts/test-actor-grid-scroll348.py; python3 scripts/test-feed-prefill349.py; python3 scripts/test-rankings-auth350.py; python3 scripts/test-enrichment351.py; python3 scripts/test-search-auth352.py; } 2>&1 | tee evidence-release/regressions.log
       - name: Install actual pinned MediaPipe SDK
         run: |
           gem install cocoapods -v 1.16.2 --no-document
@@ -372,7 +289,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :AVDBSourceTree string $(git rev-parse HEAD^{tree})" "$app/Info.plist"
           mkdir -p "$RUNNER_TEMP/ipa/Payload"
           ditto "$app" "$RUNNER_TEMP/ipa/Payload/AVDB.app"
-          python3 scripts/package-lut353.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
+          python3 scripts/package-lut352.py "$RUNNER_TEMP/ipa" "$GITHUB_WORKSPACE"
           file "$app/AVDB" | tee evidence-release/macho.txt
           xcrun vtool -show-build "$app/AVDB" | tee -a evidence-release/macho.txt
           codesign -dv "$app" 2> evidence-release/codesign.txt || true
@@ -393,7 +310,7 @@ jobs:
           test "$bytes" -gt 500000000
       - uses: actions/upload-artifact@v4
         with:
-          name: AVDB-353-release
+          name: AVDB-352-release
           path: |
             AVDB-unsigned-*.ipa
             evidence-release/*
@@ -403,7 +320,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: AVDB-353-release-logs
+          name: AVDB-352-release-logs
           path: |
             evidence-release/*
             fetch-live289.log
@@ -424,7 +341,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-cloud-tests
+          name: AVDB-352-cloud-tests
           path: evidence-cloud290/*
           if-no-files-found: warn
   ai-cover-settings-screenshots:
@@ -440,7 +357,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-ai-cover-cloud-screenshots
+          name: AVDB-352-ai-cover-cloud-screenshots
           path: |
             evidence-ai290ui/shots/*
             evidence-ai290ui/status.json
@@ -459,7 +376,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-live-subtitle-screenshots
+          name: AVDB-352-live-subtitle-screenshots
           path: |
             evidence-live287/ui/shots/*
             evidence-live287/ui/status.json
@@ -480,7 +397,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-production-controller-HLS
+          name: AVDB-352-production-controller-HLS
           path: |
             evidence-hls-app/*.json
             evidence-hls-app/*.log
@@ -508,7 +425,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-strict-runtime
+          name: AVDB-352-strict-runtime
           path: |
             evidence-hls-runtime/*.json
             evidence-hls-runtime/*.log
@@ -525,25 +442,16 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-hq-simulator
+          name: AVDB-352-home-hq-simulator
           path: evidence-homehq298/*
           if-no-files-found: warn
   home-hero-hq-screenshots:
-    needs: [libmpv-353, spatial-353]
     # Build 326: production HomeView (neutral --home326-fixture 700×1000 B-tier rasters, no network)
     # on an iPhone simulator; screenshots of the full-bleed HQ hero and the rails.
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -588,27 +496,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-screenshots
+          name: AVDB-352-home-screenshots
           path: |
             evidence-home326/*
             home326-ui.log
           if-no-files-found: warn
 
   detail-auth-327:
-    needs: [libmpv-353, spatial-353]
     # Build 327: detail-page token + visible auth errors (unit + UI, no live network)
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -645,26 +544,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-detail-auth-tests
+          name: AVDB-352-detail-auth-tests
           path: |
             detail327-ui.log
           if-no-files-found: warn
 
   home-hot-328:
-    needs: [libmpv-353, spatial-353]
     # Build 328: playback hero + vertical swipe policy + stuck-source deadline (unit + UI)
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -701,27 +591,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-hot-tests
+          name: AVDB-352-home-hot-tests
           path: |
             home328-ui.log
           if-no-files-found: warn
 
   home-hot-329:
-    needs: [libmpv-353, spatial-353]
     # Build 329: unblurred hero floor, 3×3 grids, delayed CDN upgrade, preheat, offline floor (unit + UI)
     # HomeHot329Tests: test329DelayedCDNPaintsSharpFloorThenUpgrades, test329PreheatFollowingDTOThumbs, test329OfflineColdStartRestoresSharpFloor, test329RailFloorAccepts147ThumbAnd360IsPreferenceOnly, test329HeroCIDMapReadsDTOAndCache
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -758,27 +639,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-hot-tests
+          name: AVDB-352-home-hot-tests
           path: |
             home329-ui.log
           if-no-files-found: warn
 
   home-chrome-330:
-    needs: [libmpv-353, spatial-353]
     # Build 330: 44 pt liquid-glass search, overlay-tap hero navigation, official DetailPosterResolver portrait, liquid-glass shortcuts (unit)
     # HomeChrome330Tests: test330CleanTapOpensDetailAndPageCommitDoesNot, test330DTOFloorPaintsThenUpgradesToResolverWinner, test330CacheHitUsedImmediately, test330EnrichMergedDetailCoverIsMiddleStep, test330BackdropPLIsNotPrimaryOverOfficialPortrait
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -815,27 +687,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-chrome-tests
+          name: AVDB-352-home-chrome-tests
           path: |
             home330-ui.log
           if-no-files-found: warn
 
   home-hero-331:
-    needs: [libmpv-353, spatial-353]
     # Build 331: home hero front crop — two-level floor (front-cropped cover_url / thumb → official DetailPosterResolver winner), disk-only restores, per-item enrich → resolver pipeline (unit)
     # HomeHero331Tests: test331ColdStartFirstFrameIsFrontPortrait, test331SwipeToFourthAndBackKeepsSharpWinner, test331OfflineColdStartShowsDetailWinner, test331LandscapeFixtureNeverShowsUncroppedLayer, test331ResolverNeverCompletesStaysOnSharpFrontFloor, test331EvictedWinnerRestoresWithZeroNetwork, test331SetCurrentIndexKeepsMergedFields, test331DetailWinnerSharedByMovieID
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -872,27 +735,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-hero-tests
+          name: AVDB-352-home-hero-tests
           path: |
             home331-ui.log
           if-no-files-found: warn
 
   home-hero-332:
-    needs: [libmpv-353, spatial-353]
     # Build 332: home hero paints the original decoded bitmap (display-time front window, 32 pt overlap, sRGB translate-redraw crop, ICC-preserving JPEG)
     # HomeHero332Tests: test332FloorIsOriginalBitmapAndWindowIsFront, test332SnosWinnerRenderDeltaEAgainstReferenceImage, test332VisibleWindowHidesBackCoverOnThreeFixtures, test332FloorToWinnerCrossfadeKeepsColorTemperature, test332OverlapKeepsBottomUIAndFacesVisible, test332LoadPosterCropIsPackedSRGBAndDeltaEUnder2, test332HeroCoverDiskJPEGPreservesSRGBProfile
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -929,26 +783,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-hero-color-tests
+          name: AVDB-352-home-hero-color-tests
           path: |
             home332-ui.log
           if-no-files-found: warn
   home-hero-333:
-    needs: [libmpv-353, spatial-353]
     # Build 333: home hero paints the detail page display image (art.image) with a detail-style bottom gradient (floor transition kept)
     # HomeHero333Tests: test333SharpLayerIsDetailDisplayImageNotRawEnvelope, test333JacketWinnerShowsFrontDisplayRaster, test333DiskRestoreReturnsDisplayImage, test333BottomChromeInsetsAboveFadeBand
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -985,26 +830,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-hero-detail-tests
+          name: AVDB-352-home-hero-detail-tests
           path: |
             home333-ui.log
           if-no-files-found: warn
   home-hero-334:
-    needs: [libmpv-353, spatial-353]
     # Build 334: home hero height mirrors DetailPortraitGeometry (detail parity); HomeHero334Tests compile fix
     # HomeHero334Tests: test334HeroHeightMatchesDetailPortraitGeometry, test334IPadHeroHeightUnchanged
     runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-libmpv
-          path: Vendor/Libmpv.xcframework
-      - uses: actions/download-artifact@v4
-        with:
-          name: AVDB-353-spatial
-          path: Vendor/
       - name: Simulator-only app setup (no live models; drop the device-only vendor xcframeworks — both are canImport-guarded)
         run: |
           set -euo pipefail
@@ -1041,7 +877,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AVDB-353-home-hero-parity-tests
+          name: AVDB-352-home-hero-parity-tests
           path: |
             home334-ui.log
           if-no-files-found: warn

@@ -25,25 +25,6 @@ struct Pan115PlayerView: View {
             Color.black.ignoresSafeArea()
             if let url = vm.playURL, vm.errorMessage == nil, !vm.isLoading {
                 let metricsGeneration = vm.metricsGeneration
-                if PlaybackKernelSettings.current == .mplayKit {
-                    // Build 353 全量还原：新层 open 支持 startSeconds（以 mpv
-                    // start 属性起播）；本调用点暂未传入续播位置（沿用默认 0），
-                    // 续播接线见 Build353-MPlayKit.md 偏差表第 9 项。
-                    MPlayKitPlayerView(
-                        url: url,
-                        title: movie.displayNumber,
-                        subtitle: vm.qualityLabel,
-                        headers: vm.headers,
-                        onPlaybackFailure: {
-                            Task {
-                                guard vm.metricsGeneration == metricsGeneration else { return }
-                                await vm.failed()
-                            }
-                        }
-                    )
-                    .id(url)
-                    .id(metricsGeneration)
-                } else {
                 KSChromePlayer(
                     url: url,
                     title: movie.displayNumber,
@@ -72,7 +53,6 @@ struct Pan115PlayerView: View {
                 )
                 .id(url)
                 .id(metricsGeneration)
-                }
             } else if let err = vm.errorMessage {
                 ContentUnavailableView {
                     Label("无法播放", systemImage: "exclamationmark.triangle")

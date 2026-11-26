@@ -10,7 +10,6 @@ import SwiftUI
 struct UserView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject private var pan115 = Pan115Settings.shared
-    @AppStorage(PlaybackKernelSettings.defaultsKey) private var playbackKernel = PlaybackKernel.ksPlayer.rawValue
     @State private var showLogin = false
 
     var body: some View {
@@ -271,15 +270,6 @@ struct UserView: View {
                     } label: {
                         Label("JAV Ranking", systemImage: "list.number")
                     }
-                }
-
-                Section("播放") {
-                    Picker("播放内核", selection: $playbackKernel) {
-                        ForEach(PlaybackKernel.allCases) { kernel in
-                            Text(kernel.rawValue).tag(kernel.rawValue)
-                        }
-                    }
-                    .accessibilityIdentifier("playback-kernel-picker")
                 }
 
                 Section("AI 翻译") {

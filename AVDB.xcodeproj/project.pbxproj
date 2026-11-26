@@ -124,49 +124,6 @@
 		A24300000000000000000003 /* ActorAliasCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000004 /* ActorAliasCatalog.swift */; };
 		FEED34900000000000000001 /* RankingFeedClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED34900000000000000002 /* RankingFeedClient.swift */; };
 		E351FEED0000000000000002 /* EnrichmentFeedClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E351FEED0000000000000001 /* EnrichmentFeedClient.swift */; };
-		MPLAY3530000000000000011 /* MPlayKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000001 /* MPlayKernel.swift */; };
-		MPLAY3530000000000000012 /* MPlayDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000002 /* MPlayDiagnostics.swift */; };
-		MPLAY3530000000000000013 /* MPlayState.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000003 /* MPlayState.swift */; };
-		MPLAY3530000000000000014 /* MPlayPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000004 /* MPlayPlayer.swift */; };
-		MPLAY3530000000000000016 /* MPlayVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000006 /* MPlayVideoView.swift */; };
-		MPLAY3530000000000000017 /* MPlayPreviewReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000007 /* MPlayPreviewReader.swift */; };
-		MPLAY3530000000000000100 /* MPlayAudioPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000074 /* MPlayAudioPolicy.swift */; };
-		MPLAY3530000000000000101 /* MPlayCachePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000075 /* MPlayCachePolicy.swift */; };
-		MPLAY3530000000000000102 /* MPlayCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000076 /* MPlayCapture.swift */; };
-		MPLAY3530000000000000103 /* MPlayDisc.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000077 /* MPlayDisc.swift */; };
-		MPLAY3530000000000000104 /* MPlayDolbyVision.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000078 /* MPlayDolbyVision.swift */; };
-		MPLAY3530000000000000105 /* MPlayFrameOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000079 /* MPlayFrameOutput.swift */; };
-		MPLAY3530000000000000106 /* MPlayNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000080 /* MPlayNowPlaying.swift */; };
-		MPLAY3530000000000000107 /* MPlayPictureInPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000081 /* MPlayPictureInPicture.swift */; };
-		MPLAY3530000000000000108 /* MPlayPlayerExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000082 /* MPlayPlayerExtras.swift */; };
-		MPLAY3530000000000000109 /* MPlayPostChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000083 /* MPlayPostChain.swift */; };
-		MPLAY3530000000000000110 /* MPlayPostChain.metal in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000084 /* MPlayPostChain.metal */; };
-		MPLAY3530000000000000111 /* MPlaySpatial.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000085 /* MPlaySpatial.swift */; };
-		MPLAY3530000000000000112 /* MPlaySpatialRender.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000086 /* MPlaySpatialRender.swift */; };
-		MPLAY3530000000000000113 /* MPlayStreamBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000087 /* MPlayStreamBridge.c */; };
-		MPLAY3530000000000000114 /* MPlayStreamProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000089 /* MPlayStreamProtocol.swift */; };
-		MPLAY3530000000000000115 /* MPlaySubtitleLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000090 /* MPlaySubtitleLayer.swift */; };
-		MPLAY3530000000000000116 /* MPlaySubtitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000091 /* MPlaySubtitles.swift */; };
-		MPLAY3530000000000000117 /* MPlaySpatialBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000092 /* MPlaySpatialBridge.c */; };
-		MPLAY3530000000000000018 /* MPlayKitPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000008 /* MPlayKitPlayerView.swift */; };
-		MPLAY3530000000000000031 /* Libmpv.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000030 /* Libmpv.xcframework */; };
-		MPLAY3530000000000000118 /* TrueHD.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000097 /* TrueHD.xcframework */; };
-		MPLAY3530000000000000119 /* DTSX.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000098 /* DTSX.xcframework */; };
-		MPLAY3530000000000000032 /* Libmpv.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000030 /* Libmpv.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		MPLAY3530000000000000120 /* DTSX.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000098 /* DTSX.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		MPLAY3530000000000000060 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000040 /* AVFoundation.framework */; };
-		MPLAY3530000000000000061 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000041 /* AudioToolbox.framework */; };
-		MPLAY3530000000000000062 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000042 /* CoreMedia.framework */; };
-		MPLAY3530000000000000063 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000043 /* CoreVideo.framework */; };
-		MPLAY3530000000000000064 /* VideoToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000044 /* VideoToolbox.framework */; };
-		MPLAY3530000000000000065 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000045 /* OpenGLES.framework */; };
-		MPLAY3530000000000000066 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000046 /* Security.framework */; };
-		MPLAY3530000000000000067 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000047 /* Foundation.framework */; };
-		MPLAY3530000000000000068 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000048 /* CoreFoundation.framework */; };
-		MPLAY3530000000000000070 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000050 /* libc++.tbd */; };
-		MPLAY3530000000000000071 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000051 /* libz.tbd */; };
-		MPLAY3530000000000000072 /* libiconv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000052 /* libiconv.tbd */; };
-		MPLAY3530000000000000073 /* libbz2.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = MPLAY3530000000000000053 /* libbz2.tbd */; };
 		E351FEED0000000000000004 /* XAITranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E351FEED0000000000000003 /* XAITranslationService.swift */; };
 		A24300000000000000000005 /* ExternalActorResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24300000000000000000006 /* ExternalActorResolver.swift */; };
 		RESUME280000000000000001 /* PlaybackResume.swift in Sources */ = {isa = PBXBuildFile; fileRef = RESUME280000000000000002 /* PlaybackResume.swift */; };
@@ -300,53 +257,6 @@
 		A24300000000000000000004 /* ActorAliasCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActorAliasCatalog.swift; sourceTree = "<group>"; };
 		FEED34900000000000000002 /* RankingFeedClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingFeedClient.swift; sourceTree = "<group>"; };
 		E351FEED0000000000000001 /* EnrichmentFeedClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentFeedClient.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000001 /* MPlayKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayKernel.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000002 /* MPlayDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayDiagnostics.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000003 /* MPlayState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayState.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000004 /* MPlayPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayPlayer.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000006 /* MPlayVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayVideoView.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000007 /* MPlayPreviewReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayPreviewReader.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000008 /* MPlayKitPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayKitPlayerView.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000074 /* MPlayAudioPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayAudioPolicy.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000075 /* MPlayCachePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayCachePolicy.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000076 /* MPlayCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayCapture.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000077 /* MPlayDisc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayDisc.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000078 /* MPlayDolbyVision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayDolbyVision.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000079 /* MPlayFrameOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayFrameOutput.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000080 /* MPlayNowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayNowPlaying.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000081 /* MPlayPictureInPicture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayPictureInPicture.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000082 /* MPlayPlayerExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayPlayerExtras.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000083 /* MPlayPostChain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayPostChain.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000084 /* MPlayPostChain.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = MPlayPostChain.metal; sourceTree = "<group>"; };
-		MPLAY3530000000000000085 /* MPlaySpatial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlaySpatial.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000086 /* MPlaySpatialRender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlaySpatialRender.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000087 /* MPlayStreamBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = MPlayStreamBridge.c; sourceTree = "<group>"; };
-		MPLAY3530000000000000088 /* MPlayStreamBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MPlayStreamBridge.h; sourceTree = "<group>"; };
-		MPLAY3530000000000000089 /* MPlayStreamProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlayStreamProtocol.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000090 /* MPlaySubtitleLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlaySubtitleLayer.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000091 /* MPlaySubtitles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPlaySubtitles.swift; sourceTree = "<group>"; };
-		MPLAY3530000000000000092 /* MPlaySpatialBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = MPlaySpatialBridge.c; sourceTree = "<group>"; };
-		MPLAY3530000000000000093 /* MPlaySpatialBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MPlaySpatialBridge.h; sourceTree = "<group>"; };
-		MPLAY3530000000000000094 /* truehd_atmos.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = truehd_atmos.h; sourceTree = "<group>"; };
-		MPLAY3530000000000000095 /* dtsx.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = dtsx.h; sourceTree = "<group>"; };
-		MPLAY3530000000000000096 /* UPSTREAM.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = UPSTREAM.md; sourceTree = "<group>"; };
-		MPLAY3530000000000000099 /* AVDB-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "AVDB-Bridging-Header.h"; sourceTree = "<group>"; };
-		MPLAY3530000000000000030 /* Libmpv.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Libmpv.xcframework; path = Vendor/Libmpv.xcframework; sourceTree = SOURCE_ROOT; };
-		MPLAY3530000000000000097 /* TrueHD.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = TrueHD.xcframework; path = Vendor/TrueHD.xcframework; sourceTree = SOURCE_ROOT; };
-		MPLAY3530000000000000098 /* DTSX.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = DTSX.xcframework; path = Vendor/DTSX.xcframework; sourceTree = SOURCE_ROOT; };
-		MPLAY3530000000000000040 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000041 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000042 /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000043 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000044 /* VideoToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000045 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000046 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000047 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000048 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
-		MPLAY3530000000000000050 /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
-		MPLAY3530000000000000051 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
-		MPLAY3530000000000000052 /* libiconv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libiconv.tbd; path = usr/lib/libiconv.tbd; sourceTree = SDKROOT; };
-		MPLAY3530000000000000053 /* libbz2.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
 		E351FEED0000000000000003 /* XAITranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XAITranslationService.swift; sourceTree = "<group>"; };
 		A24300000000000000000006 /* ExternalActorResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalActorResolver.swift; sourceTree = "<group>"; };
 		E21E8365384D35AB1B1B4C52 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -377,8 +287,6 @@
 			files = (
 				SHERPA289000000000000002 /* SherpaOnnxC.xcframework in Embed Frameworks */,
 				LLAMA292000000000000002 /* llama.xcframework in Embed Frameworks */,
-				MPLAY3530000000000000032 /* Libmpv.xcframework in Embed Frameworks */,
-				MPLAY3530000000000000120 /* DTSX.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -393,22 +301,6 @@
 				A115C11E7A7B115C11E7A009 /* KSPlayer in Frameworks */,
 				SHERPA289000000000000001 /* SherpaOnnxC.xcframework in Frameworks */,
 				LLAMA292000000000000001 /* llama.xcframework in Frameworks */,
-				MPLAY3530000000000000031 /* Libmpv.xcframework in Frameworks */,
-				MPLAY3530000000000000118 /* TrueHD.xcframework in Frameworks */,
-				MPLAY3530000000000000119 /* DTSX.xcframework in Frameworks */,
-				MPLAY3530000000000000060 /* AVFoundation.framework in Frameworks */,
-				MPLAY3530000000000000061 /* AudioToolbox.framework in Frameworks */,
-				MPLAY3530000000000000062 /* CoreMedia.framework in Frameworks */,
-				MPLAY3530000000000000063 /* CoreVideo.framework in Frameworks */,
-				MPLAY3530000000000000064 /* VideoToolbox.framework in Frameworks */,
-				MPLAY3530000000000000065 /* OpenGLES.framework in Frameworks */,
-				MPLAY3530000000000000066 /* Security.framework in Frameworks */,
-				MPLAY3530000000000000067 /* Foundation.framework in Frameworks */,
-				MPLAY3530000000000000068 /* CoreFoundation.framework in Frameworks */,
-				MPLAY3530000000000000070 /* libc++.tbd in Frameworks */,
-				MPLAY3530000000000000071 /* libz.tbd in Frameworks */,
-				MPLAY3530000000000000072 /* libiconv.tbd in Frameworks */,
-				MPLAY3530000000000000073 /* libbz2.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -444,7 +336,6 @@
 			isa = PBXGroup;
 			children = (
 				380FFE9F6E4CF01F277CD7BD /* AVDBApp.swift */,
-				MPLAY3530000000000000099 /* AVDB-Bridging-Header.h */,
 				A296A58319160592237A1545 /* Models */,
 				7680DD4FBFFAFFDECAD87E67 /* Networking */,
 				A1B9B43015237F5437EE30F3 /* Services */,
@@ -522,54 +413,9 @@
 			path = Categories;
 			sourceTree = "<group>";
 		};
-		MPLAY3530000000000000020 /* MPlayKit */ = {
-			isa = PBXGroup;
-			children = (
-				MPLAY3530000000000000001 /* MPlayKernel.swift */,
-				MPLAY3530000000000000002 /* MPlayDiagnostics.swift */,
-				MPLAY3530000000000000003 /* MPlayState.swift */,
-				MPLAY3530000000000000004 /* MPlayPlayer.swift */,
-				MPLAY3530000000000000006 /* MPlayVideoView.swift */,
-				MPLAY3530000000000000007 /* MPlayPreviewReader.swift */,
-				MPLAY3530000000000000079 /* MPlayFrameOutput.swift */,
-				MPLAY3530000000000000090 /* MPlaySubtitleLayer.swift */,
-				MPLAY3530000000000000081 /* MPlayPictureInPicture.swift */,
-				MPLAY3530000000000000083 /* MPlayPostChain.swift */,
-				MPLAY3530000000000000084 /* MPlayPostChain.metal */,
-				MPLAY3530000000000000075 /* MPlayCachePolicy.swift */,
-				MPLAY3530000000000000085 /* MPlaySpatial.swift */,
-				MPLAY3530000000000000086 /* MPlaySpatialRender.swift */,
-				MPLAY3530000000000000078 /* MPlayDolbyVision.swift */,
-				MPLAY3530000000000000088 /* MPlayStreamBridge.h */,
-				MPLAY3530000000000000087 /* MPlayStreamBridge.c */,
-				MPLAY3530000000000000089 /* MPlayStreamProtocol.swift */,
-				MPLAY3530000000000000091 /* MPlaySubtitles.swift */,
-				MPLAY3530000000000000080 /* MPlayNowPlaying.swift */,
-				MPLAY3530000000000000077 /* MPlayDisc.swift */,
-				MPLAY3530000000000000082 /* MPlayPlayerExtras.swift */,
-				MPLAY3530000000000000074 /* MPlayAudioPolicy.swift */,
-				MPLAY3530000000000000076 /* MPlayCapture.swift */,
-				MPLAY3530000000000000121 /* Spatial */,
-			);
-			path = MPlayKit;
-			sourceTree = "<group>";
-		};
-		MPLAY3530000000000000121 /* Spatial */ = {
-			isa = PBXGroup;
-			children = (
-				MPLAY3530000000000000093 /* MPlaySpatialBridge.h */,
-				MPLAY3530000000000000092 /* MPlaySpatialBridge.c */,
-				MPLAY3530000000000000094 /* truehd_atmos.h */,
-				MPLAY3530000000000000095 /* dtsx.h */,
-				MPLAY3530000000000000096 /* UPSTREAM.md */,
-			);
-			path = Spatial;
-			sourceTree = "<group>";
-		};
 		A1B9B43015237F5437EE30F3 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				MPLAY3530000000000000020 /* MPlayKit */,
 				312A00000000000000000002 /* HomeListLoading.swift */,
 				313A00000000000000000002 /* ZhongZhiTongCatalog.swift */,
 				08E2326CABB6BD1B603B04E1 /* DMMRankingStore.swift */,
@@ -660,22 +506,6 @@
 				5AF0A8AA6CE0C53609C6E140 /* AVDB */,
 				SHERPA289000000000000003 /* SherpaOnnxC.xcframework */,
 				LLAMA292000000000000003 /* llama.xcframework */,
-				MPLAY3530000000000000030 /* Libmpv.xcframework */,
-				MPLAY3530000000000000097 /* TrueHD.xcframework */,
-				MPLAY3530000000000000098 /* DTSX.xcframework */,
-				MPLAY3530000000000000040 /* AVFoundation.framework */,
-				MPLAY3530000000000000041 /* AudioToolbox.framework */,
-				MPLAY3530000000000000042 /* CoreMedia.framework */,
-				MPLAY3530000000000000043 /* CoreVideo.framework */,
-				MPLAY3530000000000000044 /* VideoToolbox.framework */,
-				MPLAY3530000000000000045 /* OpenGLES.framework */,
-				MPLAY3530000000000000046 /* Security.framework */,
-				MPLAY3530000000000000047 /* Foundation.framework */,
-				MPLAY3530000000000000048 /* CoreFoundation.framework */,
-				MPLAY3530000000000000050 /* libc++.tbd */,
-				MPLAY3530000000000000051 /* libz.tbd */,
-				MPLAY3530000000000000052 /* libiconv.tbd */,
-				MPLAY3530000000000000053 /* libbz2.tbd */,
 				AVDB00000000000000000000B1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -695,7 +525,6 @@
 				D21600000000000000000001 /* SubtitleCatProvider.swift */,
 				D21600000000000000000002 /* OnlineSubtitleModel.swift */,
 				B08C58091094C960D502C7F8 /* PlayerView.swift */,
-				MPLAY3530000000000000008 /* MPlayKitPlayerView.swift */,
 				LIVE2870000000000000005F /* LiveSubtitleViews.swift */,
 				C25400000000000000000004 /* OnlinePlaybackPanel.swift */,
 				D21500000000000000000001 /* PlaybackVideoMetrics.swift */,
@@ -964,31 +793,6 @@
 				A24300000000000000000003 /* ActorAliasCatalog.swift in Sources */,
 				FEED34900000000000000001 /* RankingFeedClient.swift in Sources */,
 				E351FEED0000000000000002 /* EnrichmentFeedClient.swift in Sources */,
-				MPLAY3530000000000000011 /* MPlayKernel.swift in Sources */,
-				MPLAY3530000000000000012 /* MPlayDiagnostics.swift in Sources */,
-				MPLAY3530000000000000013 /* MPlayState.swift in Sources */,
-				MPLAY3530000000000000014 /* MPlayPlayer.swift in Sources */,
-				MPLAY3530000000000000016 /* MPlayVideoView.swift in Sources */,
-				MPLAY3530000000000000017 /* MPlayPreviewReader.swift in Sources */,
-				MPLAY3530000000000000100 /* MPlayAudioPolicy.swift in Sources */,
-				MPLAY3530000000000000101 /* MPlayCachePolicy.swift in Sources */,
-				MPLAY3530000000000000102 /* MPlayCapture.swift in Sources */,
-				MPLAY3530000000000000103 /* MPlayDisc.swift in Sources */,
-				MPLAY3530000000000000104 /* MPlayDolbyVision.swift in Sources */,
-				MPLAY3530000000000000105 /* MPlayFrameOutput.swift in Sources */,
-				MPLAY3530000000000000106 /* MPlayNowPlaying.swift in Sources */,
-				MPLAY3530000000000000107 /* MPlayPictureInPicture.swift in Sources */,
-				MPLAY3530000000000000108 /* MPlayPlayerExtras.swift in Sources */,
-				MPLAY3530000000000000109 /* MPlayPostChain.swift in Sources */,
-				MPLAY3530000000000000110 /* MPlayPostChain.metal in Sources */,
-				MPLAY3530000000000000111 /* MPlaySpatial.swift in Sources */,
-				MPLAY3530000000000000112 /* MPlaySpatialRender.swift in Sources */,
-				MPLAY3530000000000000113 /* MPlayStreamBridge.c in Sources */,
-				MPLAY3530000000000000114 /* MPlayStreamProtocol.swift in Sources */,
-				MPLAY3530000000000000115 /* MPlaySubtitleLayer.swift in Sources */,
-				MPLAY3530000000000000116 /* MPlaySubtitles.swift in Sources */,
-				MPLAY3530000000000000117 /* MPlaySpatialBridge.c in Sources */,
-				MPLAY3530000000000000018 /* MPlayKitPlayerView.swift in Sources */,
 				E351FEED0000000000000004 /* XAITranslationService.swift in Sources */,
 				A24300000000000000000005 /* ExternalActorResolver.swift in Sources */,
 			);
@@ -1003,7 +807,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 353;
+				CURRENT_PROJECT_VERSION = 352;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1015,7 +819,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.xy0305.AVDB;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "AVDB/AVDB-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1027,7 +830,7 @@
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 353;
+				CURRENT_PROJECT_VERSION = 352;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AVDB/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1039,7 +842,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.xy0305.AVDB;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "AVDB/AVDB-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
