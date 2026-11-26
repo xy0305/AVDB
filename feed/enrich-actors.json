@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "actors",
- "generated_at": "2026-11-25T19:12:29+00:00",
+ "generated_at": "2026-11-26T19:17:43+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -723,6 +723,20 @@
   },
   {
    "javdb_id": null,
+   "name": "京本晴美",
+   "birthday": "1998-10-10",
+   "height_cm": 160,
+   "bust": 88,
+   "waist": 65,
+   "hip": 90,
+   "cup": "E",
+   "birthplace": "愛知県",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/019/522153.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-26T19:13:40+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "仁科百華",
    "birthday": "1990-10-03",
    "height_cm": 166,
@@ -747,6 +761,20 @@
    "name": "今井美優",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E4%BB%8A%E4%BA%95%E7%BE%8E%E5%84%AA.jpg",
    "enriched_at": "2026-11-15T19:12:45+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "仲村みう",
+   "birthday": "1991-03-14",
+   "height_cm": 157,
+   "bust": 83,
+   "waist": 54,
+   "hip": 83,
+   "cup": "C",
+   "birthplace": "岩手県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/3-MUTEKI/%E4%BB%B2%E6%9D%91%E3%81%BF%E3%81%86.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-26T19:13:54+00:00"
   },
   {
    "javdb_id": null,
@@ -968,6 +996,19 @@
   },
   {
    "javdb_id": null,
+   "name": "凪ひかる",
+   "birthday": "1997-04-06",
+   "height_cm": 162,
+   "bust": 105,
+   "waist": 59,
+   "hip": 88,
+   "cup": "J",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E5%87%AA%E3%81%B2%E3%81%8B%E3%82%8B.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-26T19:14:12+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "凰華りん",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E5%87%B0%E8%8F%AF%E3%82%8A%E3%82%93.jpg",
    "enriched_at": "2026-11-15T04:11:08+00:00"
@@ -985,6 +1026,20 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/4-Kawaii/%E5%88%9D%E5%B7%9D%E3%81%BF%E3%81%AA%E3%81%BF.jpg",
    "gender": "female",
    "enriched_at": "2026-11-16T19:14:24+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "初美なのか",
+   "birthday": "2005-06-07",
+   "height_cm": 157,
+   "bust": 85,
+   "waist": 57,
+   "hip": 85,
+   "cup": "E",
+   "birthplace": "岐阜県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/1-Diaz/%E5%88%9D%E7%BE%8E%E3%81%AA%E3%81%AE%E3%81%8B.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-26T19:14:21+00:00"
   },
   {
    "javdb_id": null,
@@ -1185,6 +1240,20 @@
    "name": "友田真希",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Madonna/%E5%8F%8B%E7%94%B0%E7%9C%9F%E5%B8%8C.jpg",
    "enriched_at": "2026-11-15T03:56:56+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "古村えりか",
+   "birthday": "1989-11-04",
+   "height_cm": 158,
+   "bust": 80,
+   "waist": 59,
+   "hip": 84,
+   "cup": "D",
+   "birthplace": "岩手県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E5%8F%A4%E6%9D%91%E3%81%88%E3%82%8A%E3%81%8B.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-26T19:14:45+00:00"
   },
   {
    "javdb_id": null,
@@ -3201,6 +3270,20 @@
   },
   {
    "javdb_id": null,
+   "name": "桜乃りの",
+   "birthday": "2004-11-12",
+   "height_cm": 156,
+   "bust": 85,
+   "waist": 56,
+   "hip": 83,
+   "cup": "E",
+   "birthplace": "東京都",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/6-Tpowers/%E6%A1%9C%E4%B9%83%E3%82%8A%E3%81%AE.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-26T19:15:39+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "桜井あゆ",
    "birthday": "1991-04-15",
    "height_cm": 162,
@@ -4605,6 +4688,19 @@
    "name": "若月もあ",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/8-Honnaka/%E8%8B%A5%E6%9C%88%E3%82%82%E3%81%82.jpg",
    "enriched_at": "2026-11-16T19:22:29+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "若林ゆりな",
+   "birthday": "1991-01-01",
+   "height_cm": 160,
+   "bust": 93,
+   "waist": 64,
+   "hip": 90,
+   "cup": "F",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/062/648062.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-26T19:17:43+00:00"
   },
   {
    "javdb_id": null,

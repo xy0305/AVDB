@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-k",
- "generated_at": "2026-11-25T19:20:14+00:00",
+ "generated_at": "2026-11-26T20:08:20+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -146,6 +146,29 @@
    "cover_hires_url": "http://163.47.40.207:8901/KPkzQ.jpg",
    "release_date": "2020-04-25",
    "enriched_at": "2026-11-20T19:11:31+00:00"
+  },
+  {
+   "javdb_id": "Kk0mpA",
+   "code": "SNOS437",
+   "plot": "婚活女さん、ハイスペ（笑）に釣られて「幸せかも～」って…\nマジで勘違いすぎて見てらんないw\nそれ、まともな女子には即ハジかれた「外面だけ良いモラハラ男やセクハラ男」だから。\n大金払って地雷のババ抜きに自ら突っ込んでいくの、タイパ悪すぎてシンプルに情弱の極みすぎん？\n中身激ヤバの男を掴まされてるのに、本人気づいてないの本当に草。\n成婚退会した瞬間、人生詰むの確定してるから早く目を覚ましな？w\nいや～結婚って難しいすわ。\n\n※本作品は、成婚率を上げるためだけに仕事を完璧に果たす有能婚活アドバイザーと、スペックは一流だが中身の終わっている地雷物件のおっさんに、‘結婚’の文字に釣られて何も気づかずに振り回されエロがられた\nとてもかわいくピュアな女の子の、酷い物語です。",
+   "plot_source": "dmm",
+   "director": "イナバール",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 159,
+   "score": 5.0,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00437/snos00437jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00437/snos00437jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00437/snos00437jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00437/snos00437jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00437/snos00437jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00437/snos00437jp-6.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/IQoTQDZXXMZ5e3nRaYjMgEBOke_LmVgN-PZ1Z5vNhpCJo_Kpwu_dxyPIZk3gAh/snos00437hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/Kk0mpA.jpg",
+   "release_date": "2026-10-22",
+   "enriched_at": "2026-11-26T19:12:12+00:00"
   },
   {
    "javdb_id": "Kk0yaP",

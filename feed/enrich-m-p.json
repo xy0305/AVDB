@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-p",
- "generated_at": "2026-11-25T19:20:14+00:00",
+ "generated_at": "2026-11-26T20:08:20+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -186,6 +186,33 @@
    "trailer_url": "https://tencc3001.dmm.co.jp/pv/N3IqQD8tN5c5lIKAHHzuppLHUc19iR7CFTgysa2CZE7jtstkYJXJRlrb5apurnKkw9649i/h_1472kkwz00003hhb.mp4",
    "cover_hires_url": "http://163.47.40.207:8901/P92XAJ.jpg",
    "enriched_at": "2026-11-15T02:54:22+00:00"
+  },
+  {
+   "javdb_id": "P94kBE",
+   "code": "SONE576",
+   "plot": "経営統合問題…。大手航空会社に訪れた試練。そしてその煽りを受けた客室乗務員・みつは。セクハラの限りを尽くされ、どこまでも堕落していく。調教を受け何が正しいことかも判別がつかなくなっていき、下品という感覚すらも失っていく。奉仕することを専門としているばかりにどこまでも抗えず…。もう一度あの空に飛びたい。そう願い、遠くを見つめながら、彼女はオヤジたちの餌食になっていく…。",
+   "plot_source": "dmm",
+   "director": "肉尊",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 139,
+   "score": 4.39,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00576/sone00576jp-10.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/PAJ6EB49EE3eMYV96GT4pqtL2S8jhBvYMD-csDBsjcxm6ZdkLYKISdNjBmuRJd/sone00576hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/P94kBE.jpg",
+   "release_date": "2025-02-06",
+   "enriched_at": "2026-11-26T19:12:12+00:00"
   },
   {
    "javdb_id": "P96r4r",

@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-9",
- "generated_at": "2026-11-25T19:20:14+00:00",
+ "generated_at": "2026-11-26T20:08:20+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -1136,6 +1136,32 @@
    "cover_hires_url": "http://163.47.40.207:8901/96rdJw.jpg",
    "release_date": "2026-10-22",
    "enriched_at": "2026-11-18T19:11:22+00:00"
+  },
+  {
+   "javdb_id": "96rqv6",
+   "code": "SNOS449",
+   "plot": "幼い頃に両親が離婚し、女手ひとつで大切に育ててくれたお母さん。\nそんな母は最近彼氏ができて凄く幸せそうだ。\nただ、母の恋人である中田は、デリカシーに欠けた女好きのセクハラ親父で私は内心警戒していた…。\nそんな私の気持ちは知らず、母は再婚し私は中田とも一緒に生活をすることになる。\nある日母親は、中田から旅行のプレゼントを貰い私を残して出て行ってしまった…。\nそう、母と再婚した義父の狙いは女子X生の私だったのです…",
+   "plot_source": "dmm",
+   "director": "U吉",
+   "maker": "エスワン ナンバーワンスタイル",
+   "duration_min": 137,
+   "score": 4.86,
+   "score_source": "dmm",
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/snos00449/snos00449jp-9.jpg"
+   ],
+   "trailer_url": "https://tencc3001.dmm.co.jp/pv/SjUoEwIt3rafQIPPlZfs-ERQWX23p_m9TJ0FZatvUR6IvL9sHzslUXVei3tdDP/snos00449hhb.mp4",
+   "cover_hires_url": "http://163.47.40.207:8901/96rqv6.jpg",
+   "release_date": "2026-10-22",
+   "enriched_at": "2026-11-26T19:12:12+00:00"
   },
   {
    "javdb_id": "96rqyX",
