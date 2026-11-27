@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "actors",
- "generated_at": "2026-11-26T19:17:43+00:00",
+ "generated_at": "2026-11-27T19:13:26+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -229,6 +229,20 @@
   },
   {
    "javdb_id": null,
+   "name": "はやのうた",
+   "birthday": "2000-09-07",
+   "height_cm": 155,
+   "bust": 92,
+   "waist": 56,
+   "hip": 87,
+   "cup": "G",
+   "birthplace": "東京都",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/0-Hand-Storage/%E3%81%AF%E3%82%84%E3%81%AE%E3%81%86%E3%81%9F.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-27T19:12:19+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "ひなの花音",
    "birthday": "1999-04-03",
    "height_cm": 160,
@@ -446,6 +460,20 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Premium/%E4%B8%89%E5%A5%BD%E4%BD%91%E9%A6%99.jpg",
    "gender": "female",
    "enriched_at": "2026-11-21T19:12:03+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "三宮つばき",
+   "birthday": "1998-05-04",
+   "height_cm": 150,
+   "bust": 89,
+   "waist": 54,
+   "hip": 83,
+   "cup": "G",
+   "birthplace": "東京都",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E4%B8%89%E5%AE%AE%E3%81%A4%E3%81%B0%E3%81%8D.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-27T19:12:40+00:00"
   },
   {
    "javdb_id": null,
@@ -1504,6 +1532,19 @@
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/5-Ebody/%E5%A4%95%E5%AD%A3%E3%81%A1%E3%81%A8%E3%81%9B.jpg",
    "gender": "female",
    "enriched_at": "2026-11-20T19:14:56+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "夕木こいろ",
+   "birthday": "2002-12-03",
+   "height_cm": 148,
+   "bust": 92,
+   "waist": 59,
+   "hip": 88,
+   "cup": "G",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E5%A4%95%E6%9C%A8%E3%81%93%E3%81%84%E3%82%8D.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-27T19:12:51+00:00"
   },
   {
    "javdb_id": null,
@@ -3963,6 +4004,20 @@
   },
   {
    "javdb_id": null,
+   "name": "白坂みあん",
+   "birthday": "2000-06-09",
+   "height_cm": 167,
+   "bust": 86,
+   "waist": 58,
+   "hip": 89,
+   "cup": "E",
+   "birthplace": "青森県",
+   "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-S1/%E7%99%BD%E5%9D%82%E3%81%BF%E3%81%82%E3%82%93.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-27T19:12:59+00:00"
+  },
+  {
+   "javdb_id": null,
    "name": "白峰ミウ",
    "birthday": "1997-02-16",
    "height_cm": 170,
@@ -4265,6 +4320,19 @@
    "name": "石川澪",
    "avatar_hires": "https://raw.githubusercontent.com/gfriends/gfriends/master/Content/7-Moodyz/%E7%9F%B3%E5%B7%9D%E6%BE%AA.jpg",
    "enriched_at": "2026-11-15T04:11:07+00:00"
+  },
+  {
+   "javdb_id": null,
+   "name": "石川陽波",
+   "birthday": "1997-12-18",
+   "height_cm": 156,
+   "bust": 95,
+   "waist": 60,
+   "hip": 88,
+   "cup": "H",
+   "avatar_hires": "https://www.minnano-av.com/p_actress_125_125/025/213932.jpg",
+   "gender": "female",
+   "enriched_at": "2026-11-27T19:13:08+00:00"
   },
   {
    "javdb_id": null,

@@ -1,7 +1,7 @@
 {
  "board": "enrich",
  "term": "m-y",
- "generated_at": "2026-11-26T20:08:20+00:00",
+ "generated_at": "2026-11-27T19:22:33+00:00",
  "source": "enrichment-v1",
  "entries": [
   {
@@ -950,6 +950,37 @@
    "cover_hires_url": "http://163.47.40.207:8901/YwMeZ6.jpg",
    "release_date": "2026-10-22",
    "enriched_at": "2026-11-18T19:11:22+00:00"
+  },
+  {
+   "javdb_id": "YwNbm8",
+   "code": "SROB052",
+   "maker": "素人まっちんぐEX/妄想族",
+   "duration_min": 322,
+   "stills": [
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-1.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-2.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-3.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-4.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-5.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-6.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-7.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-8.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-9.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-10.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-11.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-12.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-13.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-14.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-15.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-16.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-17.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-18.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-19.jpg",
+    "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/srob00052/srob00052jp-20.jpg"
+   ],
+   "cover_hires_url": "http://163.47.40.207:8901/YwNbm8.jpg",
+   "release_date": "2026-10-15",
+   "enriched_at": "2026-11-27T19:11:48+00:00"
   },
   {
    "javdb_id": "YwZnNz",
